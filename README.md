@@ -1,1 +1,206 @@
-# encore-lab-app
+# ENCOR Lab Builder for Cisco Modeling Labs 2.9
+
+Builds CCNP ENCOR (350-401) practice labs in your CML 2.9 server and checks whether you solved them.
+You get a local web UI (and a CLI that does the same things). Device checks run through the
+**CML console server**, so your PC only needs to reach the CML controller, not the lab devices.
+
+Built-in catalog (11 labs): EIGRP basic, VLAN/trunk/RSTP, EtherChannel, OSPF multi-area, EIGRP named mode,
+eBGP/iBGP, HSRP, ACL/NAT, VRF-lite, GRE over IPsec, NTP/Syslog/SNMPv3/IP SLA. Each has live and config checks.
+You can **import more labs** (`.encorlab` packs or single `.yaml` files), build your own in the **Lab builder**,
+or generate them with any AI chatbot (see "Adding labs").
+
+## Ready-to-run builds (no Python needed)
+| Download | Start it |
+|---|---|
+| `ENCORLab-<version>-windows-x64.zip` (Windows 10/11 x64) | Unzip anywhere (e.g. `Documents\ENCORLab`) and double-click **ENCORLab.exe** |
+| `ENCORLab-<version>-linux-x64.tar.gz` (glibc 2.28+: Debian 10+, Ubuntu 20.04+) | `tar xzf ENCORLab-*.tar.gz && ./ENCORLab-*/ENCORLab` (optional: `./install-desktop-entry.sh`) |
+
+- A small console window opens and your default browser shows the app at http://127.0.0.1:8765. If the port is busy, the next free port is used and the window shows the real address.
+- Starting it again while it runs just opens the browser on the running copy.
+- **Quit:** close the console window or press Ctrl+C.
+- **Your data stays outside the app folder,** in `%APPDATA%\encorlab` or `~/.config/encorlab`. That covers settings, imported labs and history. To update, delete the old folder and unzip the new one.
+- The bundle includes `example-packs/` (drag them onto the Labs page), `docs/` and this README.
+- The command line works too: `ENCORLab list`, `ENCORLab check <lab>`, `ENCORLab --port 9000`, `ENCORLab --no-browser`.
+- **Windows SmartScreen:** the exe is not code-signed, so the first start may show "Windows protected your PC". Click *More info* > *Run anyway*.
+  You can also right-click the downloaded zip, choose *Properties* > *Unblock*, then extract it.
+
+## Requirements (running from source)
+- Python **3.10 to 3.13** (3.13 recommended). Python 3.14+ is not supported yet: some dependencies (e.g. PyYAML) have no prebuilt wheels for it, so pip tries to compile them.
+  Windows 11: python.org 64-bit installer with the "py launcher" option checked. Debian/Ubuntu: `sudo apt install python3 python3-venv`.
+- CML 2.9.x with the IOL (`iol-xe`) image (default) or IOSv (`iosv`)
+- From your PC: HTTPS to the CML URL. Live checks also need SSH to the CML console server (directly or via a TCP passthrough proxy). Without it, config mode works over HTTPS only.
+
+## Windows 11
+```powershell
+# unzip encor-lab-app.zip, then in PowerShell:
+cd encor-lab-app
+copy .env.example .env     # optional: edit CML_URL / CML_USERNAME
+.\run.bat                  # first run creates .venv and installs everything
+```
+Open http://127.0.0.1:8765. Manual alternative: `py -3 -m venv .venv`, `.venv\Scripts\pip install -e .`, `.venv\Scripts\python -m encorlab web`.
+
+## Debian / Ubuntu
+```bash
+sudo apt install python3 python3-venv
+unzip encor-lab-app.zip && cd encor-lab-app
+cp .env.example .env       # optional
+./run.sh                   # web UI on http://127.0.0.1:8765
+```
+Manual alternative: `python3 -m venv .venv && .venv/bin/pip install -e . && .venv/bin/python -m encorlab web`.
+
+## Using it
+1. **Settings**: Saving writes the non-secret settings to `%APPDATA%\encorlab\settings.json` (Windows) or `~/.config/encorlab/settings.json` (Linux). Saved values take priority over `.env`; passwords are never written there.
+   Enter the CML URL, username and password. TLS verification stays **On** (your Let's Encrypt cert works as-is).
+   The password is kept in memory only. Tick "Remember password in OS keyring" to store it in Windows Credential Manager or the Linux Secret Service.
+   Set *Console server host* if SSH port 22 is not reachable at the URL's host name (see below).
+2. **Labs**: pick a lab and click **Build**. It imports the topology as `ENCOR-<lab>`, starts it and waits until all nodes are BOOTED.
+3. Open the device consoles in CML, solve the task, then click **Check**. You get pass/fail per check, with details, hints and the raw output.
+4. **Reset** stops the lab, wipes it and restarts it with the original configs. **Destroy** stops, wipes and deletes the lab.
+
+The lab page also has a timer (it starts on Build and stops when the lab is solved) and a per-lab results history.
+
+**Hints and solutions (1.4.0):**
+- **Hint** (next to Check) works at any time. Each click reveals the next hint, from vague to specific, with a "Hint 2 of 3" label.
+- Revealed hints are remembered per lab in the browser and cleared by **Reset**. History records how many hints you used for each check.
+- When a Check scores 100%, a **Solution summary** appears automatically: the root cause, the exact fix per device, and why it works.
+- Below 100%, **Reveal solution** (after a confirm) shows the summary and the full solution config per device.
+- Labs without an authored summary get one generated from their solution config.
+Small **?** icons next to labels explain each field: hover for ~0.3 s or Tab to the icon, and Esc closes the tooltip.
+Buttons explain themselves with a normal hover tooltip. Turn the icons off with *Settings > Show help icons*;
+the choice is saved in settings.json. All help text is in `encorlab/web/static/help.json`, and a test makes sure
+every control has help text. Filters: domain, difficulty, built-in/imported. ◐ toggles dark mode.
+
+CLI equivalents (`run.sh <cmd>` / `run.bat <cmd>`; `python -m encorlab <cmd>` inside the venv):
+
+| Command | What it does |
+|---|---|
+| `list`, `task <lab>`, `version` | catalog, task text, version |
+| `doctor` | tests CML login, images, node budget and the console server |
+| `build <lab> [--rebuild]`, `check <lab> [--mode auto\|live\|config] [--json]`, `reset <lab>`, `destroy <lab>` | lab lifecycle |
+| `history <lab>` | your past scores (with hints used) |
+| `hint <lab> [N]`, `solution <lab>` | progressive hint N of M; the solution summary + config (spoilers). `check` prints the summary at 100% (`--hints-used N` records hints) |
+| `import <file> [--replace]`, `export <lab> [-o f.encorlab] [--cml-yaml]`, `delete <lab> -y` | manage your labs |
+| `validate [paths…]` | offline test: schema, interfaces, solution = 100%, starting config = 0% |
+| `pack <folder-or-yaml> [-o x.encorlab]` | strict validate and write a shareable pack |
+| `test-live <lab> [--keep]` | builds `ENCOR-TEST-<lab>` with the solution applied, grades it, deletes it |
+| `schema [-o f]`, `prompt ["request"]`, `docs` | JSON Schema, AI prompt, regenerate `docs/` |
+| `save-password`, `web [--no-open]` | keyring, web UI |
+
+## Adding labs
+**Import** (the easiest way): drag `.encorlab`, `.zip` or `.yaml` files anywhere onto the Labs page, or click **Import lab**.
+The file is validated immediately. You get readable errors such as `checks[2] (r1-nbr).params: missing neighbor_id`.
+A valid lab appears in the list right away, marked *imported*. If a lab with that id exists, you're asked whether to replace it.
+CLI: `run.bat import file.encorlab`.
+
+Imported labs are stored apart from the built-ins, in `%APPDATA%\encorlab\labs\<id>\` (Windows) or
+`~/.config/encorlab/labs/<id>/` (Linux; override with `ENCOR_USER_LABS_DIR`). Results history is kept in `history/` next to it.
+**Export pack** shares a lab and **Delete lab** removes an imported one (built-ins can't be deleted).
+
+**Lab file formats** (full reference in [docs/LAB-AUTHORING.md](docs/LAB-AUTHORING.md), schema in
+[docs/encorlab-lab.schema.json](docs/encorlab-lab.schema.json)):
+- a single `lab.yaml` with the reference solution embedded under `solution:`, or
+- a `.encorlab` zip with `lab.yaml`, optional `solution.cfg`, `fixture_solved.yaml` / `fixture_blank.yaml`
+  (recorded show output so live checks can be tested offline) and `README.md`.
+
+**Lab builder** (menu *Lab builder*): a form with metadata, Markdown task, nodes (starting config + solution side by side),
+links, and checks chosen from templates (OSPF/EIGRP/BGP neighbor, route present, ping, interface up, VLAN, config lines/regex…).
+A YAML tab shows the same lab with live validation. *Open existing lab* edits an imported lab (built-ins open as a copy).
+*Import from CML* starts from any IOL/IOSv lab in your CML. *Test lab (offline)* runs the strict validator.
+*Live test in CML* (for saved labs) builds a throw-away `ENCOR-TEST-…` copy with the solution applied, grades it and deletes it.
+
+**AI-generated labs.** Use any AI chat: *More > Copy prompt for any AI* (or `python -m encorlab prompt "OSPF stub lab, 4 routers"`)
+copies a self-contained prompt with the rules, templates, guide, schema and an example. Import the YAML the AI returns.
+The prompt template is in [docs/AI-PROMPT.md](docs/AI-PROMPT.md). An assistant that can run code should
+`validate` and `pack` the lab before sending it.
+The optional built-in generator (*More > Generate with AI*) calls any OpenAI-compatible API: xAI, OpenAI, Ollama or LM Studio.
+Configure it in *Settings > AI generator*; there is no default provider. The API key is kept in memory, or in the OS keyring
+if you tick the box, and is never written to settings.json. The generated lab is validated strictly. If it fails, the errors
+are sent back to the AI for up to 2 retries, then the lab opens in the builder for review. Nothing is saved until you click Save.
+
+An example pack is in `examples/ospf-multiarea-stub/` (OSPF multi-area, totally stubby area, ABR /22 summarization).
+
+### Environment variables (all optional; the Settings page overrides them)
+| Variable | Default | Meaning |
+|---|---|---|
+| CML_URL / CML_USERNAME / CML_PASSWORD | - | Controller and credentials (same as the CML web login) |
+| CML_VERIFY_SSL | true | `true`, `false`, or a path to a CA bundle |
+| CML_CONSOLE_HOST / CML_CONSOLE_PORT | URL host / 22 | Console server FQDN (port 22 proxy) and port, for live checks |
+| ENCOR_GRADING_MODE | auto | `auto`, `live` or `config` |
+| ENCOR_PLATFORM | iol | `iol` (IOL / IOL-L2, light) or `iosv` (IOSv / IOSvL2) |
+| ENCOR_NODE_LIMIT | 20 | Refuse to start a lab if it would exceed this many running nodes |
+| ENCOR_BOOT_TIMEOUT | 900 | Seconds to wait for nodes to boot |
+| ENCOR_DEVICE_USERNAME / _PASSWORD / _ENABLE | cisco | Used only if a device console asks for a login or enable password |
+| ENCOR_USER_LABS_DIR / ENCOR_DATA_DIR | settings folder | Where imported labs / results history are stored |
+| ENCOR_AI_BASE_URL / ENCOR_AI_MODEL / ENCOR_AI_API_KEY | - | Optional AI generator (OpenAI-compatible) |
+| ENCOR_CONSOLE_BACKEND | ssh | `ssh` (paramiko, all OSes) or `pyats` (Linux/macOS only, needs `pip install -e .[pyats]`) |
+
+### Grading modes
+| Mode | How | What it proves |
+|---|---|---|
+| **Live** | SSH to the CML console server, then read-only `show` and `ping` on each device | Real state: EIGRP neighbors up, D routes learned, loopback ping works |
+| **Config** | HTTPS only: CML API `extract_configuration` on each running node, then regex checks on the running config | The configuration is right (`router eigrp 100`, network statements for 10.0.12.0 and the loopback). **It does not verify adjacencies, routes or reachability.** |
+| **Auto** (default) | Tests TCP/SSH reachability of the console server first. If it's unreachable, or every live check fails to connect, it falls back to config mode | The results show which mode ran, plus a note when it fell back |
+
+Choose the default on the Settings page (or `ENCOR_GRADING_MODE`). You can override it per Check with the mode selector, or with `check <lab> --mode live|config|auto` on the CLI.
+Config extraction requires the nodes to be running. It overwrites the node's stored startup config in CML, so **Reset** re-applies the lab's original configs before rebooting.
+
+### Console access and your reverse proxy
+Live checks open `ssh <cml-user>@<console host>:<port>` and run `open /ENCOR-<lab>/<node>/0` on the CML console server.
+They then run only read-only `show` and `ping` commands. The console server is set separately from the CML URL:
+Settings field **"Console server FQDN (port 22 proxy)"** plus **port** (default 22), or `CML_CONSOLE_HOST` / `CML_CONSOLE_PORT` in `.env`.
+If you put a proxy in front of port 22, it **must be a TCP/stream passthrough** (nginx `stream { server { listen 22; proxy_pass <cml>:22; } }`, HAProxy `mode tcp`).
+An HTTP/HTTPS reverse proxy cannot carry SSH. `doctor` opens a TCP connection to the console server and checks for an `SSH-` banner.
+If it gets an HTTP response, it tells you the proxy is not TCP passthrough.
+The first connection accepts the server's host key and logs a warning.
+
+## Troubleshooting
+- **Install fails on Windows with "Microsoft Visual C++ 14.0 or greater is required", or with PyYAML building from source.**
+  You're on a Python version that's too new (e.g. 3.15). Install Python 3.13 (64-bit) from python.org. Several versions can coexist.
+  Then run `run.bat` again: the launcher picks the newest of `py -3.13`, `-3.12`, `-3.11`, `-3.10`.
+- **"No supported Python (3.10-3.13) found"**: install 3.13 as above. Check what the launcher sees with `py -0p`.
+- **An old .venv made with an unsupported Python**: the launchers read `.venv\pyvenv.cfg` (`.venv/pyvenv.cfg` on Linux) and recreate it automatically. You can also just delete the `.venv` folder.
+- **Dependency install failed**: the launcher stops and removes the half-built `.venv` instead of starting the app. Fix the cause (network/proxy, Python version) and run it again.
+- **Debian/Ubuntu "ensurepip is not available" / venv errors**: `sudo apt install python3-venv` (or `python3.11-venv` / `python3.12-venv` for your version).
+- **PowerShell says scripts are disabled**: use `run.bat`, or `powershell -ExecutionPolicy Bypass -File .\run.ps1`.
+- **Live checks can't connect**: see "Console access" above. `run.bat doctor` / `./run.sh doctor` tests the console server's TCP/SSH reachability. Config mode works over HTTPS only.
+
+## Diagnostics
+If the page looks wrong or buttons do nothing (especially right after an upgrade), first do a **hard refresh**:
+Ctrl+Shift+R (or Ctrl+F5). Since 1.3.1, asset URLs include the version and every response is sent with `no-cache`,
+so this should no longer be needed. Still stuck? Press **F12**, open the **Console** tab and look for red errors, and
+check the yellow banner at the top of the page, which shows any failed request or script error. Include both when
+reporting a problem, along with `run.bat doctor` output and the version shown in the header.
+
+## Safety
+- Only touches labs titled `ENCOR-…`. Deleting anything else is refused.
+- Checks never change device configuration (only `show` and `ping` commands are allowed in labs).
+- Imported packs are size-limited (5 MB) and path-checked. A lab file only contains data (YAML/regex), never code.
+- The UI listens on 127.0.0.1 only. Secrets are never returned by the API or written to logs.
+
+## Building the executables
+PyInstaller can't cross-compile, so each OS builds its own bundle. Both use the same `packaging/encorlab.spec` and
+`packaging/build.py`. The build is one-folder (an exe plus `_internal/`), not one-file: it starts faster, never unpacks to `%TEMP%`, and triggers
+far fewer antivirus false positives.
+
+- **Windows (once, on your PC):** install Python 3.12 or 3.13 from python.org, then double-click `packaging\build_exe.bat`.
+  The result is `dist\ENCORLab-<version>-windows-x64.zip`. Use `set PYTHON=C:\path\python.exe` to pick a specific interpreter.
+- **Linux:** `packaging/build_linux.sh` produces `dist/ENCORLab-<version>-linux-x64.tar.gz`. With `uv` installed, it uses
+  python-build-standalone Python 3.12 and manylinux_2_28 wheels, so the binary runs on glibc 2.28+ even when built on a newer distro.
+- **GitHub Actions:** `.github/workflows/build.yml` builds and smoke-tests both bundles (windows-latest + ubuntu-22.04) on every `v*` tag.
+  The bundles are kept as workflow artifacts. To publish them, run it by hand (*Actions > build > Run workflow*), tick *publish* and enter the tag.
+  Existing release assets are never overwritten.
+- **Smoke test:** `python packaging/smoke_test.py <exe> --version <v> --data-dir <user data dir> --pack x.encorlab` checks the CLI, the launcher, the UI assets, the lab list and imports
+  (`build.py --smoke` runs it; it imports the example packs into the user data folder).
+
+The UI checks versions on load and whenever the tab becomes visible again. It shows a banner if the cached `app.js` is older than
+the page, or if the app was updated while the tab was open. Cache-busting (`?v=<version>` plus `no-cache`) is unchanged.
+
+## Development / tests
+```bash
+.venv/bin/pip install -e ".[dev]"
+.venv/bin/python -m pytest -q        # unit + simulated end-to-end tests (no CML needed)
+.venv/bin/python -m encorlab validate
+```
+Built-in labs live in `encorlab/labs/<id>/` (same format as packs). In configs, checks and fixtures, `%if0%` / `%if0s%`
+become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv.
+After changing the schema, templates, guide or example, run `python -m encorlab docs` (a test checks `docs/` is current).
