@@ -1,6 +1,6 @@
 id: 06-hsrp
 title: HSRPv2 First-Hop Redundancy with Object Tracking
-blueprint: ["3.3.b"]
+blueprint: ["3.3.c"]
 domain: "3.0 Infrastructure - IP Services"
 difficulty: 3
 summary: Provide a redundant default gateway with HSRP version 2, priority, preemption and interface tracking.

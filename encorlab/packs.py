@@ -222,6 +222,11 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
     if not lab.solution_summary.strip():
         warnings.append("no solution_summary: add a short Markdown summary (root cause, exact fix commands per device, "
                         "why it works); until then the app shows an auto-generated one built from the solution")
+    from .blueprint import known as known_item
+    unknown = [b for b in lab.blueprint if not known_item(b)]
+    if unknown:
+        warnings.append(f"blueprint items {unknown} are not ENCOR v1.2 exam topics (e.g. 3.2.b); the progress dashboard "
+                        "maps them by their domain number only")
     if not lab.hints and not any(c.hint for c in lab.checks):
         warnings.append("no hints: add an ordered `hints:` list (vague first) for the Hint button")
     for dev in sol:

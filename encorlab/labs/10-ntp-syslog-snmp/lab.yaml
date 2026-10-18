@@ -1,6 +1,6 @@
 id: 10-ntp-syslog-snmp
 title: NTP, Syslog, SNMPv3 and IP SLA
-blueprint: ["3.3.c", "4.1", "4.2"]
+blueprint: ["3.3.a", "4.1", "4.4"]
 domain: "3.0 Infrastructure - IP Services / 4.0 Network Assurance"
 difficulty: 3
 summary: Build an authenticated NTP hierarchy, remote syslog with timestamps, an SNMPv3 authPriv user and an ICMP IP SLA probe.

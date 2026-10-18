@@ -283,7 +283,7 @@ The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocompl
 | Field | Required | Notes |
 |---|---|---|
 | id, title | yes | |
-| blueprint | yes | ENCOR 350-401 v1.1 items, e.g. `["3.2.b"]` |
+| blueprint | yes | ENCOR 350-401 v1.2 items, e.g. `["3.2.b"]` |
 | domain | yes | e.g. `"3.0 Infrastructure - Layer 3"` |
 | difficulty | yes | 1-5 |
 | platforms | no | default `[iol, iosv]`. Use both unless a feature needs one image |
@@ -844,7 +844,7 @@ hints:
    "type": "string"
   },
   "blueprint": {
-   "description": "ENCOR 350-401 v1.1 blueprint items, e.g. ['3.2.b']",
+   "description": "ENCOR 350-401 v1.2 blueprint items, e.g. ['3.2.b']",
    "items": {
     "type": "string"
    },

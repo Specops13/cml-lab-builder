@@ -9,8 +9,14 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
   checks plus fault-specific checks; when it passes, you see the root cause and fix. Fault-specific hints,
   *Reveal the answer*, *End fault practice*, and Reset re-applies the same broken config.
   CLI: `break <lab> [--fault ID]`, `fault <lab> [--reveal|--end]`. History marks fault attempts.
+- **Progress dashboard** (Progress page, `progress` CLI, `GET /api/progress`): mastery per ENCOR v1.2 domain (weighted)
+  and blueprint item, weakest topics, streak, time spent, most-failed checks and 30-day activity. Each Check now records
+  the lab timer value and whether the answer had been revealed.
 - Lab files can define `faults:`. The validator applies each fault offline with an IOS-style config merge and requires
   that it is detected and fixable.
+### Changed
+- Blueprint tags follow the current **350-401 ENCOR v1.2** exam topics: HSRP is 3.3.c, NAT/ACL is 3.3.b + 5.2.a,
+  NTP/Syslog/SNMP/IP SLA is 3.3.a + 4.1 + 4.4, GRE/IPsec is 2.2.b. The validator warns about unknown blueprint items.
 ### Fixed
 - 07-acl-nat: the BLOCK-TELNET config check now accepts the sequence numbers IOS-XE shows in named ACLs (`10 deny ...`).
 

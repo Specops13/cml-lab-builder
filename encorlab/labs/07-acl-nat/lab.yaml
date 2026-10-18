@@ -1,6 +1,6 @@
 id: 07-acl-nat
 title: ACLs, PAT and Static NAT
-blueprint: ["3.3.a", "5.1"]
+blueprint: ["3.3.b", "5.2.a"]
 domain: "3.0 Infrastructure - IP Services / 5.0 Security"
 difficulty: 3
 summary: Translate a private LAN with PAT, publish an internal host with static NAT and filter Telnet with a named extended ACL.

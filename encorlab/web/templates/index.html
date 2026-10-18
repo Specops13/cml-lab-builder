@@ -13,6 +13,7 @@
   <div class="brand">ENCOR Lab Builder <span class="ver">v{{VERSION}}</span></div>
   <nav>
     <a data-help="nav.labs" href="#labs" data-view="labs" class="active">Labs</a>
+    <a data-help="nav.progress" href="#progress" data-view="progress">Progress</a>
     <a data-help="nav.builder" href="#builder" data-view="builder">Lab builder</a>
     <a data-help="nav.settings" href="#settings" data-view="settings">Settings</a>
     <div class="menu"><button data-help="nav.more" class="ghost" id="more-btn" aria-haspopup="true">More ▾</button>
@@ -48,6 +49,15 @@
       <ul id="lab-list"></ul>
     </aside>
     <div id="lab-detail" class="card"><div class="empty">Select a lab, or import one.</div></div>
+  </div>
+</section>
+
+<!-- ===================== PROGRESS ===================== -->
+<section id="view-progress" hidden>
+  <div class="card">
+    <div class="toolbar"><h2 style="margin:0">Progress</h2><span class="sep"></span>
+      <button data-help="p.refresh" id="p-refresh">Refresh</button></div>
+    <div id="progress" class="muted">Loading…</div>
   </div>
 </section>
 

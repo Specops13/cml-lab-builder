@@ -113,5 +113,19 @@
   "lab.faultReveal": "Give up and show the cause and the fix of the current fault. This is recorded as revealed.",
   "lab.faultEnd": "Stop fault practice. The devices keep their configs; click Reset afterwards to go back to the starting configs.",
   "lab.faultPanel": "What was broken and the exact fix. Shown when Check passes during fault practice, or after Reveal.",
-  "lab.faultConfig": "The IOS lines that were applied on top of the working config to create the fault."
+  "lab.faultConfig": "The IOS lines that were applied on top of the working config to create the fault.",
+  "nav.progress": "Your progress: mastery per ENCOR exam domain and topic, streak, time spent and weakest topics.",
+  "p.refresh": "Reload the dashboard from your results history.",
+  "p.mastery": "Weighted by the exam domain weights. Hints and revealed answers lower the score that counts.",
+  "p.solved": "Labs you have scored 100% on at least once, out of all labs in your catalog.",
+  "p.streak": "Days in a row with at least one Check, ending today or yesterday.",
+  "p.time": "Estimated from the lab timer value sent with each Check.",
+  "p.faults": "Break my lab faults you fixed (Check passed during fault practice).",
+  "p.domains": "Mastery per exam domain from the 350-401 ENCOR v1.2 topics, with the official exam weight.",
+  "p.weakest": "Topics with the lowest mastery. Open one of the labs listed to practise them.",
+  "p.items": "Every blueprint item your labs cover, with mastery and the labs that train it.",
+  "p.activity": "Number of checks per day over the last 30 days. Hover a bar for the date.",
+  "p.failed": "The checks you have failed most often across all your attempts.",
+  "p.recent": "Your last checks. Counted is the score after the hint penalty, or the exam result.",
+  "p.openLab": "Open this lab on the Labs page."
 }

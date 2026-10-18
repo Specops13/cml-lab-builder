@@ -36,7 +36,7 @@ def add(lab_id: str, report: dict) -> dict:
         "failed": [r["id"] for r in report.get("results", []) if not r.get("passed")],
         "hints_used": report.get("hints_used"), "hints_total": report.get("hints_total"),
     }
-    for k in ("fault", "elapsed_s", "exam"):
+    for k in ("fault", "elapsed_s", "exam", "revealed"):
         if report.get(k) is not None:
             entry[k] = report[k]
     items = (load(lab_id) + [entry])[-MAX_ENTRIES:]

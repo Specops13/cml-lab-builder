@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, catalog, config, faults, history, packs, service
+from .. import __version__, ai, catalog, config, faults, history, packs, progress, service
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -289,6 +289,11 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         history.clear(lab_id)
         return {"cleared": lab_id}
 
+    @app.get("/api/progress")
+    def get_progress():
+        """Progress dashboard: mastery per ENCOR domain and blueprint item, streaks, time spent, weakest topics."""
+        return progress.compute()
+
     # ------------------------------------------------------------ settings
     @app.get("/api/settings")
     def get_settings():
@@ -323,17 +328,23 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         return _start("build", lab_id, lambda s, p: service.do_build(s, lab_id, p, rebuild=rebuild, client_factory=client_factory))
 
     @app.post("/api/labs/{lab_id}/check")
-    def check(lab_id: str, mode: str | None = None, hints_used: int | None = None):
+    def check(lab_id: str, mode: str | None = None, hints_used: int | None = None, elapsed_s: int | None = None,
+              revealed: bool = False):
         _entry(lab_id)
         if mode not in (None, "auto", "live", "config"):
             raise HTTPException(400, "mode must be auto, live or config")
+        extra = {}
+        if elapsed_s is not None:
+            extra["elapsed_s"] = max(0, min(int(elapsed_s), 30 * 24 * 3600))
+        if revealed:
+            extra["revealed"] = True
 
         def fn(s, p):
             m = mode or s.grading_mode
             runner = runner_factory(s, lab_id) if (runner_factory and m != "config") else None
             src = config_factory(s, lab_id) if config_factory else None
             return service.do_check(s, lab_id, p, client_factory=client_factory, runner=runner,
-                                    config_source=src, mode=m, probe=probe, hints_used=hints_used)
+                                    config_source=src, mode=m, probe=probe, hints_used=hints_used, extra=extra)
         return _start("check", lab_id, fn)
 
     @app.post("/api/labs/{lab_id}/test-live")

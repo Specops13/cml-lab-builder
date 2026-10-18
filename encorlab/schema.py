@@ -111,7 +111,7 @@ class Lab(_Strict):
     """One ENCOR practice lab."""
     id: str = Field(description="Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name")
     title: str
-    blueprint: list[str] = Field(description="ENCOR 350-401 v1.1 blueprint items, e.g. ['3.2.b']")
+    blueprint: list[str] = Field(description="ENCOR 350-401 v1.2 blueprint items, e.g. ['3.2.b']")
     domain: str = Field(description="Blueprint domain, e.g. '3.0 Infrastructure - Layer 3'")
     difficulty: int = Field(ge=1, le=5, description="1 (easy) to 5 (hard)")
     platforms: list[Literal["iol", "iosv"]] = Field(default=["iol", "iosv"], description="Image profiles the lab supports")

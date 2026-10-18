@@ -41,6 +41,8 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   *Auto* uses live when it can and falls back to config.
 - **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (33 in total). One click rebuilds
   the working lab with a random fault and gives you a symptom-only trouble ticket, so you get unlimited troubleshooting practice.
+- **Progress dashboard:** mastery per ENCOR 350-401 v1.2 exam domain (with the official weights) and per blueprint item,
+  your weakest topics with links to the labs that train them, daily streak, time spent, most-failed checks and recent activity.
 - **Learning aids:** a **Hint** button with progressive hints ("Hint 2 of 3"), remembered per lab and cleared on Reset.
   A **Solution summary** (root cause, exact fix per device, why it works) appears automatically at 100%.
   Below 100% you can open it with **Reveal solution**, after a confirm.
@@ -150,6 +152,7 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `hint <lab> [N]`, `solution <lab>` | progressive hint N of M; solution summary + config (spoilers) |
 | `break <lab> [--fault ID]`, `fault <lab> [--reveal\|--end]` | Break my lab: rebuild with a random fault and print the ticket; show/reveal/end the active fault |
 | `history <lab>` | your past scores (with hints used) |
+| `progress [--json]` | progress dashboard: mastery per exam domain, streak, time spent, weakest topics |
 | `import <file> [--replace]`, `export <lab> [-o f.encorlab] [--cml-yaml]`, `delete <lab> -y` | manage your labs |
 | `validate [paths…]`, `pack <folder-or-yaml> [-o x.encorlab]` | offline test (solution 100%, starting config 0%); strict validate + write a shareable pack |
 | `test-live <lab> [--keep]` | builds `ENCOR-TEST-<lab>` with the solution applied, grades it, deletes it |
@@ -170,6 +173,20 @@ a removed `next-hop-self`. You only get the trouble ticket, which describes symp
 
 Your own labs can define faults too (`faults:` in lab.yaml, see [docs/LAB-AUTHORING.md](docs/LAB-AUTHORING.md)). The
 validator applies each fault offline and requires that a config check detects it and that the solved lab still passes.
+
+### Progress dashboard
+The **Progress** page summarizes your results history and maps every lab to the
+[350-401 ENCOR v1.2 exam topics](https://learningnetwork.cisco.com/s/encor-exam-topics):
+
+- **Overall mastery**, weighted by the official domain weights (Architecture 15%, Virtualization 10%, Infrastructure 30%,
+  Network Assurance 10%, Security 20%, Automation and AI 15%). Domains without labs (mostly theory) are listed but not counted.
+- **Per domain and per blueprint item:** mastery, labs solved, and buttons that open the labs.
+- **Weakest topics**, **checks you fail most**, a 30-day **activity** chart and your **streak** (days in a row with a Check).
+- **Time spent**, estimated from the lab timer value sent with each Check.
+
+How a score counts: the best attempt per lab, minus 5 points per hint used. It is capped at 50% if you revealed the answer
+first, and exam attempts use the exam result. Labs never checked count as 0. Everything is computed locally from the
+history files; nothing leaves your machine.
 
 ## Grading modes
 | Mode | How | What it proves |

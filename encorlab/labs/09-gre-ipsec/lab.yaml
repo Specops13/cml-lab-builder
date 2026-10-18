@@ -1,6 +1,6 @@
 id: 09-gre-ipsec
 title: GRE over IPsec with OSPF
-blueprint: ["2.2.b", "2.2.c"]
+blueprint: ["2.2.b"]
 domain: "2.0 Virtualization"
 difficulty: 4
 summary: Build a GRE tunnel between two sites across an ISP, run OSPF over it, and protect it with an IPsec profile.

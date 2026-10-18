@@ -90,11 +90,13 @@ const IFNAMES = {iol: ["Ethernet0/", "Et0/"], iosv: ["GigabitEthernet0/", "Gi0/"
 function renderIf(text, plat) { return String(text || "").replace(/%if(\d)(s?)%/g, (_, n, sh) => IFNAMES[plat][sh ? 1 : 0] + n); }
 
 /* ---------------------------------------------------------------- navigation + theme */
+const VIEWS = ["labs", "progress", "builder", "settings", "ai"];
 function show(view) {
-  for (const v of ["labs", "builder", "settings", "ai"]) $(`#view-${v}`).hidden = v !== view;
+  for (const v of VIEWS) $(`#view-${v}`).hidden = v !== view;
   $$("nav>a").forEach((a) => a.classList.toggle("active", a.dataset.view === view));
   $("#more-menu").hidden = true;
   if (view === "settings") loadSettings();
+  if (view === "progress") loadProgress();
   if (view === "builder" && !draft) newDraft();
 }
 $$("[data-view]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); location.hash = a.dataset.view; show(a.dataset.view); }));
@@ -241,6 +243,7 @@ async function selectLab(id) {
   bindHints($("#lab-detail"));
   renderTimer(); refreshStatus(); loadHistory();
 }
+const revealedKey = (id) => `revealed:${id}`;
 /* ---------------------------------------------------------------- progressive hints (per lab, localStorage) */
 let currentHints = [];
 const hintsKey = (id) => `hints:${id}`;
@@ -283,13 +286,15 @@ async function run(kind) {
   clearInterval(statusTimer); statusTimer = setInterval(refreshStatus, 4000);
   try {
     const q = new URLSearchParams();
-    if (kind === "check") { if ($("#mode").value) q.set("mode", $("#mode").value); q.set("hints_used", String(hintsUsed(lab))); }
+    if (kind === "check") { if ($("#mode").value) q.set("mode", $("#mode").value); q.set("hints_used", String(hintsUsed(lab)));
+      q.set("elapsed_s", String(timerSecs(lab))); if (localStorage.getItem(revealedKey(lab))) q.set("revealed", "true"); }
     const {job_id} = await api(`/api/labs/${lab}/${kind}` + (q.toString() ? `?${q}` : ""), {method: "POST"});
     const j = await pollJob(job_id, (j) => { if (lab === current) { $("#log").textContent = j.log.join("\n") || "…"; $("#log").scrollTop = 1e9; } });
     if (j.state === "error") toast(`${kind} failed: ${j.error}`, "err", 12000);
     else {
       toast(`${kind} finished`, "ok");
       if (kind === "build") timerStart(lab);
+      if (kind === "reset" || kind === "break") localStorage.removeItem(revealedKey(lab));
       if (kind === "reset") hintsSet(lab, 0);
       if (kind === "break") { hintsSet(lab, 0); timerSet(lab, {acc: 0, start: Date.now()}); toast("Trouble ticket ready. Find and fix the fault.", "ok", 7000); if (lab === current) await selectLab(lab); }
       if (kind === "check" && j.result && lab === current) {
@@ -317,7 +322,7 @@ function showResults(r) {
   const rb = $("#a-reveal");
   if (rb) rb.onclick = async () => {
     if (!confirm("Reveal the full solution? This shows the root cause and the exact fix for every device.")) return;
-    try { $("#solution-box").innerHTML = solutionPanel(await api(`/api/labs/${current}/solution`), true); }
+    try { $("#solution-box").innerHTML = solutionPanel(await api(`/api/labs/${current}/solution`), true); localStorage.setItem(revealedKey(current), "1"); }
     catch (e) { toast("Could not load the solution: " + e.message, "err"); }
   };
 }
@@ -339,6 +344,41 @@ async function loadHistory() {
     <button data-help="lab.historyClear" class="hint-btn" id="hist-clear">Clear history</button>` : '<span class="muted">No checks yet.</span>';
   if ($("#hist-clear")) $("#hist-clear").onclick = async () => { await api(`/api/history/${current}`, {method: "DELETE"}); loadHistory(); loadLabs(); };
 }
+
+/* ---------------------------------------------------------------- progress dashboard */
+const fmtDur = (s) => `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, "0")}m`;
+const bar = (pct) => `<div class="pbar"><div style="width:${Math.max(0, Math.min(100, pct || 0))}%"></div></div>`;
+function openLab(id) { location.hash = "labs"; show("labs"); selectLab(id); }
+async function loadProgress() {
+  let p;
+  try { p = await api("/api/progress"); } catch (e) { $("#progress").textContent = "Could not load progress: " + e.message; return; }
+  const o = p.overall, st = p.streak, maxAct = Math.max(1, ...p.activity.map((a) => a.checks));
+  const labBtns = (ids) => ids.map((id) => `<button data-help="p.openLab" class="hint-btn" data-open="${esc(id)}">${esc(id)}</button>`).join(" ");
+  $("#progress").classList.remove("muted");
+  $("#progress").innerHTML = `
+    <div class="kpis">
+      <div class="kpi" data-help="p.mastery"><b>${o.mastery_pct}%</b><span>overall mastery</span></div>
+      <div class="kpi" data-help="p.solved"><b>${o.labs_solved}/${o.labs_total}</b><span>labs solved (${o.labs_attempted} attempted)</span></div>
+      <div class="kpi" data-help="p.streak"><b>${st.current} day${st.current === 1 ? "" : "s"}</b><span>streak (longest ${st.longest})</span></div>
+      <div class="kpi" data-help="p.time"><b>${fmtDur(o.time_spent_s)}</b><span>time spent</span></div>
+      <div class="kpi" data-help="p.faults"><b>${o.faults_fixed}</b><span>faults fixed</span></div></div>
+    <h3 data-help="p.domains">Exam domains <span class="muted small">(${esc(p.blueprint)})</span></h3>
+    <table><tr><th>Domain</th><th>Weight</th><th>Mastery</th><th></th><th>Solved</th><th>Labs</th></tr>${p.domains.map((d) => `<tr>
+      <td>${esc(d.id)} ${esc(d.name)}</td><td>${d.weight}%</td>${d.labs ? `<td>${d.mastery_pct}%</td><td>${bar(d.mastery_pct)}</td><td>${d.solved}/${d.labs}</td><td>${labBtns(d.lab_ids)}</td>`
+      : '<td colspan="4" class="muted small">No labs for this domain yet (mostly theory topics). Study it separately.</td>'}</tr>`).join("")}</table>
+    <h3 data-help="p.weakest">Weakest topics</h3>
+    <table>${p.weakest.map((i) => `<tr><td><b>${esc(i.id)}</b> ${esc(i.title)}</td><td>${i.mastery_pct}%</td><td>${bar(i.mastery_pct)}</td><td>${labBtns(i.lab_ids)}</td></tr>`).join("")}</table>
+    <details><summary data-help="p.items">All blueprint items covered by labs (${p.items.length})</summary>
+      <table><tr><th>Item</th><th>Mastery</th><th></th><th>Solved</th><th>Labs</th></tr>${p.items.map((i) => `<tr><td><b>${esc(i.id)}</b> ${esc(i.title)}</td><td>${i.mastery_pct}%</td><td>${bar(i.mastery_pct)}</td><td>${i.solved}/${i.labs}</td><td>${labBtns(i.lab_ids)}</td></tr>`).join("")}</table></details>
+    <h3 data-help="p.activity">Activity (last 30 days)</h3>
+    <div class="activity">${p.activity.map((a) => `<span title="${esc(a.day)}: ${a.checks} check(s)" style="height:${4 + Math.round(36 * a.checks / maxAct)}px" class="${a.checks ? "on" : ""}"></span>`).join("")}</div>
+    ${p.failed_checks.length ? `<h3 data-help="p.failed">Checks you fail most</h3><table>${p.failed_checks.map((f) => `<tr><td>${esc(f.description)}</td><td class="muted small">${esc(f.lab_id)} / ${esc(f.check_id)}</td><td>${f.count}×</td><td>${labBtns([f.lab_id])}</td></tr>`).join("")}</table>` : ""}
+    <h3 data-help="p.recent">Recent checks</h3>${p.recent.length ? `<table><tr><th>When</th><th>Lab</th><th>Type</th><th>Score</th><th>Counted</th></tr>${p.recent.map((r) =>
+      `<tr><td>${esc(r.ts)}</td><td>${esc(r.title)}</td><td>${esc(r.kind)}</td><td class="${r.passed ? "pass" : ""}">${r.score_pct}%</td><td>${r.adjusted_pct}%</td></tr>`).join("")}</table>` : '<p class="muted">No checks yet. Build a lab and click Check.</p>'}
+    <p class="muted small">Mastery = best score per lab, minus ${p.rules.hint_penalty} points per hint used (capped at ${p.rules.revealed_cap}% after revealing the answer), averaged per topic; labs never checked count as 0. Overall is weighted by the exam domain weights of the domains that have labs.</p>`;
+  $$("#progress [data-open]").forEach((b) => b.onclick = () => openLab(b.dataset.open));
+}
+$("#p-refresh").onclick = loadProgress;
 
 /* ---------------------------------------------------------------- builder */
 function emptyDraft() {
@@ -599,5 +639,5 @@ async function versionCheck() {
   await step("check templates", async () => { templates = await api("/api/templates"); });
   await step("lab list", loadLabs);
   const v = (location.hash || "#labs").slice(1);
-  show(["labs", "builder", "settings", "ai"].includes(v) ? v : "labs");
+  show(VIEWS.includes(v) ? v : "labs");
 })();

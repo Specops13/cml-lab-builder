@@ -72,3 +72,7 @@ header .help-icon{color:#cfe3ff;border-color:#cfe3ff}
 .solution-panel h3{margin:.4rem 0}#solution-box{margin-top:.6rem}
 button.warn{border-color:var(--warn-line)}.tag.warn{border-color:var(--warn-line);color:var(--fg)}
 .fault-box{background:var(--warn-bg);border:1px solid var(--warn-line);padding:.5rem .8rem;border-radius:8px;margin:.6rem 0}.fault-box h3{margin:.2rem 0}
+.kpis{display:flex;flex-wrap:wrap;gap:.6rem;margin:.5rem 0 1rem}.kpi{border:1px solid var(--line);border-radius:10px;padding:.5rem .9rem;min-width:140px;display:flex;flex-direction:column}
+.kpi b{font-size:1.5rem}.kpi span{color:var(--muted);font-size:.85rem}
+.pbar{width:140px;height:9px;background:var(--line);border-radius:5px;overflow:hidden}.pbar>div{height:100%;background:var(--accent)}
+.activity{display:flex;align-items:flex-end;gap:3px;height:44px;margin:.3rem 0 1rem}.activity span{width:12px;background:var(--line);border-radius:2px}.activity span.on{background:var(--ok)}

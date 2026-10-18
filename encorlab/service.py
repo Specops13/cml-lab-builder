@@ -121,6 +121,8 @@ def do_check(settings, lab_id, progress, client_factory=None, runner=None, confi
         if d.get("passed"):
             d["fault_fixed"] = faults.reveal(base_lab, fault, plat)
             d["fault_revealed"] = bool(fstate.get("revealed"))
+            if d["fault_revealed"]:
+                d["revealed"] = True
             faults.clear(base_lab.id)
             progress(f"Fault fixed: {d['fault_fixed']['title']}")
     elif d.get("passed"):

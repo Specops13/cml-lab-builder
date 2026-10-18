@@ -268,6 +268,31 @@ def test_live(lab_id: str, mode: str = typer.Option("auto"), keep: bool = typer.
     raise typer.Exit(0 if rep["passed"] else 2)
 
 
+@app.command("progress")
+def show_progress(as_json: bool = typer.Option(False, "--json")):
+    """Progress dashboard: mastery per ENCOR domain, streak, time spent, weakest topics."""
+    from . import progress
+    p = progress.compute()
+    if as_json:
+        typer.echo(json.dumps(p, indent=2))
+        return
+    o, st = p["overall"], p["streak"]
+    h, m = divmod(o["time_spent_s"] // 60, 60)
+    typer.echo(f"Overall mastery {o['mastery_pct']}% ({p['blueprint']}, weighted by exam domain)")
+    typer.echo(f"Labs solved {o['labs_solved']}/{o['labs_total']}, attempted {o['labs_attempted']}, checks {o['checks_run']}, "
+               f"faults fixed {o['faults_fixed']}, time {h}h{m:02d}m")
+    typer.echo(f"Streak {st['current']} day(s), longest {st['longest']}, active days {st['active_days']}")
+    typer.echo("")
+    for d in p["domains"]:
+        bar = "-" if d["mastery_pct"] is None else "#" * int(d["mastery_pct"] // 10)
+        typer.echo(f"{d['id']} {d['name'][:28]:28} {d['weight']:3}%  "
+                   + ("no labs yet" if not d["labs"] else f"{d['mastery_pct']:5}% {bar:10} solved {d['solved']}/{d['labs']}"))
+    typer.echo("")
+    typer.echo("Weakest topics:")
+    for i in p["weakest"]:
+        typer.echo(f"  {i['id']:6} {i['title'][:40]:40} {i['mastery_pct']}%  labs: {', '.join(i['lab_ids'])}")
+
+
 @app.command("history")
 def show_history(lab_id: str):
     """Show past check results for a lab."""

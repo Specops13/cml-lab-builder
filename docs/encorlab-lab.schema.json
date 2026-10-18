@@ -275,7 +275,7 @@
       "type": "string"
     },
     "blueprint": {
-      "description": "ENCOR 350-401 v1.1 blueprint items, e.g. ['3.2.b']",
+      "description": "ENCOR 350-401 v1.2 blueprint items, e.g. ['3.2.b']",
       "items": {
         "type": "string"
       },
