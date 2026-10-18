@@ -2,7 +2,7 @@
 
 All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
+## [1.5.0] - 2026-10-18
 ### Added
 - **Three new built-in labs** (14 in total), each with a solution summary, 3 progressive hints and 3 faults:
   `11-ipsla-tracking` (IP SLA ICMP probe + object tracking driving the default route and an HSRP priority decrement;

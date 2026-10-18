@@ -1,6 +1,6 @@
 """Smoke test for a packaged build (stdlib only; used locally, under Wine and in CI).
 
-    python packaging/smoke_test.py <path to ENCORLab or ENCORLab.exe> --version 1.4.0 \
+    python packaging/smoke_test.py <path to ENCORLab or ENCORLab.exe> --version 1.5.0 \
         --data-dir <expected user data folder> [--pack x.encorlab ...] [--runner wine] [--port 8791]
 
 Checks: CLI runs (version, list); the launcher serves the UI on 127.0.0.1 with versioned (cache-busted)
