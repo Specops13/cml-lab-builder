@@ -1,6 +1,7 @@
 """Shared core used by both CLI and web UI."""
 from __future__ import annotations
 
+import re
 import threading
 import time
 import traceback
@@ -8,7 +9,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import catalog
+from . import catalog, render
 from .cml import CML
 from .grader import grade
 from .platforms import get as get_platform
@@ -182,7 +183,30 @@ def do_destroy(settings, lab_id, progress, client_factory=None):
 def do_status(settings, lab_id, client_factory=None):
     lab = catalog.get(lab_id)
     st = make_cml(settings, client_factory).status(lab)
-    return st.__dict__
+    d = st.__dict__.copy()
+    if st.exists:
+        d.update(console_info(settings, lab, st.lab_id, st.nodes or {}))
+    return d
+
+
+_SAFE_PATH = re.compile(r"^[A-Za-z0-9 _.+-]+$")
+
+
+def console_info(settings, lab, cml_lab_id: str, node_states: dict) -> dict:
+    """Links for the CML web UI and ready-to-paste console server commands, one per lab device.
+    CML's console server takes `open /<lab>/<node>/<line>`; lab and node may be names or ids."""
+    title = render.lab_title(lab, settings.lab_prefix)
+    lab_ref = title if _SAFE_PATH.match(title) else cml_lab_id
+    host, port, user = settings.effective_console_host, int(settings.console_port), settings.username
+    base = settings.cml_url.rstrip("/")
+    consoles = []
+    for n in lab.nodes:
+        path = f"/{lab_ref}/{n.name}/0"
+        target = f"{user}@{host}" if user else host
+        ssh = f'ssh -t {"" if port == 22 else f"-p {port} "}{target} "open {path}"'
+        consoles.append({"node": n.name, "kind": n.kind, "state": node_states.get(n.name), "path": path, "ssh": ssh})
+    return {"cml_lab_url": f"{base}/lab/{cml_lab_id}" if base and cml_lab_id else None, "cml_title": title,
+            "console_host": host, "console_port": port, "consoles": consoles}
 
 
 @dataclass

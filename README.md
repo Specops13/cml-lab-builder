@@ -43,6 +43,8 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   the working lab with a random fault and gives you a symptom-only trouble ticket, so you get unlimited troubleshooting practice.
 - **Progress dashboard:** mastery per ENCOR 350-401 v1.2 exam domain (with the official weights) and per blueprint item,
   your weakest topics with links to the labs that train them, daily streak, time spent, most-failed checks and recent activity.
+- **Console links:** once a lab is built, open it in the CML Workbench with one click, or copy a ready-to-paste
+  console server command (`ssh -t user@cml "open /ENCOR-<lab>/R1/0"`) for any node.
 - **Learning aids:** a **Hint** button with progressive hints ("Hint 2 of 3"), remembered per lab and cleared on Reset.
   A **Solution summary** (root cause, exact fix per device, why it works) appears automatically at 100%.
   Below 100% you can open it with **Reveal solution**, after a confirm.
@@ -136,7 +138,9 @@ The first connection accepts the server's host key and logs a warning.
    - Non-secret settings are saved to `settings.json` in your data folder.
    - Set *Console server host* if SSH port 22 isn't reachable at the URL's host name.
 2. **Labs**: pick a lab and click **Build**. It imports the topology as `ENCOR-<lab>`, starts it and waits until all nodes are BOOTED.
-3. Open the device consoles in CML (or `ssh` to the console server), solve the task, then click **Check**. You get pass/fail per check, with details and the raw output.
+3. Open the device consoles: the lab's **Consoles** section has an *Open lab in CML* link and a copyable
+   `ssh -t <user>@<console host> "open /ENCOR-<lab>/<node>/0"` command per node (Windows 11 has `ssh` built in).
+   Solve the task, then click **Check**. You get pass/fail per check, with details and the raw output.
 4. Stuck? Click **Hint** for the next hint. At 100% the **Solution summary** appears. Below 100%, **Reveal solution** shows it after a confirm.
 5. **Reset** stops the lab, wipes it and restarts it with the original configs (it also clears revealed hints). **Destroy** stops, wipes and deletes the lab.
 6. Done with a lab? Click **Break my lab** for troubleshooting practice (see below).
@@ -154,6 +158,7 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `build <lab> [--rebuild]`, `check <lab> [--mode auto\|live\|config] [--json] [--hints-used N]`, `reset <lab>`, `destroy <lab>` | lab lifecycle (`check` prints the solution summary at 100%) |
 | `hint <lab> [N]`, `solution <lab>` | progressive hint N of M; solution summary + config (spoilers) |
 | `break <lab> [--fault ID]`, `fault <lab> [--reveal\|--end]` | Break my lab: rebuild with a random fault and print the ticket; show/reveal/end the active fault |
+| `console <lab>` | CML web link and console server `ssh` commands for each node |
 | `history <lab>` | your past scores (with hints used) |
 | `progress [--json]` | progress dashboard: mastery per exam domain, streak, time spent, weakest topics |
 | `library list` / `library install <file or https URL> [--sha256 …]` | browse / install from the online lab library |

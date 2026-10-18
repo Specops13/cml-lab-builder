@@ -345,6 +345,20 @@ def fault(lab_id: str, reveal: bool = typer.Option(False, "--reveal", help="show
     typer.echo("TROUBLE TICKET: " + faults.public(lab, st, plat)["ticket"])
 
 
+@app.command("console")
+def console_cmds(lab_id: str):
+    """Show the CML web link and console server commands for the lab's nodes."""
+    s = _settings()
+    st = service.do_status(s, lab_id)
+    if not st.get("exists"):
+        typer.echo(f"{lab_id} is not built in CML yet (run: encorlab build {lab_id})")
+        raise typer.Exit(1)
+    if st.get("cml_lab_url"):
+        typer.echo(f"CML web UI: {st['cml_lab_url']}")
+    for c in st["consoles"]:
+        typer.echo(f"{c['node']:<8} {(c['state'] or '-'):<9} {c['ssh']}")
+
+
 @app.command()
 def reset(lab_id: str):
     """Stop, wipe, restore initial configs and restart a lab (during fault practice: the broken configs)."""

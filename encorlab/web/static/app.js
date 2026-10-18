@@ -312,6 +312,7 @@ async function selectLab(id) {
     <details><summary data-help="lab.objectives">Objectives graded (${l.checks.length} checks: ${l.checks.filter((c) => c.mode === "live").length} live, ${l.checks.filter((c) => c.mode === "config").length} config) - spoilers</summary>
       <table>${l.checks.map((c) => `<tr><td><span class="tag">${c.mode}</span></td><td>${esc(c.device)}</td><td>${esc(c.description)}</td>
       <td>${c.hint ? `<button data-help="lab.hint" class="hint-btn" data-hint="${esc(c.hint)}">Show hint</button>` : ""}</td></tr>`).join("")}</table></details>
+    <details id="cons-box" hidden><summary data-help="lab.consoles">Consoles</summary><div id="consoles"></div></details>
     <h3 data-help="lab.results">Results</h3><div id="results" class="muted">Not checked yet.</div>
     <h3 data-help="lab.activity">Activity</h3><pre id="log" class="log">-</pre>
     <details id="hist-box"><summary data-help="lab.history">History</summary><div id="history"></div></details>`;
@@ -379,7 +380,27 @@ async function refreshStatus() {
       text += `${s.state} · ${booted}/${states.length} nodes booted`;
     }
     $("#status").textContent = text; $("#boot-bar").style.width = pct + "%";
+    renderConsoles(s.exists ? s : null);
   } catch (e) { $("#status").textContent = "Status: " + e.message; }
+}
+let consKey = "";
+function renderConsoles(s) {
+  const box = $("#cons-box"); if (!box) return;
+  const key = s && s.consoles ? JSON.stringify([s.cml_lab_url, s.consoles]) : "";
+  if (key === consKey && box.dataset.lab === current) return;
+  consKey = key; box.dataset.lab = current || "";
+  box.hidden = !key; if (!key) { $("#consoles").innerHTML = ""; return; }
+  $("#consoles").innerHTML = `<div class="toolbar">
+      ${s.cml_lab_url ? `<a data-help="lab.openCml" class="btn" href="${esc(s.cml_lab_url)}" target="_blank" rel="noopener">Open lab in CML ↗</a>` : ""}
+      <button data-help="lab.copyAllConsoles" id="cons-copy-all" class="hint-btn">Copy all commands</button>
+      <span class="muted small">Console server ${esc(s.console_host)}:${s.console_port}, lab "${esc(s.cml_title)}"</span></div>
+    <table><tr><th>Node</th><th>State</th><th>Console server command</th><th></th></tr>${s.consoles.map((c) => `<tr>
+      <td><b>${esc(c.node)}</b> <span class="muted small">${esc(c.kind)}</span></td><td><span class="tag ${c.state === "BOOTED" ? "ok" : ""}">${esc(c.state || "-")}</span></td>
+      <td><code class="cmd">${esc(c.ssh)}</code></td><td><button data-help="lab.copyConsole" class="hint-btn" data-cmd="${esc(c.ssh)}">Copy</button></td></tr>`).join("")}</table>
+    <div class="muted small">Paste a command into a terminal (Windows Terminal/PowerShell, or any Linux shell) and log in with your CML password.
+      Inside the console server you can also type <code>open ${esc(s.consoles[0] ? s.consoles[0].path : "/lab/node/0")}</code>. In the CML web UI: right-click a node, then Console.</div>`;
+  $$("#consoles [data-cmd]").forEach((b) => b.addEventListener("click", async () => toast(await copyText(b.dataset.cmd) ? "Command copied" : "Could not copy", "ok")));
+  $("#cons-copy-all").onclick = async () => toast(await copyText(s.consoles.map((c) => `# ${c.node}\n${c.ssh}`).join("\n")) ? "All console commands copied" : "Could not copy", "ok");
 }
 function setBusy(b) { $$("#lab-detail .toolbar button").forEach((x) => { if (!x.closest("a")) x.disabled = b; }); if (!b) renderHints(); }
 async function run(kind) {

@@ -145,5 +145,9 @@
   "lib.fromUrl": "Install a .encorlab or .encorcourse file shared by someone else, straight from an https link.",
   "lib.fileUrl": "https link to a .encorlab, .encorcourse or lab .yaml file (max 20 MB).",
   "lib.sha": "Optional but recommended: the sha256 the author published. If it does not match, nothing is installed.",
-  "lib.installUrl": "Download, verify and install the file from the link."
+  "lib.installUrl": "Download, verify and install the file from the link.",
+  "lab.consoles": "Open device consoles: a link to this lab in the CML web UI and a ready-to-paste console server command for every node. Shown once the lab exists in CML.",
+  "lab.openCml": "Open this lab in the CML Workbench in a new browser tab (log in to CML if asked). Right-click a node there, then Console.",
+  "lab.copyConsole": "Copy the SSH command for this node's console. Paste it in a terminal and log in with your CML username and password.",
+  "lab.copyAllConsoles": "Copy the console commands of all nodes at once, one per line."
 }

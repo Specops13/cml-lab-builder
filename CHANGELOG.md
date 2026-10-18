@@ -16,6 +16,9 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
   `.encorcourse` courses (ordered study tracks) from the repo's new `labs/` folder or any https URL, with sha256/size
   verification, an https-only policy and a 20 MB limit. Courses track solved/total with *Continue* and a course filter.
   `packaging/build_library.py` builds `labs/` reproducibly; two courses ship (OSPF Mastery, ENCOR routing track).
+- **Console links:** a *Consoles* section per built lab with *Open lab in CML* (`https://<cml>/lab/<id>`) and a copyable
+  console server command per node (`ssh -t user@host "open /<lab>/<node>/0"`, custom port supported). Also `console <lab>`
+  in the CLI and `cml_lab_url` / `consoles` in `GET /api/labs/{id}/status`.
 - Lab files can define `faults:`. The validator applies each fault offline with an IOS-style config merge and requires
   that it is detected and fixable.
 ### Changed

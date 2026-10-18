@@ -78,3 +78,5 @@ button.warn{border-color:var(--warn-line)}.tag.warn{border-color:var(--warn-line
 .activity{display:flex;align-items:flex-end;gap:3px;height:44px;margin:.3rem 0 1rem}.activity span{width:12px;background:var(--line);border-radius:2px}.activity span.on{background:var(--ok)}
 .course{margin:.5rem 0;padding:.6rem .8rem}.course ol{margin:.4rem 0 0 1.2rem;padding:0}.course li{margin:.15rem 0}
 #library .err{color:var(--bad)}
+a.btn{display:inline-block;padding:.42rem .85rem;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--fg);text-decoration:none}a.btn:hover{border-color:var(--accent)}
+code.cmd{font-family:Consolas,"DejaVu Sans Mono",monospace;font-size:.8rem;word-break:break-all;user-select:all}
