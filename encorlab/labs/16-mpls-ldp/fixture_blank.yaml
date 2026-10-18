@@ -1,0 +1,23 @@
+# Starting state: no MPLS anywhere (synthesized, not recorded on real hardware).
+P1:
+  show mpls ldp neighbor: ""
+  show mpls interfaces: |
+    Interface              IP            Tunnel   BGP Static Operational
+PE2:
+  show mpls ldp neighbor: ""
+PE1:
+  show mpls forwarding-table 4.4.4.4 32: |
+    Local      Outgoing   Prefix           Bytes Label   Outgoing   Next Hop
+    Label      Label      or Tunnel Id     Switched      interface
+    None       No Label   4.4.4.4/32       0             %if0s%      10.0.12.2
+  ping mpls ipv4 4.4.4.4/32 repeat 5: |
+    Sending 5, 100-byte MPLS Echos to 4.4.4.4/32,
+         timeout is 2 seconds, send interval is 0 msec:
+
+    Type escape sequence to abort.
+    QQQQQ
+    Success rate is 0 percent (0/5)
+P2:
+  show mpls forwarding-table 4.4.4.4 32: |
+    Local      Outgoing   Prefix           Bytes Label   Outgoing   Next Hop
+    Label      Label      or Tunnel Id     Switched      interface

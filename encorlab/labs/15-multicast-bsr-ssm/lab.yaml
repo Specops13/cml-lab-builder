@@ -294,6 +294,7 @@ faults:
   device: R3
   ticket: The design says R2 is the primary RP for every group, but the network now uses 3.3.3.3 as the RP for 239.2.2.2. Nothing failed on R2.
   config: |
+    no ip pim rp-candidate Loopback0
     ip pim rp-candidate Loopback0 priority 5
   explanation: |-
     **Root cause:** R3's candidate-RP priority was changed to 5. In the BSR C-RP election the **lowest** priority wins, so R3 (5) now beats R2 (10) for 224.0.0.0/4. `show ip pim rp mapping` lists both candidates with their priorities.
@@ -341,9 +342,9 @@ faults:
   ticket: The SSM channel (10.1.1.10, 232.1.1.1) went dark after a change on R4, while the 239.2.2.2 stream is fine.
   config: |
     interface %if2%
-     ip igmp version 2
+     no ip igmp version
   explanation: |-
-    **Root cause:** R4's receiver LAN was set back to IGMPv2. RCV falls back to v2 when it hears v2 queries, and IGMPv2 reports cannot name a source, so the SSM join for (10.1.1.10, 232.1.1.1) is never signalled. ASM groups do not need a source and keep working.
+    **Root cause:** R4's receiver LAN lost `ip igmp version 3`, so it is back at the default, IGMPv2. RCV falls back to v2 when it hears v2 queries, and IGMPv2 reports cannot name a source, so the SSM join for (10.1.1.10, 232.1.1.1) is never signalled. ASM groups do not need a source and keep working.
 
     **Fix (R4):**
     ```

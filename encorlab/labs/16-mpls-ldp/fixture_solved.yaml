@@ -1,0 +1,59 @@
+# Synthesized from Cisco IOS / IOS-XE MPLS LDP documentation (not recorded on real hardware).
+P1:
+  show mpls ldp neighbor: |
+        Peer LDP Ident: 1.1.1.1:0; Local LDP Ident 2.2.2.2:0
+            TCP connection: 1.1.1.1.646 - 2.2.2.2.38012
+            State: Oper; Msgs sent/rcvd: 21/21; Downstream
+            Up time: 00:08:12
+            LDP discovery sources:
+              %if0%, Src IP addr: 10.0.12.1
+            Addresses bound to peer LDP Ident:
+              10.0.12.1       1.1.1.1         99.99.99.1
+        Peer LDP Ident: 3.3.3.3:0; Local LDP Ident 2.2.2.2:0
+            TCP connection: 3.3.3.3.24133 - 2.2.2.2.646
+            State: Oper; Msgs sent/rcvd: 22/21; Downstream
+            Up time: 00:08:10
+            LDP discovery sources:
+              %if1%, Src IP addr: 10.0.23.3
+            Addresses bound to peer LDP Ident:
+              10.0.23.3       10.0.34.3       3.3.3.3         99.99.99.3
+  show mpls interfaces: |
+    Interface              IP            Tunnel   BGP Static Operational
+    %if0%            Yes (ldp)     No       No  No     Yes
+    %if1%            Yes (ldp)     No       No  No     Yes
+PE2:
+  show mpls ldp neighbor: |
+        Peer LDP Ident: 3.3.3.3:0; Local LDP Ident 4.4.4.4:0
+            TCP connection: 3.3.3.3.646 - 4.4.4.4.51122
+            State: Oper; Msgs sent/rcvd: 20/20; Downstream
+            Up time: 00:08:05
+            LDP discovery sources:
+              %if0%, Src IP addr: 10.0.34.3
+            Addresses bound to peer LDP Ident:
+              10.0.23.3       10.0.34.3       3.3.3.3         99.99.99.3
+PE1:
+  show mpls forwarding-table 4.4.4.4 32: |
+    Local      Outgoing   Prefix           Bytes Label   Outgoing   Next Hop
+    Label      Label      or Tunnel Id     Switched      interface
+    19         18         4.4.4.4/32       0             %if0s%      10.0.12.2
+  ping mpls ipv4 4.4.4.4/32 repeat 5: |
+    Sending 5, 100-byte MPLS Echos to 4.4.4.4/32,
+         timeout is 2 seconds, send interval is 0 msec:
+
+    Codes: '!' - success, 'Q' - request not sent, '.' - timeout,
+      'L' - labeled output interface, 'B' - unlabeled output interface,
+      'D' - DS Map mismatch, 'F' - no FEC mapping, 'f' - FEC mismatch,
+      'M' - malformed request, 'm' - unsupported tlvs, 'N' - no label entry,
+      'P' - no rx intf label prot, 'p' - premature termination of LSP,
+      'R' - transit router, 'I' - unknown upstream index,
+      'l' - Label switched with FEC change, 'd' - see DDMAP for return code,
+      'X' - unknown return code, 'x' - return code 0
+
+    Type escape sequence to abort.
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/2/4 ms
+P2:
+  show mpls forwarding-table 4.4.4.4 32: |
+    Local      Outgoing   Prefix           Bytes Label   Outgoing   Next Hop
+    Label      Label      or Tunnel Id     Switched      interface
+    18         Pop Label  4.4.4.4/32       1140          %if1s%      10.0.34.4

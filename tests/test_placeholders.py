@@ -49,7 +49,7 @@ def test_api_task_hints_checks_and_titles(with_pack):
         no_tokens(c.get("/api/labs").json(), f"/api/labs ({plat.name})")
         d = c.get(f"/api/labs/{e.lab.id}").json()
         no_tokens(d, f"/api/labs/{e.lab.id} ({plat.name})")
-        assert plat.ifname(0, False) in d["task"] or "%if" not in e.lab.task
+        assert plat.long_prefix + "0/" in d["task"] or "%if" not in e.lab.task
 
 
 def test_grade_reports_rendered(with_pack):

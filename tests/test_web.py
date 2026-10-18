@@ -39,7 +39,7 @@ def test_labs_and_task():
     c, _ = make()
     data = c.get("/api/labs").json()
     ids = [l["id"] for l in data["labs"]]
-    assert "eigrp-basic" in ids and len(ids) == 16 and data["broken"] == {}
+    assert "eigrp-basic" in ids and len(ids) == 18 and data["broken"] == {}
     assert all(l["source"] == "builtin" for l in data["labs"])
     t = c.get("/api/labs/eigrp-basic").json()
     assert "Ethernet0/0" in t["task"] and "%if" not in t["task"]

@@ -1,0 +1,67 @@
+# Synthesized from Cisco IOS / IOS-XE MPLS VPN documentation (not recorded on real hardware).
+PE1:
+  show bgp vpnv4 unicast all summary: |
+    BGP router identifier 1.1.1.1, local AS number 65000
+    BGP table version is 5, main routing table version 5
+    2 network entries using 312 bytes of memory
+    2 path entries using 168 bytes of memory
+    2/2 BGP path/bestpath attribute entries using 304 bytes of memory
+    1 BGP AS-PATH entries using 24 bytes of memory
+    1 BGP extended community entries using 24 bytes of memory
+
+    Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    3.3.3.3         4        65000      12      12        5    0    0 00:06:31        1
+    10.1.1.2        4        65001      11      12        5    0    0 00:06:40        1
+  show ip route vrf CUST-A: |
+    Routing Table: CUST-A
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+
+    Gateway of last resort is not set
+
+          10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks
+    C        10.1.1.0/30 is directly connected, %if1%
+    L        10.1.1.1/32 is directly connected, %if1%
+    B     192.168.1.0/24 [20/0] via 10.1.1.2, 00:06:38
+    B     192.168.2.0/24 [200/0] via 3.3.3.3, 00:06:29
+  show bgp vpnv4 unicast vrf CUST-A labels: |2
+       Network          Next Hop      In label/Out label
+    Route Distinguisher: 65000:1 (CUST-A)
+       192.168.1.0      10.1.1.2        16/nolabel
+       192.168.2.0      3.3.3.3         nolabel/16
+PE2:
+  show bgp vpnv4 unicast all summary: |
+    BGP router identifier 3.3.3.3, local AS number 65000
+    BGP table version is 5, main routing table version 5
+    2 network entries using 312 bytes of memory
+
+    Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    1.1.1.1         4        65000      12      12        5    0    0 00:06:31        1
+    10.2.2.2        4        65002      11      12        5    0    0 00:06:35        1
+CE1:
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+
+    Gateway of last resort is not set
+
+          10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks
+    C        10.1.1.0/30 is directly connected, %if0%
+    L        10.1.1.2/32 is directly connected, %if0%
+          192.168.1.0/24 is variably subnetted, 2 subnets, 2 masks
+    C        192.168.1.0/24 is directly connected, Loopback0
+    L        192.168.1.1/32 is directly connected, Loopback0
+    B     192.168.2.0/24 [20/0] via 10.1.1.1, 00:06:20
+  ping 192.168.2.1 source Loopback0 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.2.1, timeout is 2 seconds:
+    Packet sent with a source address of 192.168.1.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 2/3/5 ms
+P:
+  show mpls ldp neighbor: |
+        Peer LDP Ident: 1.1.1.1:0; Local LDP Ident 2.2.2.2:0
+            TCP connection: 1.1.1.1.646 - 2.2.2.2.41271
+            State: Oper; Msgs sent/rcvd: 30/30; Downstream
+        Peer LDP Ident: 3.3.3.3:0; Local LDP Ident 2.2.2.2:0
+            TCP connection: 3.3.3.3.33318 - 2.2.2.2.646
+            State: Oper; Msgs sent/rcvd: 30/29; Downstream

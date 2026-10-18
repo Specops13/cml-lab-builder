@@ -58,7 +58,7 @@ def test_labs_list_survives_broken_and_bad_settings(monkeypatch):
     s = config.Settings()
     s.platform = "iol\r"   # e.g. a CRLF .env value that bypassed validation
     data = client(s).get("/api/labs").json()
-    assert len(data["labs"]) == 16 and "settings" in data["broken"] and any("broken" in k for k in data["broken"])
+    assert len(data["labs"]) == 18 and "settings" in data["broken"] and any("broken" in k for k in data["broken"])
 
 
 def test_frontend_resilience_hooks_present():

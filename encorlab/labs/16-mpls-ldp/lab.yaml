@@ -1,0 +1,262 @@
+id: 16-mpls-ldp
+title: "MPLS: LDP Label Distribution in the Core"
+blueprint: ["2.2"]
+domain: "2.0 Virtualization"
+difficulty: 3
+summary: Turn an OSPF core into an MPLS core with LDP, pin the LDP router ID to a reachable loopback, and read label bindings, the forwarding table, penultimate-hop popping and an LSP ping.
+nodes:
+  - name: PE1
+    kind: router
+    x: -375
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 1.1.1.1 255.255.255.255
+      interface Loopback1
+       description management loopback (not advertised)
+       ip address 99.99.99.1 255.255.255.255
+      interface %if0%
+       description to P1
+       ip address 10.0.12.1 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 1.1.1.1
+       network 1.1.1.1 0.0.0.0 area 0
+       network 10.0.12.0 0.0.0.3 area 0
+  - name: P1
+    kind: router
+    x: -125
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 2.2.2.2 255.255.255.255
+      interface Loopback1
+       description management loopback (not advertised)
+       ip address 99.99.99.2 255.255.255.255
+      interface %if0%
+       description to PE1
+       ip address 10.0.12.2 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to P2
+       ip address 10.0.23.2 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 2.2.2.2
+       network 2.2.2.2 0.0.0.0 area 0
+       network 10.0.12.0 0.0.0.3 area 0
+       network 10.0.23.0 0.0.0.3 area 0
+  - name: P2
+    kind: router
+    x: 125
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 3.3.3.3 255.255.255.255
+      interface Loopback1
+       description management loopback (not advertised)
+       ip address 99.99.99.3 255.255.255.255
+      interface %if0%
+       description to P1
+       ip address 10.0.23.3 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to PE2
+       ip address 10.0.34.3 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 3.3.3.3
+       network 3.3.3.3 0.0.0.0 area 0
+       network 10.0.23.0 0.0.0.3 area 0
+       network 10.0.34.0 0.0.0.3 area 0
+  - name: PE2
+    kind: router
+    x: 375
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 4.4.4.4 255.255.255.255
+      interface Loopback1
+       description management loopback (not advertised)
+       ip address 99.99.99.4 255.255.255.255
+      interface %if0%
+       description to P2
+       ip address 10.0.34.4 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 4.4.4.4
+       network 4.4.4.4 0.0.0.0 area 0
+       network 10.0.34.0 0.0.0.3 area 0
+links:
+  - {a: {node: PE1, port: 0}, b: {node: P1, port: 0}}
+  - {a: {node: P1, port: 1}, b: {node: P2, port: 0}}
+  - {a: {node: P2, port: 1}, b: {node: PE2, port: 0}}
+task: |
+  # Lab 16 - MPLS with LDP
+
+  PE1 - P1 - P2 - PE2 is a provider core running OSPF area 0. Every router has **Loopback0** (n.n.n.n/32, in OSPF)
+  and a management **Loopback1** (99.99.99.n/32) that is deliberately **not** advertised.
+
+  1. On all four routers, make LDP use **Loopback0** as its router ID, even if another interface has a higher
+     address (`force`).
+  2. Enable MPLS forwarding with **LDP** on every core link: PE1 %if0%, P1 %if0% and %if1%, P2 %if0% and %if1%,
+     PE2 %if0%. Per-interface `mpls ip` or `mpls ldp autoconfig` under OSPF are both accepted.
+
+  Verify:
+  - `show mpls interfaces` and `show mpls ldp discovery`
+  - `show mpls ldp neighbor` (P1 has two LDP sessions, state Oper)
+  - `show mpls ldp bindings 4.4.4.4 32` (local label plus one remote label per neighbor)
+  - `show mpls forwarding-table 4.4.4.4 32` on PE1 (a real outgoing label) and on P2 (**Pop Label**: penultimate-hop
+    popping, because PE2 advertised implicit-null for its own loopback)
+  - `ping mpls ipv4 4.4.4.4/32` on PE1 (an LSP ping along the label-switched path)
+
+  Think about it: why would LDP sessions fail if you skipped step 1? (Look at Loopback1.)
+checks:
+  - id: p1-ldp-nbrs
+    description: P1 has Operational LDP sessions with PE1 (1.1.1.1) and P2 (3.3.3.3), using LDP ID 2.2.2.2
+    device: P1
+    command: show mpls ldp neighbor
+    match: ['Peer LDP Ident: 1\.1\.1\.1:0; Local LDP Ident 2\.2\.2\.2:0', 'Peer LDP Ident: 3\.3\.3\.3:0; Local LDP Ident 2\.2\.2\.2:0', 'State: Oper']
+    hint: An LDP session needs `mpls ip` on both ends of the link and a reachable LDP router ID (TCP 646 between the IDs).
+  - id: pe2-ldp-nbr
+    description: PE2 has an LDP session with P2 (3.3.3.3), using LDP ID 4.4.4.4
+    device: PE2
+    command: show mpls ldp neighbor
+    match: ['Peer LDP Ident: 3\.3\.3\.3:0; Local LDP Ident 4\.4\.4\.4:0']
+    hint: If the local LDP ID shows 99.99.99.4, the router ID is not pinned to Loopback0.
+  - id: p1-mpls-ifs
+    description: P1 runs LDP on both core interfaces
+    device: P1
+    command: show mpls interfaces
+    match: ['^%if0%\s+Yes \(ldp\)', '^%if1%\s+Yes \(ldp\)']
+  - id: pe1-lfib
+    description: PE1 imposes a real label for 4.4.4.4/32 toward P1 (10.0.12.2)
+    device: PE1
+    command: show mpls forwarding-table 4.4.4.4 32
+    match: ['^\d+\s+\d+\s+4\.4\.4\.4/32\s+\d+\s+%if0s%\s+10\.0\.12\.2\b']
+    hint: The outgoing label is the one P1 advertised for 4.4.4.4/32. Without an LDP session it shows "No Label".
+  - id: p2-php
+    description: P2 pops the label for 4.4.4.4/32 (penultimate-hop popping toward PE2)
+    device: P2
+    command: show mpls forwarding-table 4.4.4.4 32
+    match: ['^\d+\s+Pop Label\s+4\.4\.4\.4/32\s+\d+\s+%if1s%\s+10\.0\.34\.4\b']
+    hint: PE2 advertises implicit-null (label 3) for its own connected prefix, so the last P router pops.
+  - id: pe1-lsp-ping
+    description: An MPLS LSP ping from PE1 to 4.4.4.4/32 succeeds
+    device: PE1
+    command: ping mpls ipv4 4.4.4.4/32 repeat 5
+    min_success: 80
+    hint: The LSP must be labelled end to end; every core link needs LDP.
+  # ---- config-mode checks (running config via CML API) ----
+  - id: pe1-cfg-ldp
+    mode: config
+    description: PE1 pins the LDP router ID to Loopback0 and runs LDP on %if0%
+    device: PE1
+    match:
+    - ^mpls ldp router-id Loopback0 force\s*$
+    - '(?:^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+mpls ip\s*$|^router ospf 1\s*\n(?:[ \t].*\n)*?[ \t]+mpls ldp autoconfig(?: area 0)?\s*$)'
+  - id: p1-cfg-ldp
+    mode: config
+    description: P1 pins the LDP router ID to Loopback0 and runs LDP on %if0% and %if1%
+    device: P1
+    match: &pcore
+    - ^mpls ldp router-id Loopback0 force\s*$
+    - '(?:^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+mpls ip\s*$|^router ospf 1\s*\n(?:[ \t].*\n)*?[ \t]+mpls ldp autoconfig(?: area 0)?\s*$)'
+    - '(?:^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+mpls ip\s*$|^router ospf 1\s*\n(?:[ \t].*\n)*?[ \t]+mpls ldp autoconfig(?: area 0)?\s*$)'
+  - id: p2-cfg-ldp
+    mode: config
+    description: P2 pins the LDP router ID to Loopback0 and runs LDP on %if0% and %if1%
+    device: P2
+    match: *pcore
+  - id: pe2-cfg-ldp
+    mode: config
+    description: PE2 pins the LDP router ID to Loopback0 and runs LDP on %if0%
+    device: PE2
+    match:
+    - ^mpls ldp router-id Loopback0 force\s*$
+    - '(?:^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+mpls ip\s*$|^router ospf 1\s*\n(?:[ \t].*\n)*?[ \t]+mpls ldp autoconfig(?: area 0)?\s*$)'
+solution_summary: |
+  **What was missing:** MPLS/LDP on the core links, and an LDP router ID the neighbors can reach.
+
+  **All four routers**
+  ```
+  mpls ldp router-id Loopback0 force
+  interface <each core link>
+   mpls ip
+  ```
+  (Alternative for the second part: `router ospf 1` / `mpls ldp autoconfig` enables LDP on every OSPF interface.)
+
+  **Why it works:** LDP discovers neighbors with UDP hellos to 224.0.0.2 (port 646) on each `mpls ip` interface,
+  then opens a TCP session between the two **LDP router IDs** (the transport address). By default the ID is the
+  highest loopback address, 99.99.99.n here. It is not in OSPF, so the TCP session would never come up even though
+  `show mpls ldp discovery` lists the neighbor. `force` pins the ID to Loopback0 and resets the sessions right away.
+  Each router then binds a local label to every IGP prefix and advertises the bindings to all its neighbors (the LIB,
+  `show mpls ldp bindings`). The binding from the IGP next hop goes into the LFIB (`show mpls forwarding-table`).
+  PE2 advertises *implicit-null* for its own 4.4.4.4/32, so P2 pops the label (PHP) and PE2 does a single IP lookup.
+  `ping mpls ipv4` sends MPLS echo requests down the LSP and proves it is labelled end to end.
+hints:
+  - "Two things: MPLS has to be switched on where labels should travel, and LDP needs a router ID its neighbors can actually reach."
+  - "`mpls ip` on every core-facing interface (both ends of each link). Look at `show mpls ldp discovery`: which LDP ID does each router announce?"
+  - "`mpls ldp router-id Loopback0 force` on all four routers; Loopback1 (99.99.99.n) would otherwise become the LDP ID and is not in OSPF."
+faults:
+- id: p1-no-mpls-to-p2
+  title: MPLS disabled on the P1-P2 link
+  device: P1
+  ticket: Customers report that MPLS traffic from PE1 to PE2 is being dropped. OSPF is fine and plain pings between the loopbacks succeed, but the LSP ping fails.
+  config: |
+    interface %if1%
+     no mpls ip
+  explanation: |-
+    **Root cause:** P1 %if1% lost `mpls ip`, so there is no LDP session between P1 and P2. P1 has no outgoing label for 4.4.4.4/32 ("No Label") and the LSP breaks in the middle. Plain IP pings still work because the core also routes unlabelled IP.
+
+    **Fix (P1):**
+    ```
+    interface %if1%
+     mpls ip
+    ```
+  hints:
+  - IP routing is healthy, so look at the label plane hop by hop.
+  - '`show mpls ldp neighbor` and `show mpls interfaces` on P1 and P2.'
+  checks: []
+- id: pe2-ldp-id-not-forced
+  title: PE2's LDP router ID is unreachable
+  device: PE2
+  ticket: After PE2 was rebooted with a cleaned-up config, P2 still lists PE2 in `show mpls ldp discovery`, but no LDP session with PE2 ever comes up.
+  config: |
+    no mpls ldp router-id Loopback0 force
+  explanation: |-
+    **Root cause:** PE2 no longer pins its LDP router ID, so it picked its highest loopback, 99.99.99.4 (Loopback1). That address is not advertised in OSPF, so P2 cannot open the LDP TCP session to it. Hellos still arrive, which is why discovery looks fine.
+
+    **Fix (PE2):**
+    ```
+    mpls ldp router-id Loopback0 force
+    ```
+  hints:
+  - Discovery works but the session doesn't. What does the session connect to?
+  - '`show mpls ldp discovery` on P2: what LDP ID does PE2 announce, and is it in P2''s routing table?'
+  checks: []
+- id: p1-ldp-password
+  title: One-sided LDP MD5 password on P1
+  device: P1
+  ticket: Security hardening was rolled out to P1 this morning. Since then, P1 and P2 show no LDP session, and P2 logs TCP MD5 authentication messages from 2.2.2.2.
+  config: |
+    mpls ldp neighbor 3.3.3.3 password LDP-KEY
+  explanation: |-
+    **Root cause:** P1 has an LDP MD5 password for neighbor 3.3.3.3, but P2 has none. LDP runs over TCP, and an MD5 signature on one side only makes the TCP session fail. The other sessions are unaffected because the password is per neighbor.
+
+    **Fix:** remove it from P1 (`no mpls ldp neighbor 3.3.3.3 password LDP-KEY`), or configure the same password on P2 for neighbor 2.2.2.2.
+  hints:
+  - Only the P1-P2 session is affected, and it started with a security change on one router.
+  - '`show running-config | include mpls ldp` on P1 and P2, then `show mpls ldp neighbor 3.3.3.3 detail` on P1.'
+  checks:
+  - id: f-p1-no-ldp-password
+    mode: config
+    description: P1 has no one-sided LDP password toward 3.3.3.3 (or P2 has the matching one)
+    device: P1
+    absent: ['^mpls ldp neighbor 3\.3\.3\.3 password']

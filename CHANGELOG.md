@@ -4,7 +4,7 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
 ## [1.6.0] - Unreleased
 ### Added
-- **Multicast labs** (16 built-in labs, 48 faults). Both run on IOL or IOSv routers, with routers acting as the
+- **Multicast labs**. Both run on IOL or IOSv routers, with routers acting as the
   source and receiver hosts:
   - `14-multicast-pim-sm` (5 nodes, ENCOR 3.3.d): `ip multicast-routing`, PIM sparse mode on every path interface, a
     static RP, an IGMP join, shared tree vs. shortest-path tree, and the RPF check.
@@ -14,6 +14,15 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
     `show ip igmp interface`, `show ip mroute` and a ping to the group; a fault check uses `show ip rpf`. Each lab has
     config checks, a solution summary, 3 hints and 3 *Break my lab* faults. The recorded outputs are synthesized from
     Cisco documentation and are not verified on real hardware.
+- **MPLS labs** (18 built-in labs, 54 faults), on IOL or IOSv:
+  - `16-mpls-ldp` (4 nodes, 2.2): LDP on the core links, `mpls ldp router-id Loopback0 force` (with an unadvertised
+    Loopback1 that shows why), label bindings, the LFIB, penultimate-hop popping and an LSP ping (`ping mpls ipv4`).
+  - `17-mpls-l3vpn` (5 nodes, advanced, 2.2 / 2.2.a): VRF CUST-A with RD and route targets, moving the CE link into the
+    VRF, iBGP VPNv4 between the PE loopbacks with extended communities, and eBGP to the CEs inside the VRF.
+  - Faults include an unreachable LDP router ID, a one-sided LDP MD5 password, a wrong import route target, and a
+    broken LSP under healthy BGP. The recorded outputs are synthesized and not verified on real hardware.
+- **Course "Multicast and MPLS track"** (`encor-multicast-mpls`) in the online library: labs 14, 15, 08-vrf-lite, 16 and 17.
+- Standalone `.encorlab` packs of the four new labs, with their own ids, attached to the release. They import into 1.5.x.
 - The offline config merge (used to validate faults) knows `ip igmp version`, `ip pim rp-candidate`, `ip pim bsr-candidate`,
   `ip pim ssm`, `mpls ldp router-id`, `mpls label protocol` and `rd` as single-value lines.
 

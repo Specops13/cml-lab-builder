@@ -32,17 +32,17 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [Version and changelog](#version-and-changelog)
 
 ## Features
-- **16 built-in labs** covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
+- **18 built-in labs** covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
   OSPFv2 multi-area/stub/summarization, EIGRP named mode with authentication and stub, eBGP/iBGP with next-hop-self,
   HSRPv2 with tracking, ACL/PAT/static NAT, VRF-lite, GRE over IPsec with OSPF, NTP/Syslog/SNMPv3/IP SLA,
   HSRP failover driven by IP SLA object tracking, policy-based routing, mutual OSPF/EIGRP redistribution with route tags,
-  and **IP multicast** (PIM sparse mode with a static RP, BSR RP election, IGMPv3 and SSM). See
-  [Multicast and MPLS labs](#multicast-and-mpls-labs).
+  **IP multicast** (PIM sparse mode with a static RP, BSR RP election, IGMPv3 and SSM) and **MPLS** (LDP core, and an
+  MPLS L3VPN with VRFs and MP-BGP VPNv4). See [Multicast and MPLS labs](#multicast-and-mpls-labs).
 - **One-click lifecycle in CML:** Build (import + start + wait for boot), Check, Reset (back to the starting configs), Destroy.
   It only ever touches labs titled `ENCOR-…`.
 - **Two grading modes:** *live* (real adjacencies, routes, pings over the console server) and *config* (HTTPS only).
   *Auto* uses live when it can and falls back to config.
-- **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (48 in total). One click rebuilds
+- **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (54 in total). One click rebuilds
   the working lab with a random fault and gives you a symptom-only trouble ticket, so you get unlimited troubleshooting practice.
 - **Exam mode:** a timed, one-shot attempt with a countdown, the solution withheld, and hints disabled or costing
   points. *Submit exam* (or the timer running out) grades once and shows a score report (raw score, hint penalty,
@@ -195,14 +195,22 @@ with `ip igmp join-group`, and a source pings the group address. Both images use
 |---|---|---|---|
 | `14-multicast-pim-sm` | `ip multicast-routing`, PIM-SM on every path interface, static RP, IGMP join, shared tree vs. SPT, RPF | 5 (SRC, R1-R3, RCV) | `show ip pim neighbor`, `show ip pim rp mapping`, `show ip igmp groups`, `ping 239.1.1.1`, `show ip mroute`, `show ip rpf` (fault) |
 | `15-multicast-bsr-ssm` | BSR election (higher priority wins) vs. C-RP election (lower wins), IGMPv3, SSM `(S,G)` channel without an RP | 6 (SRC, R1-R4, RCV) | `show ip pim bsr-router`, `show ip pim rp mapping`, `show ip igmp interface`, `show ip mroute`, pings to an ASM and an SSM group |
+| `16-mpls-ldp` | `mpls ip` on core links, `mpls ldp router-id Loopback0 force` (a decoy Loopback1 shows why), LIB/LFIB, penultimate-hop popping, LSP ping | 4 (PE1, P1, P2, PE2) | `show mpls ldp neighbor`, `show mpls interfaces`, `show mpls forwarding-table`, `ping mpls ipv4` |
+| `17-mpls-l3vpn` (advanced) | VRF with RD and route targets, `vrf forwarding` (and re-adding the IP), iBGP VPNv4 with extended communities, eBGP PE-CE inside the VRF | 5 (CE1, PE1, P, PE2, CE2) | `show bgp vpnv4 unicast all summary`, `show ip route vrf`, `show bgp vpnv4 unicast vrf … labels`, CE-to-CE ping |
 
-Each one has config checks, a solution summary, 3 progressive hints and 3 *Break my lab* faults (for example a missing
-RP on the last-hop router, PIM missing on the source LAN, a static route that drags the source tree through the RP,
-a C-RP priority that flips the RP, or IGMPv2 silently breaking SSM). The checks read `show ip mroute` right after
+Each one has config checks, a solution summary, 3 progressive hints and 3 *Break my lab* faults. Examples: a missing
+RP on the last-hop router, a static route that drags the source tree through the RP, a C-RP priority that flips the RP,
+IGMPv2 silently breaking SSM, an unreachable LDP router ID, a one-sided LDP MD5 password, a wrong import route target,
+or a broken LSP under healthy BGP. The checks read `show ip mroute` right after
 the source ping, because `(S,G)` state ages out about 3 minutes after the source stops.
+MPLS L3VPN goes beyond the ENCOR blueprint (it is ENARSI/SPCOR material), but it builds directly on VRF-lite (2.2.a).
+The **Multicast and MPLS track** course (*Library & courses*) puts them in order: 14, 15, then 08-vrf-lite, 16, 17.
+Standalone copies of the four labs (`mcast-*.encorlab`, `mpls-*.encorlab`, with their own ids) are attached to the
+v1.6.0 release for older app versions or for sharing.
 
 > **Not verified on real devices yet.** The recorded outputs these labs are tested against were written from Cisco
-> documentation and published CML `iol-xe` captures, not captured from your CML. If a live check fails on a
+> documentation (and, for multicast, published CML `iol-xe` captures), not captured from your CML. The MPLS LSP ping
+> and the `... labels` output format are the least certain parts. If a live check fails on a
 > correctly solved lab, run it in *Config* grading mode and please report the device output.
 
 ### Break my lab (fault practice)
@@ -423,7 +431,7 @@ encorlab/                 the application (Python package)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders
-  labs/<id>/              16 built-in labs (lab.yaml, solution.cfg, fixture_*.yaml)
+  labs/<id>/              18 built-in labs (lab.yaml, solution.cfg, fixture_*.yaml)
   web/                    FastAPI app, templates/index.html, static/ (app.js, help.js, help.json, style.css)
   resources/              authoring guide + example lab (source of docs/)
 docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example lab, images/

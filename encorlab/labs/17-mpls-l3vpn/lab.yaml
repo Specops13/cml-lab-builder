@@ -1,0 +1,318 @@
+id: 17-mpls-l3vpn
+title: "MPLS L3VPN: VRFs and MP-BGP VPNv4 (advanced)"
+blueprint: ["2.2", "2.2.a"]
+domain: "2.0 Virtualization"
+difficulty: 5
+summary: Build a basic MPLS Layer 3 VPN over an existing LDP core - customer VRF with RD and route targets on both PEs, an iBGP VPNv4 session between the PE loopbacks, and eBGP to the customer sites inside the VRF.
+nodes:
+  - name: CE1
+    kind: router
+    x: -500
+    y: 0
+    config: |
+      ! Customer site 1 (AS 65001) - already configured, do not change
+      interface Loopback0
+       description site-1 LAN
+       ip address 192.168.1.1 255.255.255.0
+      interface %if0%
+       description to PE1
+       ip address 10.1.1.2 255.255.255.252
+       no shutdown
+      router bgp 65001
+       bgp router-id 192.168.1.1
+       bgp log-neighbor-changes
+       neighbor 10.1.1.1 remote-as 65000
+       network 192.168.1.0 mask 255.255.255.0
+  - name: PE1
+    kind: router
+    x: -250
+    y: 0
+    config: |
+      mpls ldp router-id Loopback0 force
+      interface Loopback0
+       ip address 1.1.1.1 255.255.255.255
+      interface %if0%
+       description to P (core)
+       ip address 10.0.12.1 255.255.255.252
+       ip ospf network point-to-point
+       mpls ip
+       no shutdown
+      interface %if1%
+       description to CE1 (customer CUST-A)
+       ip address 10.1.1.1 255.255.255.252
+       no shutdown
+      router ospf 1
+       router-id 1.1.1.1
+       network 1.1.1.1 0.0.0.0 area 0
+       network 10.0.12.0 0.0.0.3 area 0
+  - name: P
+    kind: router
+    x: 0
+    y: 0
+    config: |
+      ! Provider core router - already configured, do not change
+      mpls ldp router-id Loopback0 force
+      interface Loopback0
+       ip address 2.2.2.2 255.255.255.255
+      interface %if0%
+       description to PE1
+       ip address 10.0.12.2 255.255.255.252
+       ip ospf network point-to-point
+       mpls ip
+       no shutdown
+      interface %if1%
+       description to PE2
+       ip address 10.0.23.2 255.255.255.252
+       ip ospf network point-to-point
+       mpls ip
+       no shutdown
+      router ospf 1
+       router-id 2.2.2.2
+       network 2.2.2.2 0.0.0.0 area 0
+       network 10.0.12.0 0.0.0.3 area 0
+       network 10.0.23.0 0.0.0.3 area 0
+  - name: PE2
+    kind: router
+    x: 250
+    y: 0
+    config: |
+      mpls ldp router-id Loopback0 force
+      interface Loopback0
+       ip address 3.3.3.3 255.255.255.255
+      interface %if0%
+       description to P (core)
+       ip address 10.0.23.3 255.255.255.252
+       ip ospf network point-to-point
+       mpls ip
+       no shutdown
+      interface %if1%
+       description to CE2 (customer CUST-A)
+       ip address 10.2.2.1 255.255.255.252
+       no shutdown
+      router ospf 1
+       router-id 3.3.3.3
+       network 3.3.3.3 0.0.0.0 area 0
+       network 10.0.23.0 0.0.0.3 area 0
+  - name: CE2
+    kind: router
+    x: 500
+    y: 0
+    config: |
+      ! Customer site 2 (AS 65002) - already configured, do not change
+      interface Loopback0
+       description site-2 LAN
+       ip address 192.168.2.1 255.255.255.0
+      interface %if0%
+       description to PE2
+       ip address 10.2.2.2 255.255.255.252
+       no shutdown
+      router bgp 65002
+       bgp router-id 192.168.2.1
+       bgp log-neighbor-changes
+       neighbor 10.2.2.1 remote-as 65000
+       network 192.168.2.0 mask 255.255.255.0
+links:
+  - {a: {node: CE1, port: 0}, b: {node: PE1, port: 1}}
+  - {a: {node: PE1, port: 0}, b: {node: P, port: 0}}
+  - {a: {node: P, port: 1}, b: {node: PE2, port: 0}}
+  - {a: {node: PE2, port: 1}, b: {node: CE2, port: 0}}
+task: |
+  # Lab 17 - MPLS Layer 3 VPN
+
+  The provider core (PE1 - P - PE2, AS 65000) already runs OSPF and LDP. Customer **CUST-A** has two sites: CE1
+  (AS 65001, LAN 192.168.1.0/24) and CE2 (AS 65002, LAN 192.168.2.0/24). Both CEs are already configured to peer
+  with their PE over eBGP. Connect the two sites through an MPLS L3VPN. Configure only PE1 and PE2.
+
+  1. On both PEs, create VRF **CUST-A** (`vrf definition`) with RD **65000:1**, IPv4 address family, and route
+     target **65000:1** for import and export.
+  2. Put the CE-facing interface (%if1%) into the VRF. Watch out: assigning a VRF removes the interface's IP
+     address, so put it back (PE1 10.1.1.1/30, PE2 10.2.2.1/30).
+  3. Configure **router bgp 65000** on both PEs with an iBGP session between the loopbacks (1.1.1.1 <-> 3.3.3.3,
+     update-source Loopback0). Activate it in the **VPNv4** address family and send extended communities.
+  4. In `address-family ipv4 vrf CUST-A`, peer with the local CE (PE1: 10.1.1.2 AS 65001, PE2: 10.2.2.2 AS 65002).
+
+  Verify: `show bgp vpnv4 unicast all summary`, `show ip route vrf CUST-A`, `show bgp vpnv4 unicast vrf CUST-A labels`
+  (the VPN label), and on CE1 `ping 192.168.2.1 source Loopback0`. Notice that the global routing table on the PEs
+  and P never learns 192.168.x.0. P forwards on the outer LDP label only.
+checks:
+  - id: pe1-bgp-sessions
+    description: PE1 has the VPNv4 session to PE2 (3.3.3.3) and the VRF session to CE1 (10.1.1.2) Established
+    device: PE1
+    command: show bgp vpnv4 unicast all summary
+    match: ['^3\.3\.3\.3\s+4\s+65000\s.*\s\d+\s*$', '^10\.1\.1\.2\s+4\s+65001\s.*\s\d+\s*$']
+    hint: The iBGP session must use the loopbacks (update-source) and be activated under address-family vpnv4. The CE session lives under address-family ipv4 vrf CUST-A.
+  - id: pe2-bgp-sessions
+    description: PE2 has the VPNv4 session to PE1 (1.1.1.1) and the VRF session to CE2 (10.2.2.2) Established
+    device: PE2
+    command: show bgp vpnv4 unicast all summary
+    match: ['^1\.1\.1\.1\s+4\s+65000\s.*\s\d+\s*$', '^10\.2\.2\.2\s+4\s+65002\s.*\s\d+\s*$']
+  - id: pe1-vrf-route
+    template: route_present
+    device: PE1
+    params: {prefix: 192.168.2.0/24, code: B, via: 3.3.3.3, vrf: CUST-A}
+    hint: VPNv4 routes are only imported into a VRF whose import route target matches the export RT of the other PE.
+  - id: pe1-vpn-label
+    description: PE1 has a VPN label from PE2 for 192.168.2.0/24
+    device: PE1
+    command: show bgp vpnv4 unicast vrf CUST-A labels
+    match: ['192\.168\.2\.0\S*\s+3\.3\.3\.3\s+nolabel/\d+']
+  - id: ce1-route
+    template: route_present
+    device: CE1
+    params: {prefix: 192.168.2.0/24, code: B, via: 10.1.1.1}
+    hint: CE1 learns site 2 from PE1 over eBGP once PE1 has the route in VRF CUST-A.
+  - id: ce1-ping
+    template: ping
+    device: CE1
+    params: {target: 192.168.2.1, source: Loopback0}
+    hint: If routes are everywhere but pings fail, check the label-switched path between the PE loopbacks.
+  # ---- config-mode checks (running config via CML API) ----
+  - id: pe1-cfg-vrf
+    mode: config
+    description: PE1 VRF CUST-A (RD 65000:1, RT 65000:1 import/export) on %if1% with 10.1.1.1/30
+    device: PE1
+    match:
+    - ^(?:vrf definition|ip vrf) CUST-A\s*\n(?:[ \t].*\n)*?[ \t]+rd 65000:1\s*$
+    - ^(?:vrf definition|ip vrf) CUST-A\s*\n(?:[ \t].*\n)*?[ \t]+route-target export 65000:1\s*$
+    - ^(?:vrf definition|ip vrf) CUST-A\s*\n(?:[ \t].*\n)*?[ \t]+route-target import 65000:1\s*$
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+(?:ip )?vrf forwarding CUST-A\s*$
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+ip address 10\.1\.1\.1 255\.255\.255\.252\s*$
+  - id: pe1-cfg-bgp
+    mode: config
+    description: PE1 BGP 65000 with VPNv4 to 3.3.3.3 (loopback source, extended communities) and CE1 in the VRF
+    device: PE1
+    match:
+    - ^router bgp 65000\s*\n(?:[ \t].*\n)*?[ \t]+neighbor 3\.3\.3\.3 remote-as 65000\s*$
+    - ^router bgp 65000\s*\n(?:[ \t].*\n)*?[ \t]+neighbor 3\.3\.3\.3 update-source Loopback0\s*$
+    - '^ address-family vpnv4(?: unicast)?\s*\n(?:(?! address-family)[ \t].*\n)*?[ \t]+neighbor 3\.3\.3\.3 activate\s*$'
+    - '^ address-family vpnv4(?: unicast)?\s*\n(?:(?! address-family)[ \t].*\n)*?[ \t]+neighbor 3\.3\.3\.3 send-community (?:extended|both)\s*$'
+    - '^ address-family ipv4 vrf CUST-A\s*\n(?:(?! address-family)[ \t].*\n)*?[ \t]+neighbor 10\.1\.1\.2 remote-as 65001\s*$'
+    - '^ address-family ipv4 vrf CUST-A\s*\n(?:(?! address-family)[ \t].*\n)*?[ \t]+neighbor 10\.1\.1\.2 activate\s*$'
+  - id: pe2-cfg-vrf
+    mode: config
+    description: PE2 VRF CUST-A (RD 65000:1, RT 65000:1 import/export) on %if1% with 10.2.2.1/30
+    device: PE2
+    match:
+    - ^(?:vrf definition|ip vrf) CUST-A\s*\n(?:[ \t].*\n)*?[ \t]+rd 65000:1\s*$
+    - ^(?:vrf definition|ip vrf) CUST-A\s*\n(?:[ \t].*\n)*?[ \t]+route-target export 65000:1\s*$
+    - ^(?:vrf definition|ip vrf) CUST-A\s*\n(?:[ \t].*\n)*?[ \t]+route-target import 65000:1\s*$
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+(?:ip )?vrf forwarding CUST-A\s*$
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+ip address 10\.2\.2\.1 255\.255\.255\.252\s*$
+  - id: pe2-cfg-bgp
+    mode: config
+    description: PE2 BGP 65000 with VPNv4 to 1.1.1.1 (loopback source, extended communities) and CE2 in the VRF
+    device: PE2
+    match:
+    - ^router bgp 65000\s*\n(?:[ \t].*\n)*?[ \t]+neighbor 1\.1\.1\.1 remote-as 65000\s*$
+    - ^router bgp 65000\s*\n(?:[ \t].*\n)*?[ \t]+neighbor 1\.1\.1\.1 update-source Loopback0\s*$
+    - '^ address-family vpnv4(?: unicast)?\s*\n(?:(?! address-family)[ \t].*\n)*?[ \t]+neighbor 1\.1\.1\.1 activate\s*$'
+    - '^ address-family vpnv4(?: unicast)?\s*\n(?:(?! address-family)[ \t].*\n)*?[ \t]+neighbor 1\.1\.1\.1 send-community (?:extended|both)\s*$'
+    - '^ address-family ipv4 vrf CUST-A\s*\n(?:(?! address-family)[ \t].*\n)*?[ \t]+neighbor 10\.2\.2\.2 remote-as 65002\s*$'
+    - '^ address-family ipv4 vrf CUST-A\s*\n(?:(?! address-family)[ \t].*\n)*?[ \t]+neighbor 10\.2\.2\.2 activate\s*$'
+solution_summary: |
+  **What was missing:** the customer VRF on the PEs, MP-BGP VPNv4 between them, and the PE-CE sessions in the VRF.
+
+  **PE1** (PE2 is the same with neighbor 1.1.1.1, CE 10.2.2.2 AS 65002 and interface IP 10.2.2.1)
+  ```
+  vrf definition CUST-A
+   rd 65000:1
+   address-family ipv4
+    route-target both 65000:1
+  interface %if1%
+   vrf forwarding CUST-A
+   ip address 10.1.1.1 255.255.255.252
+  router bgp 65000
+   neighbor 3.3.3.3 remote-as 65000
+   neighbor 3.3.3.3 update-source Loopback0
+   address-family vpnv4
+    neighbor 3.3.3.3 activate
+    neighbor 3.3.3.3 send-community extended
+   address-family ipv4 vrf CUST-A
+    neighbor 10.1.1.2 remote-as 65001
+    neighbor 10.1.1.2 activate
+  ```
+
+  **Why it works:** the VRF gives CUST-A its own routing table on each PE. PE1 learns 192.168.1.0/24 from CE1 inside
+  the VRF and turns it into a VPNv4 route: the RD (65000:1) makes it unique, the export route target (65000:1) is an
+  extended community, and PE1 allocates a VPN label. That is why the iBGP session needs `send-community extended` and
+  must be activated for VPNv4. PE2 imports every VPNv4 route whose RT matches its import RT into CUST-A, then advertises
+  it to CE2 over eBGP. In the data plane, PE2 pushes two labels: the VPN label (inner) and the LDP label for PE1's
+  loopback 1.1.1.1 (outer, the BGP next hop). P switches only on the outer label and pops it (PHP), and PE1 uses the VPN
+  label to pick the VRF. That is why the BGP next hop must be the PE loopback with a working LSP, and why the core never
+  needs the customer routes. `vrf forwarding` removes the interface IP, so it must be configured first and the IP re-added.
+hints:
+  - "Three building blocks on each PE: a per-customer routing table, a BGP session that can carry customer routes between PEs, and a BGP session to the CE inside that table."
+  - "`vrf definition CUST-A` with `rd` and `route-target both` under `address-family ipv4`; then `vrf forwarding CUST-A` on %if1% (and re-add the IP)."
+  - "In `router bgp 65000`: neighbor <other PE loopback> remote-as 65000 + update-source Loopback0, activate it under `address-family vpnv4` (send-community extended), and put the CE neighbor under `address-family ipv4 vrf CUST-A`."
+faults:
+- id: pe2-wrong-rt-import
+  title: Wrong import route target on PE2
+  device: PE2
+  ticket: CE1 has a BGP route to 192.168.2.0/24, but CE2 has no route back to 192.168.1.0/24, and pings between the sites fail. Both VPNv4 sessions are up.
+  config: |
+    vrf definition CUST-A
+     address-family ipv4
+      no route-target import 65000:1
+      route-target import 65000:99
+  explanation: |-
+    **Root cause:** PE2 imports route target 65000:99 instead of 65000:1. PE1's routes arrive over VPNv4 (they are in `show bgp vpnv4 unicast all`), but no VRF on PE2 imports them, so CE2 never learns site 1. Site 2's routes still reach site 1 because PE2's export RT and PE1's import RT still match.
+
+    **Fix (PE2):**
+    ```
+    vrf definition CUST-A
+     address-family ipv4
+      no route-target import 65000:99
+      route-target import 65000:1
+    ```
+  hints:
+  - The route is missing in one direction only. What decides which VPNv4 routes enter a VRF?
+  - '`show bgp vpnv4 unicast all` vs `show ip route vrf CUST-A` on PE2, then `show vrf detail CUST-A`.'
+  checks: []
+- id: p-no-mpls-to-pe2
+  title: LSP broken at P
+  device: P
+  ticket: All BGP sessions are up and both CEs have each other's routes, but no traffic passes between the customer sites. The provider loopbacks ping each other fine.
+  config: |
+    interface %if1%
+     no mpls ip
+  explanation: |-
+    **Root cause:** P %if1% (toward PE2) lost `mpls ip`, so there is no LDP session P-PE2 and no label-switched path between the PE loopbacks. P receives VPN traffic with the outer LDP label but has no outgoing label for the BGP next hop, so it removes the labels and tries an IP lookup on a customer address it doesn't know. The traffic is dropped. The control plane (BGP) doesn't notice.
+
+    **Fix (P):**
+    ```
+    interface %if1%
+     mpls ip
+    ```
+  hints:
+  - BGP is happy, so the problem is in the data plane between the PEs.
+  - '`show mpls ldp neighbor` on P, and `show mpls forwarding-table 3.3.3.3 32` on P.'
+  checks:
+  - id: f-p-mpls-links
+    mode: config
+    description: P runs LDP on both core links
+    device: P
+    match: ['^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+mpls ip\s*$', '^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+mpls ip\s*$']
+  - id: f-p-ldp-nbrs
+    description: P has LDP sessions with both PEs
+    device: P
+    command: show mpls ldp neighbor
+    match: ['Peer LDP Ident: 1\.1\.1\.1:0', 'Peer LDP Ident: 3\.3\.3\.3:0']
+- id: pe1-ce-ip-lost
+  title: PE1's CE link has no IP address
+  device: PE1
+  ticket: Right after a change on PE1 that moved the CE1 link into the customer VRF, the PE1-CE1 BGP session went down and CE1 can no longer ping 10.1.1.1.
+  config: |
+    interface %if1%
+     no ip address
+  explanation: |-
+    **Root cause:** PE1 %if1% has no IP address. Assigning `vrf forwarding` to an interface removes its IP configuration, and nobody re-applied it, so the eBGP session to CE1 cannot form.
+
+    **Fix (PE1):**
+    ```
+    interface %if1%
+     ip address 10.1.1.1 255.255.255.252
+    ```
+  hints:
+  - What does IOS do to an interface's addressing when you change its VRF?
+  - '`show ip vrf interfaces` or `show ip interface brief` on PE1.'
+  checks: []
