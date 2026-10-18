@@ -716,6 +716,7 @@ async function loadSettings() {
   for (const k of ["cml_url", "username", "console_host", "console_port", "grading_mode", "platform", "node_limit", "ai_base_url", "ai_model"]) f[k].value = s[k] ?? "";
   f.verify_tls.value = s.verify_tls === false ? "false" : "true";
   f.show_help.checked = s.show_help !== false; if (window.Help) Help.setVisible(f.show_help.checked);
+  f.check_updates.checked = s.check_updates === true;
   f.password.value = ""; f.password.placeholder = s.password_set ? "(saved - leave blank to keep)" : "";
   f.ai_api_key.value = ""; f.ai_api_key.placeholder = s.ai_api_key_set ? "(saved - leave blank to keep)" : "";
   presets = await api("/api/ai/presets");
@@ -729,7 +730,7 @@ $("#settings-form").addEventListener("submit", async (e) => {
     console_host: f.console_host.value, console_port: Number(f.console_port.value) || 22, grading_mode: f.grading_mode.value,
     platform: f.platform.value, node_limit: Number(f.node_limit.value) || 20, remember_password: f.remember_password.checked,
     ai_preset: f.ai_preset.value, ai_base_url: f.ai_base_url.value, ai_model: f.ai_model.value, ai_api_key: f.ai_api_key.value,
-    remember_ai_key: f.remember_ai_key.checked, show_help: f.show_help.checked};
+    remember_ai_key: f.remember_ai_key.checked, show_help: f.show_help.checked, check_updates: f.check_updates.checked};
   try {
     const r = await api("/api/settings", {method: "POST", body: JSON.stringify(body)});
     if (window.Help) Help.setVisible(r.show_help !== false);
@@ -738,6 +739,37 @@ $("#settings-form").addEventListener("submit", async (e) => {
     loadSettings();
   } catch (err) { toast("Settings not saved: " + err.message, "err", 9000); }
 });
+
+/* ---------------------------------------------------------------- update check (GitHub Releases; on click, or daily if enabled) */
+async function checkUpdates(manual) {
+  const out = $("#update-result");
+  if (manual && out) out.textContent = "Checking…";
+  let r;
+  try { r = await api("/api/update-check"); }
+  catch (e) {
+    const msg = `Could not check for updates: ${(e.data && e.data.error) || e.message}`;
+    if (out) out.textContent = msg; if (manual) toast(msg, "err", 8000);
+    return;
+  }
+  localStorage.setItem("updateChecked", String(Date.now()));
+  const text = r.update_available ? `Version ${r.latest} is available (you have ${r.current}).`
+    : `You have the latest version (${r.current}).`;
+  if (out) out.innerHTML = `${esc(text)} <a data-help="s.releaseLink" href="${esc(r.url)}" target="_blank" rel="noopener">Release page ↗</a>`;
+  if (r.update_available) {
+    const seen = localStorage.getItem("updateDismissed");
+    if (manual || seen !== r.latest) {
+      banner(`ENCOR Lab Builder ${r.latest} is available (you have ${r.current}). Download it from ${r.url}`);
+      localStorage.setItem("updateDismissed", r.latest);
+    }
+  } else if (manual) toast(text, "ok");
+}
+$("#s-update-check").onclick = () => checkUpdates(true);
+$("#update-link").onclick = (e) => { e.preventDefault(); show("settings"); location.hash = "settings"; checkUpdates(true); };
+async function autoUpdateCheck() {
+  const s = await api("/api/settings");
+  const last = Number(localStorage.getItem("updateChecked") || 0);
+  if (s.check_updates === true && Date.now() - last > 86400000) await checkUpdates(false);
+}
 
 /* ---------------------------------------------------------------- version check (stale cache / app updated while open) */
 async function versionCheck() {
@@ -762,6 +794,7 @@ async function versionCheck() {
   await step("check templates", async () => { templates = await api("/api/templates"); });
   await step("lab list", loadLabs);
   await step("courses", loadCourses);
+  autoUpdateCheck().catch(() => {});   // opt-in, at most once a day; never blocks startup
   const v = (location.hash || "#labs").slice(1);
   show(VIEWS.includes(v) ? v : "labs");
 })();

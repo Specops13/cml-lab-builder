@@ -345,6 +345,21 @@ def fault(lab_id: str, reveal: bool = typer.Option(False, "--reveal", help="show
     typer.echo("TROUBLE TICKET: " + faults.public(lab, st, plat)["ticket"])
 
 
+@app.command("update-check")
+def update_check():
+    """Check GitHub Releases for a newer version (one anonymous request; nothing is installed)."""
+    from . import updates
+    try:
+        r = updates.check()
+    except library.LibraryError as e:
+        typer.echo(f"ERROR: could not check for updates: {e}")
+        raise typer.Exit(1)
+    if r["update_available"]:
+        typer.echo(f"Update available: {r['latest']} (you have {r['current']}). Download: {r['url']}")
+    else:
+        typer.echo(f"You have the latest version ({r['current']}; latest release {r['latest']}).")
+
+
 @app.command("console")
 def console_cmds(lab_id: str):
     """Show the CML web link and console server commands for the lab's nodes."""

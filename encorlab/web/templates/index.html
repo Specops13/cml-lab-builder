@@ -21,6 +21,7 @@
         <a data-help="more.ai" href="#ai" data-view="ai">Generate with AI</a>
         <a data-help="more.copyPrompt" href="#" id="copy-prompt-link">Copy prompt for any AI</a>
         <a data-help="more.schema" href="/api/schema" target="_blank">Lab JSON Schema</a>
+        <a data-help="more.updates" href="#" id="update-link">Check for updates</a>
       </div></div>
     <button data-help="theme" class="ghost" id="theme-btn" aria-label="Toggle dark mode">◐</button>
   </nav>
@@ -120,6 +121,9 @@
     <label>Device images <select data-help="s.platform" name="platform"><option value="iol">IOL / IOL-L2 (light)</option><option value="iosv">IOSv / IOSvL2</option></select></label>
     <label>Node limit <input data-help="s.node_limit" name="node_limit" type="number" min="1"></label>
     <label class="inline"><input data-help="s.show_help" name="show_help" type="checkbox"> Show help icons</label>
+    <h2>Updates</h2>
+    <label class="inline"><input data-help="s.check_updates" name="check_updates" type="checkbox"> Check for new versions automatically (once a day)</label>
+    <div class="toolbar"><button data-help="s.updateNow" type="button" id="s-update-check">Check for updates now</button><span id="update-result" class="muted small"></span></div>
     <details><summary data-help="s.aiSection"><b>AI generator (optional)</b></summary>
       <label>Preset <select data-help="s.ai_preset" name="ai_preset" id="ai-preset"><option value="">(none)</option></select></label>
       <label>Base URL (OpenAI-compatible) <input data-help="s.ai_base_url" name="ai_base_url" placeholder="https://api.x.ai/v1"></label>

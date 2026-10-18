@@ -61,6 +61,8 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   placeholders, so one lab file works on both.
 - **Safe by design:** loopback-only UI, read-only checks, secrets kept in memory or the OS keyring and never written to
   settings.json or logs. TLS verification stays on.
+- **Update check:** *More > Check for updates* (or *Settings > Updates*) asks GitHub Releases whether a newer version
+  exists. The automatic daily check is **off by default**.
 - **Ready-to-run downloads** for Windows 11 and Linux (no Python needed), plus a `?` help tooltip on every control and a dark mode.
 
 ## Screenshots
@@ -159,6 +161,7 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `hint <lab> [N]`, `solution <lab>` | progressive hint N of M; solution summary + config (spoilers) |
 | `break <lab> [--fault ID]`, `fault <lab> [--reveal\|--end]` | Break my lab: rebuild with a random fault and print the ticket; show/reveal/end the active fault |
 | `console <lab>` | CML web link and console server `ssh` commands for each node |
+| `update-check` | ask GitHub Releases whether a newer version exists (nothing is installed) |
 | `history <lab>` | your past scores (with hints used) |
 | `progress [--json]` | progress dashboard: mastery per exam domain, streak, time spent, weakest topics |
 | `library list` / `library install <file or https URL> [--sha256 …]` | browse / install from the online lab library |
@@ -287,6 +290,8 @@ Everything can be set on the **Settings** page; `.env` / environment variables p
 - Only touches labs titled `ENCOR-…`. Deleting anything else is refused.
 - Checks never change device configuration (only `show` and `ping` commands are allowed in labs).
 - Imported packs are size-limited (5 MB) and path-checked. A lab file only contains data (YAML/regex), never code.
+- Internet access happens only when you ask for it: *Load library* / *Install* (raw.githubusercontent.com or your URL) and
+  *Check for updates* (api.github.com), or once a day if you turn on *Settings > Updates*. Nothing is installed automatically.
 - Library downloads are https-only (redirects included), size-limited and verified against the sha256 in the index before
   they are validated and installed.
 - The UI listens on 127.0.0.1 only. Secrets are never returned by the API or written to logs.

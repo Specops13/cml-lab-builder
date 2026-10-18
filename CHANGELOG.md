@@ -19,6 +19,8 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 - **Console links:** a *Consoles* section per built lab with *Open lab in CML* (`https://<cml>/lab/<id>`) and a copyable
   console server command per node (`ssh -t user@host "open /<lab>/<node>/0"`, custom port supported). Also `console <lab>`
   in the CLI and `cml_lab_url` / `consoles` in `GET /api/labs/{id}/status`.
+- **Update check:** *More > Check for updates*, *Settings > Updates* and `update-check` compare your version with the
+  latest GitHub release and link to it. The optional daily automatic check (`check_updates`) is off by default.
 - Lab files can define `faults:`. The validator applies each fault offline with an IOS-style config merge and requires
   that it is detected and fixable.
 ### Changed

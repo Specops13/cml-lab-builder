@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, catalog, config, courses, faults, history, library, packs, progress, service
+from .. import __version__, ai, catalog, config, courses, faults, history, library, packs, progress, service, updates
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -53,6 +53,7 @@ class SettingsIn(BaseModel):
     ai_model: str | None = None
     ai_api_key: str | None = None
     show_help: bool | None = None
+    check_updates: bool | None = None
     remember_password: bool = False
     remember_ai_key: bool = False
 
@@ -79,7 +80,7 @@ class CmlDraftIn(BaseModel):
 
 def create_app(store: config.SettingsStore | None = None, client_factory=None, runner_factory=None,
                config_factory=None, probe=None, persist: bool = True, ai_transport=None,
-               library_fetch=None) -> FastAPI:
+               library_fetch=None, update_fetch=None) -> FastAPI:
     store = store or config.SettingsStore()
     jobs = service.JobManager()
     app = FastAPI(title="ENCOR Lab Builder", version=__version__)
@@ -356,6 +357,14 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         return progress.compute()
 
     # ------------------------------------------------------------ settings
+    @app.get("/api/update-check")
+    def update_check():
+        """One GET to the GitHub Releases API; only called on a click or when check_updates is on."""
+        try:
+            return updates.check(__version__, fetch=update_fetch or library.http_fetch)
+        except library.LibraryError as e:
+            return JSONResponse({"error": str(e), "current": __version__, "url": updates.RELEASES_PAGE}, status_code=502)
+
     @app.get("/api/settings")
     def get_settings():
         return store.get().public_dict()

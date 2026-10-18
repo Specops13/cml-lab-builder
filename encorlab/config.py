@@ -47,6 +47,7 @@ class Settings:
     ai_model: str = ""
     ai_api_key: str = field(default="", repr=False)
     show_help: bool = True          # web UI: show the small "?" help icons
+    check_updates: bool = False     # web UI: check GitHub Releases for a new version once a day (off by default)
 
     def __repr__(self) -> str:  # never leak secrets
         parts = []
@@ -125,7 +126,8 @@ def from_env(env: dict | None = None) -> Settings:
 
 # Non-secret settings saved from the web Settings page. Passwords are never written here.
 PERSISTED = ("cml_url", "username", "verify_tls", "console_host", "console_port", "grading_mode",
-             "platform", "node_limit", "boot_timeout", "ai_preset", "ai_base_url", "ai_model", "show_help")
+             "platform", "node_limit", "boot_timeout", "ai_preset", "ai_base_url", "ai_model", "show_help",
+             "check_updates")
 
 
 def settings_file(env=None) -> Path:
@@ -194,7 +196,7 @@ class SettingsStore:
                     v = int(v)
                 if k == "verify_tls" and isinstance(v, str):
                     v = _bool_or_path(v, True)
-                if k == "show_help":
+                if k in ("show_help", "check_updates"):
                     v = v if isinstance(v, bool) else str(v).strip().lower() in ("1", "true", "yes", "on")
                 if k == "cml_url" and isinstance(v, str):
                     v = v.strip().rstrip("/")
