@@ -159,3 +159,67 @@ hints:
   - "Build the GRE tunnel first and test that you can ping across it before adding OSPF or IPsec."
   - "Run OSPF only on the tunnel and the LAN loopbacks. Never on the WAN interface the tunnel is sourced from."
   - "Protect the tunnel with an IPsec profile. The IKE policy, pre-shared key (per peer address) and transform-set must match on both routers."
+faults:
+- id: r2-psk-mismatch
+  title: Pre-shared key mismatch
+  device: R2
+  ticket: Tunnel0 is up/up on both routers, but OSPF over it never comes up. `show crypto isakmp sa` on R1 shows MM_NO_STATE.
+  config: |
+    crypto isakmp key WRONG123 address 203.0.113.1
+  explanation: |-
+    **Root cause:** R2's ISAKMP pre-shared key for R1 was changed, so IKE phase 1 authentication fails.
+
+    **Fix (R2):**
+    ```
+    crypto isakmp key ENCOR123 address 203.0.113.1
+    ```
+  hints:
+  - MM_NO_STATE means IKE phase 1 never completes.
+  - Compare the `crypto isakmp key` lines on R1 and R2.
+  checks:
+  - id: f-r2-cfg-psk
+    mode: config
+    device: R2
+    description: R2 uses the shared ISAKMP key for R1
+    match:
+    - ^crypto isakmp key (\d )?ENCOR123 address 203\.0\.113\.1
+    hint: crypto isakmp key ENCOR123 address 203.0.113.1
+- id: r1-wrong-destination
+  title: Wrong tunnel destination on R1
+  device: R1
+  ticket: R1's Tunnel0 is up/up, yet there is no OSPF neighbor and no IPsec SA. R2 never receives any GRE or IKE packets from R1.
+  config: |
+    interface Tunnel0
+     tunnel destination 198.51.100.2
+  explanation: |-
+    **Root cause:** R1's tunnel destination points at the ISP router (198.51.100.2) instead of R2 (198.51.100.1).
+
+    **Fix (R1):**
+    ```
+    interface Tunnel0
+     tunnel destination 198.51.100.1
+    ```
+    A GRE tunnel is up/up as soon as the destination is routable, even if nothing answers there.
+  hints:
+  - A GRE tunnel can be up/up while pointing at the wrong place.
+  - Compare R1's `show interfaces Tunnel0` destination with R2's public address.
+  checks: []
+- id: r2-no-protection
+  title: Tunnel protection missing on R2
+  device: R2
+  ticket: OSPF over Tunnel0 is down. R1 shows encrypted packets going out but nothing coming back decrypted, and R2's tunnel is up/up.
+  config: |
+    interface Tunnel0
+     no tunnel protection ipsec profile GRE-PROT
+  explanation: |-
+    **Root cause:** `tunnel protection ipsec profile GRE-PROT` was removed from R2's Tunnel0. R1 encrypts and R2 sends clear GRE, so neither side accepts the other's packets.
+
+    **Fix (R2):**
+    ```
+    interface Tunnel0
+     tunnel protection ipsec profile GRE-PROT
+    ```
+  hints:
+  - Both ends must protect the tunnel the same way.
+  - Compare the Tunnel0 configs of R1 and R2.
+  checks: []

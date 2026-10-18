@@ -47,7 +47,8 @@ def list_labs():
     plat = get_platform(config.from_env().platform)
     for lid, e in catalog.entries().items():
         lab = e.lab
-        typer.echo(f"{lid:28} {e.source:7} {lab.node_count} nodes  d{lab.difficulty}  [{', '.join(lab.blueprint)}]  {render(lab.title, plat)}")
+        fl = f"  faults:{len(lab.faults)}" if lab.faults else ""
+        typer.echo(f"{lid:28} {e.source:7} {lab.node_count} nodes  d{lab.difficulty}  [{', '.join(lab.blueprint)}]  {render(lab.title, plat)}{fl}")
 
 
 @app.command()
@@ -214,6 +215,11 @@ def _print_check(rep: dict) -> None:
     for n in rep["notes"]:
         typer.echo(f"NOTE: {n}")
     typer.echo(f"Mode {rep['mode']}: score {rep['earned']}/{rep['total']} ({rep['score_pct']}%)")
+    if rep.get("fault_fixed"):
+        ff = rep["fault_fixed"]
+        typer.echo("")
+        typer.echo(f"Fault fixed: {ff['title']} (on {ff['device']})")
+        typer.echo(ff["explanation"].rstrip())
     if rep.get("passed") and rep.get("solution_summary"):
         typer.echo("")
         typer.echo("Solution summary" + (" (auto-generated)" if rep.get("solution_summary_auto") else "") + ":")
@@ -270,9 +276,41 @@ def show_history(lab_id: str):
         typer.echo(f"{h['ts']}  {h['mode']:6}  {h['earned']}/{h['total']}{hu}  {'SOLVED' if h['passed'] else ''}")
 
 
+@app.command("break")
+def break_lab(lab_id: str, fault: str = typer.Option(None, help="a specific fault id (default: random)")):
+    """Break my lab: rebuild a working lab with one random predefined fault, then troubleshoot it."""
+    rep = service.do_break(_settings(), lab_id, _p, fault_id=fault)
+    typer.echo("")
+    typer.echo("TROUBLE TICKET: " + rep["ticket"])
+    typer.echo(f"Fix it, then run: encorlab check {lab_id}   (encorlab fault {lab_id} --reveal to give up)")
+
+
+@app.command()
+def fault(lab_id: str, reveal: bool = typer.Option(False, "--reveal", help="show the cause and fix (spoiler)"),
+          end: bool = typer.Option(False, "--end", help="stop fault practice for this lab")):
+    """Show the active 'Break my lab' ticket, reveal its answer, or end fault practice."""
+    from . import faults
+    lab = catalog.get(lab_id)
+    plat = get_platform(config.from_env().platform)
+    st = faults.active(lab_id)
+    if end:
+        faults.clear(lab_id)
+        typer.echo("fault practice ended (use 'encorlab reset' to go back to the starting configs)")
+        return
+    if not st:
+        typer.echo(f"No active fault. {len(lab.faults)} predefined faults; start with: encorlab break {lab_id}")
+        raise typer.Exit(1)
+    if reveal:
+        faults.mark_revealed(lab_id)
+        r = faults.reveal(lab, faults.get(lab, st["fault_id"]), plat)
+        typer.echo(f"Fault: {r['title']} (on {r['device']})\n\n{r['explanation'].rstrip()}")
+        return
+    typer.echo("TROUBLE TICKET: " + faults.public(lab, st, plat)["ticket"])
+
+
 @app.command()
 def reset(lab_id: str):
-    """Stop, wipe, restore initial configs and restart a lab."""
+    """Stop, wipe, restore initial configs and restart a lab (during fault practice: the broken configs)."""
     service.do_reset(_settings(), lab_id, _p)
 
 

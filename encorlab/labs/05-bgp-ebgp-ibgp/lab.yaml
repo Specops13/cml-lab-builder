@@ -201,3 +201,70 @@ hints:
   - "Start with the eBGP sessions on the directly connected links. Each side names the other AS."
   - "The iBGP session runs between loopbacks: both routers must source it from Loopback0."
   - "The iBGP session is up but the routes aren't best (no `>`)? Check the next hop of the eBGP-learned prefixes."
+faults:
+- id: r2-no-nhs
+  title: next-hop-self missing on R2
+  device: R2
+  ticket: R4 (AS 65002) cannot reach 192.168.1.0/24. On R3 the BGP route to 192.168.1.0 is present but not marked best (no >).
+  config: |
+    router bgp 65000
+     no neighbor 10.255.0.3 next-hop-self
+  explanation: |-
+    **Root cause:** R2 no longer sets itself as next hop towards its iBGP peer R3. R3 receives 192.168.1.0/24 with next hop 10.0.12.1, which it cannot resolve.
+
+    **Fix (R2):**
+    ```
+    router bgp 65000
+     neighbor 10.255.0.3 next-hop-self
+    ```
+    eBGP next hops are carried unchanged into iBGP, so the iBGP peer must be able to reach them.
+  hints:
+  - A BGP route that is received but never best is usually not usable. Why?
+  - 'Check the Next Hop column of `show ip bgp` on R3: can R3 reach that address?'
+  checks: []
+- id: r3-no-update-source
+  title: Wrong iBGP update source on R3
+  device: R3
+  ticket: The iBGP session between R2 and R3 is stuck in Active/Idle since R3 was reloaded with a 'cleaned up' config. Both loopbacks are reachable.
+  config: |
+    router bgp 65000
+     no neighbor 10.255.0.2 update-source Loopback0
+  explanation: |-
+    **Root cause:** R3 sources its iBGP session from the physical interface, but R2 expects the session from R3's Loopback0 (10.255.0.3), so R2 rejects it.
+
+    **Fix (R3):**
+    ```
+    router bgp 65000
+     neighbor 10.255.0.2 update-source Loopback0
+    ```
+    With loopback peering, both peers must source the TCP session from their loopback.
+  hints:
+  - The loopbacks can reach each other, so look at how the TCP session is sourced.
+  - Compare the neighbor statements for the iBGP peer on R2 and R3.
+  checks: []
+- id: r1-wrong-remote-as
+  title: Wrong remote-as on R1
+  device: R1
+  ticket: 'R2 logs ''BGP notification sent: bad remote AS'' for 10.0.12.1 every minute. R1 has no BGP routes at all.'
+  config: |
+    router bgp 65001
+     neighbor 10.0.12.2 remote-as 65010
+  explanation: |-
+    **Root cause:** R1's neighbor statement for R2 uses remote-as 65010, but R2 is in AS 65000, so the OPEN messages are rejected.
+
+    **Fix (R1):**
+    ```
+    router bgp 65001
+     neighbor 10.0.12.2 remote-as 65000
+    ```
+  hints:
+  - BGP OPEN messages carry the AS number, and the peer checks it.
+  - Does R1's `neighbor 10.0.12.2 remote-as` match R2's actual AS?
+  checks:
+  - id: f-r1-cfg-remote-as
+    mode: config
+    device: R1
+    description: R1 peers with R2 in AS 65000
+    match:
+    - ^\s+neighbor 10\.0\.12\.2 remote-as 65000\s*$
+    hint: neighbor 10.0.12.2 remote-as 65000

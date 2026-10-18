@@ -129,7 +129,7 @@ checks:
     device: R2
     match:
     - ^ip access-list extended BLOCK-TELNET
-    - ^\s+deny\s+tcp any any eq telnet
+    - ^\s+(\d+\s+)?deny\s+tcp any any eq telnet
     - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip access-group BLOCK-TELNET in
 solution_summary: |
   **What was missing:** R2 had no NAT and no ACLs, so the private LAN could not reach the internet, the server was not
@@ -159,3 +159,74 @@ hints:
   - "NAT needs to know which interfaces are inside and outside."
   - "PAT for the whole LAN uses an ACL that matches the inside hosts, plus `overload` on the outside interface. The server needs a separate static mapping."
   - "Filter Telnet with a named extended ACL, as close to the source as possible. Don't forget that ACLs end with an implicit deny."
+faults:
+- id: r2-no-nat-outside
+  title: ip nat outside missing
+  device: R2
+  ticket: Users on 192.168.1.0/24 lost Internet access, and `show ip nat translations` on R2 is empty.
+  config: |
+    interface %if1%
+     no ip nat outside
+  explanation: |-
+    **Root cause:** `ip nat outside` was removed from R2 %if1%. NAT only translates traffic between an inside and an outside interface.
+
+    **Fix (R2):**
+    ```
+    interface %if1%
+     ip nat outside
+    ```
+  hints:
+  - No translations at all means NAT never sees a matching packet flow.
+  - 'Check `show ip nat statistics` on R2: are both inside and outside interfaces listed?'
+  checks: []
+- id: r2-acl-outbound
+  title: Telnet filter applied in the wrong direction
+  device: R2
+  ticket: Telnet from the LAN to the Internet works again, which the security policy forbids. The ACL BLOCK-TELNET itself was not changed.
+  config: |
+    interface %if0%
+     no ip access-group BLOCK-TELNET in
+     ip access-group BLOCK-TELNET out
+  explanation: |-
+    **Root cause:** BLOCK-TELNET is now applied outbound on the LAN interface %if0%, so it only filters traffic going *to* the LAN, not Telnet sessions coming *from* it.
+
+    **Fix (R2):**
+    ```
+    interface %if0%
+     no ip access-group BLOCK-TELNET out
+     ip access-group BLOCK-TELNET in
+    ```
+  hints:
+  - The ACL is fine, so look at where and how it is applied.
+  - 'Check `show ip interface %if0%` on R2: inbound or outbound access list?'
+  checks: []
+- id: r2-nat-acl-wrong
+  title: NAT ACL matches the wrong subnet
+  device: R2
+  ticket: Users on 192.168.1.0/24 lost Internet access, but the published server 203.0.113.5 can still be reached from outside.
+  config: |
+    ip access-list standard NAT-INSIDE
+     no permit 192.168.1.0 0.0.0.255
+     permit 192.168.10.0 0.0.0.255
+  explanation: |-
+    **Root cause:** the NAT-INSIDE ACL now permits 192.168.10.0/24 instead of 192.168.1.0/24, so PAT no longer matches the LAN. Static NAT does not use the ACL and keeps working.
+
+    **Fix (R2):**
+    ```
+    ip access-list standard NAT-INSIDE
+     no permit 192.168.10.0 0.0.0.255
+     permit 192.168.1.0 0.0.0.255
+    ```
+  hints:
+  - Static NAT works and dynamic PAT doesn't. What does only PAT depend on?
+  - Check `show ip access-lists NAT-INSIDE` on R2.
+  checks:
+  - id: f-r2-cfg-nat-acl
+    mode: config
+    device: R2
+    description: NAT-INSIDE permits the LAN 192.168.1.0/24
+    match:
+    - ^ip access-list standard NAT-INSIDE\s*\n(?:[ \t].*\n)*?[ \t]+(\d+\s+)?permit 192\.168\.1\.0 0\.0\.0\.255
+    absent:
+    - ^ip access-list standard NAT-INSIDE\s*\n(?:[ \t].*\n)*?[ \t]+(\d+\s+)?permit 192\.168\.10\.0
+    hint: NAT-INSIDE must permit 192.168.1.0 0.0.0.255

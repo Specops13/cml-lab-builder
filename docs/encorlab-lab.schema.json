@@ -136,6 +136,70 @@
       "title": "Endpoint",
       "type": "object"
     },
+    "Fault": {
+      "additionalProperties": false,
+      "description": "A predefined fault for \"Break my lab\": applied on top of a working (solved) lab so the student\ngets a realistic trouble ticket. `config` is IOS config applied after the solution (use `no ...`\nto remove lines). Optional `checks` are graded in addition to the lab checks while the fault is active.",
+      "properties": {
+        "id": {
+          "description": "Short unique id, e.g. 'r2-wrong-key'",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "description": "Short name of the fault (shown after it is fixed)",
+          "title": "Title",
+          "type": "string"
+        },
+        "ticket": {
+          "description": "Symptom-only trouble ticket shown to the student (never the cause)",
+          "title": "Ticket",
+          "type": "string"
+        },
+        "device": {
+          "description": "Device the fault is applied to",
+          "title": "Device",
+          "type": "string"
+        },
+        "config": {
+          "description": "IOS config applied after the solution, e.g. 'interface %if0%\\n shutdown'",
+          "title": "Config",
+          "type": "string"
+        },
+        "explanation": {
+          "description": "Markdown: root cause and the exact fix, shown after the fault is fixed or revealed",
+          "title": "Explanation",
+          "type": "string"
+        },
+        "hints": {
+          "default": [],
+          "description": "Progressive hints for this fault, vaguest first",
+          "items": {
+            "type": "string"
+          },
+          "title": "Hints",
+          "type": "array"
+        },
+        "checks": {
+          "default": [],
+          "description": "Extra checks graded while this fault is active",
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "title": "Checks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "ticket",
+        "device",
+        "config",
+        "explanation"
+      ],
+      "title": "Fault",
+      "type": "object"
+    },
     "Link": {
       "additionalProperties": false,
       "properties": {
@@ -307,6 +371,15 @@
         "type": "string"
       },
       "title": "Hints",
+      "type": "array"
+    },
+    "faults": {
+      "default": [],
+      "description": "Optional predefined faults for 'Break my lab' (random troubleshooting practice on the solved lab)",
+      "items": {
+        "$ref": "#/$defs/Fault"
+      },
+      "title": "Faults",
       "type": "array"
     },
     "author": {

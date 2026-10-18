@@ -170,3 +170,55 @@ hints:
   - "NTP first: R1 is the master. Clients only sync to a server they trust, so all three routers need the same authentication key."
   - "NTP can take a few minutes to sync. Meanwhile, set up syslog (host, severity, timestamps) and the SNMPv3 group/user with authPriv."
   - "An IP SLA operation does nothing until it is scheduled."
+faults:
+- id: r2-no-trusted-key
+  title: NTP trusted-key missing on R2
+  device: R2
+  ticket: 'R2 is no longer synchronized: `show ntp status` says ''Clock is unsynchronized'', while R3 is still synchronized to R1.'
+  config: |
+    no ntp trusted-key 1
+  explanation: |-
+    **Root cause:** `ntp trusted-key 1` was removed from R2. With `ntp authenticate` on, R2 only syncs to servers whose key is trusted.
+
+    **Fix (R2):**
+    ```
+    ntp trusted-key 1
+    ```
+  hints:
+  - Authentication is on, so check which keys R2 accepts.
+  - Compare the `^ntp` lines of R2 and R3 (`show running-config | include ^ntp`).
+  checks: []
+- id: r2-syslog-warnings
+  title: Syslog trap level too high
+  device: R2
+  ticket: The syslog server 10.255.0.1 stopped receiving interface up/down and configuration messages from R2; only errors still arrive.
+  config: |
+    logging trap warnings
+  explanation: |-
+    **Root cause:** the trap level on R2 was changed to warnings (4), so notifications (5) and informational (6) messages are no longer sent.
+
+    **Fix (R2):**
+    ```
+    logging trap informational
+    ```
+  hints:
+  - Some messages still arrive, so the transport works. Think severity levels.
+  - Check the 'Trap logging' line in `show logging` on R2.
+  checks: []
+- id: r3-sla-unscheduled
+  title: IP SLA operation not scheduled
+  device: R3
+  ticket: 'The IP SLA probe 10 on R3 shows no statistics (''Number of successes: Unknown'') since R3 was reloaded.'
+  config: |
+    no ip sla schedule 10 life forever start-time now
+  explanation: |-
+    **Root cause:** the `ip sla schedule` line was removed, so operation 10 is defined but never runs.
+
+    **Fix (R3):**
+    ```
+    ip sla schedule 10 life forever start-time now
+    ```
+  hints:
+  - 'An IP SLA operation needs two parts: the definition and something that starts it.'
+  - 'Check `show ip sla configuration 10` on R3: is it scheduled?'
+  checks: []

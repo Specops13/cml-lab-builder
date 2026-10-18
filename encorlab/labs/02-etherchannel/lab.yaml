@@ -157,3 +157,70 @@ hints:
   - "Which negotiation protocol does each bundle use? LACP and PAgP have different mode keywords."
   - "Only one side may start negotiation: SW2 must be the passive/auto side. Members only join when their switchport settings match."
   - "Put the trunk or access settings on the Port-channel interface as well, and don't forget the load-balancing method."
+faults:
+- id: sw2-po1-mode-on
+  title: LACP member forced to mode on
+  device: SW2
+  ticket: Port-channel 1 between SW1 and SW2 is running on only one link. SW1 flags one of its LACP members as stand-alone (I) or suspended.
+  config: |
+    interface %if1%
+     channel-group 1 mode on
+  explanation: |-
+    **Root cause:** SW2 %if1% was changed to `channel-group 1 mode on` (static, no LACP) while SW1 runs LACP active, so SW1 never receives LACPDUs on that link.
+
+    **Fix (SW2):**
+    ```
+    interface %if1%
+     channel-group 1 mode passive
+    ```
+    LACP needs active/active or active/passive; `on` only works when both ends are `on`.
+  hints:
+  - Look at the member ports of Port-channel 1 on both switches.
+  - Compare the channel-group mode of every Po1 member on SW1 and SW2 (`show etherchannel summary`, running config).
+  checks: []
+- id: sw1-po2-vlan-mismatch
+  title: Access VLAN mismatch on a PAgP member
+  device: SW1
+  ticket: Port-channel 2 lost one of its two member links after somebody 'tidied up' an access port on SW1. The port shows as suspended (s).
+  config: |
+    interface %if3%
+     switchport access vlan 1
+  explanation: |-
+    **Root cause:** SW1 %if3% was moved to access VLAN 1 while Port-channel 2 and the other member use VLAN 10. Members with different settings are suspended.
+
+    **Fix (SW1):**
+    ```
+    interface %if3%
+     switchport access vlan 10
+    ```
+    All members of an EtherChannel must have the same speed, duplex, mode and VLAN settings.
+  hints:
+  - A suspended member usually means its settings differ from the port-channel.
+  - Compare `show running-config interface` of the two Po2 members on SW1.
+  checks:
+  - id: f-sw1-cfg-po2-vlan
+    mode: config
+    device: SW1
+    description: SW1 Po2 members use access VLAN 10
+    match:
+    - ^interface %if2%\s*\n(?:[ \t].*\n)*?[ \t]+switchport access vlan 10\s*$
+    - ^interface %if3%\s*\n(?:[ \t].*\n)*?[ \t]+switchport access vlan 10\s*$
+    hint: Every Po2 member must be in access VLAN 10
+- id: sw1-lb-src-mac
+  title: Load-balancing method changed
+  device: SW1
+  ticket: Monitoring shows that all traffic between the two server subnets is pinned to a single member of Port-channel 1, while the other link sits idle.
+  config: |
+    port-channel load-balance src-mac
+  explanation: |-
+    **Root cause:** the global load-balancing method on SW1 was changed to `src-mac`; with few source MACs every flow hashes onto the same link.
+
+    **Fix (SW1):**
+    ```
+    port-channel load-balance src-dst-ip
+    ```
+    Hashing on both source and destination IP spreads flows between many host pairs across the members.
+  hints:
+  - The bundle is up; the issue is how flows are distributed across it.
+  - Check `show etherchannel load-balance` on SW1.
+  checks: []

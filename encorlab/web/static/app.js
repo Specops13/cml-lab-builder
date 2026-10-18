@@ -159,7 +159,7 @@ function renderList() {
   $("#lab-list").innerHTML = items.map((l) => `<li data-help="lab.item" data-id="${esc(l.id)}" class="${l.id === current ? "sel" : ""}">
     <b>${esc(l.title)}</b><br>
     <span class="tag">${"★".repeat(l.difficulty)}</span><span class="tag">${l.nodes} nodes</span><span class="tag">${esc(l.blueprint.join(", "))}</span>
-    ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}${l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : "")}
+    ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : "")}
     <div class="muted small">${esc(l.summary)}</div></li>`).join("") || `<li class="muted">No labs match.</li>`;
   $$("#lab-list li[data-id]").forEach((li) => li.addEventListener("click", () => selectLab(li.dataset.id)));
 }
@@ -191,12 +191,18 @@ async function selectLab(id) {
       <button data-help="lab.build" id="a-build" class="primary">Build</button><button data-help="lab.check" id="a-check">Check</button><button data-help="lab.hintNext" id="a-hint">Hint</button>
       <label class="inline">Grading<select data-help="lab.mode" id="mode"><option value="">Mode: default</option><option value="auto">Auto</option><option value="live">Live only</option><option value="config">Config only</option></select></label>
       <button data-help="lab.reset" id="a-reset">Reset</button><button data-help="lab.destroy" id="a-destroy" class="danger">Destroy</button>
+      ${l.faults ? `<button data-help="lab.break" id="a-break" class="warn">Break my lab</button>` : ""}
       <span class="sep"></span>
       <button data-help="lab.edit" id="a-edit">Edit / copy</button><button data-help="lab.export" id="a-export">Export pack</button>
       ${l.source === "user" ? '<button data-help="lab.delete" id="a-delete" class="danger">Delete lab</button>' : ""}
     </div>
     <div class="statusbar"><span data-help="lab.status" class="muted"><span id="status">Status: …</span></span><div class="progress"><div id="boot-bar"></div></div>
       <span data-help="lab.timer">⏱ <span id="timer" class="timer">00:00:00</span></span><button data-help="lab.timerToggle" id="t-toggle" class="hint-btn">Start</button><button data-help="lab.timerReset" id="t-reset" class="hint-btn">Reset timer</button></div>
+    ${l.fault ? `<section class="fault-box" data-help="lab.faultBox"><h3>Trouble ticket <span class="tag">fault practice</span></h3>
+      <p>${esc(l.fault.ticket)}</p><p class="muted small">Started ${esc(l.fault.started || "")}. The lab was built from a working config with one fault added.
+      Find and fix it, then click Check.${l.fault.extra_checks ? ` ${l.fault.extra_checks} extra check(s) are graded for this fault.` : ""}</p>
+      <div class="toolbar"><button data-help="lab.faultReveal" id="a-fault-reveal" class="hint-btn">Reveal the answer</button>
+      <button data-help="lab.faultEnd" id="a-fault-end" class="hint-btn">End fault practice</button></div><div id="fault-answer"></div></section>` : ""}
     <div id="hints-box" class="hints-box" data-help="lab.hintsBox" hidden></div>
     <h3 data-help="lab.task">Task</h3><div class="task md">${md(l.task)}</div>
     <details><summary data-help="lab.objectives">Objectives graded (${l.checks.length} checks: ${l.checks.filter((c) => c.mode === "live").length} live, ${l.checks.filter((c) => c.mode === "config").length} config) - spoilers</summary>
@@ -210,7 +216,18 @@ async function selectLab(id) {
   currentHints = l.hints || [];
   $("#a-hint").onclick = () => { const n = hintsUsed(id); if (n < currentHints.length) { hintsSet(id, n + 1); } };
   renderHints();
-  $("#a-reset").onclick = () => confirm("Reset wipes all your device configs back to the starting configs. Continue?") && run("reset");
+  $("#a-reset").onclick = () => confirm(l.fault ? "Reset rebuilds the broken lab (same fault) and discards your changes. Continue?"
+    : "Reset wipes all your device configs back to the starting configs. Continue?") && run("reset");
+  if ($("#a-break")) $("#a-break").onclick = () => confirm(`Break my lab: the lab is rebuilt in CML with a working configuration plus one random fault (out of ${l.faults}). Your current device configs are replaced. Continue?`) && run("break");
+  if ($("#a-fault-end")) $("#a-fault-end").onclick = async () => {
+    if (!confirm("End fault practice? The devices keep their current configs; use Reset afterwards to go back to the starting configs.")) return;
+    await api(`/api/labs/${id}/fault/end`, {method: "POST"}); hintsSet(id, 0); selectLab(id);
+  };
+  if ($("#a-fault-reveal")) $("#a-fault-reveal").onclick = async () => {
+    if (!confirm("Reveal the cause and the fix of this fault?")) return;
+    try { $("#fault-answer").innerHTML = faultPanel(await api(`/api/labs/${id}/fault/reveal`, {method: "POST"}), "Answer"); }
+    catch (e) { toast(e.message, "err"); }
+  };
   $("#a-destroy").onclick = () => confirm("Delete this lab from CML?") && run("destroy");
   $("#a-edit").onclick = () => openInBuilder(id);
   $("#a-export").onclick = () => { location.href = `/api/labs/${encodeURIComponent(id)}/export`; };
@@ -274,7 +291,10 @@ async function run(kind) {
       toast(`${kind} finished`, "ok");
       if (kind === "build") timerStart(lab);
       if (kind === "reset") hintsSet(lab, 0);
-      if (kind === "check" && j.result && lab === current) { showResults(j.result); if (j.result.passed) { timerPause(lab); toast("Lab solved!", "ok"); } loadHistory(); loadLabs(); }
+      if (kind === "break") { hintsSet(lab, 0); timerSet(lab, {acc: 0, start: Date.now()}); toast("Trouble ticket ready. Find and fix the fault.", "ok", 7000); if (lab === current) await selectLab(lab); }
+      if (kind === "check" && j.result && lab === current) {
+        if (j.result.fault_fixed) { hintsSet(lab, 0); await selectLab(lab); }
+        showResults(j.result); if (j.result.passed) { timerPause(lab); toast(j.result.fault_fixed ? "Fault fixed!" : "Lab solved!", "ok"); } loadHistory(); loadLabs(); }
     }
   } catch (e) { toast(e.message, "err", 10000); if ($("#log")) $("#log").textContent = "Error: " + e.message; }
   clearInterval(statusTimer); setBusy(false); refreshStatus();
@@ -290,7 +310,8 @@ function showResults(r) {
     <td>${esc(c.description)}<br><code class="small">${esc(c.command)}</code></td>
     <td class="small">${c.details.map(esc).join("<br>")}${c.hint ? `<br><button data-help="lab.hint" class="hint-btn" data-hint="${esc(c.hint)}">Show hint</button>` : ""}
     <details><summary data-help="lab.output">output</summary><pre class="log">${esc(c.output)}</pre></details></td></tr>`).join("")}</table>
-    <div id="solution-box">${r.passed && r.solution_summary ? solutionPanel({summary: r.solution_summary, auto_generated: r.solution_summary_auto, configs: {}})
+    ${r.fault_fixed ? faultPanel(r.fault_fixed, "Fault fixed") : ""}
+    <div id="solution-box">${r.fault ? "" : r.passed && r.solution_summary ? solutionPanel({summary: r.solution_summary, auto_generated: r.solution_summary_auto, configs: {}})
       : '<button data-help="lab.revealSolution" id="a-reveal" class="hint-btn">Reveal solution</button>'}</div>`;
   bindHints($("#results"));
   const rb = $("#a-reveal");
@@ -299,6 +320,10 @@ function showResults(r) {
     try { $("#solution-box").innerHTML = solutionPanel(await api(`/api/labs/${current}/solution`), true); }
     catch (e) { toast("Could not load the solution: " + e.message, "err"); }
   };
+}
+function faultPanel(f, heading) {
+  return `<section class="solution-panel" data-help="lab.faultPanel"><h3>${esc(heading)}: ${esc(f.title)} <span class="tag">${esc(f.device)}</span></h3>
+    <div class="md">${md(f.explanation)}</div><details><summary data-help="lab.faultConfig">Config that was applied to break the lab</summary><pre class="code">${esc(f.config)}</pre></details></section>`;
 }
 function solutionPanel(s, withConfigs = false) {
   const cfgs = withConfigs ? Object.entries(s.configs || {}) : [];
@@ -309,8 +334,8 @@ function solutionPanel(s, withConfigs = false) {
 async function loadHistory() {
   if (!current) return;
   const h = await api(`/api/history/${current}`);
-  $("#history").innerHTML = h.length ? `<table><tr><th>When</th><th>Mode</th><th>Score</th><th>Hints</th><th>Failed checks</th></tr>${h.slice().reverse().map((x) =>
-    `<tr><td>${esc(x.ts)}</td><td>${esc(x.mode)}</td><td class="${x.passed ? "pass" : ""}">${x.earned}/${x.total} (${x.score_pct}%)</td><td>${x.hints_used == null ? "-" : `${x.hints_used}/${x.hints_total ?? "?"}`}</td><td class="small">${esc((x.failed || []).join(", "))}</td></tr>`).join("")}</table>
+  $("#history").innerHTML = h.length ? `<table><tr><th>When</th><th>Mode</th><th>Score</th><th>Hints</th><th>Type</th><th>Failed checks</th></tr>${h.slice().reverse().map((x) =>
+    `<tr><td>${esc(x.ts)}</td><td>${esc(x.mode)}</td><td class="${x.passed ? "pass" : ""}">${x.earned}/${x.total} (${x.score_pct}%)</td><td>${x.hints_used == null ? "-" : `${x.hints_used}/${x.hints_total ?? "?"}`}</td><td class="small">${x.exam ? "exam" : x.fault ? "fault" : "lab"}</td><td class="small">${esc((x.failed || []).join(", "))}</td></tr>`).join("")}</table>
     <button data-help="lab.historyClear" class="hint-btn" id="hist-clear">Clear history</button>` : '<span class="muted">No checks yet.</span>';
   if ($("#hist-clear")) $("#hist-clear").onclick = async () => { await api(`/api/history/${current}`, {method: "DELETE"}); loadHistory(); loadLabs(); };
 }

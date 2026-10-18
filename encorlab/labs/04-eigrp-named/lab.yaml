@@ -168,3 +168,83 @@ hints:
   - "Named mode puts the AS number under the address-family, not after `router eigrp`. All three routers must agree on it."
   - "Authentication is applied per interface. Look at the af-interface default section and a key chain with the same key ID and string."
   - "R3 must advertise only its connected networks to its neighbors, and loopbacks should not send hellos."
+faults:
+- id: r2-wrong-key
+  title: Wrong EIGRP key-string on R2
+  device: R2
+  ticket: R2 has had no EIGRP neighbors since a password change. R1 and R3 are still neighbors with each other.
+  config: |
+    key chain EIGRP-KEYS
+     key 1
+      key-string WRONG
+  explanation: |-
+    **Root cause:** the key-string of key 1 in key chain EIGRP-KEYS on R2 was changed, so MD5 authentication fails with both neighbors.
+
+    **Fix (R2):**
+    ```
+    key chain EIGRP-KEYS
+     key 1
+      key-string ENCOR
+    ```
+    EIGRP authentication needs the same key ID and key string on both neighbors.
+  hints:
+  - One router lost all its neighbors at once, so look at what all its adjacencies share.
+  - Compare the key chain on R2 with R1's (`show key chain`).
+  checks:
+  - id: f-r2-cfg-key
+    mode: config
+    device: R2
+    description: R2 key 1 of EIGRP-KEYS uses the shared key string
+    match:
+    - ^key chain EIGRP-KEYS\s*\n\s+key 1\s*\n\s+key-string ENCOR\s*$
+    hint: key chain EIGRP-KEYS / key 1 / key-string ENCOR
+- id: r1-missing-network
+  title: R1 no longer runs EIGRP towards R3
+  device: R1
+  ticket: R1 and R3 are no longer EIGRP neighbors, while R1-R2 and R2-R3 are fine. Traffic from R1 to R3's loopback now goes through R2.
+  config: |
+    router eigrp ENCOR
+     address-family ipv4 unicast autonomous-system 100
+      no network 10.0.13.0 0.0.0.255
+  explanation: |-
+    **Root cause:** the `network 10.0.13.0 0.0.0.255` statement was removed from R1, so EIGRP is not enabled on the R1-R3 link.
+
+    **Fix (R1):**
+    ```
+    router eigrp ENCOR
+     address-family ipv4 unicast autonomous-system 100
+      network 10.0.13.0 0.0.0.255
+    ```
+  hints:
+  - Only one link is affected, so check that EIGRP runs on it at all.
+  - Does `show ip eigrp interfaces` on R1 list the interface towards R3?
+  checks:
+  - id: f-r1-cfg-net13
+    mode: config
+    device: R1
+    description: R1 enables EIGRP on the R1-R3 link
+    match:
+    - ^\s+network 10\.0\.13\.0 0\.0\.0\.255\s*$
+    hint: network 10.0.13.0 0.0.0.255 under the address family
+- id: r3-not-stub
+  title: R3 is no longer a stub router
+  device: R3
+  ticket: During a WAN failure test, R1 started sending transit traffic for R2 through R3, which must never be used as a transit router.
+  config: |
+    router eigrp ENCOR
+     address-family ipv4 unicast autonomous-system 100
+      no eigrp stub connected
+  explanation: |-
+    **Root cause:** `eigrp stub connected` was removed from R3, so R3 advertises learned routes again and becomes a transit path.
+
+    **Fix (R3):**
+    ```
+    router eigrp ENCOR
+     address-family ipv4 unicast autonomous-system 100
+      eigrp stub connected
+    ```
+    A stub router only advertises the route types it is told to and is never queried.
+  hints:
+  - Which router is designed to never carry transit traffic?
+  - 'Look at the EIGRP address family on R3: what makes it a stub?'
+  checks: []

@@ -131,3 +131,73 @@ hints:
   - "Both routers must run EIGRP with the same AS number. Which one does the task ask for?"
   - "EIGRP must be enabled on the shared link (10.0.12.0/24) so the routers become neighbors."
   - "Each router must also advertise its own Loopback0. A /32 is matched with a 0.0.0.0 wildcard."
+faults:
+- id: r2-wrong-as
+  title: AS number mismatch
+  device: R2
+  ticket: R1 and R2 are directly connected and can ping each other, but `show ip eigrp neighbors` is empty on both.
+  config: |
+    no router eigrp 100
+    router eigrp 200
+     network 2.2.2.2 0.0.0.0
+     network 10.0.12.0 0.0.0.255
+  explanation: |-
+    **Root cause:** R2 runs EIGRP AS 200 while R1 runs AS 100. EIGRP neighbors must use the same AS number.
+
+    **Fix (R2):**
+    ```
+    no router eigrp 200
+    router eigrp 100
+     network 2.2.2.2 0.0.0.0
+     network 10.0.12.0 0.0.0.255
+    ```
+  hints:
+  - Ping works, so the link is fine. Compare the EIGRP processes.
+  - Look at `show ip protocols` on both routers.
+  checks: []
+- id: r1-missing-loopback
+  title: Loopback not advertised
+  device: R1
+  ticket: R2 cannot reach R1's Loopback0 1.1.1.1, although the EIGRP neighbor between R1 and R2 is up.
+  config: |
+    router eigrp 100
+     no network 1.1.1.1 0.0.0.0
+  explanation: |-
+    **Root cause:** the `network 1.1.1.1 0.0.0.0` statement was removed from R1, so the loopback is not advertised.
+
+    **Fix (R1):**
+    ```
+    router eigrp 100
+     network 1.1.1.1 0.0.0.0
+    ```
+  hints:
+  - The neighbor is up, so the question is what R1 advertises.
+  - Check `show ip eigrp interfaces` and `show ip route eigrp` on R2.
+  checks: []
+- id: r1-passive-link
+  title: Passive interface on the link
+  device: R1
+  ticket: The EIGRP neighborship between R1 and R2 went down after R1's config was hardened. Both interfaces are still up/up.
+  config: |
+    router eigrp 100
+     passive-interface %if0%
+  explanation: |-
+    **Root cause:** `passive-interface %if0%` on R1 stops hellos on the link to R2, so no adjacency can form.
+
+    **Fix (R1):**
+    ```
+    router eigrp 100
+     no passive-interface %if0%
+    ```
+  hints:
+  - Hardening often adds passive interfaces.
+  - Look at the Passive Interface(s) section of `show ip protocols` on R1.
+  checks:
+  - id: f-r1-cfg-not-passive
+    mode: config
+    device: R1
+    description: R1 sends EIGRP hellos on the link to R2
+    absent:
+    - ^\s+passive-interface %if0%\s*$
+    hint: no passive-interface on the link to R2
+    match: []

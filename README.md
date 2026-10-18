@@ -39,6 +39,8 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   It only ever touches labs titled `ENCOR-…`.
 - **Two grading modes:** *live* (real adjacencies, routes, pings over the console server) and *config* (HTTPS only).
   *Auto* uses live when it can and falls back to config.
+- **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (33 in total). One click rebuilds
+  the working lab with a random fault and gives you a symptom-only trouble ticket, so you get unlimited troubleshooting practice.
 - **Learning aids:** a **Hint** button with progressive hints ("Hint 2 of 3"), remembered per lab and cleared on Reset.
   A **Solution summary** (root cause, exact fix per device, why it works) appears automatically at 100%.
   Below 100% you can open it with **Reveal solution**, after a confirm.
@@ -132,6 +134,7 @@ The first connection accepts the server's host key and logs a warning.
 3. Open the device consoles in CML (or `ssh` to the console server), solve the task, then click **Check**. You get pass/fail per check, with details and the raw output.
 4. Stuck? Click **Hint** for the next hint. At 100% the **Solution summary** appears. Below 100%, **Reveal solution** shows it after a confirm.
 5. **Reset** stops the lab, wipes it and restarts it with the original configs (it also clears revealed hints). **Destroy** stops, wipes and deletes the lab.
+6. Done with a lab? Click **Break my lab** for troubleshooting practice (see below).
 
 A timer starts on Build and stops when the lab is solved, and each lab keeps a results history.
 Small **?** icons explain each field. Turn them off with *Settings > Show help icons*; all help text is in `encorlab/web/static/help.json`.
@@ -145,12 +148,28 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `doctor` | tests CML login, images, node budget and the console server |
 | `build <lab> [--rebuild]`, `check <lab> [--mode auto\|live\|config] [--json] [--hints-used N]`, `reset <lab>`, `destroy <lab>` | lab lifecycle (`check` prints the solution summary at 100%) |
 | `hint <lab> [N]`, `solution <lab>` | progressive hint N of M; solution summary + config (spoilers) |
+| `break <lab> [--fault ID]`, `fault <lab> [--reveal\|--end]` | Break my lab: rebuild with a random fault and print the ticket; show/reveal/end the active fault |
 | `history <lab>` | your past scores (with hints used) |
 | `import <file> [--replace]`, `export <lab> [-o f.encorlab] [--cml-yaml]`, `delete <lab> -y` | manage your labs |
 | `validate [paths…]`, `pack <folder-or-yaml> [-o x.encorlab]` | offline test (solution 100%, starting config 0%); strict validate + write a shareable pack |
 | `test-live <lab> [--keep]` | builds `ENCOR-TEST-<lab>` with the solution applied, grades it, deletes it |
 | `schema [-o f]`, `prompt ["request"]`, `docs` | JSON Schema, AI prompt, regenerate `docs/` |
 | `save-password`, `web [--no-open]` | keyring, web UI |
+
+### Break my lab (fault practice)
+**Break my lab** rebuilds the lab in CML from its *working* configuration (starting config + reference solution) plus one
+random predefined fault, such as a wrong HSRP key, a missing `ip nat outside`, an LACP member forced to `mode on`, or
+a removed `next-hop-self`. You only get the trouble ticket, which describes symptoms and never the cause.
+
+- Fix the fault and click **Check**. All lab checks, plus any extra checks for that fault, must pass. Then the panel shows what
+  was broken and the exact fix.
+- **Hint** gives fault-specific hints. **Reveal the answer** gives up (recorded as revealed). **End fault practice** stops it.
+- **Reset** during fault practice restores the *broken* lab (same fault), so you can try again from scratch.
+- The next **Break my lab** picks a different fault than the recent ones. History marks these attempts as *fault*.
+- Rebuilding replaces your current device configs; the app asks first.
+
+Your own labs can define faults too (`faults:` in lab.yaml, see [docs/LAB-AUTHORING.md](docs/LAB-AUTHORING.md)). The
+validator applies each fault offline and requires that a config check detects it and that the solved lab still passes.
 
 ## Grading modes
 | Mode | How | What it proves |

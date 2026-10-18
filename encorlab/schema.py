@@ -86,6 +86,27 @@ class Check(_Strict):
         return self
 
 
+class Fault(_Strict):
+    """A predefined fault for "Break my lab": applied on top of a working (solved) lab so the student
+    gets a realistic trouble ticket. `config` is IOS config applied after the solution (use `no ...`
+    to remove lines). Optional `checks` are graded in addition to the lab checks while the fault is active."""
+    id: str = Field(description="Short unique id, e.g. 'r2-wrong-key'")
+    title: str = Field(description="Short name of the fault (shown after it is fixed)")
+    ticket: str = Field(description="Symptom-only trouble ticket shown to the student (never the cause)")
+    device: str = Field(description="Device the fault is applied to")
+    config: str = Field(description="IOS config applied after the solution, e.g. 'interface %if0%\\n shutdown'")
+    explanation: str = Field(description="Markdown: root cause and the exact fix, shown after the fault is fixed or revealed")
+    hints: list[str] = Field(default=[], description="Progressive hints for this fault, vaguest first")
+    checks: list[Check] = Field(default=[], description="Extra checks graded while this fault is active")
+
+    @field_validator("id")
+    @classmethod
+    def _fid(cls, v):
+        if not re.match(r"^[a-z0-9][a-z0-9-]{1,40}$", v):
+            raise ValueError("fault id must be lowercase letters, digits, dashes")
+        return v
+
+
 class Lab(_Strict):
     """One ENCOR practice lab."""
     id: str = Field(description="Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name")
@@ -107,6 +128,8 @@ class Lab(_Strict):
     hints: list[str] = Field(default=[], description=(
         "Ordered progressive hints (vague first, most specific last), revealed one at a time with the Hint button. "
         "Never paste the full answer into a hint. If empty, the per-check hints are used in check order"))
+    faults: list[Fault] = Field(default=[], description=(
+        "Optional predefined faults for 'Break my lab' (random troubleshooting practice on the solved lab)"))
     author: str = ""
     version: str = "1"
 
@@ -152,6 +175,21 @@ class Lab(_Strict):
         for dev in (self.solution or {}):
             if dev not in names:
                 errs.append(f"solution references unknown device {dev}")
+        fids = [f.id for f in self.faults]
+        if len(set(fids)) != len(fids):
+            errs.append("duplicate fault ids")
+        for f in self.faults:
+            if f.device not in names:
+                errs.append(f"fault {f.id} references unknown device {f.device}")
+            if not f.config.strip() or not f.ticket.strip() or not f.explanation.strip():
+                errs.append(f"fault {f.id}: config, ticket and explanation are required")
+            for c in f.checks:
+                if c.device not in names:
+                    errs.append(f"fault {f.id}: check {c.id} references unknown device {c.device}")
+                if c.id in ids:
+                    errs.append(f"fault {f.id}: check id {c.id} clashes with a lab check")
+            if any(not h.strip() for h in f.hints):
+                errs.append(f"fault {f.id}: hints must not contain empty entries")
         if any(not h.strip() for h in self.hints):
             errs.append("hints must not contain empty entries")
         for n in self.nodes:

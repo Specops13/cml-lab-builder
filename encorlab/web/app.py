@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, catalog, config, history, packs, service
+from .. import __version__, ai, catalog, config, faults, history, packs, service
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -143,6 +143,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                             "domain": l.domain, "difficulty": l.difficulty, "nodes": l.node_count,
                             "platforms": l.platforms, "source": e.source,
                             "checks": {"live": len(l.checks_for("live")), "config": len(l.checks_for("config"))},
+                            "faults": len(l.faults), "fault_active": bool(faults.active(lid)),
                             "best": max((x.get("score_pct") or 0 for x in h), default=None),
                             "solved": any(x.get("passed") for x in h)})
             except Exception as ex:  # pragma: no cover - defensive
@@ -154,13 +155,15 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         e = _entry(lab_id)
         l = e.lab
         plat = get_platform(store.get().platform)
+        fault = faults.public(l, faults.active(lab_id), plat)
         return {"id": l.id, "title": render(l.title, plat), "summary": render(l.summary, plat),
                 "source": e.source, "task": render(l.task, plat),
+                "faults": len(l.faults), "fault": fault,
                 "blueprint": l.blueprint, "domain": l.domain, "difficulty": l.difficulty, "nodes": l.node_count,
                 "platforms": l.platforms, "author": l.author,
                 "has_solution": bool(catalog.load_solution(lab_id)),
                 "has_solution_summary": bool(l.solution_summary.strip()),
-                "hints": solution_mod.hints(l, plat),
+                "hints": (fault["hints"] if fault and fault["hints"] else solution_mod.hints(l, plat)),
                 "checks": [{"id": c.id, "mode": c.mode, "description": render(c.description, plat),
                             "device": c.device, "hint": render(c.hint, plat)} for c in l.checks]}
 
@@ -346,6 +349,37 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
             return service.do_test_live(s, e.lab, sol, p, client_factory=client_factory, mode=mode,
                                         runner=runner, config_source=src, probe=probe)
         return _start("test-live", lab_id, fn)
+
+    @app.post("/api/labs/{lab_id}/break")
+    def break_lab(lab_id: str, fault: str | None = None):
+        """Break my lab: rebuild with the solution plus one random predefined fault."""
+        e = _entry(lab_id)
+        if not e.lab.faults:
+            raise HTTPException(400, "this lab has no predefined faults")
+        if not catalog.load_solution(lab_id):
+            raise HTTPException(400, "this lab has no reference solution")
+        if fault:
+            try:
+                faults.get(e.lab, fault)
+            except faults.FaultError as ex:
+                raise HTTPException(400, str(ex))
+        return _start("break", lab_id, lambda s, p: service.do_break(s, lab_id, p, fault_id=fault, client_factory=client_factory))
+
+    @app.post("/api/labs/{lab_id}/fault/end")
+    def fault_end(lab_id: str):
+        _entry(lab_id)
+        faults.clear(lab_id)
+        return {"ended": True}
+
+    @app.post("/api/labs/{lab_id}/fault/reveal")
+    def fault_reveal(lab_id: str):
+        """Give up on the current fault: shows its cause and fix (recorded as revealed)."""
+        e = _entry(lab_id)
+        st = faults.active(lab_id)
+        if not st:
+            raise HTTPException(400, "no fault is active for this lab")
+        faults.mark_revealed(lab_id)
+        return faults.reveal(e.lab, faults.get(e.lab, st["fault_id"]), get_platform(store.get().platform))
 
     @app.post("/api/labs/{lab_id}/reset")
     def reset(lab_id: str):

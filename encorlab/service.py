@@ -50,13 +50,43 @@ def _all_connect_errors(report) -> bool:
         (not r.passed) and r.details and r.details[0].startswith("error running command") for r in report.results)
 
 
+def do_break(settings, lab_id, progress, fault_id: str | None = None, client_factory=None, rng=None):
+    """'Break my lab': rebuild the lab with the reference solution plus one random predefined fault."""
+    from . import faults
+    lab = catalog.get(lab_id)
+    sol = catalog.load_solution(lab_id)
+    if not sol:
+        raise faults.FaultError("this lab has no reference solution, so it cannot be broken")
+    f = faults.pick(lab, fault_id, rng=rng)
+    progress(f"Picked one of {len(lab.faults)} faults. Rebuilding the lab with a working config plus the fault "
+             "(your current device configs are replaced)")
+    cml = make_cml(settings, client_factory)
+    cml.build(lab, start=True, rebuild=True, progress=progress, solution=faults.broken_config(sol, f))
+    faults.set_active(lab_id, f.id)
+    plat = get_platform(settings.platform)
+    progress("Fault applied. Read the trouble ticket, find the problem and fix it, then click Check.")
+    return {"ticket": faults.public(lab, faults.active(lab_id), plat)["ticket"], "faults_total": len(lab.faults)}
+
+
 def do_check(settings, lab_id, progress, client_factory=None, runner=None, config_source=None,
-             mode: str | None = None, probe=None, lab=None, title=None, record=True, hints_used: int | None = None):
-    """mode: 'live', 'config' or 'auto' (live first, fall back to config if the console is unreachable)."""
-    from . import history
+             mode: str | None = None, probe=None, lab=None, title=None, record=True, hints_used: int | None = None,
+             fault_aware: bool = True, extra: dict | None = None):
+    """mode: 'live', 'config' or 'auto' (live first, fall back to config if the console is unreachable).
+    While a 'Break my lab' fault is active the fault's extra checks are graded too.
+    extra: additional fields stored with the history entry (exam mode, elapsed time)."""
+    from . import faults, history
     from .cml import probe_console
     lab = lab or catalog.get(lab_id)
     plat = get_platform(settings.platform)
+    fstate = faults.active(lab.id) if fault_aware else None
+    fault = None
+    if fstate:
+        try:
+            fault = faults.get(lab, fstate["fault_id"])
+        except faults.FaultError:
+            fault = None
+    base_lab = lab
+    lab = faults.grading_lab(lab, fault)
     mode = mode or settings.grading_mode
     if mode not in ("auto", "live", "config"):
         raise ValueError(f"unknown grading mode {mode!r}")
@@ -82,15 +112,23 @@ def do_check(settings, lab_id, progress, client_factory=None, runner=None, confi
     d = report.to_dict()
     d["requested_mode"] = mode
     from . import solution as sol_mod
-    total_hints = len(sol_mod.hints(lab, plat))
+    total_hints = len(fault.hints) if (fault and fault.hints) else len(sol_mod.hints(base_lab, plat))
     d["hints_total"] = total_hints
     d["hints_used"] = None if hints_used is None else max(0, min(int(hints_used), total_hints))
-    if d.get("passed"):
+    d.update(extra or {})
+    if fault:
+        d["fault"] = fault.id
+        if d.get("passed"):
+            d["fault_fixed"] = faults.reveal(base_lab, fault, plat)
+            d["fault_revealed"] = bool(fstate.get("revealed"))
+            faults.clear(base_lab.id)
+            progress(f"Fault fixed: {d['fault_fixed']['title']}")
+    elif d.get("passed"):
         try:
             sol = catalog.load_solution(lab.id)
         except catalog.LabNotFound:
             sol = dict(lab.solution or {})
-        d["solution_summary"], d["solution_summary_auto"] = sol_mod.summary(lab, sol, plat)
+        d["solution_summary"], d["solution_summary_auto"] = sol_mod.summary(base_lab, sol, plat)
     if record:
         try:
             history.add(lab.id, d)
@@ -111,7 +149,8 @@ def do_test_live(settings, lab, solution: dict, progress, client_factory=None, m
     cml.build(lab, start=True, rebuild=True, progress=progress, solution=solution, title=title)
     try:
         return do_check(settings, lab.id, progress, client_factory=client_factory, runner=runner,
-                        config_source=config_source, mode=mode, probe=probe, lab=lab, title=title, record=False)
+                        config_source=config_source, mode=mode, probe=probe, lab=lab, title=title, record=False,
+                        fault_aware=False)
     finally:
         if not keep:
             progress("Removing test copy")
@@ -119,7 +158,16 @@ def do_test_live(settings, lab, solution: dict, progress, client_factory=None, m
 
 
 def do_reset(settings, lab_id, progress, client_factory=None):
+    """Back to the starting configs; during fault practice back to the broken lab (same fault)."""
+    from . import faults
     lab = catalog.get(lab_id)
+    st = faults.active(lab_id)
+    if st:
+        f = faults.get(lab, st["fault_id"])
+        make_cml(settings, client_factory).reset(
+            lab, progress=progress, extra=faults.broken_config(catalog.load_solution(lab_id), f),
+            label="broken (fault practice)")
+        return {"reset": True, "fault_practice": True}
     make_cml(settings, client_factory).reset(lab, progress=progress)
     return {"reset": True}
 

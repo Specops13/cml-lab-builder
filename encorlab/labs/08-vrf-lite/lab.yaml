@@ -139,3 +139,71 @@ hints:
   - "Two customers use identical addressing on one router. They need separate routing tables."
   - "Moving an interface into a VRF wipes its IP address. Check the interface after you assign it."
   - "Each customer LAN needs a route inside that customer's own table (`ip route vrf ...`)."
+faults:
+- id: pe-cea-wrong-vrf
+  title: Customer A interface in the wrong VRF
+  device: PE
+  ticket: Customer A (CEA) reports a total outage while customer B is fine. The PE logged an 'overlaps with' address error at boot.
+  config: |
+    interface %if0%
+     vrf forwarding CUST-B
+     ip address 10.1.1.1 255.255.255.252
+  explanation: |-
+    **Root cause:** PE %if0% (to CEA) was put into VRF CUST-B. CUST-B already uses 10.1.1.0/30 on %if1%, so the address is rejected and customer A has no VRF at all.
+
+    **Fix (PE):**
+    ```
+    interface %if0%
+     vrf forwarding CUST-A
+     ip address 10.1.1.1 255.255.255.252
+    ```
+    Changing `vrf forwarding` removes the interface IP address, so re-enter it.
+  hints:
+  - One customer is down, so compare its PE interface with the working customer's.
+  - Check `show vrf` and `show ip interface brief` on the PE.
+  checks: []
+- id: pe-no-route-b
+  title: Customer B static route missing
+  device: PE
+  ticket: Customer B's LAN 192.168.100.0/24 is unreachable from the PE inside their VRF. Customer A works and the CEB link is up.
+  config: |
+    no ip route vrf CUST-B 192.168.100.0 255.255.255.0 10.1.1.2
+  explanation: |-
+    **Root cause:** the VRF static route for customer B was removed.
+
+    **Fix (PE):**
+    ```
+    ip route vrf CUST-B 192.168.100.0 255.255.255.0 10.1.1.2
+    ```
+  hints:
+  - The link works, so look at the routing table of that VRF.
+  - Compare `show ip route vrf CUST-A` and `show ip route vrf CUST-B`.
+  checks: []
+- id: pe-global-route
+  title: Static route in the global table
+  device: PE
+  ticket: '`ping 192.168.100.1` from the PE''s global table no longer fails as expected, but `ping vrf CUST-A 192.168.100.1` does.'
+  config: |
+    no ip route vrf CUST-A 192.168.100.0 255.255.255.0 10.1.1.2
+    ip route 192.168.100.0 255.255.255.0 10.1.1.2
+  explanation: |-
+    **Root cause:** customer A's route was re-entered without the `vrf CUST-A` keyword, so it went into the global table (and the next hop is not even reachable there).
+
+    **Fix (PE):**
+    ```
+    no ip route 192.168.100.0 255.255.255.0 10.1.1.2
+    ip route vrf CUST-A 192.168.100.0 255.255.255.0 10.1.1.2
+    ```
+  hints:
+  - Every customer route must live in that customer's VRF.
+  - Compare `show ip route` with `show ip route vrf CUST-A` on the PE.
+  checks:
+  - id: f-pe-cfg-no-global
+    mode: config
+    device: PE
+    description: No customer route in the global table
+    match:
+    - ^ip route vrf CUST-A 192\.168\.100\.0
+    absent:
+    - ^ip route 192\.168\.100\.0 255\.255\.255\.0
+    hint: customer routes need `ip route vrf <name> ...`

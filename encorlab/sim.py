@@ -52,9 +52,10 @@ def interface(config: str, name: str) -> str:
 
 class SimRunner:
     def __init__(self, lab: Lab, platform: Platform, solved: bool,
-                 solution: dict | None = None, fixtures: dict | None = None):
+                 solution: dict | None = None, fixtures: dict | None = None, extra: dict | None = None):
         """solution/fixtures default to the catalog's files for lab.id.
-        fixtures = {"solved": {...}, "blank": {...}} when given explicitly."""
+        fixtures = {"solved": {...}, "blank": {...}} when given explicitly.
+        extra = device -> config applied after the solution (e.g. a fault), merged IOS-style."""
         self.lab = lab
         self.platform = platform
         if solution is None:
@@ -62,6 +63,11 @@ class SimRunner:
         sol = solution if solved else {}
         self.running = {}
         for n in lab.nodes:
+            if extra:
+                from .iosmerge import merge
+                self.running[n.name] = merge(node_config(lab, n.name, platform), render(sol.get(n.name, ""), platform),
+                                             render(extra.get(n.name, ""), platform))
+                continue
             cfg = node_config(lab, n.name, platform).replace("\nend\n", "\n")
             cfg += render(sol.get(n.name, ""), platform)
             self.running[n.name] = cfg

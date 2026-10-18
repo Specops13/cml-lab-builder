@@ -33,6 +33,14 @@ def node_config(lab: Lab, node_name: str, platform: Platform) -> str:
     return cfg
 
 
+def full_config(lab: Lab, node_name: str, platform: Platform, extra: dict | None = None) -> str:
+    """Day-0 config: starting config, plus extra lines (solution, fault, snapshot) when given."""
+    base = node_config(lab, node_name, platform)
+    if not (extra and extra.get(node_name)):
+        return base
+    return base.replace("\nend\n", "\n") + render(extra[node_name], platform).rstrip() + "\nend\n"
+
+
 def to_topology(lab: Lab, platform: Platform, prefix: str, solution: dict | None = None,
                 title: str | None = None) -> dict:
     """solution: device -> extra config appended to the starting config (used by 'test live')."""
@@ -53,8 +61,7 @@ def to_topology(lab: Lab, platform: Platform, prefix: str, solution: dict | None
             "x": n.x,
             "y": n.y,
             "tags": [TAG],
-            "configuration": node_config(lab, n.name, platform) if not (solution and solution.get(n.name)) else
-            node_config(lab, n.name, platform).replace("\nend\n", "\n") + render(solution[n.name], platform).rstrip() + "\nend\n",
+            "configuration": full_config(lab, n.name, platform, solution),
             "interfaces": ifaces,
         })
     links = []

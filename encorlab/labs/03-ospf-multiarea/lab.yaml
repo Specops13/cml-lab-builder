@@ -195,3 +195,64 @@ hints:
   - "Draw the areas first: which interfaces of R1 and R2 belong to area 0, and which to area 1 or 2?"
   - "The links are point-to-point, and the stub flag must match on every router in area 1, or the adjacency never forms."
   - "Summarize on the ABR that owns area 1, with a range that covers exactly 172.16.30.0/24 and 172.16.31.0/24."
+faults:
+- id: r3-not-stub
+  title: Stub flag missing on R3
+  device: R3
+  ticket: R3 lost its OSPF adjacency to R1 after a reload. R3's routing table only has connected routes, and R1 logs nothing about a dead neighbor.
+  config: |
+    router ospf 1
+     no area 1 stub
+  explanation: |-
+    **Root cause:** `area 1 stub` was removed from R3. The stub (E-bit) flag in the hellos no longer matches R1's, so the routers ignore each other's hellos.
+
+    **Fix (R3):**
+    ```
+    router ospf 1
+     area 1 stub
+    ```
+    All routers in an area must agree on the area type.
+  hints:
+  - Neighbors that never appear point to a hello parameter mismatch.
+  - 'Compare `show ip ospf` on R1 and R3: is area 1 the same type on both?'
+  checks: []
+- id: r1-no-summary
+  title: ABR summary removed
+  device: R1
+  ticket: R4 now sees two separate routes, 172.16.30.0/24 and 172.16.31.0/24, instead of one aggregate. The change policy says area 1 must be advertised as a single summary.
+  config: |
+    router ospf 1
+     no area 1 range 172.16.30.0 255.255.254.0
+  explanation: |-
+    **Root cause:** the `area 1 range` summary on the ABR R1 was removed, so the individual type-3 LSAs are flooded into area 0 and area 2.
+
+    **Fix (R1):**
+    ```
+    router ospf 1
+     area 1 range 172.16.30.0 255.255.254.0
+    ```
+    Inter-area summarization is configured on the ABR for the area the prefixes come from.
+  hints:
+  - Summaries for an area are made on its ABR.
+  - 'Look at the `router ospf 1` section on R1: what tells OSPF to aggregate area 1?'
+  checks: []
+- id: r1-network-type
+  title: OSPF network type mismatch
+  device: R1
+  ticket: R1 and R3 show each other as FULL neighbors, yet R4 can no longer reach R3's 172.16.30.0/23 networks and R3's routes are missing on R1.
+  config: |
+    interface %if1%
+     ip ospf network broadcast
+  explanation: |-
+    **Root cause:** R1 %if1% was set to the broadcast network type while R3 uses point-to-point. The adjacency comes up, but the router and network LSAs do not match, so SPF cannot build the path.
+
+    **Fix (R1):**
+    ```
+    interface %if1%
+     ip ospf network point-to-point
+    ```
+    Both ends of a link must use the same OSPF network type.
+  hints:
+  - A FULL adjacency with missing routes often means the two ends describe the link differently.
+  - Compare `show ip ospf interface brief` (or `show ip ospf interface`) on R1 and R3 for the R1-R3 link.
+  checks: []

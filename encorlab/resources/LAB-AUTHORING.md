@@ -43,6 +43,7 @@ The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocompl
 | solution | recommended | `{R1: "router ospf 1\n network ...\n"}`. Required for `pack` and AI generation |
 | solution_summary | yes (new labs) | Markdown shown when the student scores 100% (or clicks *Reveal solution*). See below |
 | hints | recommended | Ordered list, vaguest first. The *Hint* button reveals them one at a time ("Hint 2 of 3") |
+| faults | optional | Predefined faults for *Break my lab* (see below) |
 | author, version | no | free text |
 
 ## Solution summary and hints
@@ -74,6 +75,37 @@ hints:
 If `solution_summary` is empty, the app generates a fallback that lists the solution lines per device.
 If `hints` is empty, the Hint button uses the per-check `hint` texts in check order.
 Hints go from vague to specific. The last one may name the feature, but should not paste the whole solution.
+
+## Faults ("Break my lab")
+
+Optional. Each fault breaks the **solved** lab in one realistic way. *Break my lab* rebuilds the lab with
+starting config + solution + one random fault config, and the student gets only the `ticket` (symptoms).
+
+```yaml
+faults:
+  - id: r2-wrong-key            # lowercase, unique
+    title: Wrong EIGRP key-string on R2
+    device: R2
+    ticket: R2 has had no EIGRP neighbors since a password change.   # symptoms only, never the cause
+    config: |                   # IOS lines applied after the solution; use "no ..." to remove lines
+      key chain EIGRP-KEYS
+       key 1
+        key-string WRONG
+    explanation: |              # Markdown: root cause, exact fix, why
+      **Root cause:** ... **Fix (R2):** ...
+    hints: ["vaguest hint", "more specific hint"]
+    checks:                     # optional extra checks graded while this fault is active
+      - id: f-r2-cfg-key
+        mode: config
+        device: R2
+        description: R2 uses the shared key string
+        match: ['^key chain EIGRP-KEYS\s*\n\s+key 1\s*\n\s+key-string ENCOR\s*$']
+```
+
+The validator applies every fault offline (IOS-style merge: a line replaces the same setting, `no X` removes it) and
+requires that at least one config-mode check (lab checks + the fault's `checks`) **fails** with the fault and that
+all of them still pass without it. Avoid faults whose fix is not visible in the running config as you wrote it
+(for example NTP keys, which IOS stores encrypted).
 
 ## Checks
 Each check has `id`, `device`, `description` (optional when using a template), `points` (default 1) and `hint` (shown next to a failed check).

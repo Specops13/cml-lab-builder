@@ -2,6 +2,18 @@
 
 All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+### Added
+- **Break my lab (fault practice).** Each built-in lab has 3 predefined faults (33 in total). *Break my lab* rebuilds the
+  working lab with a random fault (not one used recently) and shows a symptom-only trouble ticket. Check grades the lab
+  checks plus fault-specific checks; when it passes, you see the root cause and fix. Fault-specific hints,
+  *Reveal the answer*, *End fault practice*, and Reset re-applies the same broken config.
+  CLI: `break <lab> [--fault ID]`, `fault <lab> [--reveal|--end]`. History marks fault attempts.
+- Lab files can define `faults:`. The validator applies each fault offline with an IOS-style config merge and requires
+  that it is detected and fixable.
+### Fixed
+- 07-acl-nat: the BLOCK-TELNET config check now accepts the sequence numbers IOS-XE shows in named ACLs (`10 deny ...`).
+
 ## [1.4.0] - 2026-10-17
 ### Added
 - **Solution summary.** New `solution_summary` lab field (Markdown: root cause, the exact fix per device, why it works).

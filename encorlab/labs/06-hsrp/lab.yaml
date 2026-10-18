@@ -169,3 +169,66 @@ hints:
   - "Both routers must agree on the HSRP version, the group number and the virtual IP."
   - "Which router should be active? Priority alone doesn't take the role back after a failure without preempt."
   - "Authentication must match on both routers, and R1 must give up the active role when its uplink fails (object tracking)."
+faults:
+- id: r1-no-preempt
+  title: Preemption removed on R1
+  device: R1
+  ticket: After R1 was reloaded for maintenance, R2 stayed the active gateway even though R1 is back up and healthy.
+  config: |
+    interface %if0%
+     no standby 10 preempt
+  explanation: |-
+    **Root cause:** `standby 10 preempt` was removed from R1. With the higher priority but no preempt, R1 does not take the active role back from R2.
+
+    **Fix (R1):**
+    ```
+    interface %if0%
+     standby 10 preempt
+    ```
+  hints:
+  - R1 has the higher priority, so why doesn't it take over?
+  - Look at the P column in `show standby brief` on R1.
+  checks: []
+- id: r2-wrong-auth
+  title: HSRP authentication mismatch
+  device: R2
+  ticket: Both R1 and R2 claim to be HSRP Active for 192.168.10.254, and SW1 sees the virtual MAC flapping.
+  config: |
+    interface %if0%
+     standby 10 authentication md5 key-string ENC0R
+  explanation: |-
+    **Root cause:** R2's HSRP MD5 key-string was changed (ENC0R with a zero), so the routers discard each other's hellos and both become Active.
+
+    **Fix (R2):**
+    ```
+    interface %if0%
+     standby 10 authentication md5 key-string ENCOR
+    ```
+  hints:
+  - Two Active routers means they don't accept each other's hellos.
+  - Compare the authentication settings in `show standby` on R1 and R2.
+  checks:
+  - id: f-r2-cfg-auth
+    mode: config
+    device: R2
+    description: R2 HSRP uses the shared MD5 key
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+standby 10 authentication md5 key-string ENCOR\s*$
+    hint: standby 10 authentication md5 key-string ENCOR
+- id: r1-track-lan
+  title: Tracking the wrong interface
+  device: R1
+  ticket: During an uplink failure test (R1's link to R3 shut down), R1 stayed HSRP Active and SW1 lost Internet access.
+  config: |
+    track 1 interface %if0% line-protocol
+  explanation: |-
+    **Root cause:** track object 1 on R1 now follows the LAN interface %if0% instead of the uplink %if1%, so an uplink failure never lowers R1's priority.
+
+    **Fix (R1):**
+    ```
+    track 1 interface %if1% line-protocol
+    ```
+  hints:
+  - Tracking only helps if it watches the right thing.
+  - 'Check `show track 1` on R1: which interface does it follow?'
+  checks: []

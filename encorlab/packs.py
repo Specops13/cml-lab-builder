@@ -254,6 +254,9 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
                 passing = [r.id for r in blank.results if r.passed]
                 (errors if (strict and mode == "config") else warnings).append(
                     f"[{plat_name}/{mode}] checks already passing on the starting config: {passing}")
+        if sol and lab.faults:
+            from .faults import validate as validate_faults
+            errors.extend(validate_faults(lab, sol, plat))
     if sol and not pack.fixtures.get("solved"):
         warnings.append("live checks are not tested offline (no fixture_solved.yaml); they are validated for syntax only")
     return Report(not errors, lab.id, lab.title, errors, warnings, results)

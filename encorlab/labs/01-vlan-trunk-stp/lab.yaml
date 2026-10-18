@@ -174,3 +174,69 @@ hints:
   - "Start with the VLAN database: do all three switches know VLANs 10, 20 and 99? There is no VTP in this lab."
   - "Every inter-switch link must be a static 802.1Q trunk, configured identically on both ends (native VLAN and allowed list)."
   - "Root bridge: SW2 already uses priority 4096, so SW1 needs a lower one. Rapid PVST+ must be the STP mode everywhere."
+faults:
+- id: sw1-native-mismatch
+  title: Native VLAN mismatch on the SW1-SW2 trunk
+  device: SW1
+  ticket: SW1 and SW2 keep logging CDP 'Native VLAN mismatch' messages on the link between them, and management traffic on VLAN 99 between the two switches is unreliable.
+  config: |
+    interface %if0%
+     switchport trunk native vlan 1
+  explanation: |-
+    **Root cause:** SW1 %if0% (to SW2) was changed to native VLAN 1 while SW2 still uses native VLAN 99.
+
+    **Fix (SW1):**
+    ```
+    interface %if0%
+     switchport trunk native vlan 99
+    ```
+    Both ends of an 802.1Q trunk must agree on the native (untagged) VLAN, otherwise untagged frames leak between VLANs and CDP reports the mismatch.
+  hints:
+  - Look at the trunk between SW1 and SW2 from both ends.
+  - Compare the Native vlan column of `show interfaces trunk` on SW1 and SW2.
+  checks: []
+- id: sw1-not-root
+  title: SW1 lost its root bridge priority
+  device: SW1
+  ticket: 'After a config cleanup on SW1, the spanning-tree topology for VLANs 10 and 20 changed: traffic between the switches now takes a different path and a different switch is root.'
+  config: |
+    no spanning-tree vlan 10,20 priority 0
+  explanation: |-
+    **Root cause:** the `spanning-tree vlan 10,20 priority 0` line was removed from SW1, so the switch with the lowest MAC address became root.
+
+    **Fix (SW1):**
+    ```
+    spanning-tree vlan 10,20 priority 0
+    ```
+    (or `spanning-tree vlan 10,20 root primary`). The lowest bridge priority wins the root election.
+  hints:
+  - Which switch is root for VLAN 10 now, and which one should it be?
+  - 'Check `show spanning-tree vlan 10` on SW1: is it the root, and what is its priority?'
+  checks: []
+- id: sw3-vlan10-pruned
+  title: VLAN 10 removed from the SW3-SW1 trunk
+  device: SW3
+  ticket: SW3 can still reach 10.10.10.1 on SW1, but `traceroute`-style tests and STP show VLAN 10 now detours through SW2 even though the direct SW3-SW1 link is up/up.
+  config: |
+    interface %if1%
+     switchport trunk allowed vlan 20,99
+  explanation: |-
+    **Root cause:** VLAN 10 was removed from the allowed list on SW3 %if1% (the trunk to SW1).
+
+    **Fix (SW3):**
+    ```
+    interface %if1%
+     switchport trunk allowed vlan 10,20,99
+    ```
+    (or `switchport trunk allowed vlan add 10`). A VLAN must be allowed on both ends of a trunk to be forwarded over it.
+  hints:
+  - The link is up, so the problem is which VLANs it carries.
+  - Compare the 'Vlans allowed on trunk' section of `show interfaces trunk` on SW3 and SW1.
+  checks:
+  - id: f-sw3-cfg-allowed
+    mode: config
+    device: SW3
+    description: SW3 trunk to SW1 allows VLAN 10
+    match:
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+switchport trunk allowed vlan (\S+,)?10(,\S+)?\s*$
+    hint: switchport trunk allowed vlan 10,20,99 on the trunk to SW1

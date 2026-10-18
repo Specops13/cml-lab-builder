@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from .platforms import get as get_platform
-from .render import lab_title, node_config, to_yaml
+from .render import full_config, lab_title, to_yaml
 from .schema import Lab
 
 log = logging.getLogger(__name__)
@@ -156,8 +156,10 @@ class CML:
                 raise CMLError(f"nodes did not boot within {self.s.boot_timeout}s: {states}")
             self._sleep(10)
 
-    def reset(self, lab: Lab, progress: Callable[[str], None] = lambda m: None):
-        """Stop + wipe (restores day-0 configs on next boot) + start."""
+    def reset(self, lab: Lab, progress: Callable[[str], None] = lambda m: None, extra: dict | None = None,
+              label: str = "initial"):
+        """Stop + wipe (restores day-0 configs on next boot) + start.
+        extra: device -> config added to the starting config (fault practice, snapshots)."""
         cl = self.find(lab)
         if cl is None:
             raise CMLError("lab is not built")
@@ -168,9 +170,11 @@ class CML:
         # Config extraction (config grading mode) overwrites the stored day-0 config,
         # so always re-apply the lab's original configs before booting again.
         plat = get_platform(self.s.platform)
-        progress("Restoring initial configs")
+        progress(f"Restoring {label} configs")
+        names = {n.name for n in lab.nodes}
         for n in cl.nodes():
-            n.configuration = node_config(lab, n.label, plat)
+            if n.label in names:
+                n.configuration = full_config(lab, n.label, plat, extra)
         self.check_capacity(lab, cl)
         progress("Starting nodes")
         cl.start(wait=False)

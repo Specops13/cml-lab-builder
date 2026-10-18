@@ -33,7 +33,7 @@
   "lab.results": "Pass/fail per check with what was found or missing. Expand output to see the raw device output.",
   "lab.output": "Raw output the check looked at.",
   "lab.activity": "Progress log of the current or last Build, Check, Reset or Destroy.",
-  "lab.history": "Your previous check scores for this lab (last 50), including how many hints you had used.",
+  "lab.history": "Your previous check scores for this lab (last 50): hints used and whether it was a normal attempt, fault practice or an exam.",
   "lab.historyClear": "Delete the score history of this lab.",
   "b.new": "Start a blank two-router draft. The current draft is discarded.",
   "b.load": "Open an existing lab in the builder. Built-in labs open as a copy you can save.",
@@ -107,5 +107,11 @@
   "lab.revealSolution": "Shows the root cause, the exact fix per device and the solution config. You will be asked to confirm first.",
   "lab.solutionPanel": "What the reference solution changes and why it works. Shown automatically when you score 100%.",
   "f.solutionSummary": "Markdown shown after a 100% score or on Reveal solution: the root cause, the exact fix commands per device, and why it works.",
-  "f.hints": "Progressive hints, one per line and vaguest first, for the Hint button. If left empty, the check hints are used in order."
+  "f.hints": "Progressive hints, one per line and vaguest first, for the Hint button. If left empty, the check hints are used in order.",
+  "lab.break": "Rebuilds the lab with a working config plus one random predefined fault, for unlimited troubleshooting practice.",
+  "lab.faultBox": "The symptom you have to troubleshoot. The cause stays hidden until you fix it or reveal the answer.",
+  "lab.faultReveal": "Give up and show the cause and the fix of the current fault. This is recorded as revealed.",
+  "lab.faultEnd": "Stop fault practice. The devices keep their configs; click Reset afterwards to go back to the starting configs.",
+  "lab.faultPanel": "What was broken and the exact fix. Shown when Check passes during fault practice, or after Reveal.",
+  "lab.faultConfig": "The IOS lines that were applied on top of the working config to create the fault."
 }
