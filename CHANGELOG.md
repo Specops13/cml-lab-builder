@@ -2,7 +2,7 @@
 
 All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
-## [1.6.0] - Unreleased
+## [1.6.0] - 2026-10-18
 ### Added
 - **Multicast labs**. Both run on IOL or IOSv routers, with routers acting as the
   source and receiver hosts:

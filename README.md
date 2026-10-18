@@ -511,5 +511,5 @@ become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv
 After changing the schema, templates, guide or example, run `python -m encorlab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **1.5.0**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
+Current version: **1.6.0**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/encore-lab-app/releases) for downloads.
