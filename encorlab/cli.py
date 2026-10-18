@@ -454,6 +454,19 @@ def snapshot_cmd(lab_id: str,
         raise typer.Exit(1)
 
 
+@app.command("report")
+def report_cmd(lab_id: str = typer.Argument(None, help="lab id; omit for the progress report over all labs"),
+               out: Path = typer.Option(None, "-o", "--out", help="output .html file"),
+               outputs: bool = typer.Option(False, "--outputs", help="include the raw command output of each check"),
+               name: str = typer.Option("", "--name", help="your name, printed in the report header")):
+    """Write a printable HTML report (open it in a browser and print / save as PDF)."""
+    from . import report
+    html = report.lab_report(lab_id, outputs=outputs, student=name) if lab_id else report.progress_report(student=name)
+    out = out or Path(f"encor-report-{lab_id or 'progress'}.html")
+    out.write_text(html, encoding="utf-8")
+    typer.echo(f"wrote {out} (open it in a browser and print, or save as PDF)")
+
+
 @app.command("console")
 def console_cmds(lab_id: str):
     """Show the CML web link and console server commands for the lab's nodes."""

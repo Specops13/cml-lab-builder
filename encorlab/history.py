@@ -47,7 +47,8 @@ def add(lab_id: str, report: dict) -> dict:
 
 
 def clear(lab_id: str) -> None:
-    try:
-        _file(lab_id).unlink()
-    except FileNotFoundError:
-        pass
+    for f in (_file(lab_id), data_dir() / "reports" / f"{lab_id}.json"):
+        try:
+            f.unlink()
+        except FileNotFoundError:
+            pass

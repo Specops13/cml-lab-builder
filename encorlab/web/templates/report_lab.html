@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Lab report - {{ lab.title }}</title>{% include "_report_style.html" %}</head>
+<body><div class="page">
+<div class="toolbar noprint"><button title="Open the print dialog; choose 'Save as PDF' to get a PDF" onclick="window.print()">Print / Save as PDF</button></div>
+<div class="head"><div>
+  <div class="muted small">ENCOR Lab Builder {{ version }} - lab report</div>
+  <h1>{{ lab.title }}</h1>
+  <div class="small">{% for b, t in items %}<span class="tag">{{ b }} {{ t }}</span>{% endfor %}
+    <span class="tag">difficulty {{ lab.difficulty }}/5</span><span class="tag">{{ lab.nodes|length }} devices</span>{% if source == "user" %}<span class="tag">imported</span>{% endif %}</div>
+</div><div class="small muted" style="text-align:right">{% if student %}<b>{{ student }}</b><br>{% endif %}Generated {{ generated }}<br>Lab id {{ lab.id }}<br>{{ bp_version }}</div></div>
+
+<div class="kpis">
+  <div class="kpi"><span class="muted small">Status</span><b class="{{ 'pass' if solved else 'fail' }}">{{ "Solved" if solved else "Not solved" }}</b></div>
+  <div class="kpi"><span class="muted small">Best counted score</span><b>{{ "-" if best is none else (best|round(1)) ~ "%" }}</b></div>
+  <div class="kpi"><span class="muted small">Attempts</span><b>{{ history|length }}</b></div>
+  <div class="kpi"><span class="muted small">Time spent</span><b>{{ time_s|dur }}</b></div>
+</div>
+
+{% if last %}
+<h2>Latest check ({{ last.ts }})</h2>
+{% if last.exam %}{% set x = last.exam %}
+<div class="box"><h3>Exam result: <span class="{{ 'pass' if x.passed else 'fail' }}">{{ x.final_pct }}% {{ "PASS" if x.passed else "FAIL" }}</span>
+  <span class="muted small">(target {{ x.pass_pct }}%)</span></h3>
+  <table style="width:auto"><tr><td>Raw score</td><td>{{ x.raw_pct }}%</td></tr>
+  <tr><td>Hints</td><td>{% if x.hints == "off" %}disabled{% else %}{{ x.hints_used }} used x {{ x.penalty_per_hint }} = -{{ x.penalty }} points{% endif %}</td></tr>
+  <tr><td>Time</td><td>{{ x.used_s|dur }} of {{ x.duration_s|dur }}{% if x.late %} <span class="fail">submitted late: scored 0%</span>{% endif %}</td></tr></table></div>
+{% endif %}
+<p class="result"><b>Score {{ last.earned }}/{{ last.total }} ({{ last.score_pct }}%)</b>
+  <span class="{{ 'pass' if last.passed else 'fail' }}">{{ "SOLVED" if last.passed else "not solved" }}</span></p>
+<p class="small">Grading mode: <b>{{ "config (running config via the CML API)" if last.mode == "config" else "live (device consoles)" }}</b>
+  {% if last.hints_used is not none %} - hints used {{ last.hints_used }}/{{ last.hints_total }}{% endif %}
+  {% if last.elapsed_s %} - timer {{ last.elapsed_s|dur }}{% endif %}{% if last.fault %} - fault practice ({{ last.fault }}){% endif %}
+  {% if last.revealed %} - <span class="fail">solution was revealed before this check</span>{% endif %}</p>
+{% for n in last.notes or [] %}<p class="small muted">Note: {{ n }}</p>{% endfor %}
+<table><tr><th></th><th>Device</th><th>Check</th><th>Details</th></tr>
+{% for r in last.results %}<tr><td class="{{ 'pass' if r.passed else 'fail' }}">{{ "PASS" if r.passed else "FAIL" }}</td><td>{{ r.device }}</td>
+  <td>{{ r.description }}<br><code class="small">{{ r.command }}</code></td>
+  <td class="small">{% for d in r.details %}{{ d }}<br>{% endfor %}{% if outputs and r.output %}<pre>{{ r.output }}</pre>{% endif %}</td></tr>{% endfor %}
+</table>
+{% if last.fault_fixed %}<h3>Fault fixed: {{ last.fault_fixed.title }} ({{ last.fault_fixed.device }})</h3><div class="box">{{ last.fault_fixed.explanation|md }}</div>{% endif %}
+{% if last.passed and last.solution_summary %}<h3>Solution summary</h3><div class="box">{{ last.solution_summary|md }}</div>{% endif %}
+{% else %}
+<p class="muted">No detailed result yet: run Check once and open the report again.</p>
+{% endif %}
+
+<h2>Attempt history</h2>
+{% if history %}<table><tr><th>When</th><th>Type</th><th>Mode</th><th>Score</th><th>Counted</th><th>Hints</th><th>Timer</th><th>Failed checks</th></tr>
+{% for x in history %}<tr><td class="small">{{ x.ts }}</td><td>{{ "exam" if x.exam else ("fault" if x.fault else "lab") }}</td><td>{{ x.mode }}</td>
+  <td class="{{ 'pass' if x.passed else '' }}">{{ x.score_pct }}%</td><td>{{ (x.exam.final_pct if x.exam else none) or "" }}{% if x.exam %}%{% endif %}</td>
+  <td>{{ "-" if x.hints_used is none else x.hints_used ~ "/" ~ x.hints_total }}</td><td>{{ x.elapsed_s|dur }}</td><td class="small">{{ (x.failed or [])|join(", ") }}</td></tr>{% endfor %}
+</table>{% else %}<p class="muted">No attempts yet.</p>{% endif %}
+<p class="small muted">Counted score = score minus 5 points per hint, capped at 50% if the answer was revealed first; exam attempts count their exam score.</p>
+</div></body></html>

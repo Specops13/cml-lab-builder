@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, catalog, config, courses, exam, faults, history, library, packs, progress, service, snapshots, updates
+from .. import __version__, ai, catalog, config, courses, exam, faults, history, library, packs, progress, report, service, snapshots, updates
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -389,6 +389,17 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     def del_history(lab_id: str):
         history.clear(lab_id)
         return {"cleared": lab_id}
+
+    # ------------------------------------------------------------ printable reports (print to PDF in the browser)
+    @app.get("/report/labs/{lab_id}", response_class=HTMLResponse)
+    def lab_report_page(lab_id: str, outputs: bool = False, name: str = ""):
+        _entry(lab_id)
+        _no_exam(lab_id)
+        return HTMLResponse(report.lab_report(lab_id, outputs=outputs, student=name))
+
+    @app.get("/report/progress", response_class=HTMLResponse)
+    def progress_report_page(name: str = ""):
+        return HTMLResponse(report.progress_report(student=name))
 
     @app.get("/api/progress")
     def get_progress():

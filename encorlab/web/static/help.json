@@ -172,5 +172,8 @@
   "lab.snapView": "Show the saved configs of each device.",
   "lab.snapDownload": "Download the snapshot as a text file with one '! device NAME' section per device.",
   "lab.snapDelete": "Delete this snapshot (the lab is not changed).",
-  "lab.snapDevice": "Saved running config of this device."
+  "lab.snapDevice": "Saved running config of this device.",
+  "lab.report": "Open a printable report of this lab in a new tab: latest check per objective, exam result, attempt history. Print it or save it as PDF.",
+  "lab.reportOutputs": "The same report including the raw output of every check command (longer).",
+  "p.report": "Open a printable progress report (domains, weakest topics, all labs) in a new tab. Print it or save it as PDF."
 }

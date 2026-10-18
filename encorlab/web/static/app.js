@@ -331,7 +331,9 @@ async function selectLab(id) {
       <button data-help="lab.snapSave" id="snap-save">Save snapshot</button></div><div id="snapshots" class="muted small">Loading…</div></details>`}
     <h3 data-help="lab.results">Results</h3><div id="results" class="muted">Not checked yet.</div>
     <h3 data-help="lab.activity">Activity</h3><pre id="log" class="log">-</pre>
-    <details id="hist-box"><summary data-help="lab.history">History</summary><div id="history"></div></details>`;
+    <details id="hist-box"><summary data-help="lab.history">History</summary><div id="history"></div></details>
+    ${l.exam ? "" : `<div class="toolbar"><a data-help="lab.report" class="btn" href="/report/labs/${encodeURIComponent(l.id)}" target="_blank" rel="noopener">Print report ↗</a>
+      <a data-help="lab.reportOutputs" class="btn" href="/report/labs/${encodeURIComponent(l.id)}?outputs=true" target="_blank" rel="noopener">Report with command output ↗</a></div>`}`;
   $("#a-build").onclick = () => run("build");
   $("#a-check").onclick = () => (l.exam ? confirm("Submit the exam now? It is graded once and the exam ends.") && run("check") : run("check"));
   currentExam = l.exam || null; currentHintsTotal = l.hints_total || 0;

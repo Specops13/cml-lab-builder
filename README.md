@@ -44,6 +44,8 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - **Exam mode:** a timed, one-shot attempt with a countdown, the solution withheld, and hints disabled or costing
   points. *Submit exam* (or the timer running out) grades once and shows a score report (raw score, hint penalty,
   time used, pass/fail against an 80% target).
+- **Printable reports:** a lab report (latest check per objective, exam result, solution summary, attempt history) and a
+  progress report (domains, weakest topics, all labs) as clean pages. Print them or save them as PDF from the browser.
 - **Config snapshots:** save the running configs of a built lab (over the CML API) and restore them later. Restore
   stops, wipes and reboots the lab with the saved configs. View or download snapshots as text.
 - **Progress dashboard:** mastery per ENCOR 350-401 v1.2 exam domain (with the official weights) and per blueprint item,
@@ -169,6 +171,7 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `update-check` | ask GitHub Releases whether a newer version exists (nothing is installed) |
 | `exam <lab> --start [--minutes N] [--hints penalty\|off] [--penalty P]`, `exam <lab> [--abort]` | exam mode: start, status, abort (submit with `check`; `hint` costs points) |
 | `snapshot <lab> [--save NAME] [--restore NAME] [--show NAME] [--delete NAME]` | config snapshots: list, save, restore, print, delete |
+| `report [<lab>] [-o file.html] [--outputs] [--name "Your Name"]` | printable HTML report of a lab (or of your progress); print or save as PDF |
 | `history <lab>` | your past scores (with hints used) |
 | `progress [--json]` | progress dashboard: mastery per exam domain, streak, time spent, weakest topics |
 | `library list` / `library install <file or https URL> [--sha256 …]` | browse / install from the online lab library |
@@ -193,6 +196,17 @@ a removed `next-hop-self`. You only get the trouble ticket, which describes symp
 
 Your own labs can define faults too (`faults:` in lab.yaml, see [docs/LAB-AUTHORING.md](docs/LAB-AUTHORING.md)). The
 validator applies each fault offline and requires that a config check detects it and that the solved lab still passes.
+
+### Printable reports
+- **Lab report:** *Print report* at the bottom of a lab opens a clean page in a new tab. It shows the latest check
+  (every objective with PASS/FAIL and details, mode, hints, timer), the exam result or fixed fault if any, the solution
+  summary once solved, and the attempt history. *Report with command output* adds the raw `show` output (trimmed to
+  4,000 characters per check).
+- **Progress report:** *Print report* on the Progress page covers mastery per exam domain, weakest topics, every lab and
+  the checks you fail most.
+- Click **Print / Save as PDF** (or Ctrl+P) and choose *Save as PDF*. The layout is print-ready (A4/Letter, no buttons).
+  From the CLI, `report <lab> -o r.html` or `report -o progress.html` writes the same pages; add `--name` to print your name.
+  Lab reports are not available during an exam.
 
 ### Config snapshots
 Open **Config snapshots** in a built lab and click **Save snapshot**, for example before trying something risky or to keep
@@ -382,6 +396,7 @@ encorlab/                 the application (Python package)
   courses.py, library.py  .encorcourse + online library    faults.py     "Break my lab" faults (iosmerge.py: config merge)
   blueprint.py            ENCOR v1.2 exam topics           progress.py   progress dashboard
   exam.py, snapshots.py   exam mode, config snapshots      updates.py    GitHub Releases update check
+  report.py               printable HTML reports (web/templates/report_*.html)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders

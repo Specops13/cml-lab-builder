@@ -29,6 +29,9 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
   reboot with the saved day-0 configs). View or download them as `.cfg`, up to 20 per lab, using the *Config snapshots*
   section, the `snapshot` CLI command or `/api/labs/{id}/snapshots`. Show-run banners are stripped, and restoring onto
   the other image platform is refused.
+- **Printable reports:** lab report (latest check per objective, exam/fault result, solution summary, attempt history,
+  optional command output) and progress report, as print-ready HTML (*Print report* buttons, `/report/labs/{id}`,
+  `/report/progress`, `report` CLI command). The latest full check result per lab is now kept in `reports/` in the data folder.
 - Lab files can define `faults:`. The validator applies each fault offline with an IOS-style config merge and requires
   that it is detected and fixable.
 ### Changed

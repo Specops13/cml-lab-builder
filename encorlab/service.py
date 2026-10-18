@@ -145,8 +145,10 @@ def do_check(settings, lab_id, progress, client_factory=None, runner=None, confi
             sol = dict(lab.solution or {})
         d["solution_summary"], d["solution_summary_auto"] = sol_mod.summary(base_lab, sol, plat)
     if record:
+        from . import report as report_mod
         try:
             history.add(lab.id, d)
+            report_mod.save_last(lab.id, d)
         except OSError:
             pass
     return d
