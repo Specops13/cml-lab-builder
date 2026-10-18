@@ -153,5 +153,15 @@
   "more.updates": "Ask GitHub whether a newer ENCOR Lab Builder release exists. Nothing is downloaded or installed.",
   "s.check_updates": "Off by default. When on, the app asks GitHub Releases at most once a day for a newer version (nothing is installed).",
   "s.updateNow": "Check GitHub Releases for a newer version right now (one anonymous request to api.github.com).",
-  "s.releaseLink": "Open the release page on GitHub to read the changes and download the new version."
+  "s.releaseLink": "Open the release page on GitHub to read the changes and download the new version.",
+  "lab.exam": "Exam mode: a timed, one-shot attempt with the solution withheld and hints disabled or costing points. You get a score report at the end.",
+  "lab.examMinutes": "Time limit in minutes (5-240). The default depends on the lab's difficulty and size.",
+  "lab.examHints": "Allow hints at a cost (each hint subtracts points from the final score) or disable them completely.",
+  "lab.examPenalty": "Points subtracted from the exam score for each hint you use (0-50).",
+  "lab.examStart": "Start the countdown now. Build the lab first if it is not running yet.",
+  "lab.examCancel": "Close this panel without starting an exam.",
+  "lab.examBox": "The exam countdown. When it reaches zero your lab is submitted automatically.",
+  "lab.examAbort": "Abandon the exam. Nothing is recorded, and hints and the solution become available again.",
+  "lab.examSubmit": "Grade the lab once and end the exam. The score report shows the raw score, hint penalty, time used and pass/fail.",
+  "lab.examReport": "Exam score report: final score (raw score minus hint penalty, 0% if late) against the 80% practice target."
 }

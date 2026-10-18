@@ -292,12 +292,13 @@ async function selectLab(id) {
       <span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>
       ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}</div>
     <div class="toolbar">
-      <button data-help="lab.build" id="a-build" class="primary">Build</button><button data-help="lab.check" id="a-check">Check</button><button data-help="lab.hintNext" id="a-hint">Hint</button>
+      <button data-help="lab.build" id="a-build" class="primary">Build</button>${l.exam ? '<button data-help="lab.examSubmit" id="a-check" class="primary">Submit exam</button>' : '<button data-help="lab.check" id="a-check">Check</button>'}<button data-help="lab.hintNext" id="a-hint">Hint</button>
       <label class="inline">Grading<select data-help="lab.mode" id="mode"><option value="">Mode: default</option><option value="auto">Auto</option><option value="live">Live only</option><option value="config">Config only</option></select></label>
       <button data-help="lab.reset" id="a-reset">Reset</button><button data-help="lab.destroy" id="a-destroy" class="danger">Destroy</button>
-      ${l.faults ? `<button data-help="lab.break" id="a-break" class="warn">Break my lab</button>` : ""}
+      ${l.faults && !l.exam ? `<button data-help="lab.break" id="a-break" class="warn">Break my lab</button>` : ""}
+      ${!l.exam && !l.fault ? `<button data-help="lab.exam" id="a-exam">Exam mode</button>` : ""}
       <span class="sep"></span>
-      <button data-help="lab.edit" id="a-edit">Edit / copy</button><button data-help="lab.export" id="a-export">Export pack</button>
+      ${l.exam ? "" : `<button data-help="lab.edit" id="a-edit">Edit / copy</button><button data-help="lab.export" id="a-export">Export pack</button>`}
       ${l.source === "user" ? '<button data-help="lab.delete" id="a-delete" class="danger">Delete lab</button>' : ""}
     </div>
     <div class="statusbar"><span data-help="lab.status" class="muted"><span id="status">Status: …</span></span><div class="progress"><div id="boot-bar"></div></div>
@@ -307,6 +308,17 @@ async function selectLab(id) {
       Find and fix it, then click Check.${l.fault.extra_checks ? ` ${l.fault.extra_checks} extra check(s) are graded for this fault.` : ""}</p>
       <div class="toolbar"><button data-help="lab.faultReveal" id="a-fault-reveal" class="hint-btn">Reveal the answer</button>
       <button data-help="lab.faultEnd" id="a-fault-end" class="hint-btn">End fault practice</button></div><div id="fault-answer"></div></section>` : ""}
+    <section id="exam-setup" class="exam-box" hidden><h3>Exam mode</h3>
+      <p class="muted small">A timed, one-shot attempt. Hints and the solution are withheld; Check becomes <b>Submit exam</b>, which grades once and ends
+      the exam. Late submissions (after the time limit plus 1 minute) score 0%. Build the lab first if it isn't running: the clock starts when you click Start.</p>
+      <div class="toolbar"><label class="inline">Minutes <input data-help="lab.examMinutes" id="x-min" type="number" min="5" max="240" value="${l.default_exam_minutes}" style="width:5em"></label>
+      <label class="inline">Hints <select data-help="lab.examHints" id="x-hints"><option value="penalty">Allowed, cost points</option><option value="off">Disabled</option></select></label>
+      <label class="inline">Points per hint <input data-help="lab.examPenalty" id="x-pen" type="number" min="0" max="50" value="10" style="width:4em"></label>
+      <button data-help="lab.examStart" id="x-start" class="primary">Start exam</button><button data-help="lab.examCancel" id="x-cancel" class="hint-btn">Cancel</button></div></section>
+    ${l.exam ? `<section class="exam-box" data-help="lab.examBox"><h3>Exam running <span class="tag warn">no solution, ${l.exam.hints === "off" ? "no hints" : `hints -${l.exam.penalty} pts`}</span></h3>
+      <div class="exam-clock" id="exam-clock">--:--</div>
+      <p class="muted small">Started ${esc(l.exam.started)}, limit ${fmtTime(l.exam.duration_s)}. Pass target ${l.exam.pass_pct}%. Submit when done; the lab is submitted automatically when time runs out.</p>
+      <div class="toolbar"><button data-help="lab.examAbort" id="x-abort" class="hint-btn">Abort exam</button></div></section>` : ""}
     <div id="hints-box" class="hints-box" data-help="lab.hintsBox" hidden></div>
     <h3 data-help="lab.task">Task</h3><div class="task md">${md(l.task)}</div>
     <details><summary data-help="lab.objectives">Objectives graded (${l.checks.length} checks: ${l.checks.filter((c) => c.mode === "live").length} live, ${l.checks.filter((c) => c.mode === "config").length} config) - spoilers</summary>
@@ -317,10 +329,18 @@ async function selectLab(id) {
     <h3 data-help="lab.activity">Activity</h3><pre id="log" class="log">-</pre>
     <details id="hist-box"><summary data-help="lab.history">History</summary><div id="history"></div></details>`;
   $("#a-build").onclick = () => run("build");
-  $("#a-check").onclick = () => run("check");
-  currentHints = l.hints || [];
-  $("#a-hint").onclick = () => { const n = hintsUsed(id); if (n < currentHints.length) { hintsSet(id, n + 1); } };
-  renderHints();
+  $("#a-check").onclick = () => (l.exam ? confirm("Submit the exam now? It is graded once and the exam ends.") && run("check") : run("check"));
+  currentExam = l.exam || null; currentHintsTotal = l.hints_total || 0;
+  currentHints = l.exam ? (l.exam.hints_shown || []) : (l.hints || []);
+  $("#a-hint").onclick = l.exam ? () => examHint(id) : () => { const n = hintsUsed(id); if (n < currentHints.length) { hintsSet(id, n + 1); } };
+  if ($("#a-exam")) $("#a-exam").onclick = () => { $("#exam-setup").hidden = !$("#exam-setup").hidden; };
+  if ($("#x-cancel")) $("#x-cancel").onclick = () => { $("#exam-setup").hidden = true; };
+  if ($("#x-start")) $("#x-start").onclick = () => examStart(id);
+  if ($("#x-abort")) $("#x-abort").onclick = async () => {
+    if (!confirm("Abort the exam? Nothing is recorded.")) return;
+    await api(`/api/labs/${id}/exam/abort`, {method: "POST"}); toast("Exam aborted", "ok"); selectLab(id);
+  };
+  renderHints(); renderExamClock();
   $("#a-reset").onclick = () => confirm(l.fault ? "Reset rebuilds the broken lab (same fault) and discards your changes. Continue?"
     : "Reset wipes all your device configs back to the starting configs. Continue?") && run("reset");
   if ($("#a-break")) $("#a-break").onclick = () => confirm(`Break my lab: the lab is rebuilt in CML with a working configuration plus one random fault (out of ${l.faults}). Your current device configs are replaced. Continue?`) && run("break");
@@ -334,8 +354,8 @@ async function selectLab(id) {
     catch (e) { toast(e.message, "err"); }
   };
   $("#a-destroy").onclick = () => confirm("Delete this lab from CML?") && run("destroy");
-  $("#a-edit").onclick = () => openInBuilder(id);
-  $("#a-export").onclick = () => { location.href = `/api/labs/${encodeURIComponent(id)}/export`; };
+  if ($("#a-edit")) $("#a-edit").onclick = () => openInBuilder(id);
+  if ($("#a-export")) $("#a-export").onclick = () => { location.href = `/api/labs/${encodeURIComponent(id)}/export`; };
   if ($("#a-delete")) $("#a-delete").onclick = async () => {
     if (!confirm(`Delete imported lab "${l.title}" from this app? (It is not removed from CML.)`)) return;
     try { await api(`/api/user-labs/${id}`, {method: "DELETE"}); toast("Lab deleted", "ok"); current = null;
@@ -355,12 +375,46 @@ function hintsSet(id, n) { if (n) localStorage.setItem(hintsKey(id), String(n));
 function renderHints() {
   const btn = $("#a-hint"), box = $("#hints-box");
   if (!btn || !box || !current) return;
-  const total = currentHints.length, used = Math.min(hintsUsed(current), total);
-  btn.disabled = used >= total;
-  btn.textContent = !total ? "No hints" : used >= total ? `All ${total} hints shown` : `Hint ${used + 1} of ${total}`;
+  const x = currentExam && currentExam.hints;
+  const total = x ? currentHintsTotal : currentHints.length, used = x ? currentHints.length : Math.min(hintsUsed(current), total);
+  btn.disabled = used >= total || x === "off";
+  btn.textContent = x === "off" ? "Hints disabled (exam)" : !total ? "No hints" : used >= total ? `All ${total} hints shown`
+    : `Hint ${used + 1} of ${total}` + (x ? ` (-${currentExam.penalty} pts)` : "");
   box.hidden = !used;
   box.innerHTML = currentHints.slice(0, used).map((h, i) =>
     `<div class="hint-item"><span class="tag">Hint ${i + 1} of ${total}</span> ${md(h).replace(/^<p>|<\/p>$/g, "")}</div>`).join("");
+}
+/* ---------------------------------------------------------------- exam mode (server-side state; countdown here) */
+let currentExam = null, currentHintsTotal = 0, examAutoSubmitted = {};
+async function examStart(id) {
+  try {
+    await api(`/api/labs/${id}/exam/start?minutes=${Number($("#x-min").value) || 0}&hints=${$("#x-hints").value}&penalty=${Number($("#x-pen").value) || 0}`, {method: "POST"});
+    hintsSet(id, 0); localStorage.removeItem(revealedKey(id)); timerSet(id, {acc: 0, start: Date.now()});
+    delete examAutoSubmitted[id]; toast("Exam started. Good luck!", "ok"); await selectLab(id);
+  } catch (e) { toast("Could not start the exam: " + e.message, "err", 8000); }
+}
+async function examHint(id) {
+  if (!confirm(`This hint costs ${currentExam.penalty} points on your exam score. Show it?`)) return;
+  try { const r = await api(`/api/labs/${id}/exam/hint`, {method: "POST"}); currentHints = r.hints; currentExam = r.exam; renderHints(); }
+  catch (e) { toast(e.message, "err"); }
+}
+function examRemaining() { return currentExam ? Math.round(currentExam.started_ts + currentExam.duration_s - Date.now() / 1000) : 0; }
+function renderExamClock() {
+  const el = $("#exam-clock"); if (!el || !currentExam) return;
+  const rem = examRemaining();
+  el.textContent = rem > 0 ? fmtTime(rem) : "TIME IS UP";
+  el.classList.toggle("low", rem < 300);
+  if (rem <= 0 && !examAutoSubmitted[current] && $("#a-check") && !$("#a-check").disabled) {
+    examAutoSubmitted[current] = true; toast("Time is up: submitting your exam", "err", 8000); run("check");
+  }
+}
+setInterval(renderExamClock, 1000);
+function examPanel(x) {
+  return `<section class="exam-report" data-help="lab.examReport"><h3>Exam result: ${x.final_pct}% <span class="${x.passed ? "pass" : "fail"}">${x.passed ? "PASS" : "FAIL"}</span>
+    <span class="muted small">(target ${x.pass_pct}%)</span></h3>
+    <table class="kv"><tr><td>Raw score</td><td>${x.raw_pct}%</td></tr>
+    <tr><td>Hints</td><td>${x.hints === "off" ? "disabled" : `${x.hints_used} used × ${x.penalty_per_hint} = -${x.penalty} points`}</td></tr>
+    <tr><td>Time</td><td>${fmtTime(x.used_s)} of ${fmtTime(x.duration_s)}${x.late ? ' <span class="fail">submitted late: scored 0%</span>' : ""}</td></tr></table></section>`;
 }
 function bindHints(root) {
   $$("[data-hint]", root).forEach((b) => b.onclick = () => { b.replaceWith(Object.assign(document.createElement("i"), {textContent: "Hint: " + b.dataset.hint})); });
@@ -421,7 +475,8 @@ async function run(kind) {
       if (kind === "reset") hintsSet(lab, 0);
       if (kind === "break") { hintsSet(lab, 0); timerSet(lab, {acc: 0, start: Date.now()}); toast("Trouble ticket ready. Find and fix the fault.", "ok", 7000); if (lab === current) await selectLab(lab); }
       if (kind === "check" && j.result && lab === current) {
-        if (j.result.fault_fixed) { hintsSet(lab, 0); await selectLab(lab); }
+        if (j.result.fault_fixed || j.result.exam) { hintsSet(lab, 0); await selectLab(lab); }
+        if (j.result.exam) { timerPause(lab); toast(`Exam submitted: ${j.result.exam.final_pct}% (${j.result.exam.passed ? "PASS" : "below target"})`, j.result.exam.passed ? "ok" : "err", 8000); }
         showResults(j.result); if (j.result.passed) { timerPause(lab); toast(j.result.fault_fixed ? "Fault fixed!" : "Lab solved!", "ok"); } loadHistory(); loadLabs(); }
     }
   } catch (e) { toast(e.message, "err", 10000); if ($("#log")) $("#log").textContent = "Error: " + e.message; }
@@ -430,7 +485,7 @@ async function run(kind) {
 function showResults(r) {
   const modeName = r.mode === "config" ? "Config (running config via CML API)" : "Live (device console)";
   $("#results").classList.remove("muted");
-  $("#results").innerHTML = `<p><b>Score ${r.earned}/${r.total} (${r.score_pct}%)</b> ${r.passed ? '<span class="pass">SOLVED</span>' : '<span class="fail">not solved yet</span>'}</p>
+  $("#results").innerHTML = (r.exam ? examPanel(r.exam) : "") + `<p><b>Score ${r.earned}/${r.total} (${r.score_pct}%)</b> ${r.passed ? '<span class="pass">SOLVED</span>' : '<span class="fail">not solved yet</span>'}</p>
     <p>Mode used: <b>${esc(modeName)}</b>${r.requested_mode ? ` (requested: ${esc(r.requested_mode)})` : ""}</p>
     ${(r.notes || []).map((n) => `<p class="note">${esc(n)}</p>`).join("")}
     <table><tr><th></th><th>Device</th><th>Check</th><th>Details</th></tr>${r.results.map((c) => `

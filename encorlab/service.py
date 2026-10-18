@@ -53,8 +53,10 @@ def _all_connect_errors(report) -> bool:
 
 def do_break(settings, lab_id, progress, fault_id: str | None = None, client_factory=None, rng=None):
     """'Break my lab': rebuild the lab with the reference solution plus one random predefined fault."""
-    from . import faults
+    from . import exam, faults
     lab = catalog.get(lab_id)
+    if exam.active(lab_id):
+        raise faults.FaultError("an exam is running for this lab; submit or abort it first")
     sol = catalog.load_solution(lab_id)
     if not sol:
         raise faults.FaultError("this lab has no reference solution, so it cannot be broken")
@@ -75,11 +77,14 @@ def do_check(settings, lab_id, progress, client_factory=None, runner=None, confi
     """mode: 'live', 'config' or 'auto' (live first, fall back to config if the console is unreachable).
     While a 'Break my lab' fault is active the fault's extra checks are graded too.
     extra: additional fields stored with the history entry (exam mode, elapsed time)."""
-    from . import faults, history
+    from . import exam, faults, history
     from .cml import probe_console
     lab = lab or catalog.get(lab_id)
     plat = get_platform(settings.platform)
     fstate = faults.active(lab.id) if fault_aware else None
+    xstate = exam.active(lab.id) if fault_aware else None
+    if xstate:
+        hints_used = xstate["hints_used"]     # the server's count, not the client's
     fault = None
     if fstate:
         try:
@@ -117,6 +122,13 @@ def do_check(settings, lab_id, progress, client_factory=None, runner=None, confi
     d["hints_total"] = total_hints
     d["hints_used"] = None if hints_used is None else max(0, min(int(hints_used), total_hints))
     d.update(extra or {})
+    if xstate:
+        d.pop("revealed", None)   # the solution is withheld during an exam
+        d["exam"] = exam.finish(lab.id, d["score_pct"])
+        d["elapsed_s"] = d["exam"]["used_s"]
+        progress(f"Exam submitted: {d['exam']['final_pct']}% "
+                 f"({'PASS' if d['exam']['passed'] else 'below the ' + str(exam.PASS_PCT) + '% target'})"
+                 + (" - submitted after the time limit" if d["exam"]["late"] else ""))
     if fault:
         d["fault"] = fault.id
         if d.get("passed"):

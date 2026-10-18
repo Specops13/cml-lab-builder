@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, catalog, config, courses, faults, history, library, packs, progress, service, updates
+from .. import __version__, ai, catalog, config, courses, exam, faults, history, library, packs, progress, service, updates
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -153,7 +153,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                             "domain": l.domain, "difficulty": l.difficulty, "nodes": l.node_count,
                             "platforms": l.platforms, "source": e.source,
                             "checks": {"live": len(l.checks_for("live")), "config": len(l.checks_for("config"))},
-                            "faults": len(l.faults), "fault_active": bool(faults.active(lid)),
+                            "faults": len(l.faults), "fault_active": bool(faults.active(lid)), "exam_active": bool(exam.active(lid)),
                             "best": max((x.get("score_pct") or 0 for x in h), default=None),
                             "solved": any(x.get("passed") for x in h)})
             except Exception as ex:  # pragma: no cover - defensive
@@ -166,22 +166,59 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         l = e.lab
         plat = get_platform(store.get().platform)
         fault = faults.public(l, faults.active(lab_id), plat)
-        return {"id": l.id, "title": render(l.title, plat), "summary": render(l.summary, plat),
+        ex = exam.status(lab_id)
+        hints = fault["hints"] if fault and fault["hints"] else solution_mod.hints(l, plat)
+        if ex:
+            ex["hints_shown"] = hints[:ex["hints_used"]]
+        return {"exam": ex, "hints_total": len(hints), "default_exam_minutes": exam.default_minutes(l),
+                "id": l.id, "title": render(l.title, plat), "summary": render(l.summary, plat),
                 "source": e.source, "task": render(l.task, plat),
                 "faults": len(l.faults), "fault": fault,
                 "blueprint": l.blueprint, "domain": l.domain, "difficulty": l.difficulty, "nodes": l.node_count,
                 "platforms": l.platforms, "author": l.author,
                 "has_solution": bool(catalog.load_solution(lab_id)),
                 "has_solution_summary": bool(l.solution_summary.strip()),
-                "hints": (fault["hints"] if fault and fault["hints"] else solution_mod.hints(l, plat)),
+                "hints": [] if ex else hints,          # withheld during an exam (served one by one, penalized)
                 "checks": [{"id": c.id, "mode": c.mode, "description": render(c.description, plat),
-                            "device": c.device, "hint": render(c.hint, plat)} for c in l.checks]}
+                            "device": c.device, "hint": "" if ex else render(c.hint, plat)} for c in l.checks]}
+
+    def _no_exam(lab_id: str):
+        if exam.active(lab_id):
+            raise HTTPException(403, "not available while an exam is running (submit or abort it first)")
+
+    @app.post("/api/labs/{lab_id}/exam/start")
+    def exam_start(lab_id: str, minutes: int | None = None, hints: str = "penalty", penalty: int = exam.DEFAULT_PENALTY):
+        e = _entry(lab_id)
+        if exam.active(lab_id):
+            raise HTTPException(409, "an exam is already running for this lab")
+        try:
+            return exam.start(e.lab, minutes, hints, penalty)
+        except exam.ExamError as ex:
+            raise HTTPException(400, str(ex))
+
+    @app.post("/api/labs/{lab_id}/exam/hint")
+    def exam_hint(lab_id: str):
+        e = _entry(lab_id)
+        plat = get_platform(store.get().platform)
+        hints = solution_mod.hints(e.lab, plat)
+        try:
+            n = exam.use_hint(lab_id, len(hints))
+        except exam.ExamError as ex:
+            raise HTTPException(400, str(ex))
+        return {"n": n, "total": len(hints), "hints": hints[:n], "exam": exam.status(lab_id)}
+
+    @app.post("/api/labs/{lab_id}/exam/abort")
+    def exam_abort(lab_id: str):
+        _entry(lab_id)
+        exam.clear(lab_id)
+        return {"aborted": True}
 
     @app.get("/api/labs/{lab_id}/solution")
     def lab_solution(lab_id: str):
         """Solution summary (author-written or auto-generated) + per-device solution config.
         Only requested by the UI after Check (automatically at 100%, otherwise behind a confirm)."""
         e = _entry(lab_id)
+        _no_exam(lab_id)
         plat = get_platform(store.get().platform)
         return solution_mod.reveal(e.lab, catalog.load_solution(lab_id), plat)
 
@@ -189,6 +226,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     def lab_source(lab_id: str):
         """lab.yaml text with the solution embedded (for the editor)."""
         e = _entry(lab_id)
+        _no_exam(lab_id)
         data = yaml.safe_load((e.path / "lab.yaml").read_text(encoding="utf-8"))
         sol = catalog.load_solution(lab_id)
         if sol:
@@ -198,6 +236,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     @app.get("/api/labs/{lab_id}/export")
     def export(lab_id: str):
         _entry(lab_id)
+        _no_exam(lab_id)
         return Response(packs.export_pack(lab_id), media_type="application/zip",
                         headers={"Content-Disposition": f'attachment; filename="{lab_id}{packs.PACK_EXT}"'})
 
@@ -437,6 +476,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         e = _entry(lab_id)
         if not e.lab.faults:
             raise HTTPException(400, "this lab has no predefined faults")
+        _no_exam(lab_id)
         if not catalog.load_solution(lab_id):
             raise HTTPException(400, "this lab has no reference solution")
         if fault:

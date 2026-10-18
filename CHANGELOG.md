@@ -21,6 +21,10 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
   in the CLI and `cml_lab_url` / `consoles` in `GET /api/labs/{id}/status`.
 - **Update check:** *More > Check for updates*, *Settings > Updates* and `update-check` compare your version with the
   latest GitHub release and link to it. The optional daily automatic check (`check_updates`) is off by default.
+- **Exam mode:** a timed one-shot attempt (*Exam mode* button, `exam` CLI command). It has a countdown with
+  auto-submit, the solution, check hints, source and export withheld, and hints either disabled or penalized (the server
+  counts them, not the client). A late submission scores 0%. The score report (raw score, penalty, time, pass/fail
+  against an 80% target) is stored in the history and counted by the progress dashboard.
 - Lab files can define `faults:`. The validator applies each fault offline with an IOS-style config merge and requires
   that it is detected and fixable.
 ### Changed

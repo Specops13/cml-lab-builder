@@ -227,6 +227,12 @@ def _print_check(rep: dict) -> None:
     for n in rep["notes"]:
         typer.echo(f"NOTE: {n}")
     typer.echo(f"Mode {rep['mode']}: score {rep['earned']}/{rep['total']} ({rep['score_pct']}%)")
+    if rep.get("exam"):
+        x = rep["exam"]
+        typer.echo("")
+        typer.echo(f"EXAM RESULT: {x['final_pct']}%  {'PASS' if x['passed'] else 'FAIL'} (target {x['pass_pct']}%)")
+        typer.echo(f"  raw score {x['raw_pct']}%, hints used {x['hints_used']} (-{x['penalty']}), "
+                   f"time {_fmt(x['used_s'])} of {_fmt(x['duration_s'])}" + ("  SUBMITTED LATE: scored 0%" if x["late"] else ""))
     if rep.get("fault_fixed"):
         ff = rep["fault_fixed"]
         typer.echo("")
@@ -254,19 +260,31 @@ def check(lab_id: str, as_json: bool = typer.Option(False, "--json"),
 @app.command()
 def solution(lab_id: str):
     """Print the solution summary (root cause, fix commands per device, why) and the solution config. Spoilers!"""
-    from . import solution as sol_mod
+    from . import exam, solution as sol_mod
+    if exam.active(lab_id):
+        typer.echo("An exam is running for this lab: the solution is available after you submit (check) or abort it.")
+        raise typer.Exit(1)
     lab = catalog.get(lab_id)
     typer.echo(sol_mod.text_report(lab, catalog.load_solution(lab_id), get_platform(config.from_env().platform)))
 
 
 @app.command()
 def hint(lab_id: str, n: int = typer.Argument(1, help="hint number (1 = first, vaguest)")):
-    """Print progressive hint N of a lab ('Hint N of M')."""
-    from . import solution as sol_mod
+    """Print progressive hint N of a lab ('Hint N of M'). During an exam: the next hint, which costs points."""
+    from . import exam, solution as sol_mod
     hs = sol_mod.hints(catalog.get(lab_id), get_platform(config.from_env().platform))
     if not hs:
         typer.echo("This lab has no hints.")
         raise typer.Exit(1)
+    if exam.active(lab_id):
+        try:
+            k = exam.use_hint(lab_id, len(hs))
+        except exam.ExamError as e:
+            typer.echo(f"Exam: {e}")
+            raise typer.Exit(1)
+        st = exam.status(lab_id)
+        typer.echo(f"Hint {k} of {len(hs)} (exam: -{st['penalty']} points each, {k} used): {hs[k - 1]}")
+        return
     if not 1 <= n <= len(hs):
         raise typer.BadParameter(f"choose 1..{len(hs)}")
     typer.echo(f"Hint {n} of {len(hs)}: {hs[n - 1]}")
@@ -358,6 +376,46 @@ def update_check():
         typer.echo(f"Update available: {r['latest']} (you have {r['current']}). Download: {r['url']}")
     else:
         typer.echo(f"You have the latest version ({r['current']}; latest release {r['latest']}).")
+
+
+def _fmt(sec) -> str:
+    sec = int(sec or 0)
+    return f"{sec // 3600:d}:{sec % 3600 // 60:02d}:{sec % 60:02d}"
+
+
+@app.command("exam")
+def exam_cmd(lab_id: str,
+             start: bool = typer.Option(False, "--start", help="start a timed exam attempt"),
+             minutes: int = typer.Option(0, help="time limit (default depends on the lab)"),
+             hints: str = typer.Option("penalty", help="penalty (each hint costs points) or off"),
+             penalty: int = typer.Option(10, help="points per hint in penalty mode"),
+             abort: bool = typer.Option(False, "--abort", help="abandon the running exam (nothing is recorded)")):
+    """Exam mode: timed, one submission (encorlab check), hints off or penalized. Without options: show status."""
+    from . import exam
+    lab = catalog.get(lab_id)
+    if abort:
+        exam.clear(lab_id)
+        typer.echo("Exam aborted.")
+        return
+    if start:
+        if exam.active(lab_id):
+            typer.echo("An exam is already running for this lab (use --abort to abandon it).")
+            raise typer.Exit(1)
+        try:
+            st = exam.start(lab, minutes or None, hints, penalty)
+        except exam.ExamError as e:
+            typer.echo(f"ERROR: {e}")
+            raise typer.Exit(1)
+        typer.echo(f"Exam started: {_fmt(st['duration_s'])} on the clock, hints {st['hints']}"
+                   + (f" (-{st['penalty']} points each)" if st["hints"] == "penalty" else "") + f", pass target {st['pass_pct']}%.")
+        typer.echo(f"Build the lab if needed (encorlab build {lab_id}), solve it, then submit with: encorlab check {lab_id}")
+        return
+    st = exam.status(lab_id)
+    if not st:
+        typer.echo(f"No exam running. Start one with: encorlab exam {lab_id} --start [--minutes {exam.default_minutes(lab)}]")
+        return
+    typer.echo(f"Exam running since {st['started']}: {_fmt(st['remaining_s'])} left of {_fmt(st['duration_s'])}"
+               + (" (TIME IS UP - submit now)" if st["expired"] else "") + f", hints {st['hints']}, used {st['hints_used']}.")
 
 
 @app.command("console")

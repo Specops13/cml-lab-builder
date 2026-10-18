@@ -41,6 +41,9 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   *Auto* uses live when it can and falls back to config.
 - **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (33 in total). One click rebuilds
   the working lab with a random fault and gives you a symptom-only trouble ticket, so you get unlimited troubleshooting practice.
+- **Exam mode:** a timed, one-shot attempt with a countdown, the solution withheld, and hints disabled or costing
+  points. *Submit exam* (or the timer running out) grades once and shows a score report (raw score, hint penalty,
+  time used, pass/fail against an 80% target).
 - **Progress dashboard:** mastery per ENCOR 350-401 v1.2 exam domain (with the official weights) and per blueprint item,
   your weakest topics with links to the labs that train them, daily streak, time spent, most-failed checks and recent activity.
 - **Console links:** once a lab is built, open it in the CML Workbench with one click, or copy a ready-to-paste
@@ -145,7 +148,7 @@ The first connection accepts the server's host key and logs a warning.
    Solve the task, then click **Check**. You get pass/fail per check, with details and the raw output.
 4. Stuck? Click **Hint** for the next hint. At 100% the **Solution summary** appears. Below 100%, **Reveal solution** shows it after a confirm.
 5. **Reset** stops the lab, wipes it and restarts it with the original configs (it also clears revealed hints). **Destroy** stops, wipes and deletes the lab.
-6. Done with a lab? Click **Break my lab** for troubleshooting practice (see below).
+6. Done with a lab? Click **Break my lab** for troubleshooting practice, or **Exam mode** for a timed attempt (see below).
 
 A timer starts on Build and stops when the lab is solved, and each lab keeps a results history.
 Small **?** icons explain each field. Turn them off with *Settings > Show help icons*; all help text is in `encorlab/web/static/help.json`.
@@ -162,6 +165,7 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `break <lab> [--fault ID]`, `fault <lab> [--reveal\|--end]` | Break my lab: rebuild with a random fault and print the ticket; show/reveal/end the active fault |
 | `console <lab>` | CML web link and console server `ssh` commands for each node |
 | `update-check` | ask GitHub Releases whether a newer version exists (nothing is installed) |
+| `exam <lab> --start [--minutes N] [--hints penalty\|off] [--penalty P]`, `exam <lab> [--abort]` | exam mode: start, status, abort (submit with `check`; `hint` costs points) |
 | `history <lab>` | your past scores (with hints used) |
 | `progress [--json]` | progress dashboard: mastery per exam domain, streak, time spent, weakest topics |
 | `library list` / `library install <file or https URL> [--sha256 …]` | browse / install from the online lab library |
@@ -186,6 +190,21 @@ a removed `next-hop-self`. You only get the trouble ticket, which describes symp
 
 Your own labs can define faults too (`faults:` in lab.yaml, see [docs/LAB-AUTHORING.md](docs/LAB-AUTHORING.md)). The
 validator applies each fault offline and requires that a config check detects it and that the solved lab still passes.
+
+### Exam mode
+**Exam mode** turns a lab into a timed, one-shot attempt:
+1. Build the lab, then click **Exam mode**. Choose the time limit (the default depends on difficulty and size), whether
+   hints are **disabled** or **cost points** (default 10 points each), and click **Start exam**.
+2. During the exam the app withholds the solution, the per-check hints, the lab source and the export, and *Break my lab*
+   is unavailable. A countdown is shown, and the **Hint** button (if allowed) asks before it charges you.
+3. **Submit exam** grades the lab once and ends the exam. When the countdown reaches zero the lab is submitted
+   automatically. A submission later than the limit plus 1 minute (for example from the CLI) scores 0%.
+4. The **score report** shows the final score (raw score minus the hint penalty), hints used, time used and
+   PASS/FAIL against an 80% practice target (Cisco does not publish its cut score). It is saved in the history,
+   and the progress dashboard counts the exam score. *Abort exam* abandons it without recording anything.
+
+The exam state is kept on disk (`exams/` in the data folder), so the CLI and the web UI share it and a page reload
+doesn't reset the clock.
 
 ### Progress dashboard
 The **Progress** page summarizes your results history and maps every lab to the
