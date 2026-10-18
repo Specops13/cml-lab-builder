@@ -29,6 +29,9 @@ build = ["pyinstaller>=6.22,<7"]
 encorlab = "encorlab.cli:app"
 encorlab-app = "encorlab.launcher:main"
 
+[tool.setuptools]
+py-modules = ["encorboot"]   # boot loader of the packaged app (part of the frozen runtime, not of app patches)
+
 [tool.setuptools.packages.find]
 include = ["encorlab*"]
 

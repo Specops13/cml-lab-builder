@@ -23,6 +23,22 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
     broken LSP under healthy BGP. The recorded outputs are synthesized and not verified on real hardware.
 - **Course "Multicast and MPLS track"** (`encor-multicast-mpls`) in the online library: labs 14, 15, 08-vrf-lite, 16 and 17.
 - Standalone `.encorlab` packs of the four new labs, with their own ids, attached to the release. They import into 1.5.x.
+- **Patch updates instead of full downloads.** The packaged app is split into a frozen runtime (exe, Python, libraries,
+  boot loader) and the app code, which ships as plain files in `_internal/appcode/`. *Settings > Updates > Install update*
+  downloads only `encorlab-patch-<version>.zip` (about 0.25 MB versus 30+ MB), verifies it, and installs it into the
+  data folder (`app/<version>/`). *Restart now* restarts on the same port. The patch is verified against the release's
+  `SHA256SUMS.txt`, every file against `manifest.json` (no extra files, no paths outside `encorlab/`), and its version
+  and `min_runtime` are checked. If a release needs a newer runtime, the app says *Full download needed* and links it.
+  - Rollback: automatic if a new version fails to import or exits before its web UI starts (it is marked good once
+    the UI is up), and manual with *Roll back*. The current and the previous patch are kept.
+  - CLI: `update-status`, `update-install [--file] [--sha256]`, `update-rollback`.
+    API: `/api/update/status|install|rollback|restart`.
+  - Build: `packaging/build_patch.py` makes a deterministic patch. `packaging/runtime.lock.json` fingerprints the
+    runtime, and CI fails if the runtime changes without a `RUNTIME_VERSION` bump. CI publishes the patch and lists it
+    in `SHA256SUMS.txt`.
+  - The bundled app code is byte-compiled with hash-checked `.pyc`. The smoke test (`--patch-test`) exercises install,
+    a patched UI start, rollback, broken-patch fallback and runtime gating on the frozen build.
+  - 1.6.0 is the first patchable runtime: coming from 1.5.x needs one full download.
 - The offline config merge (used to validate faults) knows `ip igmp version`, `ip pim rp-candidate`, `ip pim bsr-candidate`,
   `ip pim ssm`, `mpls ldp router-id`, `mpls label protocol` and `rd` as single-value lines.
 

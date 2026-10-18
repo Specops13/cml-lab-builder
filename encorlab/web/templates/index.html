@@ -125,6 +125,9 @@
     <h2>Updates</h2>
     <label class="inline"><input data-help="s.check_updates" name="check_updates" type="checkbox"> Check for new versions automatically (once a day)</label>
     <div class="toolbar"><button data-help="s.updateNow" type="button" id="s-update-check">Check for updates now</button><span id="update-result" class="muted small"></span></div>
+    <div id="update-patch" class="toolbar" hidden><button data-help="s.installUpdate" type="button" id="s-update-install" class="primary">Install update</button><span id="update-install-note" class="muted small"></span></div>
+    <p class="small"><span data-help="s.appCode" id="update-status" class="muted">App code: …</span></p>
+    <div class="toolbar"><button data-help="s.restartApp" type="button" id="s-update-restart" hidden>Restart now</button><button data-help="s.rollback" type="button" id="s-update-rollback" hidden>Roll back update</button></div>
     <details><summary data-help="s.aiSection"><b>AI generator (optional)</b></summary>
       <label>Preset <select data-help="s.ai_preset" name="ai_preset" id="ai-preset"><option value="">(none)</option></select></label>
       <label>Base URL (OpenAI-compatible) <input data-help="s.ai_base_url" name="ai_base_url" placeholder="https://api.x.ai/v1"></label>

@@ -19,6 +19,7 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Quick start (ready-to-run download)](#quick-start-ready-to-run-download)
+- [Updating (small patches instead of a full download)](#updating-small-patches-instead-of-a-full-download)
 - [Running from source](#running-from-source)
 - [CML requirements](#cml-requirements)
 - [Using it](#using-it)
@@ -71,8 +72,9 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   placeholders, so one lab file works on both.
 - **Safe by design:** loopback-only UI, read-only checks, secrets kept in memory or the OS keyring and never written to
   settings.json or logs. TLS verification stays on.
-- **Update check:** *More > Check for updates* (or *Settings > Updates*) asks GitHub Releases whether a newer version
-  exists. The automatic daily check is **off by default**.
+- **Update check and patch updates:** *More > Check for updates* (or *Settings > Updates*) asks GitHub Releases whether a
+  newer version exists. From 1.6.0 the packaged app can **Install update**: it downloads only the app-code patch
+  (about 0.25 MB instead of 30+ MB), verifies it, and you restart. The automatic daily check is **off by default**.
 - **Ready-to-run downloads** for Windows 11 and Linux (no Python needed), plus a `?` help tooltip on every control and a dark mode.
 
 ## Screenshots
@@ -96,13 +98,52 @@ Download from **[Releases](https://github.com/Specops13/encore-lab-app/releases/
 - A small console window opens and your default browser shows the app at http://127.0.0.1:8765. If the port is busy, the next free port is used and the window shows the real address.
 - Starting it again while it runs just opens the browser on the running copy.
 - **Quit:** close the console window or press Ctrl+C.
-- **Your data stays outside the app folder,** in `%APPDATA%\encorlab` or `~/.config/encorlab`. That covers settings, imported labs and history. To update, delete the old folder and unzip the new one.
+- **Your data stays outside the app folder,** in `%APPDATA%\encorlab` or `~/.config/encorlab`. That covers settings, imported labs, history and installed updates. To update, use *Settings > Updates > Install update* (see [Updating](#updating-small-patches-instead-of-a-full-download)), or delete the old app folder and unzip the new one.
 - The bundle includes `example-packs/` (drag them onto the Labs page), `docs/` and this README.
 - The command line works too: `ENCORLab list`, `ENCORLab check <lab>`, `ENCORLab --port 9000`, `ENCORLab --no-browser`.
 - **Windows SmartScreen:** the exe is not code-signed, so the first start may show "Windows protected your PC". Click *More info* > *Run anyway*.
   You can also right-click the downloaded zip, choose *Properties* > *Unblock*, then extract it. Check the download against `SHA256SUMS.txt` from the release.
 
 Then open **Settings**, enter your CML URL and credentials, pick a lab and click **Build**.
+
+## Updating (small patches instead of a full download)
+Since 1.6.0 the download is split in two parts:
+
+- **The runtime:** the exe, Python and the libraries in `_internal/`. It only changes with a full download.
+- **The app code:** the `encorlab` package. It ships in `_internal/appcode/` and can be replaced by a small patch
+  (`encorlab-patch-<version>.zip`, about 0.25 MB, attached to each release).
+
+**How to update** (Windows 11 and Linux, all in the GUI; every button has a `?` tooltip):
+1. *Settings > Updates > Check now* (or *More > Check for updates*). If a newer release has a patch, an **Install update** button appears.
+2. **Install update** downloads the patch and verifies it before anything is installed:
+   - the zip's SHA-256 must match the release's `SHA256SUMS.txt`;
+   - every file must match the SHA-256 in the patch's `manifest.json`, with no extra or missing files and no paths outside `encorlab/`;
+   - the version must match the release, and the patch's `min_runtime` must not be newer than your runtime.
+
+   The patch is then unpacked into your data folder (`%APPDATA%\encorlab\app\<version>` or
+   `~/.config/encorlab/app/<version>`). The app folder itself is never modified.
+3. **Restart now** restarts the app on the same port, and the page reconnects by itself. Closing and starting the app works too.
+
+**Safety net:**
+- **Automatic rollback:** a new version counts as good once its web UI has started. If it fails to import, exits with an
+  error before the UI starts, or crashes before its UI comes up, the next start falls back to the previous version
+  (or the built-in copy) and *Settings > Updates* shows why.
+- **Manual rollback:** *Roll back* returns to the version you used before (or the built-in copy) from the next restart.
+  Only the current and the previous patch are kept.
+- **Newer full download wins:** if you unzip a full release that is newer than your installed patch, its built-in code is used.
+
+**When a full download is needed:** if a release changes the runtime (a new Python, a new or upgraded library, or a
+change to the launcher), its patch declares a higher `min_runtime`. *Install update* then says **Full download needed**
+and links the release page. Your data is kept. 1.6.0 is the first patchable runtime, so **coming from 1.5.x you need one
+full download of 1.6.0**. After that, patches work.
+
+**Command line:** `ENCORLab update-status`, `ENCORLab update-install` (latest release),
+`ENCORLab update-install --file encorlab-patch-<v>.zip [--sha256 …]` (offline) and `ENCORLab update-rollback`.
+
+> **Security note:** the checksums come from the same GitHub release as the patch. This proves the download is complete
+> and unmodified in transit, but it is not a code signature: whoever can publish releases on this repo can publish a
+> patch. The app never installs anything on its own; it only acts when you click *Install update*.
+> When you run from source (`run.sh` / `pip install -e .`), use `git pull` instead; the patch buttons are disabled there.
 
 ## Running from source
 Needs Python **3.10 to 3.13** (3.13 recommended). Python 3.14+ is not supported yet: some dependencies have no prebuilt wheels for it.
@@ -172,6 +213,7 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `break <lab> [--fault ID]`, `fault <lab> [--reveal\|--end]` | Break my lab: rebuild with a random fault and print the ticket; show/reveal/end the active fault |
 | `console <lab>` | CML web link and console server `ssh` commands for each node |
 | `update-check` | ask GitHub Releases whether a newer version exists (nothing is installed) |
+| `update-status`, `update-install [--file patch.zip] [--sha256 …]`, `update-rollback` | packaged app: show the running app code, install the latest (or a downloaded) patch, roll back |
 | `exam <lab> --start [--minutes N] [--hints penalty\|off] [--penalty P]`, `exam <lab> [--abort]` | exam mode: start, status, abort (submit with `check`; `hint` costs points) |
 | `snapshot <lab> [--save NAME] [--restore NAME] [--show NAME] [--delete NAME]` | config snapshots: list, save, restore, print, delete |
 | `report [<lab>] [-o file.html] [--outputs] [--name "Your Name"]` | printable HTML report of a lab (or of your progress); print or save as PDF |
@@ -367,7 +409,10 @@ Everything can be set on the **Settings** page; `.env` / environment variables p
 - Checks never change device configuration (only `show` and `ping` commands are allowed in labs).
 - Imported packs are size-limited (5 MB) and path-checked. A lab file only contains data (YAML/regex), never code.
 - Internet access happens only when you ask for it: *Load library* / *Install* (raw.githubusercontent.com or your URL) and
-  *Check for updates* (api.github.com), or once a day if you turn on *Settings > Updates*. Nothing is installed automatically.
+  *Check for updates* (api.github.com), or once a day if you turn on *Settings > Updates*, and *Install update*
+  (the patch and `SHA256SUMS.txt` from github.com). Nothing is installed automatically.
+- Patches are verified (SHA256SUMS, per-file manifest hashes, safe paths, version, runtime) before they are unpacked into
+  your data folder, and are rolled back automatically if they cannot start.
 - Library downloads are https-only (redirects included), size-limited and verified against the sha256 in the index before
   they are validated and installed.
 - The UI listens on 127.0.0.1 only. Secrets are never returned by the API or written to logs.
@@ -410,9 +455,19 @@ far fewer antivirus false positives.
   python-build-standalone Python 3.12 and manylinux_2_28 wheels, so the binary runs on glibc 2.28+ even when built on a newer distro.
 - **GitHub Actions:** `.github/workflows/build.yml` builds and smoke-tests both bundles (windows-latest + ubuntu-22.04) on every `v*` tag.
   The bundles are kept as workflow artifacts. To publish them, run it by hand (*Actions > build > Run workflow*), tick *publish* and enter the tag.
-  Existing release assets are never overwritten.
+  Existing release assets are never overwritten. CI also builds `encorlab-patch-<version>.zip` and adds it to `SHA256SUMS.txt`.
+- **App-code patch:** `python packaging/build_patch.py --out dist` writes `encorlab-patch-<version>.zip`, a deterministic
+  zip with `manifest.json` (version, `min_runtime`, SHA-256 per file). The runtime is fingerprinted in
+  `packaging/runtime.lock.json`: the dependencies, `encorboot.py`, `encor_launcher.py`, the spec and `build_linux.sh`.
+  `--check-lock` (run by CI and the tests) fails if any of them changed. In that case bump `RUNTIME_VERSION` in
+  `encorboot.py` and run `--update-lock`, so that older runtimes are told to do a full download.
+- **How the bundle is laid out:** the spec keeps `encorlab` out of the frozen archive and ships it as plain files in
+  `_internal/appcode/`, with a manifest. The frozen entry point (`encor_launcher.py`) runs the boot loader
+  (`encorboot.py`), which picks the newest valid copy (an installed patch or the built-in one), imports it, and handles
+  rollback. Most of the standard library is frozen in, so patches can use modules the current code does not import yet.
 - **Smoke test:** `python packaging/smoke_test.py <exe> --version <v> --data-dir <user data dir> --pack x.encorlab` checks the CLI, the launcher, the UI assets, the lab list and imports
-  (`build.py --smoke` runs it; it imports the example packs into the user data folder).
+  (`build.py --smoke` runs it; it imports the example packs into the user data folder). With `--patch-test` it also builds test patches and checks, on the frozen build,
+  install → the patched version runs and serves the UI → rollback, automatic fallback from a broken patch, and refusal of a patch that needs a newer runtime.
 
 The UI checks versions on load and whenever the tab becomes visible again. It shows a banner if the cached `app.js` is older than
 the page, or if the app was updated while the tab was open. Cache-busting (`?v=<version>` plus `no-cache`) is unchanged.
@@ -426,7 +481,7 @@ encorlab/                 the application (Python package)
   schema.py, templates.py lab schema + check templates    packs.py      .encorlab import/export/validation
   courses.py, library.py  .encorcourse + online library    faults.py     "Break my lab" faults (iosmerge.py: config merge)
   blueprint.py            ENCOR v1.2 exam topics           progress.py   progress dashboard
-  exam.py, snapshots.py   exam mode, config snapshots      updates.py    GitHub Releases update check
+  exam.py, snapshots.py   exam mode, config snapshots      updates.py    update check + patch verify/install/rollback
   report.py               printable HTML reports (web/templates/report_*.html)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
@@ -437,7 +492,9 @@ encorlab/                 the application (Python package)
 docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example lab, images/
 examples/                 example packs and courses/ (sources of labs/)
 labs/                     online library: built packs, courses and index.json (packaging/build_library.py)
-packaging/                PyInstaller spec, build.py, build_exe.bat, build_linux.sh, smoke_test.py, icon
+encorboot.py              boot loader for packaged builds: picks the app-code bundle, rollback, RUNTIME_VERSION
+encor_launcher.py         frozen entry point (runs encorboot, then encorlab.launcher)
+packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, icon
 tests/                    pytest suite (no CML needed)
 .github/workflows/        CI: test + build/smoke-test Windows and Linux bundles
 run.bat, run.ps1, run.sh  from-source launchers (create .venv, install, start)

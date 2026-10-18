@@ -3,7 +3,8 @@
     python packaging/build.py [--out dist] [--work build/<os>] [--smoke]
 
 Windows -> dist/ENCORLab-<version>-windows-x64.zip     Linux -> dist/ENCORLab-<version>-linux-x64.tar.gz
-Contents: ENCORLab(.exe) + _internal/ (PyInstaller one-folder), README-FIRST.txt, README.md, docs/, example-packs/.
+Contents: ENCORLab(.exe) + _internal/ (PyInstaller one-folder runtime; the app code is in _internal/appcode/),
+README-FIRST.txt, README.md, docs/, example-packs/. The app-code patch is built separately by build_patch.py.
 --smoke runs packaging/smoke_test.py against the staged build (it imports the example packs into YOUR user
 data folder, so it is meant for CI machines)."""
 from __future__ import annotations
@@ -63,6 +64,12 @@ def main() -> int:
         shutil.copy2(HERE / "install-desktop-entry.sh", stage / "install-desktop-entry.sh")
         os.chmod(stage / "install-desktop-entry.sh", 0o755)
 
+    appcode = stage / "_internal" / "appcode"
+    if not (appcode / "encorlab" / "__init__.py").is_file() or not (appcode / "manifest.json").is_file():
+        raise SystemExit(f"app code missing from the bundle: {appcode}")
+    # byte-compile the bundled app code (hash-checked pycs: valid whatever the file times are after unzipping)
+    sh(sys.executable, "-m", "compileall", "-q", "--invalidation-mode", "checked-hash", appcode / "encorlab")
+
     exe = stage / ("ENCORLab.exe" if WIN else "ENCORLab")
     got = subprocess.run([str(exe), "version"], capture_output=True, text=True, timeout=120).stdout.strip()
     if got != v:
@@ -82,7 +89,7 @@ def main() -> int:
 
     if a.smoke:
         data = Path(os.environ["APPDATA"]) / "encorlab" if WIN else Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "encorlab"
-        sh(sys.executable, HERE / "smoke_test.py", exe, "--version", v, "--data-dir", data,
+        sh(sys.executable, HERE / "smoke_test.py", exe, "--version", v, "--data-dir", data, "--patch-test",
            *[x for p in sorted(packs.glob("*.encorlab")) for x in ("--pack", p)])
     return 0
 

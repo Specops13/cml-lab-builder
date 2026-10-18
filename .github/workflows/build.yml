@@ -3,6 +3,8 @@
 #    assets uploaded to an existing release by hand are never overwritten).
 #  - Actions > build > Run workflow: same, and with "publish" ticked it creates/updates the GitHub Release for
 #    the given tag. Existing assets with the same name are NOT replaced (overwrite_files: false).
+#  - every run also builds encorlab-patch-<version>.zip (app code only, used by the in-app "Install update")
+#    and checks packaging/runtime.lock.json, so a runtime change cannot ship as a patch by accident.
 name: build
 on:
   push:
@@ -27,6 +29,22 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install -e ".[dev]" && python -m pytest -q
+      # the runtime (Python, libraries, boot loader, spec) must not change without bumping RUNTIME_VERSION
+      - run: python packaging/build_patch.py --check-lock
+  patch:
+    needs: test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Build the app-code patch (encorlab-patch-<version>.zip, for in-app "Install update")
+        run: python packaging/build_patch.py --check-lock --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: encorlab-patch
+          path: dist/encorlab-patch-*.zip
+          if-no-files-found: error
   bundle:
     needs: test
     strategy:
@@ -57,16 +75,18 @@ jobs:
           if-no-files-found: error
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.publish && inputs.tag != ''
-    needs: bundle
+    needs: [bundle, patch]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/download-artifact@v4
         with: {path: dist, merge-multiple: true}
-      - run: cd dist && sha256sum ENCORLab-* > SHA256SUMS-ci.txt
+      # the in-app updater verifies the patch against SHA256SUMS.txt of the same release
+      - run: cd dist && sha256sum ENCORLab-* encorlab-patch-*.zip > SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
           overwrite_files: false
           files: |
             dist/ENCORLab-*
-            dist/SHA256SUMS-ci.txt
+            dist/encorlab-patch-*.zip
+            dist/SHA256SUMS.txt

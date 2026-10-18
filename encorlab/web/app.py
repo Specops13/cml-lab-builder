@@ -415,6 +415,38 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         except library.LibraryError as e:
             return JSONResponse({"error": str(e), "current": __version__, "url": updates.RELEASES_PAGE}, status_code=502)
 
+    @app.get("/api/update/status")
+    def update_status():
+        """Running app code, runtime version, installed patch, rollback/restart state (no network)."""
+        return updates.status()
+
+    @app.post("/api/update/install")
+    def update_install():
+        """Download, verify (SHA256SUMS + manifest) and install the latest release's app patch."""
+        try:
+            return updates.install(__version__, fetch=update_fetch or library.http_fetch)
+        except updates.UpdateError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+        except library.LibraryError as e:
+            return JSONResponse({"error": str(e)}, status_code=502)
+
+    @app.post("/api/update/rollback")
+    def update_rollback():
+        try:
+            return updates.rollback()
+        except updates.UpdateError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
+    @app.post("/api/update/restart")
+    def update_restart():
+        """Packaged app only: stop and start again on the same port (the open page reconnects)."""
+        from .. import launcher
+        try:
+            launcher.request_restart()
+        except RuntimeError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+        return {"restarting": True}
+
     @app.get("/api/settings")
     def get_settings():
         return store.get().public_dict()

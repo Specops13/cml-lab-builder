@@ -802,6 +802,7 @@ $("#ai-go").onclick = async () => {
 /* ---------------------------------------------------------------- settings */
 let presets = {};
 async function loadSettings() {
+  loadUpdateStatus().catch(() => {});
   const s = await api("/api/settings");
   const f = $("#settings-form");
   for (const k of ["cml_url", "username", "console_host", "console_port", "grading_mode", "platform", "node_limit", "ai_base_url", "ai_model"]) f[k].value = s[k] ?? "";
@@ -853,7 +854,80 @@ async function checkUpdates(manual) {
       localStorage.setItem("updateDismissed", r.latest);
     }
   } else if (manual) toast(text, "ok");
+  showPatchOffer(r).catch(() => {});
 }
+/* ---- patch updates: install the small app-code patch of a release, restart, roll back */
+const fmtSize = (n) => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+async function showPatchOffer(r) {
+  const box = $("#update-patch"), note = $("#update-install-note"), btn = $("#s-update-install");
+  if (!box) return;
+  box.hidden = !r.update_available;
+  if (!r.update_available) return;
+  const st = await api("/api/update/status");
+  const patch = (r.assets || []).find((a) => a.name === `encorlab-patch-${r.latest}.zip`);
+  const full = (r.assets || []).filter((a) => /^ENCORLab-.*-(windows|linux)-x64\./.test(a.name)).map((a) => a.size || 0);
+  btn.disabled = !(patch && st.patchable);
+  if (!patch) note.textContent = "This release has no app patch: download the full release from the release page.";
+  else if (!st.patchable) note.textContent = `Patch available (${fmtSize(patch.size || 0)}), but ${st.reason}.`;
+  else note.textContent = `Downloads ${fmtSize(patch.size || 0)}` + (full.length ? ` instead of ${fmtSize(Math.max(...full))} for the full download.` : ".");
+}
+async function loadUpdateStatus() {
+  const el = $("#update-status");
+  if (!el) return;
+  let st;
+  try { st = await api("/api/update/status"); } catch (e) { el.textContent = "App code: unknown"; return; }
+  const a = st.active || {version: st.version, source: "source tree"};
+  const src = {bundled: "built-in copy", installed: "installed update"}[a.source] || a.source;
+  let t = `App code ${a.version} (${src}) · runtime ${st.runtime ?? "-"}`;
+  if (!st.patchable) t += ` · patch updates not available: ${st.reason}`;
+  else if (st.previous || st.bundled_version) t += ` · fallback: ${st.previous || "built-in " + st.bundled_version}`;
+  if (st.failed && st.failed.version) t += ` · update ${st.failed.version} was rolled back (${st.failed.reason})`;
+  if (st.restart_needed && st.next_start) t += ` · restart to switch to ${st.next_start.version}`;
+  el.textContent = t;
+  $("#s-update-rollback").hidden = !st.can_rollback;
+  $("#s-update-restart").hidden = !(st.restart_needed && st.can_restart);
+}
+$("#s-update-install").onclick = async () => {
+  const btn = $("#s-update-install"), note = $("#update-install-note");
+  btn.disabled = true; note.textContent = "Downloading and verifying…";
+  try {
+    const r = await api("/api/update/install", {method: "POST"});
+    if (r.status === "installed") {
+      note.textContent = `Version ${r.version} installed (${fmtSize(r.size || 0)}, SHA-256 verified). Restart to use it.`;
+      toast(`Update ${r.version} installed. Click "Restart now" to use it.`, "ok", 9000);
+    } else if (r.status === "full_download") {
+      note.innerHTML = `${esc(r.reason)}. <a data-help="s.fullDownload" href="${esc(r.url)}" target="_blank" rel="noopener">Download the full release ↗</a>`;
+    } else note.textContent = `You already have the latest version (${r.current}).`;
+  } catch (e) {
+    note.textContent = `Update not installed: ${(e.data && e.data.error) || e.message}`;
+    btn.disabled = false;
+  }
+  loadUpdateStatus();
+};
+$("#s-update-rollback").onclick = async () => {
+  if (!confirm("Go back to the previous app code? It takes effect after a restart.")) return;
+  try {
+    const r = await api("/api/update/rollback", {method: "POST"});
+    toast(r.next ? `Rolled back: the next start uses ${r.next.version}.` : "Rolled back.", "ok", 8000);
+  } catch (e) { toast(`Roll back failed: ${(e.data && e.data.error) || e.message}`, "err", 9000); }
+  loadUpdateStatus();
+};
+$("#s-update-restart").onclick = async () => {
+  const before = (await api("/api/update/status").catch(() => ({}))).next_start;
+  try { await api("/api/update/restart", {method: "POST"}); }
+  catch (e) { toast(`Restart failed: ${(e.data && e.data.error) || e.message}`, "err", 9000); return; }
+  banner("Restarting ENCOR Lab Builder… this page reloads when it is back.");
+  const t0 = Date.now();
+  await new Promise((res) => setTimeout(res, 1500));
+  while (Date.now() - t0 < 90000) {
+    try {
+      const h = await fetch("/api/health", {cache: "no-store"}).then((x) => x.json());
+      if (h.ok && (!before || h.version === before.version || Date.now() - t0 > 8000)) { location.reload(); return; }
+    } catch (e) { /* still restarting */ }
+    await new Promise((res) => setTimeout(res, 1000));
+  }
+  banner("The app did not come back within 90 s. Start it again from the ENCORLab shortcut or folder.");
+};
 $("#s-update-check").onclick = () => checkUpdates(true);
 $("#update-link").onclick = (e) => { e.preventDefault(); show("settings"); location.hash = "settings"; checkUpdates(true); };
 async function autoUpdateCheck() {

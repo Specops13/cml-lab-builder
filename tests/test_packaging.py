@@ -62,12 +62,15 @@ def test_build_files_present_and_consistent():
               "encorlab.ico", "encorlab.png", "install-desktop-entry.sh"):
         assert (pk / f).is_file(), f
     spec = (pk / "encorlab.spec").read_text(encoding="utf-8")
-    assert 'collect_data_files("encorlab"' in spec and "exclude_binaries=True" in spec and "upx=False" in spec
+    # the app code is not frozen into the runtime: it ships as a replaceable bundle in _internal/appcode
+    assert '"appcode"' in spec and "build_manifest" in spec and "exclude_binaries=True" in spec and "upx=False" in spec
     assert b"\r\n" in (pk / "build_exe.bat").read_bytes()               # cmd.exe wants CRLF
     wf = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
     assert "windows-latest" in wf and "ubuntu-22.04" in wf and "--smoke" in wf
     assert "overwrite_files: false" in wf and "github.event_name == 'workflow_dispatch'" in wf  # tag push never re-publishes
-    assert (ROOT / "encor_launcher.py").read_text(encoding="utf-8").count("from encorlab.launcher import main") == 1
+    entry = (ROOT / "encor_launcher.py").read_text(encoding="utf-8")
+    assert "from encorlab.launcher import main" in entry and "encorboot.activate" in entry
+    assert "build_patch.py" in wf and "encorlab-patch-" in wf and "--check-lock" in wf
 
 
 def test_frozen_paths_are_package_relative():

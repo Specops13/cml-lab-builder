@@ -377,6 +377,62 @@ def update_check():
     else:
         typer.echo(f"You have the latest version ({r['current']}; latest release {r['latest']}).")
 
+    st = updates.status()
+    if r["update_available"]:
+        if any(a["name"] == updates.patch_name(r["latest"]) for a in r["assets"]):
+            typer.echo("A small app patch is available: run `update-install`" if st["patchable"]
+                       else f"(App patch available, but {st['reason']})")
+
+
+@app.command("update-status")
+def update_status():
+    """Show the running app code, runtime version and installed update (packaged app)."""
+    from . import updates
+    st = updates.status()
+    a = st["active"] or {"version": st["version"], "source": "source tree"}
+    typer.echo(f"App code: {a['version']} ({a['source']})   runtime: {st['runtime']}   built-in copy: {st['bundled_version'] or '-'}")
+    if not st["patchable"]:
+        typer.echo(f"Patch updates: not available ({st['reason']})")
+        return
+    typer.echo(f"Installed update: {st['installed'] or '-'}   previous: {st['previous'] or '-'}   pending first start: {st['pending']}")
+    if st["failed"]:
+        typer.echo(f"Last failed update: {st['failed'].get('version')} ({st['failed'].get('reason')}, {st['failed'].get('at')})")
+    if st["restart_needed"]:
+        n = st["next_start"]
+        typer.echo(f"Restart the app to switch to {n['version']} ({n['source']}).")
+
+
+@app.command("update-install")
+def update_install(file: str = typer.Option("", "--file", help="install a downloaded encorlab-patch-<ver>.zip instead"),
+                   sha256: str = typer.Option("", "--sha256", help="expected sha256 of --file (from SHA256SUMS.txt)")):
+    """Download, verify and install the latest release's app patch (packaged app). Restart the app afterwards."""
+    from . import updates
+    try:
+        r = updates.install_file(file, sha256 or None) if file else updates.install()
+    except (updates.UpdateError, library.LibraryError) as e:
+        typer.echo(f"ERROR: {e}")
+        raise typer.Exit(1)
+    if r["status"] == "installed":
+        typer.echo(f"Installed {r['version']} ({r['size'] / 1024:.0f} KB, sha256 verified). Restart ENCOR Lab Builder to use it.")
+    elif r["status"] == "up_to_date":
+        typer.echo(f"You have the latest version ({r['current']}).")
+    else:
+        typer.echo(f"Full download needed: {r['reason']}\n{r['url']}")
+
+
+@app.command("update-rollback")
+def update_rollback():
+    """Go back to the previous app code (or the built-in copy) from the next start on (packaged app)."""
+    from . import updates
+    try:
+        r = updates.rollback()
+    except updates.UpdateError as e:
+        typer.echo(f"ERROR: {e}")
+        raise typer.Exit(1)
+    n = r["next"]
+    typer.echo(f"Rolled back. Next start uses {n['version']} ({n['source']}). Restart ENCOR Lab Builder." if n
+               else "Rolled back. Restart ENCOR Lab Builder.")
+
 
 def _fmt(sec) -> str:
     sec = int(sec or 0)

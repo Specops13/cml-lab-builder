@@ -1,11 +1,14 @@
 """Smoke test for a packaged build (stdlib only; used locally, under Wine and in CI).
 
-    python packaging/smoke_test.py <path to ENCORLab or ENCORLab.exe> --version 1.5.0 \
-        --data-dir <expected user data folder> [--pack x.encorlab ...] [--runner wine] [--port 8791]
+    python packaging/smoke_test.py <path to ENCORLab or ENCORLab.exe> --version 1.6.0 \
+        --data-dir <expected user data folder> [--pack x.encorlab ...] [--runner wine] [--port 8791] [--patch-test]
 
 Checks: CLI runs (version, list); the launcher serves the UI on 127.0.0.1 with versioned (cache-busted)
-assets; /api/labs lists the 14 built-in labs; packs import into the user data folder; the solution
-endpoint works; a second launch detects the running instance; the server stops cleanly."""
+assets; /api/labs lists all built-in labs; packs import into the user data folder; the solution
+endpoint works; a second launch detects the running instance; the server stops cleanly.
+--patch-test also builds test patches from this source tree and checks, on the frozen build: installing a patch
+(the next start runs it), the web UI on a patched build, rollback, automatic fallback from a patch that fails
+to import, and refusal of a patch that needs a newer runtime. It removes the installed test patches at the end."""
 from __future__ import annotations
 
 import argparse
@@ -20,6 +23,9 @@ import time
 import urllib.request
 import uuid
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+BUILTIN = len([d for d in (ROOT / "encorlab" / "labs").iterdir() if (d / "lab.yaml").is_file()])
 
 
 def run(cmd, timeout=180):
@@ -42,6 +48,84 @@ def post_file(url, path: Path):
         return json.loads(r.read())
 
 
+def make_patch(tmp: Path, version: str, broken: bool = False, min_runtime: int | None = None) -> Path:
+    import shutil
+    sys.path.insert(0, str(ROOT / "packaging"))
+    import build_patch
+    src = tmp / f"src-{version}"
+    shutil.copytree(ROOT / "encorlab", src / "encorlab", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    init = src / "encorlab" / "__init__.py"
+    text = re.sub(r'__version__ = "[^"]+"', f'__version__ = "{version}"', init.read_text(encoding="utf-8"))
+    if broken:
+        text += '\nraise RuntimeError("smoke test: deliberately broken patch")\n'
+    init.write_text(text, encoding="utf-8")
+    return build_patch.build_patch(src, tmp / "out", version, min_runtime)
+
+
+def patch_tests(exe, version: str, data_dir: Path, port: int, check) -> None:
+    import shutil
+    import tempfile
+    tmp = Path(tempfile.mkdtemp(prefix="encor-smoke-"))
+    try:
+        good = make_patch(tmp, "99.0.0")
+        check(good.stat().st_size < 2_000_000, f"test patch built ({good.stat().st_size // 1024} KB)")
+        code, out = run(exe + ["update-install", "--file", str(good)])
+        check(code == 0 and "Installed 99.0.0" in out, f"update-install --file -> {out.strip()[-80:]!r}")
+        check((data_dir / "app" / "99.0.0" / "encorlab" / "__init__.py").is_file(), "patch extracted to <data>/app/99.0.0")
+        code, out = run(exe + ["version"])
+        check(code == 0 and out.strip().endswith("99.0.0"), f"next start runs the patch: version -> {out.strip()[-20:]!r}")
+        code, out = run(exe + ["update-status"])
+        check(code == 0 and "Installed update: 99.0.0" in out and "(installed)" in out, "update-status shows the installed patch")
+        # GUI start on the patched code: serves the UI and confirms the patch
+        proc = subprocess.Popen(exe + ["--no-browser", "--port", str(port)], stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                                creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+        lines: list[str] = []
+        threading.Thread(target=lambda: [lines.append(l) for l in proc.stdout], daemon=True).start()
+        health = None
+        try:
+            for _ in range(240):
+                m = re.search(r"Web UI:\s+(http://127\.0\.0\.1:\d+)", "".join(lines))
+                if m:
+                    try:
+                        health = json.loads(get(m.group(1) + "/api/health", 2)[2]); break
+                    except Exception:
+                        pass
+                time.sleep(0.5)
+            check(health and health.get("version") == "99.0.0", f"patched web UI is up: {health}")
+            time.sleep(1.5)
+            st = json.loads((data_dir / "app" / "state.json").read_text(encoding="utf-8"))
+            check(st.get("current") == "99.0.0" and not st.get("pending"), "patch marked good after the UI started")
+        finally:
+            try:
+                proc.send_signal(signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT)
+            except OSError:
+                proc.terminate()
+            try:
+                proc.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                proc.kill(); proc.wait()
+        code, out = run(exe + ["update-rollback"])
+        check(code == 0 and "Rolled back" in out, f"update-rollback -> {out.strip()[-60:]!r}")
+        code, out = run(exe + ["version"])
+        check(code == 0 and out.strip().endswith(version), f"after rollback: version -> {out.strip()[-20:]!r}")
+        bad = make_patch(tmp, "99.0.1", broken=True)
+        code, out = run(exe + ["update-install", "--file", str(bad)])
+        check(code == 0 and "Installed 99.0.1" in out, "a patch that fails to import still installs (it is valid)")
+        code, out = run(exe + ["version"])
+        check(code == 0 and out.strip().endswith(version), f"broken patch -> automatic fallback: version -> {out.strip()[-20:]!r}")
+        st = json.loads((data_dir / "app" / "state.json").read_text(encoding="utf-8"))
+        check((st.get("failed") or {}).get("version") == "99.0.1" and st.get("current") != "99.0.1",
+              f"broken patch recorded as failed: {st.get('failed')}")
+        newer = make_patch(tmp, "99.0.2", min_runtime=999)
+        code, out = run(exe + ["update-install", "--file", str(newer)])
+        check(code == 0 and "Full download needed" in out and not (data_dir / "app" / "99.0.2").exists(),
+              "a patch that needs a newer runtime is refused")
+    finally:
+        shutil.rmtree(data_dir / "app", ignore_errors=True)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("exe")
@@ -50,6 +134,7 @@ def main() -> int:
     ap.add_argument("--pack", action="append", default=[])
     ap.add_argument("--runner", default="", help="e.g. 'wine'")
     ap.add_argument("--port", type=int, default=18765)
+    ap.add_argument("--patch-test", action="store_true")
     a = ap.parse_args()
     pre = a.runner.split() if a.runner else []
     exe = pre + [a.exe]
@@ -98,7 +183,7 @@ def main() -> int:
         check(st == 200 and "json" in ct, "help.json served")
         labs = json.loads(get(base + "/api/labs")[2])
         builtin = [l for l in labs["labs"] if l["source"] == "builtin"]
-        check(len(builtin) == 14 and not labs["broken"], f"/api/labs: {len(builtin)} built-in labs, broken={labs['broken']}")
+        check(len(builtin) == BUILTIN and not labs["broken"], f"/api/labs: {len(builtin)} built-in labs, broken={labs['broken']}")
         for p in a.pack:
             rep = post_file(base + "/api/import?replace=true", Path(p))
             check(rep.get("ok") and rep.get("lab_id"), f"import {Path(p).name} -> {rep.get('lab_id')}")
@@ -108,7 +193,7 @@ def main() -> int:
             sol = json.loads(get(base + f"/api/labs/{lid}/solution")[2])
             check(sol.get("summary") and not sol.get("auto_generated"), "solution summary available")
         ids = {l["id"] for l in json.loads(get(base + "/api/labs")[2])["labs"]}
-        check(len(ids) == 14 + len(a.pack), f"catalog now has {len(ids)} labs")
+        check(len(ids) == BUILTIN + len(a.pack), f"catalog now has {len(ids)} labs")
         code, out = run(exe + ["--no-browser", "--port", base.rsplit(":", 1)[1]], timeout=60)
         check(code == 0 and "already running" in out, "second launch detects the running instance")
     finally:
@@ -124,6 +209,8 @@ def main() -> int:
         out = "".join(lines)
         print(f"---- launcher output (exit {proc.returncode}) ----\n" + out.strip() + "\n-------------------------")
     check("Web UI:" in out and "127.0.0.1" in out, "launcher printed its banner")
+    if a.patch_test:
+        patch_tests(exe, a.version, Path(a.data_dir), a.port + 1, check)
     print("SMOKE TEST " + ("PASSED" if ok else "FAILED"))
     return 0 if ok else 1
 
