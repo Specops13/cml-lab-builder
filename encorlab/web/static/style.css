@@ -84,3 +84,4 @@ code.cmd{font-family:Consolas,"DejaVu Sans Mono",monospace;font-size:.8rem;word-
 .exam-box h3{margin:.1rem 0 .3rem}.exam-clock{font:600 2rem/1.1 Consolas,"DejaVu Sans Mono",monospace;margin:.2rem 0}.exam-clock.low{color:var(--bad)}
 .exam-report{border:2px solid var(--accent);border-radius:8px;padding:.5rem .9rem;margin:.4rem 0 .8rem}.exam-report h3{margin:.2rem 0 .4rem}
 table.kv{width:auto}table.kv td{padding:.15rem .8rem .15rem 0}
+a.btn.small{padding:.2rem .5rem;font-size:.8rem}

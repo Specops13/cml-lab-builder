@@ -44,6 +44,8 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - **Exam mode:** a timed, one-shot attempt with a countdown, the solution withheld, and hints disabled or costing
   points. *Submit exam* (or the timer running out) grades once and shows a score report (raw score, hint penalty,
   time used, pass/fail against an 80% target).
+- **Config snapshots:** save the running configs of a built lab (over the CML API) and restore them later. Restore
+  stops, wipes and reboots the lab with the saved configs. View or download snapshots as text.
 - **Progress dashboard:** mastery per ENCOR 350-401 v1.2 exam domain (with the official weights) and per blueprint item,
   your weakest topics with links to the labs that train them, daily streak, time spent, most-failed checks and recent activity.
 - **Console links:** once a lab is built, open it in the CML Workbench with one click, or copy a ready-to-paste
@@ -166,6 +168,7 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `console <lab>` | CML web link and console server `ssh` commands for each node |
 | `update-check` | ask GitHub Releases whether a newer version exists (nothing is installed) |
 | `exam <lab> --start [--minutes N] [--hints penalty\|off] [--penalty P]`, `exam <lab> [--abort]` | exam mode: start, status, abort (submit with `check`; `hint` costs points) |
+| `snapshot <lab> [--save NAME] [--restore NAME] [--show NAME] [--delete NAME]` | config snapshots: list, save, restore, print, delete |
 | `history <lab>` | your past scores (with hints used) |
 | `progress [--json]` | progress dashboard: mastery per exam domain, streak, time spent, weakest topics |
 | `library list` / `library install <file or https URL> [--sha256 …]` | browse / install from the online lab library |
@@ -190,6 +193,15 @@ a removed `next-hop-self`. You only get the trouble ticket, which describes symp
 
 Your own labs can define faults too (`faults:` in lab.yaml, see [docs/LAB-AUTHORING.md](docs/LAB-AUTHORING.md)). The
 validator applies each fault offline and requires that a config check detects it and that the solved lab still passes.
+
+### Config snapshots
+Open **Config snapshots** in a built lab and click **Save snapshot**, for example before trying something risky or to keep
+a half-finished lab. The app asks CML to extract the running config of every device (HTTPS API, nodes must be BOOTED) and
+saves it under `snapshots/<lab>/` in your data folder. Up to 20 snapshots are kept per lab.
+- **Restore** stops and wipes the lab, sets each device's day-0 config to the saved config, and boots it again.
+  Unsaved changes on the devices are lost. A snapshot taken with IOL can only be restored with IOL (same for IOSv).
+- **View** shows the configs, and **.cfg** downloads them as one text file (`! device R1` sections, the `solution.cfg` format).
+- **Reset** still goes back to the lab's original starting configs. Snapshots are disabled during an exam.
 
 ### Exam mode
 **Exam mode** turns a lab into a timed, one-shot attempt:
@@ -369,6 +381,7 @@ encorlab/                 the application (Python package)
   schema.py, templates.py lab schema + check templates    packs.py      .encorlab import/export/validation
   courses.py, library.py  .encorcourse + online library    faults.py     "Break my lab" faults (iosmerge.py: config merge)
   blueprint.py            ENCOR v1.2 exam topics           progress.py   progress dashboard
+  exam.py, snapshots.py   exam mode, config snapshots      updates.py    GitHub Releases update check
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders

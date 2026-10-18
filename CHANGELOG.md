@@ -25,6 +25,10 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
   auto-submit, the solution, check hints, source and export withheld, and hints either disabled or penalized (the server
   counts them, not the client). A late submission scores 0%. The score report (raw score, penalty, time, pass/fail
   against an 80% target) is stored in the history and counted by the progress dashboard.
+- **Config snapshots:** save the running configs of a built lab (CML config extraction) and restore them (stop, wipe,
+  reboot with the saved day-0 configs). View or download them as `.cfg`, up to 20 per lab, using the *Config snapshots*
+  section, the `snapshot` CLI command or `/api/labs/{id}/snapshots`. Show-run banners are stripped, and restoring onto
+  the other image platform is refused.
 - Lab files can define `faults:`. The validator applies each fault offline with an IOS-style config merge and requires
   that it is detected and fixable.
 ### Changed

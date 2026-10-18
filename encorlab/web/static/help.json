@@ -163,5 +163,14 @@
   "lab.examBox": "The exam countdown. When it reaches zero your lab is submitted automatically.",
   "lab.examAbort": "Abandon the exam. Nothing is recorded, and hints and the solution become available again.",
   "lab.examSubmit": "Grade the lab once and end the exam. The score report shows the raw score, hint penalty, time used and pass/fail.",
-  "lab.examReport": "Exam score report: final score (raw score minus hint penalty, 0% if late) against the 80% practice target."
+  "lab.examReport": "Exam score report: final score (raw score minus hint penalty, 0% if late) against the 80% practice target.",
+  "lab.snapshots": "Save the devices' running configs and restore them later, e.g. before trying something risky. Read over the CML API; nodes must be BOOTED.",
+  "lab.snapName": "Optional name made of letters, digits, dot, underscore or dash. Blank uses the date and time.",
+  "lab.snapNote": "Optional note to remember what this snapshot contains.",
+  "lab.snapSave": "Read the running config of every device in this lab and save it as a snapshot.",
+  "lab.snapRestore": "Stop, wipe and reboot the lab with this snapshot's configs. Unsaved changes on the devices are lost.",
+  "lab.snapView": "Show the saved configs of each device.",
+  "lab.snapDownload": "Download the snapshot as a text file with one '! device NAME' section per device.",
+  "lab.snapDelete": "Delete this snapshot (the lab is not changed).",
+  "lab.snapDevice": "Saved running config of this device."
 }

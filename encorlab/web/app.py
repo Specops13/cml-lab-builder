@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, catalog, config, courses, exam, faults, history, library, packs, progress, service, updates
+from .. import __version__, ai, catalog, config, courses, exam, faults, history, library, packs, progress, service, snapshots, updates
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -501,6 +501,61 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
             raise HTTPException(400, "no fault is active for this lab")
         faults.mark_revealed(lab_id)
         return faults.reveal(e.lab, faults.get(e.lab, st["fault_id"]), get_platform(store.get().platform))
+
+    # ------------------------------------------------------------ config snapshots
+    @app.get("/api/labs/{lab_id}/snapshots")
+    def snapshot_list(lab_id: str):
+        _entry(lab_id)
+        return {"snapshots": snapshots.list_snapshots(lab_id), "max": snapshots.MAX_PER_LAB}
+
+    @app.get("/api/labs/{lab_id}/snapshots/{name}")
+    def snapshot_get(lab_id: str, name: str, fmt: str = "json"):
+        _entry(lab_id)
+        _no_exam(lab_id)
+        try:
+            snap = snapshots.load(lab_id, name)
+        except snapshots.SnapshotError as e:
+            raise HTTPException(404, str(e))
+        if fmt == "cfg":
+            return Response(snapshots.as_cfg(snap), media_type="text/plain",
+                            headers={"Content-Disposition": f'attachment; filename="{lab_id}-{name}.cfg"'})
+        return snap
+
+    @app.post("/api/labs/{lab_id}/snapshots")
+    def snapshot_save(lab_id: str, name: str = "", note: str = "", replace: bool = False):
+        _entry(lab_id)
+        _no_exam(lab_id)
+        try:
+            name = snapshots.check_name(name) if name else snapshots.default_name()
+        except snapshots.SnapshotError as e:
+            raise HTTPException(400, str(e))
+        if not replace and any(x["name"] == name for x in snapshots.list_snapshots(lab_id)):
+            raise HTTPException(409, f"a snapshot named {name!r} already exists")
+
+        def fn(s, p):
+            src = config_factory(s, lab_id) if config_factory else None
+            return service.do_snapshot_save(s, lab_id, name, p, client_factory=client_factory, config_source=src,
+                                            note=note, overwrite=replace)
+        return _start("snapshot", lab_id, fn)
+
+    @app.post("/api/labs/{lab_id}/snapshots/{name}/restore")
+    def snapshot_restore(lab_id: str, name: str):
+        _entry(lab_id)
+        _no_exam(lab_id)
+        try:
+            snapshots.load(lab_id, name)
+        except snapshots.SnapshotError as e:
+            raise HTTPException(404, str(e))
+        return _start("restore", lab_id, lambda s, p: service.do_snapshot_restore(s, lab_id, name, p, client_factory=client_factory))
+
+    @app.delete("/api/labs/{lab_id}/snapshots/{name}")
+    def snapshot_delete(lab_id: str, name: str):
+        _entry(lab_id)
+        try:
+            snapshots.delete(lab_id, name)
+        except snapshots.SnapshotError as e:
+            raise HTTPException(404, str(e))
+        return {"deleted": name}
 
     @app.post("/api/labs/{lab_id}/reset")
     def reset(lab_id: str):

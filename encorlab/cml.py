@@ -157,9 +157,10 @@ class CML:
             self._sleep(10)
 
     def reset(self, lab: Lab, progress: Callable[[str], None] = lambda m: None, extra: dict | None = None,
-              label: str = "initial"):
+              label: str = "initial", configs: dict | None = None):
         """Stop + wipe (restores day-0 configs on next boot) + start.
-        extra: device -> config added to the starting config (fault practice, snapshots)."""
+        extra: device -> config added to the starting config (fault practice).
+        configs: device -> complete config used verbatim (snapshot restore); other devices get their starting config."""
         cl = self.find(lab)
         if cl is None:
             raise CMLError("lab is not built")
@@ -174,7 +175,7 @@ class CML:
         names = {n.name for n in lab.nodes}
         for n in cl.nodes():
             if n.label in names:
-                n.configuration = full_config(lab, n.label, plat, extra)
+                n.configuration = configs[n.label] if configs and configs.get(n.label) else full_config(lab, n.label, plat, extra)
         self.check_capacity(lab, cl)
         progress("Starting nodes")
         cl.start(wait=False)

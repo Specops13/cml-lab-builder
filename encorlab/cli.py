@@ -418,6 +418,42 @@ def exam_cmd(lab_id: str,
                + (" (TIME IS UP - submit now)" if st["expired"] else "") + f", hints {st['hints']}, used {st['hints_used']}.")
 
 
+@app.command("snapshot")
+def snapshot_cmd(lab_id: str,
+                 save: str = typer.Option(None, "--save", help="save the running configs under this name ('' = timestamp)"),
+                 restore: str = typer.Option(None, "--restore", help="rebuild the lab with this snapshot's configs"),
+                 delete: str = typer.Option(None, "--delete", help="delete this snapshot"),
+                 show: str = typer.Option(None, "--show", help="print this snapshot's configs"),
+                 note: str = typer.Option("", help="note stored with --save"),
+                 replace: bool = typer.Option(False, help="overwrite an existing snapshot with --save")):
+    """Config snapshots: save / restore / list the running configs of a built lab."""
+    from . import snapshots
+    catalog.get(lab_id)
+    try:
+        if save is not None:
+            meta = service.do_snapshot_save(_settings(), lab_id, save or snapshots.default_name(), _p, note=note, overwrite=replace)
+            typer.echo(f"saved {meta['name']} ({', '.join(meta['nodes'])})")
+        elif restore:
+            if not typer.confirm(f"Restore {restore!r}? The lab is stopped, wiped and rebooted; current changes are lost."):
+                raise typer.Exit(1)
+            service.do_snapshot_restore(_settings(), lab_id, restore, _p)
+            typer.echo(f"restored {restore}")
+        elif delete:
+            snapshots.delete(lab_id, delete)
+            typer.echo(f"deleted {delete}")
+        elif show:
+            typer.echo(snapshots.as_cfg(snapshots.load(lab_id, show)), nl=False)
+        else:
+            items = snapshots.list_snapshots(lab_id)
+            if not items:
+                typer.echo(f"no snapshots for {lab_id} (save one with: encorlab snapshot {lab_id} --save NAME)")
+            for x in items:
+                typer.echo(f"{x['name']:<28} {x['created']}  {x['platform'] or '-':<5} {len(x['nodes'])} devices  {x['note']}")
+    except snapshots.SnapshotError as e:
+        typer.echo(f"ERROR: {e}")
+        raise typer.Exit(1)
+
+
 @app.command("console")
 def console_cmds(lab_id: str):
     """Show the CML web link and console server commands for the lab's nodes."""

@@ -325,6 +325,10 @@ async function selectLab(id) {
       <table>${l.checks.map((c) => `<tr><td><span class="tag">${c.mode}</span></td><td>${esc(c.device)}</td><td>${esc(c.description)}</td>
       <td>${c.hint ? `<button data-help="lab.hint" class="hint-btn" data-hint="${esc(c.hint)}">Show hint</button>` : ""}</td></tr>`).join("")}</table></details>
     <details id="cons-box" hidden><summary data-help="lab.consoles">Consoles</summary><div id="consoles"></div></details>
+    ${l.exam ? "" : `<details id="snap-box"><summary data-help="lab.snapshots">Config snapshots</summary>
+      <div class="toolbar"><input data-help="lab.snapName" id="snap-name" placeholder="name (blank = date/time)" style="width:16em" aria-label="Snapshot name">
+      <input data-help="lab.snapNote" id="snap-note" placeholder="note (optional)" style="flex:1;min-width:12em" aria-label="Snapshot note">
+      <button data-help="lab.snapSave" id="snap-save">Save snapshot</button></div><div id="snapshots" class="muted small">Loading…</div></details>`}
     <h3 data-help="lab.results">Results</h3><div id="results" class="muted">Not checked yet.</div>
     <h3 data-help="lab.activity">Activity</h3><pre id="log" class="log">-</pre>
     <details id="hist-box"><summary data-help="lab.history">History</summary><div id="history"></div></details>`;
@@ -364,7 +368,36 @@ async function selectLab(id) {
   $("#t-toggle").onclick = () => (timerState(id).start ? timerPause(id) : timerStart(id));
   $("#t-reset").onclick = () => confirm("Reset the timer?") && timerSet(id, {acc: 0, start: null});
   bindHints($("#lab-detail"));
-  renderTimer(); refreshStatus(); loadHistory();
+  if ($("#snap-save")) $("#snap-save").onclick = () => {
+    const q = new URLSearchParams({name: $("#snap-name").value.trim(), note: $("#snap-note").value.trim()});
+    run("snapshot", `/api/labs/${id}/snapshots?${q}`).then(() => { $("#snap-name").value = ""; $("#snap-note").value = ""; });
+  };
+  renderTimer(); refreshStatus(); loadHistory(); loadSnapshots();
+}
+async function loadSnapshots() {
+  const box = $("#snapshots"); if (!box || !current) return;
+  const id = current;
+  let r; try { r = await api(`/api/labs/${id}/snapshots`); } catch (e) { box.textContent = e.message; return; }
+  box.classList.toggle("muted", !r.snapshots.length);
+  box.innerHTML = r.snapshots.length ? `<table><tr><th>Name</th><th>Saved</th><th>Images</th><th>Devices</th><th>Note</th><th></th></tr>${r.snapshots.map((x) => `<tr>
+    <td><b>${esc(x.name)}</b></td><td class="small">${esc(x.created)}</td><td>${esc(x.platform || "-")}</td><td class="small">${esc(x.nodes.join(", "))}</td><td class="small">${esc(x.note)}</td>
+    <td><button data-help="lab.snapRestore" class="hint-btn" data-restore="${esc(x.name)}">Restore</button>
+      <button data-help="lab.snapView" class="hint-btn" data-view-snap="${esc(x.name)}">View</button>
+      <a data-help="lab.snapDownload" class="btn small" href="/api/labs/${encodeURIComponent(id)}/snapshots/${encodeURIComponent(x.name)}?fmt=cfg">.cfg</a>
+      <button data-help="lab.snapDelete" class="hint-btn danger" data-del-snap="${esc(x.name)}">Delete</button></td></tr>`).join("")}</table>
+    <div id="snap-view"></div><div class="muted small">${r.snapshots.length}/${r.max} snapshots. Restore stops, wipes and reboots the lab with the saved configs.</div>`
+    : "No snapshots yet. Save one when the lab is built and its nodes are BOOTED (for example before trying something risky).";
+  $$("#snapshots [data-restore]").forEach((b) => b.onclick = () => confirm(`Restore snapshot "${b.dataset.restore}"? The lab is stopped, wiped and rebooted with the saved configs; unsaved changes on the devices are lost.`)
+    && run("restore", `/api/labs/${id}/snapshots/${encodeURIComponent(b.dataset.restore)}/restore`));
+  $$("#snapshots [data-del-snap]").forEach((b) => b.onclick = async () => {
+    if (!confirm(`Delete snapshot "${b.dataset.delSnap}"?`)) return;
+    try { await api(`/api/labs/${id}/snapshots/${encodeURIComponent(b.dataset.delSnap)}`, {method: "DELETE"}); loadSnapshots(); } catch (e) { toast(e.message, "err"); }
+  });
+  $$("#snapshots [data-view-snap]").forEach((b) => b.onclick = async () => {
+    try { const sn = await api(`/api/labs/${id}/snapshots/${encodeURIComponent(b.dataset.viewSnap)}`);
+      $("#snap-view").innerHTML = `<h4>${esc(sn.name)}</h4>` + Object.entries(sn.configs).map(([d, c]) => `<details><summary data-help="lab.snapDevice">${esc(d)}</summary><pre class="code">${esc(c)}</pre></details>`).join("");
+    } catch (e) { toast(e.message, "err"); }
+  });
 }
 const revealedKey = (id) => `revealed:${id}`;
 /* ---------------------------------------------------------------- progressive hints (per lab, localStorage) */
@@ -457,7 +490,7 @@ function renderConsoles(s) {
   $("#cons-copy-all").onclick = async () => toast(await copyText(s.consoles.map((c) => `# ${c.node}\n${c.ssh}`).join("\n")) ? "All console commands copied" : "Could not copy", "ok");
 }
 function setBusy(b) { $$("#lab-detail .toolbar button").forEach((x) => { if (!x.closest("a")) x.disabled = b; }); if (!b) renderHints(); }
-async function run(kind) {
+async function run(kind, path) {
   const lab = current; setBusy(true);
   $("#log").textContent = `${kind} started…`;
   clearInterval(statusTimer); statusTimer = setInterval(refreshStatus, 4000);
@@ -465,7 +498,7 @@ async function run(kind) {
     const q = new URLSearchParams();
     if (kind === "check") { if ($("#mode").value) q.set("mode", $("#mode").value); q.set("hints_used", String(hintsUsed(lab)));
       q.set("elapsed_s", String(timerSecs(lab))); if (localStorage.getItem(revealedKey(lab))) q.set("revealed", "true"); }
-    const {job_id} = await api(`/api/labs/${lab}/${kind}` + (q.toString() ? `?${q}` : ""), {method: "POST"});
+    const {job_id} = await api(path || (`/api/labs/${lab}/${kind}` + (q.toString() ? `?${q}` : "")), {method: "POST"});
     const j = await pollJob(job_id, (j) => { if (lab === current) { $("#log").textContent = j.log.join("\n") || "…"; $("#log").scrollTop = 1e9; } });
     if (j.state === "error") toast(`${kind} failed: ${j.error}`, "err", 12000);
     else {
@@ -473,6 +506,7 @@ async function run(kind) {
       if (kind === "build") timerStart(lab);
       if (kind === "reset" || kind === "break") localStorage.removeItem(revealedKey(lab));
       if (kind === "reset") hintsSet(lab, 0);
+      if (kind === "snapshot" || kind === "restore") { if (lab === current) loadSnapshots(); if (kind === "restore") toast("Snapshot restored: the lab rebooted with the saved configs", "ok", 7000); }
       if (kind === "break") { hintsSet(lab, 0); timerSet(lab, {acc: 0, start: Date.now()}); toast("Trouble ticket ready. Find and fix the fault.", "ok", 7000); if (lab === current) await selectLab(lab); }
       if (kind === "check" && j.result && lab === current) {
         if (j.result.fault_fixed || j.result.exam) { hintsSet(lab, 0); await selectLab(lab); }

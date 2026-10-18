@@ -187,6 +187,41 @@ def do_reset(settings, lab_id, progress, client_factory=None):
     return {"reset": True}
 
 
+def do_snapshot_save(settings, lab_id, name, progress, client_factory=None, config_source=None, note: str = "",
+                     overwrite: bool = False):
+    """Read every node's running config (CML config extraction; nodes must be BOOTED) and store it."""
+    from . import exam, snapshots
+    lab = catalog.get(lab_id)
+    if exam.active(lab_id):
+        raise snapshots.SnapshotError("snapshots are not available while an exam is running")
+    name = snapshots.check_name(name or snapshots.default_name())
+    src = config_source or make_cml(settings, client_factory).config_source(lab)
+    configs = {}
+    for n in lab.nodes:
+        progress(f"Reading the running config of {n.name}")
+        configs[n.name] = src.get_config(n.name)
+    meta = snapshots.save(lab_id, name, configs, settings.platform, note, overwrite=overwrite)
+    progress(f"Snapshot {name!r} saved ({len(configs)} devices)")
+    return meta
+
+
+def do_snapshot_restore(settings, lab_id, name, progress, client_factory=None):
+    """Stop, wipe and boot the lab with the snapshot's configs as day-0 configs (current changes are lost)."""
+    from . import exam, snapshots
+    lab = catalog.get(lab_id)
+    if exam.active(lab_id):
+        raise snapshots.SnapshotError("snapshots are not available while an exam is running")
+    snap = snapshots.load(lab_id, name)
+    if snap.get("platform") and snap["platform"] != settings.platform:
+        raise snapshots.SnapshotError(f"snapshot {name!r} was taken on {snap['platform']}; switch Settings > Device images "
+                                      f"to {snap['platform']} to restore it")
+    unknown = sorted(set(snap["configs"]) - {n.name for n in lab.nodes})
+    if unknown:
+        progress(f"Ignoring configs for devices no longer in the lab: {', '.join(unknown)}")
+    make_cml(settings, client_factory).reset(lab, progress=progress, configs=snap["configs"], label=f"snapshot {name!r}")
+    return {"restored": name, "nodes": sorted(set(snap["configs"]) - set(unknown))}
+
+
 def do_destroy(settings, lab_id, progress, client_factory=None):
     lab = catalog.get(lab_id)
     return {"destroyed": make_cml(settings, client_factory).destroy(lab, progress=progress)}
