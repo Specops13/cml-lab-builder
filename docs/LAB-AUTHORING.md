@@ -196,5 +196,23 @@ R1:
 ```
 With both fixtures present, `validate` must show `live solution=100% blank=0%` as well as config.
 
+## Courses (`.encorcourse`)
+A course is a zip that bundles labs into a study track:
+```
+course.yaml              # required
+labs/<lab-id>/lab.yaml   # optional bundled labs, one folder per lab (+ solution.cfg, fixtures, README.md)
+```
+```yaml
+id: ospf-mastery                 # lowercase letters, digits and dashes
+title: "OSPF Mastery: design, areas and troubleshooting"
+description: Three labs in study order ...
+author: Your Name                # optional
+version: "1.0"                   # optional
+labs: [03-ospf-multiarea, ospf-multiarea-stub, troubleshoot-ospf-7node]   # study order (max 50)
+```
+Every listed lab must be bundled, built in, or already installed. Each bundle folder must be named after its lab id, and
+every bundled lab must pass the normal validation, otherwise nothing is installed. Build and validate one with
+`python -m encorlab course build <folder> [--labs-from examples/] -o my.encorcourse`.
+
 ## Full example
 See the example below (also shipped as `example-lab.yaml`).

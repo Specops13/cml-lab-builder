@@ -1,0 +1,3 @@
+labs/*.encorlab binary
+labs/*.encorcourse binary
+labs/index.json -text

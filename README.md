@@ -47,6 +47,9 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   A **Solution summary** (root cause, exact fix per device, why it works) appears automatically at 100%.
   Below 100% you can open it with **Reveal solution**, after a confirm.
   You also get a per-lab timer and a results history that records the hints you used.
+- **Lab library and courses:** browse the online library (the repo's [`labs/`](labs/) folder) and install lab packs or
+  whole **courses** (ordered study tracks of labs, `.encorcourse`) with one click. Every download is checked against the
+  sha256 in the index. Courses show your progress and a *Continue* button for the next unsolved lab.
 - **Bring your own labs:** import `.encorlab` packs or `.yaml` files by drag-and-drop, edit them in the **Lab builder**
   (form + YAML with live validation and check templates), import a topology from CML, or generate labs with any AI chatbot
   using the built-in prompt.
@@ -153,6 +156,8 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `break <lab> [--fault ID]`, `fault <lab> [--reveal\|--end]` | Break my lab: rebuild with a random fault and print the ticket; show/reveal/end the active fault |
 | `history <lab>` | your past scores (with hints used) |
 | `progress [--json]` | progress dashboard: mastery per exam domain, streak, time spent, weakest topics |
+| `library list` / `library install <file or https URL> [--sha256 …]` | browse / install from the online lab library |
+| `course list` / `course build <dir> [-o file]` / `course delete <id> [--labs]` | courses: progress, build a `.encorcourse`, remove |
 | `import <file> [--replace]`, `export <lab> [-o f.encorlab] [--cml-yaml]`, `delete <lab> -y` | manage your labs |
 | `validate [paths…]`, `pack <folder-or-yaml> [-o x.encorlab]` | offline test (solution 100%, starting config 0%); strict validate + write a shareable pack |
 | `test-live <lab> [--keep]` | builds `ENCOR-TEST-<lab>` with the solution applied, grades it, deletes it |
@@ -224,6 +229,23 @@ A YAML tab shows the same lab with live validation. *Open existing lab* edits an
 *Import from CML* starts from any IOL/IOSv lab in your CML. *Test lab (offline)* runs the strict validator.
 *Live test in CML* (for saved labs) builds a throw-away `ENCOR-TEST-…` copy with the solution applied, grades it and deletes it.
 
+### Lab library and courses
+Click **📚 Library & courses** on the Labs page.
+- **Online library:** *Load library* reads [`labs/index.json`](labs/index.json) from this repository (the only time the app
+  contacts GitHub) and lists the published lab packs and courses. *Install* downloads the file over https, rejects it unless
+  its **sha256 and size match the index**, validates it like any import, then installs it. You can point the library at your
+  own `index.json` (https only), for example a fork or a team share.
+- **Install from a URL:** paste an https link to a `.encorlab` / `.encorcourse` file and, ideally, the sha256 the author
+  published. A mismatch installs nothing. Downloads are limited to 20 MB.
+- **Courses** (`.encorcourse`): a zip with `course.yaml` (id, title, description, `labs:` in study order) plus optional
+  `labs/<id>/` pack folders. A course may also list built-in labs. Installation is all-or-nothing: every bundled lab is
+  validated first. Your courses show solved/total, a progress bar and *Continue* (the next unsolved lab). The *Course* filter
+  shows a course's labs in order. *Remove* deletes the course and, if you choose, the labs it imported (never built-ins,
+  never your history). Build one with `python -m encorlab course build my-course/ --labs-from examples/`.
+- **Publishing:** put lab folders in `examples/` and courses in `examples/courses/<id>/course.yaml`, then run
+  `python packaging/build_library.py`. It rebuilds `labs/` reproducibly (fixed zip timestamps) and regenerates
+  `index.json` with the checksums. The test suite fails if `labs/` is out of date.
+
 ### AI prompt (generate labs with any AI chatbot)
 
 **AI-generated labs.** Use any AI chat: *More > Copy prompt for any AI* (or `python -m encorlab prompt "OSPF stub lab, 4 routers"`)
@@ -260,6 +282,8 @@ Everything can be set on the **Settings** page; `.env` / environment variables p
 - Only touches labs titled `ENCOR-…`. Deleting anything else is refused.
 - Checks never change device configuration (only `show` and `ping` commands are allowed in labs).
 - Imported packs are size-limited (5 MB) and path-checked. A lab file only contains data (YAML/regex), never code.
+- Library downloads are https-only (redirects included), size-limited and verified against the sha256 in the index before
+  they are validated and installed.
 - The UI listens on 127.0.0.1 only. Secrets are never returned by the API or written to logs.
 
 ## Troubleshooting and diagnostics
@@ -314,6 +338,8 @@ encorlab/                 the application (Python package)
   service.py              build/check/reset/destroy       grader.py     check engine (live + config modes)
   cml.py, cml_import.py   CML 2.9 API (virl2_client)      console.py    console server SSH (paramiko / pyATS)
   schema.py, templates.py lab schema + check templates    packs.py      .encorlab import/export/validation
+  courses.py, library.py  .encorcourse + online library    faults.py     "Break my lab" faults (iosmerge.py: config merge)
+  blueprint.py            ENCOR v1.2 exam topics           progress.py   progress dashboard
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders
@@ -321,7 +347,8 @@ encorlab/                 the application (Python package)
   web/                    FastAPI app, templates/index.html, static/ (app.js, help.js, help.json, style.css)
   resources/              authoring guide + example lab (source of docs/)
 docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example lab, images/
-examples/                 example packs (source folders)
+examples/                 example packs and courses/ (sources of labs/)
+labs/                     online library: built packs, courses and index.json (packaging/build_library.py)
 packaging/                PyInstaller spec, build.py, build_exe.bat, build_linux.sh, smoke_test.py, icon
 tests/                    pytest suite (no CML needed)
 .github/workflows/        CI: test + build/smoke-test Windows and Linux bundles

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-from . import __version__, catalog, config, history, packs, service
+from . import __version__, catalog, config, courses, history, library, packs, service
 from .platforms import get as get_platform, render
 from .render import to_yaml
 
@@ -101,9 +101,21 @@ def pack(source: Path = typer.Argument(..., help="lab folder (lab.yaml [+ soluti
 
 @app.command("import")
 def import_lab(file: Path, replace: bool = typer.Option(False, help="overwrite an existing user lab with the same id")):
-    """Import a .encorlab pack or lab .yaml into your user labs folder."""
+    """Import a .encorlab pack, a .encorcourse course or a lab .yaml into your user labs folder."""
+    data = file.read_bytes()
+    if courses.is_course(file.name, data):
+        try:
+            r = courses.install(data, node_limit=config.from_env().node_limit, overwrite=replace)
+        except packs.LabError as e:
+            for err in e.errors:
+                typer.echo(f"ERROR: {err}")
+            raise typer.Exit(1)
+        for w in r["warnings"]:
+            typer.echo(f"warning: {w}")
+        typer.echo(f"installed course {r['course_id']}: {r['title']} ({len(r['labs'])} labs, {len(r['installed'])} imported)")
+        raise typer.Exit(0)
     try:
-        pk = packs.read_upload(file.name, file.read_bytes())
+        pk = packs.read_upload(file.name, data)
     except packs.LabError as e:
         for err in e.errors:
             typer.echo(f"ERROR: {err}")
@@ -368,6 +380,94 @@ def web(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = typer.Op
     if open_browser:
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+
+
+
+# ---------------------------------------------------------------- courses + online library
+course_app = typer.Typer(help="Courses: ordered bundles of labs (.encorcourse).", no_args_is_help=True)
+library_app = typer.Typer(help="Online lab library (packs and courses from the GitHub repo or a URL).", no_args_is_help=True)
+app.add_typer(course_app, name="course")
+app.add_typer(library_app, name="library")
+
+
+def _best() -> dict:
+    return {lid: max((x.get("score_pct") or 0 for x in history.load(lid)), default=None) for lid in catalog.entries()}
+
+
+@course_app.command("list")
+def course_list():
+    """Installed courses with your progress."""
+    cs = courses.list_courses(_best())
+    if not cs:
+        typer.echo("no courses installed (import a .encorcourse file, or: encorlab library list)")
+    for c in cs:
+        typer.echo(f"{c['id']}: {c['title']}  [{c['solved']}/{c['total']} solved]" + (f"  next: {c['next']}" if c["next"] else ""))
+        for i, l in enumerate(c["labs"], 1):
+            st = "solved" if l["solved"] else (f"best {l['best']:g}%" if l["best"] is not None else ("missing" if not l["available"] else "-"))
+            typer.echo(f"   {i}. {l['id']:<28} {st:<10} {l['title']}")
+
+
+@course_app.command("build")
+def course_build(source: Path = typer.Argument(..., help="folder with course.yaml (+ labs/<id>/ folders)"),
+                 out: Path = typer.Option(None, "-o", "--out"),
+                 search: list[Path] = typer.Option(None, "--labs-from", help="also take listed labs from <dir>/<id>/")):
+    """Build and validate a .encorcourse file."""
+    try:
+        data = courses.build(source, search=search or [])
+    except packs.LabError as e:
+        for err in e.errors:
+            typer.echo(f"ERROR: {err}")
+        raise typer.Exit(1)
+    c = courses.parse_course_yaml((source / "course.yaml").read_text(encoding="utf-8"))
+    out = out or Path(f"{c.id}{courses.COURSE_EXT}")
+    out.write_bytes(data)
+    typer.echo(f"wrote {out} ({len(data)} bytes, sha256 {library.sha256(data)})")
+
+
+@course_app.command("delete")
+def course_delete(course_id: str, labs: bool = typer.Option(False, "--labs", help="also delete its imported labs")):
+    """Remove an installed course (built-in labs are never deleted)."""
+    try:
+        removed = courses.delete(course_id, remove_labs=labs)
+    except packs.LabError as e:
+        typer.echo(f"ERROR: {e}")
+        raise typer.Exit(1)
+    typer.echo(f"removed course {course_id}" + (f" and labs: {', '.join(removed)}" if removed else ""))
+
+
+@library_app.command("list")
+def library_list(url: str = typer.Option(library.DEFAULT_INDEX, help="library index URL (https)")):
+    """Show what the online library offers."""
+    try:
+        idx = library.index(url)
+    except (library.LibraryError, packs.LabError) as e:
+        typer.echo(f"ERROR: {e}")
+        raise typer.Exit(1)
+    for it in idx["items"]:
+        mark = "installed" if it["installed"] else ""
+        typer.echo(f"{it['file']:<36} {it['kind']:<6} {mark:<9} {it['title']}")
+
+
+@library_app.command("install")
+def library_install(target: str = typer.Argument(..., help="a file name from 'library list', or an https URL"),
+                    sha256: str = typer.Option("", help="expected sha256 (recommended for URLs)"),
+                    url: str = typer.Option(library.DEFAULT_INDEX, help="library index URL (https)"),
+                    replace: bool = typer.Option(False, help="overwrite existing imported labs")):
+    """Download, verify (sha256) and install a pack or course."""
+    lim = config.from_env().node_limit
+    try:
+        if target.startswith(("https://", "http://")):
+            r = library.install_url(target, sha256, node_limit=lim, overwrite=replace)
+        else:
+            r = library.install_item(target, url=url, node_limit=lim, overwrite=replace)
+    except (library.LibraryError, packs.LabError) as e:
+        for err in getattr(e, "errors", [str(e)]):
+            typer.echo(f"ERROR: {err}")
+        raise typer.Exit(1)
+    for w in r.get("warnings", []):
+        typer.echo(f"warning: {w}")
+    what = f"course {r['course_id']}" if r.get("kind") == "course" else f"lab {r['lab_id']}"
+    typer.echo(f"installed {what}: {r['title']}" + ("" if r.get("verified", True) else " (no sha256 given: integrity not verified)"))
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, catalog, config, faults, history, packs, progress, service
+from .. import __version__, ai, catalog, config, courses, faults, history, library, packs, progress, service
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -25,6 +25,14 @@ HERE = Path(__file__).parent
 for _type, _ext in (("text/javascript", ".js"), ("text/javascript", ".mjs"), ("text/css", ".css"),
                     ("application/json", ".json"), ("image/svg+xml", ".svg")):
     mimetypes.add_type(_type, _ext)
+
+
+class LibInstall(BaseModel):
+    file: str = ""
+    url: str = ""
+    index_url: str = library.DEFAULT_INDEX
+    sha256: str = ""
+    replace: bool = False
 
 
 class SettingsIn(BaseModel):
@@ -70,7 +78,8 @@ class CmlDraftIn(BaseModel):
 
 
 def create_app(store: config.SettingsStore | None = None, client_factory=None, runner_factory=None,
-               config_factory=None, probe=None, persist: bool = True, ai_transport=None) -> FastAPI:
+               config_factory=None, probe=None, persist: bool = True, ai_transport=None,
+               library_fetch=None) -> FastAPI:
     store = store or config.SettingsStore()
     jobs = service.JobManager()
     app = FastAPI(title="ENCOR Lab Builder", version=__version__)
@@ -191,9 +200,23 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         return Response(packs.export_pack(lab_id), media_type="application/zip",
                         headers={"Content-Disposition": f'attachment; filename="{lab_id}{packs.PACK_EXT}"'})
 
+    def _lib_err(e: Exception):
+        if isinstance(e, packs.LabError):
+            exists = any("already exists" in x for x in e.errors)
+            return JSONResponse({"ok": False, "errors": e.errors, "warnings": e.warnings}, status_code=409 if exists else 400)
+        status = 502 if str(e).startswith(("network error", "download failed")) else 400
+        return JSONResponse({"ok": False, "errors": [str(e)], "warnings": []}, status_code=status)
+
+    fetch = library_fetch or library.http_fetch
+
     @app.post("/api/import")
     async def import_file(file: UploadFile = File(...), replace: bool = False):
         data = await file.read()
+        if courses.is_course(file.filename or "", data):
+            try:
+                return courses.install(data, node_limit=store.get().node_limit, overwrite=replace)
+            except packs.LabError as e:
+                return _lib_err(e)
         try:
             pk = packs.read_upload(file.filename or "upload", data)
         except packs.LabError as e:
@@ -203,6 +226,44 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
             exists = any("already exists" in x for x in rep.errors)
             return _err(rep, 409 if exists else 400)
         return rep.to_dict()
+
+    # ------------------------------------------------------------ courses + online library
+    def _best() -> dict:
+        out = {}
+        for lid in catalog.entries():
+            h = history.load(lid)
+            out[lid] = max((x.get("score_pct") or 0 for x in h), default=None)
+        return out
+
+    @app.get("/api/courses")
+    def course_list():
+        return {"courses": courses.list_courses(_best())}
+
+    @app.delete("/api/courses/{course_id}")
+    def course_delete(course_id: str, labs: bool = False):
+        try:
+            return {"ok": True, "removed_labs": courses.delete(course_id, remove_labs=labs)}
+        except packs.LabError as e:
+            raise HTTPException(404, "; ".join(e.errors))
+
+    @app.get("/api/library")
+    def library_index(url: str = library.DEFAULT_INDEX):
+        try:
+            return library.index(url, fetch=fetch)
+        except (library.LibraryError, packs.LabError) as e:  # shown in the UI
+            return _lib_err(e)
+
+    @app.post("/api/library/install")
+    def library_install(body: LibInstall):
+        lim = store.get().node_limit
+        try:
+            if body.file:
+                return library.install_item(body.file, url=body.index_url, fetch=fetch, node_limit=lim, overwrite=body.replace)
+            if body.url:
+                return library.install_url(body.url, body.sha256, fetch=fetch, node_limit=lim, overwrite=body.replace)
+        except (library.LibraryError, packs.LabError) as e:
+            return _lib_err(e)
+        raise HTTPException(400, "give a library file or a URL")
 
     def _pack_from_body(body: YamlIn) -> packs.Pack:
         """Builder edits don't carry fixtures; reuse the source lab's recorded outputs while they still

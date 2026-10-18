@@ -1,0 +1,13 @@
+id: encor-routing
+title: "ENCOR Infrastructure: routing track"
+description: >-
+  The built-in routing labs in a sensible order: EIGRP, OSPF, BGP and VRF-lite. No labs are bundled,
+  so this course is tiny and only records the study order and your progress through it.
+author: ENCOR Lab Builder
+version: "1.0"
+labs:
+  - eigrp-basic
+  - 04-eigrp-named
+  - 03-ospf-multiarea
+  - 05-bgp-ebgp-ibgp
+  - 08-vrf-lite

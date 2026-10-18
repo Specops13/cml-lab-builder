@@ -1,0 +1,63 @@
+{
+  "format": 1,
+  "items": [
+    {
+      "file": "encor-routing.encorcourse",
+      "sha256": "18dafa1dfc5b4a363c8cfff5be0bbbc21fac61b0aa83280eb195178b47a3cdef",
+      "size": 394,
+      "kind": "course",
+      "id": "encor-routing",
+      "title": "ENCOR Infrastructure: routing track",
+      "description": "The built-in routing labs in a sensible order: EIGRP, OSPF, BGP and VRF-lite. No labs are bundled, so this course is tiny and only records the study order and your progress through it.",
+      "labs": [
+        "eigrp-basic",
+        "04-eigrp-named",
+        "03-ospf-multiarea",
+        "05-bgp-ebgp-ibgp",
+        "08-vrf-lite"
+      ]
+    },
+    {
+      "file": "ospf-mastery.encorcourse",
+      "sha256": "3ef5d14d385f6ccea1958c740d4a974a8f7602bb1ac8627f164cea269f2e0786",
+      "size": 14028,
+      "kind": "course",
+      "id": "ospf-mastery",
+      "title": "OSPF Mastery: design, areas and troubleshooting",
+      "description": "Three labs in study order: multi-area OSPF basics, ABR summarization with a totally stubby area, then a 7-node troubleshooting ticket. Bundles the two community labs; the first one is built in.",
+      "labs": [
+        "03-ospf-multiarea",
+        "ospf-multiarea-stub",
+        "troubleshoot-ospf-7node"
+      ]
+    },
+    {
+      "file": "ospf-multiarea-stub.encorlab",
+      "sha256": "17f5eb2bd7ceb4c5811af17a357cf40b11c430b986dc2bc381547476bc6a0745",
+      "size": 4941,
+      "kind": "lab",
+      "id": "ospf-multiarea-stub",
+      "title": "OSPFv2 Multi-Area: ABR Summarization and a Totally Stubby Area",
+      "description": "Four routers, two OSPF areas. Make area 1 totally stubby and summarize its loopbacks to a /22 on the ABR.",
+      "blueprint": [
+        "3.2.b"
+      ],
+      "nodes": 4,
+      "difficulty": 3
+    },
+    {
+      "file": "troubleshoot-ospf-7node.encorlab",
+      "sha256": "621ec436dc28fd948b7d9dc0b939098b2bbdab0509224e19923253ffd3af2319",
+      "size": 8211,
+      "kind": "lab",
+      "id": "troubleshoot-ospf-7node",
+      "title": "Troubleshooting: Branch-2 Cannot Reach the Data-Center Server",
+      "description": "Seven-router multi-area OSPF enterprise, fully configured. Users at Branch-2 can't reach the DC server. Find and fix the one fault.",
+      "blueprint": [
+        "3.2.b"
+      ],
+      "nodes": 7,
+      "difficulty": 3
+    }
+  ]
+}

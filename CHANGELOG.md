@@ -12,6 +12,10 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 - **Progress dashboard** (Progress page, `progress` CLI, `GET /api/progress`): mastery per ENCOR v1.2 domain (weighted)
   and blueprint item, weakest topics, streak, time spent, most-failed checks and 30-day activity. Each Check now records
   the lab timer value and whether the answer had been revealed.
+- **Lab library and courses:** a *Library & courses* panel and `library` / `course` CLI commands. Install lab packs and
+  `.encorcourse` courses (ordered study tracks) from the repo's new `labs/` folder or any https URL, with sha256/size
+  verification, an https-only policy and a 20 MB limit. Courses track solved/total with *Continue* and a course filter.
+  `packaging/build_library.py` builds `labs/` reproducibly; two courses ship (OSPF Mastery, ENCOR routing track).
 - Lab files can define `faults:`. The validator applies each fault offline with an IOS-style config merge and requires
   that it is detected and fixable.
 ### Changed
