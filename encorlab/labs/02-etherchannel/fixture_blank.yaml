@@ -1,0 +1,10 @@
+SW1:
+  show etherchannel summary: |
+    Number of channel-groups in use: 0
+    Number of aggregators:           0
+
+    Group  Port-channel  Protocol    Ports
+    ------+-------------+-----------+-----------------------------------------------
+  show etherchannel load-balance: |
+    EtherChannel Load-Balancing Configuration:
+            src-dst-mac

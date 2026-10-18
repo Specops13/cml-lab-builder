@@ -1,0 +1,42 @@
+PE:
+  show vrf: |
+      Name                             Default RD            Protocols   Interfaces
+      CUST-A                           <not set>             ipv4        %if0s%
+      CUST-B                           <not set>             ipv4        %if1s%
+  show ip route vrf CUST-A: |
+
+    Routing Table: CUST-A
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+
+    Gateway of last resort is not set
+
+          10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks
+    C        10.1.1.0/30 is directly connected, %if0%
+    L        10.1.1.1/32 is directly connected, %if0%
+    S     192.168.100.0/24 [1/0] via 10.1.1.2
+  show ip route vrf CUST-B: |
+
+    Routing Table: CUST-B
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+
+    Gateway of last resort is not set
+
+          10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks
+    C        10.1.1.0/30 is directly connected, %if1%
+    L        10.1.1.1/32 is directly connected, %if1%
+    S     192.168.100.0/24 [1/0] via 10.1.1.2
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+
+    Gateway of last resort is not set
+
+  ping vrf CUST-A 192.168.100.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.100.1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+  ping vrf CUST-B 192.168.100.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.100.1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms

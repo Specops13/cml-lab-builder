@@ -1,0 +1,11 @@
+R2:
+  show ip nat statistics: |
+    Total active translations: 0 (0 static, 0 dynamic; 0 extended)
+    Outside interfaces:
+    Inside interfaces:
+    Hits: 0  Misses: 0
+  show ip interface %if0%: |
+    %if0% is up, line protocol is up
+      Internet address is 10.0.12.2/30
+      Outgoing access list is not set
+      Inbound  access list is not set

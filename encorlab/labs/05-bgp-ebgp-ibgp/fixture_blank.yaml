@@ -1,0 +1,6 @@
+R2:
+  show ip bgp summary: |
+    % BGP not active
+R3:
+  show ip bgp summary: |
+    % BGP not active

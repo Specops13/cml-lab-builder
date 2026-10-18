@@ -1,0 +1,170 @@
+id: 04-eigrp-named
+title: EIGRP Named Mode, Authentication and Stub
+blueprint: ["3.2.a"]
+domain: "3.0 Infrastructure - Layer 3"
+difficulty: 3
+summary: Configure EIGRP named mode with MD5 authentication, a stub router and passive loopbacks.
+nodes:
+  - name: R1
+    kind: router
+    x: 0
+    y: -150
+    config: |
+      interface Loopback0
+       ip address 10.255.0.1 255.255.255.255
+      interface %if0%
+       description to R2
+       ip address 10.0.12.1 255.255.255.0
+       no shutdown
+      interface %if1%
+       description to R3
+       ip address 10.0.13.1 255.255.255.0
+       no shutdown
+  - name: R2
+    kind: router
+    x: -200
+    y: 100
+    config: |
+      interface Loopback0
+       ip address 10.255.0.2 255.255.255.255
+      interface %if0%
+       description to R1
+       ip address 10.0.12.2 255.255.255.0
+       no shutdown
+      interface %if1%
+       description to R3
+       ip address 10.0.23.2 255.255.255.0
+       no shutdown
+  - name: R3
+    kind: router
+    x: 200
+    y: 100
+    config: |
+      interface Loopback0
+       ip address 10.255.0.3 255.255.255.255
+      interface %if0%
+       description to R1
+       ip address 10.0.13.3 255.255.255.0
+       no shutdown
+      interface %if1%
+       description to R2
+       ip address 10.0.23.3 255.255.255.0
+       no shutdown
+links:
+  - {a: {node: R1, port: 0}, b: {node: R2, port: 0}}
+  - {a: {node: R1, port: 1}, b: {node: R3, port: 0}}
+  - {a: {node: R2, port: 1}, b: {node: R3, port: 1}}
+task: |
+  # Lab 4 - EIGRP named mode
+
+  R1, R2 and R3 form a triangle; addressing is done.
+
+  1. On all routers configure **EIGRP named mode** with virtual-instance name `ENCOR` and
+     `address-family ipv4 unicast autonomous-system 100`. Router ID = Loopback0.
+  2. Advertise all connected networks (transit links and Loopback0). Loopback0 must be passive.
+  3. Authenticate all EIGRP adjacencies with MD5 using key chain `EIGRP-KEYS`, key 1, key-string `ENCOR`
+     (configure under `af-interface default`).
+  4. Make R3 an EIGRP **stub** advertising connected routes only (`eigrp stub connected`).
+  5. R1 must learn R3's loopback 10.255.0.3/32 via EIGRP.
+
+  Verify with `show ip eigrp neighbors`, `show ip protocols`, `show ip route eigrp`.
+checks:
+  - id: r1-nbrs
+    description: R1 has EIGRP neighbors R2 and R3
+    device: R1
+    command: show ip eigrp neighbors
+    match: ['10\.0\.12\.2\s+%if0s%\s', '10\.0\.13\.3\s+%if1s%\s']
+    hint: Same AS (100), same K values, matching authentication on both ends.
+  - id: r2-nbrs
+    description: R2 has EIGRP neighbors R1 and R3
+    device: R2
+    command: show ip eigrp neighbors
+    match: ['10\.0\.12\.1\s+%if0s%\s', '10\.0\.23\.3\s+%if1s%\s']
+  - id: r1-named
+    description: R1 runs EIGRP named mode ENCOR, AS 100
+    device: R1
+    command: show running-config | section router eigrp
+    match: ['^router eigrp ENCOR', 'address-family ipv4 unicast autonomous-system 100']
+    hint: router eigrp ENCOR / address-family ipv4 unicast autonomous-system 100
+  - id: r1-auth
+    description: R1 authenticates EIGRP with MD5 key chain EIGRP-KEYS
+    device: R1
+    command: show running-config | section router eigrp
+    match: ['authentication mode md5', 'authentication key-chain EIGRP-KEYS']
+  - id: r1-passive
+    description: R1 Loopback0 is passive in EIGRP
+    device: R1
+    command: show running-config | section router eigrp
+    match: ['af-interface Loopback0\s*\n\s+passive-interface']
+    hint: af-interface Loopback0 / passive-interface
+  - id: r3-stub
+    description: R3 is an EIGRP stub (connected)
+    device: R3
+    command: show running-config | section router eigrp
+    match: ['eigrp stub connected']
+  - id: r1-route
+    description: R1 learns 10.255.0.3/32 via EIGRP
+    device: R1
+    command: show ip route eigrp
+    match: ['^D\s+10\.255\.0\.3/32 \[90/']
+  # ---- config-mode checks (running config via CML API) ----
+  - id: r1-cfg-named
+    mode: config
+    description: R1 uses EIGRP named mode ENCOR / AS 100
+    device: R1
+    match:
+    - ^router eigrp ENCOR
+    - ^ address-family ipv4 unicast autonomous-system 100
+  - id: r2-cfg-named
+    mode: config
+    description: R2 uses EIGRP named mode ENCOR / AS 100
+    device: R2
+    match:
+    - ^router eigrp ENCOR
+    - ^ address-family ipv4 unicast autonomous-system 100
+  - id: r2-cfg-auth
+    mode: config
+    description: R2 authenticates with key chain EIGRP-KEYS
+    device: R2
+    match:
+    - authentication mode md5
+    - authentication key-chain EIGRP-KEYS
+    - ^key chain EIGRP-KEYS
+  - id: r3-cfg-stub
+    mode: config
+    description: R3 is stub connected
+    device: R3
+    match:
+    - ^\s+eigrp stub connected
+solution_summary: |
+  **What was missing:** EIGRP named mode, authentication, passive loopbacks and the stub setting were not configured.
+
+  **Fix: on R1, R2 and R3** (only the network statements and router-id differ)
+  ```
+  key chain EIGRP-KEYS
+   key 1
+    key-string ENCOR
+  router eigrp ENCOR
+   address-family ipv4 unicast autonomous-system 100
+    af-interface default
+     authentication mode md5
+     authentication key-chain EIGRP-KEYS
+    exit-af-interface
+    af-interface Loopback0
+     passive-interface
+    exit-af-interface
+    network <each connected 10.0.x.0> 0.0.0.255
+    network 10.255.0.N 0.0.0.0
+    eigrp router-id 10.255.0.N
+  ```
+  - R1 networks: 10.0.12.0, 10.0.13.0 and 10.255.0.1
+  - R2 networks: 10.0.12.0, 10.0.23.0 and 10.255.0.2
+  - R3 networks: 10.0.13.0, 10.0.23.0 and 10.255.0.3, plus `eigrp stub connected`
+
+  **Why it works:** neighbors need the same AS (100) and the same K-values. With `af-interface default` every interface
+  uses MD5 with key 1, and a mismatched key would block the hellos. A passive loopback is still advertised but sends no
+  hellos. The stub keyword stops R1 and R2 from querying R3 or using it as a transit path.
+hints:
+  - "Named mode puts the AS number under the address-family, not after `router eigrp`. All three routers must agree on it."
+  - "Authentication is applied per interface. Look at the af-interface default section and a key chain with the same key ID and string."
+  - "R3 must advertise only its connected networks to its neighbors, and loopbacks should not send hellos."

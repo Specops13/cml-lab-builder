@@ -1,0 +1,161 @@
+id: 09-gre-ipsec
+title: GRE over IPsec with OSPF
+blueprint: ["2.2.b", "2.2.c"]
+domain: "2.0 Virtualization"
+difficulty: 4
+summary: Build a GRE tunnel between two sites across an ISP, run OSPF over it, and protect it with an IPsec profile.
+nodes:
+  - name: R1
+    kind: router
+    x: -250
+    y: 0
+    config: |
+      interface Loopback1
+       description Site 1 LAN
+       ip address 192.168.1.1 255.255.255.0
+      interface %if0%
+       description to ISP
+       ip address 203.0.113.1 255.255.255.252
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 203.0.113.2
+  - name: ISP
+    kind: router
+    x: 0
+    y: -150
+    config: |
+      interface %if0%
+       ip address 203.0.113.2 255.255.255.252
+       no shutdown
+      interface %if1%
+       ip address 198.51.100.2 255.255.255.252
+       no shutdown
+  - name: R2
+    kind: router
+    x: 250
+    y: 0
+    config: |
+      interface Loopback1
+       description Site 2 LAN
+       ip address 192.168.2.1 255.255.255.0
+      interface %if0%
+       description to ISP
+       ip address 198.51.100.1 255.255.255.252
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 198.51.100.2
+links:
+  - {a: {node: R1, port: 0}, b: {node: ISP, port: 0}}
+  - {a: {node: R2, port: 0}, b: {node: ISP, port: 1}}
+task: |
+  # Lab 9 - GRE over IPsec
+
+  R1 (203.0.113.1) and R2 (198.51.100.1) reach each other through ISP. The ISP knows nothing
+  about the site LANs 192.168.1.0/24 and 192.168.2.0/24.
+
+  1. Create `interface Tunnel0` on both routers: R1 172.16.0.1/30, R2 172.16.0.2/30, source = WAN interface,
+     destination = the peer's WAN address (GRE, the default tunnel mode).
+  2. Run OSPF process 1 area 0 on Tunnel0 and Loopback1 only (never on the WAN interface). Advertise Loopback1 as /24
+     (`ip ospf network point-to-point`). Router IDs 1.1.1.1 / 2.2.2.2.
+  3. Protect the tunnel with IPsec:
+     - ISAKMP policy 10: `encryption aes 256`, `hash sha256`, `authentication pre-share`, `group 14`
+     - pre-shared key `ENCOR123` for the peer address
+     - transform set `TS` = `esp-aes 256 esp-sha256-hmac`, `mode transport`
+     - IPsec profile `GRE-PROT` using `TS`, applied with `tunnel protection ipsec profile GRE-PROT`
+  4. R1 must ping 192.168.2.1 sourced from Loopback1.
+
+  Verify with `show interfaces Tunnel0`, `show ip ospf neighbor`, `show crypto isakmp sa`, `show crypto ipsec sa`.
+  Note: requires a crypto-capable image (IOL-XE and IOSv both include it).
+checks:
+  - id: r1-tunnel
+    description: R1 Tunnel0 is up/up, GRE/IP
+    device: R1
+    command: show interfaces Tunnel0
+    match: ['Tunnel0 is up, line protocol is up', 'Tunnel protocol/transport GRE/IP']
+  - id: r1-ospf
+    description: R1 OSPF adjacency with 2.2.2.2 over Tunnel0
+    device: R1
+    command: show ip ospf neighbor
+    match: ['^2\.2\.2\.2\s+\d+\s+FULL/.*172\.16\.0\.2\s+Tunnel0']
+    absent: ['%if0%\s*$']
+    hint: Do not enable OSPF on the WAN interface (recursive routing would flap the tunnel).
+  - id: r1-route
+    description: R1 learns 192.168.2.0/24 via the tunnel
+    device: R1
+    command: show ip route ospf
+    match: ['^O\s+192\.168\.2\.0/24 \[110/\d+\] via 172\.16\.0\.2, \S+, Tunnel0']
+  - id: r1-isakmp
+    description: IKE phase 1 SA is QM_IDLE / ACTIVE
+    device: R1
+    command: show crypto isakmp sa
+    match: ['QM_IDLE\s+\d+\s+ACTIVE']
+  - id: r1-ipsec
+    description: Traffic is encrypted and decrypted by IPsec
+    device: R1
+    command: show crypto ipsec sa
+    match: ['#pkts encaps:\s*[1-9]', '#pkts decaps:\s*[1-9]']
+    hint: tunnel protection ipsec profile GRE-PROT on both tunnels; matching policy/key/transform-set.
+  - id: r1-ping
+    description: Site-to-site reachability 192.168.1.1 -> 192.168.2.1
+    device: R1
+    command: ping 192.168.2.1 source Loopback1 repeat 5
+    min_success: 80
+  # ---- config-mode checks (running config via CML API) ----
+  - id: r1-cfg-tunnel
+    mode: config
+    description: R1 Tunnel0 to 198.51.100.1 protected by GRE-PROT
+    device: R1
+    match:
+    - ^interface Tunnel0\s*\n(?:[ \t].*\n)*?[ \t]+tunnel destination 198\.51\.100\.1
+    - ^interface Tunnel0\s*\n(?:[ \t].*\n)*?[ \t]+tunnel protection ipsec profile GRE-PROT
+  - id: r1-cfg-crypto
+    mode: config
+    description: R1 ISAKMP policy, transform set and profile
+    device: R1
+    match:
+    - ^crypto isakmp policy 10
+    - ^crypto ipsec transform-set TS esp-aes 256 esp-sha256-hmac
+    - ^crypto ipsec profile GRE-PROT
+  - id: r2-cfg-tunnel
+    mode: config
+    description: R2 Tunnel0 to 203.0.113.1 protected by GRE-PROT
+    device: R2
+    match:
+    - ^interface Tunnel0\s*\n(?:[ \t].*\n)*?[ \t]+tunnel destination 203\.0\.113\.1
+    - ^interface Tunnel0\s*\n(?:[ \t].*\n)*?[ \t]+tunnel protection ipsec profile GRE-PROT
+solution_summary: |
+  **What was missing:** there was no tunnel between the sites, so the LANs couldn't reach each other, and nothing was
+  encrypted.
+
+  **Fix: R1** (R2 mirrors it)
+  ```
+  crypto isakmp policy 10
+   encryption aes 256
+   hash sha256
+   authentication pre-share
+   group 14
+  crypto isakmp key ENCOR123 address 198.51.100.1
+  crypto ipsec transform-set TS esp-aes 256 esp-sha256-hmac
+   mode transport
+  crypto ipsec profile GRE-PROT
+   set transform-set TS
+  interface Tunnel0
+   ip address 172.16.0.1 255.255.255.252
+   ip ospf 1 area 0
+   tunnel source %if0%
+   tunnel destination 198.51.100.1
+   tunnel protection ipsec profile GRE-PROT
+  interface Loopback1
+   ip ospf network point-to-point
+   ip ospf 1 area 0
+  router ospf 1
+   router-id 1.1.1.1
+  ```
+  **R2:** the same, with `crypto isakmp key ENCOR123 address 203.0.113.1`, Tunnel0 172.16.0.2,
+  `tunnel destination 203.0.113.1` and `router-id 2.2.2.2`.
+
+  **Why it works:** GRE carries OSPF hellos (multicast) between the sites, and OSPF runs only on Tunnel0 and the LAN
+  loopbacks. Keeping the WAN out of OSPF avoids recursive routing of the tunnel destination. The IPsec profile encrypts
+  the GRE packets (transport mode), using a matching IKE policy and pre-shared key on both sides.
+hints:
+  - "Build the GRE tunnel first and test that you can ping across it before adding OSPF or IPsec."
+  - "Run OSPF only on the tunnel and the LAN loopbacks. Never on the WAN interface the tunnel is sourced from."
+  - "Protect the tunnel with an IPsec profile. The IKE policy, pre-shared key (per peer address) and transform-set must match on both routers."

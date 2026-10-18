@@ -1,0 +1,241 @@
+id: ospf-multiarea-stub
+title: "OSPFv2 Multi-Area: ABR Summarization and a Totally Stubby Area"
+blueprint: ["3.2.b"]
+domain: "3.0 Infrastructure - Layer 3"
+difficulty: 3
+platforms: [iol]
+summary: Four routers, two OSPF areas. Make area 1 totally stubby and summarize its loopbacks to a /22 on the ABR.
+author: ENCOR Lab Builder
+version: "1"
+nodes:
+  - name: R1
+    kind: router
+    x: -360
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 1.1.1.1 255.255.255.255
+      interface Loopback1
+       ip address 192.168.1.1 255.255.255.0
+      interface %if0%
+       description to R2
+       ip address 10.0.12.1 255.255.255.0
+       no shutdown
+  - name: R2
+    kind: router
+    x: -120
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 2.2.2.2 255.255.255.255
+      interface %if0%
+       description to R1
+       ip address 10.0.12.2 255.255.255.0
+       no shutdown
+      interface %if1%
+       description to R3
+       ip address 10.0.23.2 255.255.255.0
+       no shutdown
+  - name: R3
+    kind: router
+    x: 120
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 172.16.0.1 255.255.255.0
+      interface Loopback1
+       ip address 172.16.1.1 255.255.255.0
+      interface %if0%
+       description to R2
+       ip address 10.0.23.3 255.255.255.0
+       no shutdown
+      interface %if1%
+       description to R4
+       ip address 10.0.34.3 255.255.255.0
+       no shutdown
+  - name: R4
+    kind: router
+    x: 360
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 172.16.2.1 255.255.255.0
+      interface Loopback1
+       ip address 172.16.3.1 255.255.255.0
+      interface %if0%
+       description to R3
+       ip address 10.0.34.4 255.255.255.0
+       no shutdown
+links:
+  - {a: {node: R1, port: 0}, b: {node: R2, port: 0}}
+  - {a: {node: R2, port: 1}, b: {node: R3, port: 0}}
+  - {a: {node: R3, port: 1}, b: {node: R4, port: 0}}
+task: |
+  # OSPFv2 multi-area: ABR summarization and a totally stubby area
+
+  Topology (all IP addresses are already configured):
+
+      R1 --- R2 --- R3 --- R4
+         area 0   area 1
+
+  | Link / interface | Addressing |
+  |---|---|
+  | R1 %if0% - R2 %if0% | 10.0.12.0/24 (.1 / .2) |
+  | R2 %if1% - R3 %if0% | 10.0.23.0/24 (.2 / .3) |
+  | R3 %if1% - R4 %if0% | 10.0.34.0/24 (.3 / .4) |
+  | R1 Loopback0 / Loopback1 | 1.1.1.1/32, 192.168.1.1/24 |
+  | R2 Loopback0 | 2.2.2.2/32 |
+  | R3 Loopback0 / Loopback1 | 172.16.0.1/24, 172.16.1.1/24 |
+  | R4 Loopback0 / Loopback1 | 172.16.2.1/24, 172.16.3.1/24 |
+
+  Configure OSPF **process 1** on all routers:
+
+  1. Router IDs: R1 1.1.1.1, R2 2.2.2.2, R3 3.3.3.3, R4 4.4.4.4 (set them with `router-id`).
+  2. **Area 0**: the R1-R2 link, R1's two loopbacks and R2 Loopback0.
+  3. **Area 1**: the R2-R3 and R3-R4 links and all R3/R4 loopbacks. R2 is the ABR.
+  4. Make area 1 **totally stubby**: routers inside area 1 must receive only a default route
+     from the ABR, with no other inter-area (O IA) routes.
+  5. On the ABR, summarize the four area 1 loopback networks into one **172.16.0.0/22** route
+     for area 0. R1 must see only the summary, not the individual loopback routes.
+
+  Verify:
+  - All OSPF adjacencies are FULL.
+  - R1 has `O IA 172.16.0.0/22` and no 172.16.x.1 host routes.
+  - R3 and R4 have an `O*IA 0.0.0.0/0` default route and no other O IA routes.
+  - `ping 1.1.1.1 source 172.16.2.1` on R4 succeeds.
+checks:
+  # ---------------- live (device console)
+  - id: r1-nbr-r2
+    template: ospf_neighbor
+    device: R1
+    params: {neighbor_id: 2.2.2.2}
+    hint: Are R1 and R2 both running OSPF in area 0 on the 10.0.12.0/24 link, with the right router IDs?
+  - id: r2-nbr-r3
+    template: ospf_neighbor
+    device: R2
+    params: {neighbor_id: 3.3.3.3}
+    hint: Stub flags must match. Both R2 and R3 need "area 1 stub" (R2 adds no-summary).
+  - id: r4-nbr-r3
+    template: ospf_neighbor
+    device: R4
+    params: {neighbor_id: 3.3.3.3}
+    hint: R4 also needs "area 1 stub", otherwise the stub flag mismatch blocks the adjacency.
+  - id: r1-summary
+    template: route_present
+    device: R1
+    params: {prefix: 172.16.0.0/22, code: O IA}
+    hint: On the ABR, use "area 1 range 172.16.0.0 255.255.252.0" under router ospf 1.
+  - id: r1-no-specifics
+    device: R1
+    mode: live
+    description: R1 does not see the individual area 1 loopback routes (only the summary)
+    command: show ip route
+    match: ['^O IA\s+172\.16\.0\.0(/22)?\s']
+    absent: ['^O IA\s+172\.16\.\d+\.[1-9]\d*(/\d+)?\s']
+    hint: The summary must replace the specific routes. Check the area number and mask in the range command.
+  - id: r3-stub-default
+    device: R3
+    mode: live
+    description: R3 has only a default route from the ABR (no other inter-area routes)
+    command: show ip route
+    match: ['^O\*IA\s+0\.0\.0\.0/0 .*via 10\.0\.23\.2']
+    absent: ['^O IA\s']
+    hint: '"area 1 stub" alone still lets O IA routes in. The ABR also needs "no-summary".'
+  - id: r4-stub-default
+    device: R4
+    mode: live
+    description: R4 has only a default route from the ABR (no other inter-area routes)
+    command: show ip route
+    match: ['^O\*IA\s+0\.0\.0\.0/0 .*via 10\.0\.34\.3']
+    absent: ['^O IA\s']
+  - id: r4-ping-r1
+    template: ping
+    device: R4
+    params: {target: 1.1.1.1, source: 172.16.2.1}
+    hint: R4 reaches R1 through the default route. R1 replies through the 172.16.0.0/22 summary.
+  # ---------------- config (running config via CML API)
+  - id: r1-cfg-ospf
+    template: config_regex
+    device: R1
+    description: R1 uses OSPF router-id 1.1.1.1
+    params: {pattern: '^ router-id 1\.1\.1\.1\s*$'}
+  - id: r1-cfg-area0
+    template: config_regex
+    device: R1
+    description: R1-R2 link is in area 0
+    params: {pattern: '(^ network 10\.0\.12\.\S+ \S+ area 0\s*$|^ ip ospf 1 area 0\s*$)'}
+  - id: r2-cfg-stub
+    template: config_lines
+    device: R2
+    description: ABR makes area 1 totally stubby
+    params: {lines: area 1 stub no-summary}
+  - id: r2-cfg-range
+    template: config_lines
+    device: R2
+    description: ABR summarizes area 1 loopbacks to 172.16.0.0/22
+    params: {lines: area 1 range 172.16.0.0 255.255.252.0}
+  - id: r2-cfg-rid
+    template: config_lines
+    device: R2
+    params: {lines: router-id 2.2.2.2}
+  - id: r3-cfg-stub
+    template: config_regex
+    device: R3
+    description: R3 is configured as a stub router for area 1
+    params: {pattern: '^ area 1 stub\s*$'}
+  - id: r3-cfg-rid
+    template: config_lines
+    device: R3
+    params: {lines: router-id 3.3.3.3}
+  - id: r4-cfg-stub
+    template: config_regex
+    device: R4
+    description: R4 is configured as a stub router for area 1
+    params: {pattern: '^ area 1 stub\s*$'}
+  - id: r4-cfg-rid
+    template: config_lines
+    device: R4
+    params: {lines: router-id 4.4.4.4}
+solution_summary: |
+  **What was missing:** OSPF was not configured. Area 1 has to be totally stubby, and R3's and R4's loopbacks have to
+  reach area 0 as a single /22.
+
+  **Fix**
+  ```
+  ! R1 (area 0)
+  router ospf 1
+   router-id 1.1.1.1
+   network 1.1.1.1 0.0.0.0 area 0
+   network 192.168.1.0 0.0.0.255 area 0
+   network 10.0.12.0 0.0.0.255 area 0
+  ! R2 (ABR)
+  router ospf 1
+   router-id 2.2.2.2
+   area 1 stub no-summary
+   area 1 range 172.16.0.0 255.255.252.0
+   network 2.2.2.2 0.0.0.0 area 0
+   network 10.0.12.0 0.0.0.255 area 0
+   network 10.0.23.0 0.0.0.255 area 1
+  ! R3 (area 1)
+  router ospf 1
+   router-id 3.3.3.3
+   area 1 stub
+   network 10.0.23.0 0.0.0.255 area 1
+   network 10.0.34.0 0.0.0.255 area 1
+   network 172.16.0.0 0.0.1.255 area 1
+  ! R4 (area 1)
+  router ospf 1
+   router-id 4.4.4.4
+   area 1 stub
+   network 10.0.34.0 0.0.0.255 area 1
+   network 172.16.2.0 0.0.1.255 area 1
+  ```
+
+  **Why it works:** every router in area 1 must set the stub flag, or the hellos don't match and no adjacency forms.
+  `no-summary` on the ABR also blocks O IA routes, so R3 and R4 see only a default route. `area 1 range` makes R2
+  advertise one 172.16.0.0/22 into area 0 instead of the specific routes. R1 reaches the loopbacks through the summary,
+  and R4 replies through the default route.
+hints:
+  - "Get area 0 working first: R1 and R2 on 10.0.12.0/24 with the router IDs from the task."
+  - "Area 1 must be stub on every router in it, or the adjacency never forms. Which router turns a stub area into a totally stubby one?"
+  - "Summarize on the ABR with a range that covers exactly the area 1 loopbacks (a /22)."

@@ -1,0 +1,339 @@
+{
+  "$defs": {
+    "Check": {
+      "additionalProperties": false,
+      "description": "A grading check. Either give command/match/absent/min_success directly, or a\n`template` + `params` (see LAB-AUTHORING.md).",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "mode": {
+          "default": "live",
+          "description": "live = show/ping over the device console; config = regex on the running config fetched via the CML API",
+          "enum": [
+            "live",
+            "config"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "command": {
+          "default": "",
+          "description": "live only: read-only 'show ...' or 'ping ...' command",
+          "title": "Command",
+          "type": "string"
+        },
+        "match": {
+          "default": [],
+          "description": "Python regexes (multiline: ^ and $ match per line) that must ALL match",
+          "items": {
+            "type": "string"
+          },
+          "title": "Match",
+          "type": "array"
+        },
+        "absent": {
+          "default": [],
+          "description": "Python regexes that must NOT match",
+          "items": {
+            "type": "string"
+          },
+          "title": "Absent",
+          "type": "array"
+        },
+        "min_success": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "live ping checks: minimum 'Success rate is N percent'",
+          "title": "Min Success"
+        },
+        "points": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Points",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "description": "Shown to the student when the check fails",
+          "title": "Hint",
+          "type": "string"
+        },
+        "template": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional check template (see LAB-AUTHORING.md)",
+          "title": "Template"
+        },
+        "params": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Parameters for the template",
+          "title": "Params"
+        }
+      },
+      "required": [
+        "id",
+        "device"
+      ],
+      "title": "Check",
+      "type": "object"
+    },
+    "Endpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "node": {
+          "description": "Node name",
+          "title": "Node",
+          "type": "string"
+        },
+        "port": {
+          "description": "Data port index 0-3 (= %if0%..%if3%)",
+          "exclusiveMaximum": 4,
+          "minimum": 0,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "port"
+      ],
+      "title": "Endpoint",
+      "type": "object"
+    },
+    "Link": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/Endpoint"
+        },
+        "b": {
+          "$ref": "#/$defs/Endpoint"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "Link",
+      "type": "object"
+    },
+    "Node": {
+      "additionalProperties": false,
+      "description": "A router or switch. `config` is the starting config (hostname is added automatically).",
+      "properties": {
+        "name": {
+          "description": "Node label/hostname: letter first, then letters/digits/_/-, max 31 chars (e.g. R1, SW1)",
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "description": "router -> iol-xe / iosv; switch -> ioll2-xe / iosvl2",
+          "enum": [
+            "router",
+            "switch"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "x": {
+          "default": 0,
+          "description": "Canvas X position in CML",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "default": 0,
+          "description": "Canvas Y position in CML",
+          "title": "Y",
+          "type": "integer"
+        },
+        "config": {
+          "description": "Starting IOS config (no hostname line needed). Use %if0%..%if3% for data interfaces",
+          "title": "Config",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "config"
+      ],
+      "title": "Node",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One ENCOR practice lab.",
+  "properties": {
+    "id": {
+      "description": "Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "blueprint": {
+      "description": "ENCOR 350-401 v1.1 blueprint items, e.g. ['3.2.b']",
+      "items": {
+        "type": "string"
+      },
+      "title": "Blueprint",
+      "type": "array"
+    },
+    "domain": {
+      "description": "Blueprint domain, e.g. '3.0 Infrastructure - Layer 3'",
+      "title": "Domain",
+      "type": "string"
+    },
+    "difficulty": {
+      "description": "1 (easy) to 5 (hard)",
+      "maximum": 5,
+      "minimum": 1,
+      "title": "Difficulty",
+      "type": "integer"
+    },
+    "platforms": {
+      "default": [
+        "iol",
+        "iosv"
+      ],
+      "description": "Image profiles the lab supports",
+      "items": {
+        "enum": [
+          "iol",
+          "iosv"
+        ],
+        "type": "string"
+      },
+      "title": "Platforms",
+      "type": "array"
+    },
+    "summary": {
+      "description": "One-line summary for the catalog",
+      "title": "Summary",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/Node"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "links": {
+      "items": {
+        "$ref": "#/$defs/Link"
+      },
+      "title": "Links",
+      "type": "array"
+    },
+    "task": {
+      "description": "Markdown task text shown to the student",
+      "title": "Task",
+      "type": "string"
+    },
+    "checks": {
+      "description": "Needs at least one live and one config check",
+      "items": {
+        "$ref": "#/$defs/Check"
+      },
+      "title": "Checks",
+      "type": "array"
+    },
+    "solution": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional reference solution: device -> config lines",
+      "title": "Solution"
+    },
+    "solution_summary": {
+      "default": "",
+      "description": "Markdown shown after the lab is solved (or on 'Reveal solution'): the root cause / what was missing, the exact fix commands per device, and briefly why it works. Required for new labs; if empty the app generates a fallback from `solution`",
+      "title": "Solution Summary",
+      "type": "string"
+    },
+    "hints": {
+      "default": [],
+      "description": "Ordered progressive hints (vague first, most specific last), revealed one at a time with the Hint button. Never paste the full answer into a hint. If empty, the per-check hints are used in check order",
+      "items": {
+        "type": "string"
+      },
+      "title": "Hints",
+      "type": "array"
+    },
+    "author": {
+      "default": "",
+      "title": "Author",
+      "type": "string"
+    },
+    "version": {
+      "default": "1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "blueprint",
+    "domain",
+    "difficulty",
+    "summary",
+    "nodes",
+    "links",
+    "task",
+    "checks"
+  ],
+  "title": "ENCOR Lab Builder lab definition",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "encorlab-lab.schema.json"
+}

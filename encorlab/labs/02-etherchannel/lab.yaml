@@ -1,0 +1,159 @@
+id: 02-etherchannel
+title: EtherChannel with LACP and PAgP
+blueprint: ["3.1.b"]
+domain: "3.0 Infrastructure - Layer 2"
+difficulty: 2
+summary: Bundle parallel links into an LACP trunk port-channel and a PAgP access port-channel.
+nodes:
+  - name: SW1
+    kind: switch
+    x: -150
+    y: 0
+    config: |
+      vlan 10
+       name USERS
+      interface Vlan10
+       ip address 10.10.10.1 255.255.255.0
+       no shutdown
+  - name: SW2
+    kind: switch
+    x: 150
+    y: 0
+    config: |
+      vlan 10
+       name USERS
+      interface Vlan10
+       ip address 10.10.10.2 255.255.255.0
+       no shutdown
+links:
+  - {a: {node: SW1, port: 0}, b: {node: SW2, port: 0}}
+  - {a: {node: SW1, port: 1}, b: {node: SW2, port: 1}}
+  - {a: {node: SW1, port: 2}, b: {node: SW2, port: 2}}
+  - {a: {node: SW1, port: 3}, b: {node: SW2, port: 3}}
+task: |
+  # Lab 2 - EtherChannel (LACP and PAgP)
+
+  SW1 and SW2 are connected by four parallel links (port N on SW1 to port N on SW2).
+  VLAN 10 and SVIs 10.10.10.1 / 10.10.10.2 already exist.
+
+  1. Bundle the first two links (%if0% and %if1%) into Port-channel 1 using **LACP**.
+     SW1 must actively negotiate (`active`), SW2 must only respond (`passive`).
+  2. Make Port-channel 1 an 802.1Q trunk (static, `switchport mode trunk`) allowing VLANs 1 and 10.
+  3. Bundle the last two links (%if2% and %if3%) into Port-channel 2 using **PAgP**:
+     SW1 `desirable`, SW2 `auto`. Make Port-channel 2 an access port in VLAN 10.
+  4. Set the load-balancing method to `src-dst-ip` on both switches.
+  5. SW1 must be able to ping 10.10.10.2.
+
+  Verify with `show etherchannel summary`, `show interfaces trunk`, `show etherchannel load-balance`.
+checks:
+  - id: sw1-po1-lacp
+    description: SW1 Po1 is up (SU) running LACP with both members bundled (P)
+    device: SW1
+    command: show etherchannel summary
+    match: ['^1\s+Po1\(SU\)\s+LACP\s+%if0s%\(P\)\s+%if1s%\(P\)']
+    hint: interface range on both ports, channel-group 1 mode active
+  - id: sw1-po2-pagp
+    description: SW1 Po2 is up (SU) running PAgP with both members bundled (P)
+    device: SW1
+    command: show etherchannel summary
+    match: ['^2\s+Po2\(SU\)\s+PAgP\s+%if2s%\(P\)\s+%if3s%\(P\)']
+    hint: channel-group 2 mode desirable on SW1, auto on SW2
+  - id: sw1-active
+    description: SW1 uses LACP active on Po1 members
+    device: SW1
+    command: show running-config interface %if0%
+    match: ['channel-group 1 mode active']
+  - id: sw2-passive
+    description: SW2 uses LACP passive on Po1 members
+    device: SW2
+    command: show running-config interface %if0%
+    match: ['channel-group 1 mode passive']
+    hint: The task requires SW2 to be passive, not active.
+  - id: sw2-auto
+    description: SW2 uses PAgP auto on Po2 members
+    device: SW2
+    command: show running-config interface %if2%
+    match: ['channel-group 2 mode auto']
+  - id: sw1-po1-trunk
+    description: Po1 is an 802.1Q trunk on SW1
+    device: SW1
+    command: show interfaces trunk
+    match: ['^Po1\s+on\s+802\.1q\s+trunking\s+1']
+    absent: ['^%if0s%\s', '^Po2\s']
+    hint: Configure the trunk on interface Port-channel1 (members inherit it); Po2 must stay access.
+  - id: sw1-lb
+    description: Load balancing is src-dst-ip on SW1
+    device: SW1
+    command: show etherchannel load-balance
+    match: ['src-dst-ip']
+    hint: port-channel load-balance src-dst-ip
+  - id: sw1-ping
+    description: SW1 can ping SW2 10.10.10.2
+    device: SW1
+    command: ping 10.10.10.2 repeat 5
+    min_success: 80
+  # ---- config-mode checks (running config via CML API) ----
+  - id: sw1-cfg-lacp
+    mode: config
+    description: SW1 Po1 members use LACP active
+    device: SW1
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+channel-group 1 mode active
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+channel-group 1 mode active
+  - id: sw2-cfg-passive
+    mode: config
+    description: SW2 Po1 members use LACP passive
+    device: SW2
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+channel-group 1 mode passive
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+channel-group 1 mode passive
+  - id: sw1-cfg-pagp
+    mode: config
+    description: SW1 Po2 members use PAgP desirable
+    device: SW1
+    match:
+    - ^interface %if2%\s*\n(?:[ \t].*\n)*?[ \t]+channel-group 2 mode desirable
+    - ^interface %if3%\s*\n(?:[ \t].*\n)*?[ \t]+channel-group 2 mode desirable
+  - id: sw1-cfg-po1-trunk
+    mode: config
+    description: Port-channel1 is a trunk on SW1
+    device: SW1
+    match:
+    - ^interface Port-channel1\s*\n(?:[ \t].*\n)*?[ \t]+switchport mode trunk
+  - id: sw1-cfg-lb
+    mode: config
+    description: Load balancing src-dst-ip on SW1
+    device: SW1
+    match:
+    - ^port-channel load-balance src-dst-ip
+solution_summary: |
+  **What was missing:** the parallel links were not bundled, so STP blocked all but one of them.
+
+  **Fix: SW1**
+  ```
+  port-channel load-balance src-dst-ip
+  interface Port-channel1
+   switchport trunk encapsulation dot1q
+   switchport trunk allowed vlan 1,10
+   switchport mode trunk
+  interface Port-channel2
+   switchport mode access
+   switchport access vlan 10
+  interface %if0%
+   channel-group 1 mode active
+  interface %if1%
+   channel-group 1 mode active
+  interface %if2%
+   channel-group 2 mode desirable
+  interface %if3%
+   channel-group 2 mode desirable
+  ```
+  **SW2:** the same, but with `channel-group 1 mode passive` and `channel-group 2 mode auto`.
+  Each member port also carries the same switchport (trunk/access) settings as its port-channel.
+
+  **Why it works:** LACP active plus passive negotiates Po1, and PAgP desirable plus auto negotiates Po2. Members only bundle
+  when their switchport settings match the port-channel. STP then sees each bundle as one logical link, so all links forward.
+hints:
+  - "Which negotiation protocol does each bundle use? LACP and PAgP have different mode keywords."
+  - "Only one side may start negotiation: SW2 must be the passive/auto side. Members only join when their switchport settings match."
+  - "Put the trunk or access settings on the Port-channel interface as well, and don't forget the load-balancing method."

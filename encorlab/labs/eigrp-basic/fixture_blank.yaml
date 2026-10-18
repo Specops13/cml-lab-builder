@@ -1,0 +1,9 @@
+R1:
+  show ip eigrp neighbors: ""
+  show ip route eigrp: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+
+    Gateway of last resort is not set
+
+R2:
+  show ip eigrp neighbors: ""

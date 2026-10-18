@@ -1,0 +1,161 @@
+id: 07-acl-nat
+title: ACLs, PAT and Static NAT
+blueprint: ["3.3.a", "5.1"]
+domain: "3.0 Infrastructure - IP Services / 5.0 Security"
+difficulty: 3
+summary: Translate a private LAN with PAT, publish an internal host with static NAT and filter Telnet with a named extended ACL.
+nodes:
+  - name: R1
+    kind: router
+    x: -250
+    y: 0
+    config: |
+      interface Loopback1
+       description LAN gateway
+       ip address 192.168.1.1 255.255.255.0
+      interface Loopback2
+       description internal server
+       ip address 192.168.1.10 255.255.255.255
+      interface %if0%
+       description to edge R2
+       ip address 10.0.12.1 255.255.255.252
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 10.0.12.2
+  - name: R2
+    kind: router
+    x: 0
+    y: 0
+    config: |
+      interface %if0%
+       description INSIDE to R1
+       ip address 10.0.12.2 255.255.255.252
+       no shutdown
+      interface %if1%
+       description OUTSIDE to ISP R3
+       ip address 203.0.113.1 255.255.255.248
+       no shutdown
+      ip route 192.168.1.0 255.255.255.0 10.0.12.1
+      ip route 0.0.0.0 0.0.0.0 203.0.113.2
+  - name: R3
+    kind: router
+    x: 250
+    y: 0
+    config: |
+      interface Loopback0
+       description Internet host
+       ip address 198.51.100.1 255.255.255.255
+      interface %if0%
+       description to customer R2
+       ip address 203.0.113.2 255.255.255.248
+       no shutdown
+links:
+  - {a: {node: R1, port: 0}, b: {node: R2, port: 0}}
+  - {a: {node: R2, port: 1}, b: {node: R3, port: 0}}
+task: |
+  # Lab 7 - ACLs and NAT
+
+  R1 (inside, LAN 192.168.1.0/24) -> R2 (edge) -> R3 (ISP, host 198.51.100.1).
+  R3 has NO routes to private networks.
+
+  1. On R2 mark %if0% as `ip nat inside` and %if1% as `ip nat outside`.
+  2. Create standard ACL `NAT-INSIDE` permitting 192.168.1.0/24 and configure **PAT** (overload)
+     on R2's outside interface address.
+  3. Publish the internal server 192.168.1.10 with **static NAT** as 203.0.113.5.
+  4. Create named extended ACL `BLOCK-TELNET` that denies Telnet (TCP/23) from any to any and permits all other IP;
+     apply it **inbound** on R2's inside interface.
+  5. R1 must ping 198.51.100.1 sourced from 192.168.1.1, and R3 must ping 203.0.113.5.
+
+  Verify with `show ip nat translations`, `show ip nat statistics`, `show ip access-lists`.
+checks:
+  - id: r2-nat-ifs
+    description: R2 inside/outside NAT interfaces are correct
+    device: R2
+    command: show ip nat statistics
+    match: ['Outside interfaces:\s*\n\s*%if1%', 'Inside interfaces:\s*\n\s*%if0%']
+  - id: r2-pat
+    description: R2 PAT uses ACL NAT-INSIDE overloaded on the outside interface
+    device: R2
+    command: show running-config | include ip nat inside source
+    match: ['ip nat inside source list NAT-INSIDE interface %if1% overload']
+  - id: r2-static
+    description: Static NAT 192.168.1.10 <-> 203.0.113.5
+    device: R2
+    command: show ip nat translations
+    match: ['---\s+203\.0\.113\.5\s+192\.168\.1\.10\s+---\s+---']
+    hint: ip nat inside source static 192.168.1.10 203.0.113.5
+  - id: r2-acl
+    description: BLOCK-TELNET denies telnet and permits other IP
+    device: R2
+    command: show ip access-lists BLOCK-TELNET
+    match: ['deny tcp any any eq telnet', 'permit ip any any']
+  - id: r2-acl-applied
+    description: BLOCK-TELNET is applied inbound on the inside interface
+    device: R2
+    command: show ip interface %if0%
+    match: ['Inbound\s+access list is BLOCK-TELNET']
+  - id: r1-ping
+    description: LAN reaches the Internet host through PAT
+    device: R1
+    command: ping 198.51.100.1 source 192.168.1.1 repeat 5
+    min_success: 80
+  - id: r3-ping
+    description: Internet reaches the published server 203.0.113.5
+    device: R3
+    command: ping 203.0.113.5 repeat 5
+    min_success: 80
+  # ---- config-mode checks (running config via CML API) ----
+  - id: r2-cfg-pat
+    mode: config
+    description: PAT with ACL NAT-INSIDE on the outside interface
+    device: R2
+    match:
+    - ^ip nat inside source list NAT-INSIDE interface %if1% overload
+  - id: r2-cfg-static
+    mode: config
+    description: Static NAT 192.168.1.10 -> 203.0.113.5
+    device: R2
+    match:
+    - ^ip nat inside source static 192\.168\.1\.10 203\.0\.113\.5
+  - id: r2-cfg-nat-ifs
+    mode: config
+    description: NAT inside/outside interfaces
+    device: R2
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip nat inside
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+ip nat outside
+  - id: r2-cfg-acl
+    mode: config
+    description: BLOCK-TELNET defined and applied inbound on the inside interface
+    device: R2
+    match:
+    - ^ip access-list extended BLOCK-TELNET
+    - ^\s+deny\s+tcp any any eq telnet
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip access-group BLOCK-TELNET in
+solution_summary: |
+  **What was missing:** R2 had no NAT and no ACLs, so the private LAN could not reach the internet, the server was not
+  published, and Telnet was not filtered.
+
+  **Fix: R2**
+  ```
+  ip access-list standard NAT-INSIDE
+   permit 192.168.1.0 0.0.0.255
+  ip access-list extended BLOCK-TELNET
+   deny tcp any any eq telnet
+   permit ip any any
+  interface %if0%
+   ip nat inside
+   ip access-group BLOCK-TELNET in
+  interface %if1%
+   ip nat outside
+  ip nat inside source list NAT-INSIDE interface %if1% overload
+  ip nat inside source static 192.168.1.10 203.0.113.5
+  ```
+
+  **Why it works:** the inside/outside roles tell IOS which direction to translate. PAT (`overload`) maps the whole LAN to
+  the outside interface address using ports. The static entry gives 192.168.1.10 a fixed public address, so it can be
+  reached from outside. The extended ACL drops Telnet as it enters from the LAN, and the final `permit ip any any` keeps
+  all other traffic flowing.
+hints:
+  - "NAT needs to know which interfaces are inside and outside."
+  - "PAT for the whole LAN uses an ACL that matches the inside hosts, plus `overload` on the outside interface. The server needs a separate static mapping."
+  - "Filter Telnet with a named extended ACL, as close to the source as possible. Don't forget that ACLs end with an implicit deny."

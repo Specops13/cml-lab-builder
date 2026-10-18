@@ -1,0 +1,9 @@
+SW1:
+  show vlan brief: |
+    VLAN Name                             Status    Ports
+    ---- -------------------------------- --------- -------------------------------
+    1    default                          active    %if0s%, %if1s%, %if2s%, %if3s%
+  show spanning-tree vlan 10: |
+    Spanning tree instance(s) for vlan 10 does not exist.
+  show spanning-tree vlan 20: |
+    Spanning tree instance(s) for vlan 20 does not exist.

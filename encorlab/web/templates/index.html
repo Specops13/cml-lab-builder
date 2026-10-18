@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ENCOR Lab Builder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%231f6feb%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css?v={{VERSION}}">
+<script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch (e) { /* storage blocked */ }</script>
+</head>
+<body>
+<header>
+  <div class="brand">ENCOR Lab Builder <span class="ver">v{{VERSION}}</span></div>
+  <nav>
+    <a data-help="nav.labs" href="#labs" data-view="labs" class="active">Labs</a>
+    <a data-help="nav.builder" href="#builder" data-view="builder">Lab builder</a>
+    <a data-help="nav.settings" href="#settings" data-view="settings">Settings</a>
+    <div class="menu"><button data-help="nav.more" class="ghost" id="more-btn" aria-haspopup="true">More ▾</button>
+      <div class="menu-list" id="more-menu" hidden>
+        <a data-help="more.ai" href="#ai" data-view="ai">Generate with AI</a>
+        <a data-help="more.copyPrompt" href="#" id="copy-prompt-link">Copy prompt for any AI</a>
+        <a data-help="more.schema" href="/api/schema" target="_blank">Lab JSON Schema</a>
+      </div></div>
+    <button data-help="theme" class="ghost" id="theme-btn" aria-label="Toggle dark mode">◐</button>
+  </nav>
+</header>
+<div id="error-banner" role="alert" hidden></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="tooltip" role="tooltip" hidden></div>
+<div id="drop-overlay" hidden><div>Drop .encorlab or .yaml lab files to import</div></div>
+<input data-help="import.button" type="file" id="import-file" accept=".encorlab,.zip,.yaml,.yml" multiple hidden>
+
+<main>
+<!-- ===================== LABS ===================== -->
+<section id="view-labs">
+  <div class="cols">
+    <aside class="catalog">
+      <div class="import-box">
+        <button data-help="import.button" id="import-btn" class="primary big">⬆ Import lab</button>
+        <div data-help="import.drop" class="muted small">or drag &amp; drop .encorlab / .yaml files anywhere on this page</div>
+      </div>
+      <div class="filters">
+        <input data-help="filter.search" id="f-search" aria-label="Search labs" placeholder="Search labs…">
+        <select data-help="filter.domain" id="f-domain" aria-label="Domain"><option value="">All domains</option></select>
+        <select data-help="filter.diff" id="f-diff" aria-label="Difficulty"><option value="">Any difficulty</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+        <select data-help="filter.source" id="f-source" aria-label="Source"><option value="">All sources</option><option value="builtin">Built-in</option><option value="user">Imported</option></select>
+      </div>
+      <ul id="lab-list"></ul>
+    </aside>
+    <div id="lab-detail" class="card"><div class="empty">Select a lab, or import one.</div></div>
+  </div>
+</section>
+
+<!-- ===================== BUILDER ===================== -->
+<section id="view-builder" hidden>
+  <div class="card">
+    <div class="toolbar">
+      <button data-help="b.new" id="b-new">New lab</button>
+      <select data-help="b.load" id="b-load" aria-label="Open existing lab"><option value="">Open existing lab…</option></select>
+      <button data-help="b.cml" id="b-cml">Import from CML…</button>
+      <span class="sep"></span>
+      <button data-help="b.validate" id="b-validate">Test lab (offline)</button>
+      <label class="inline"><input data-help="b.replace" type="checkbox" id="b-replace"> replace existing</label>
+      <button data-help="b.save" id="b-save" class="primary">Save to my labs</button>
+      <button data-help="b.testlive" id="b-testlive">Live test in CML</button>
+    </div>
+    <div class="tabs"><button data-help="b.tabForm" class="tab active" data-tab="form">Form</button><button data-help="b.tabYaml" class="tab" data-tab="yaml">YAML</button></div>
+    <div data-help="b.validation" id="b-validation" class="validation muted">Not validated yet.</div>
+    <div id="tab-form"></div>
+    <div id="tab-yaml" hidden>
+      <textarea data-help="b.yaml" id="b-yaml" spellcheck="false" class="code tall" aria-label="Lab YAML"></textarea>
+      <div class="muted small">Edits are validated live. Placeholders: %if0%..%if3% (long), %if0s%..%if3s% (short).</div>
+    </div>
+  </div>
+  <dialog id="cml-dialog"><h3>Start from a CML lab</h3><div id="cml-list" class="muted">Loading…</div>
+    <div class="right"><button data-help="cml.close" id="cml-close">Close</button></div></dialog>
+</section>
+
+<!-- ===================== AI ===================== -->
+<section id="view-ai" hidden>
+  <div class="card narrow">
+    <h2>Generate a lab with AI <span class="badge">optional</span></h2>
+    <p class="muted">Uses any OpenAI-compatible API you configure in Settings. The lab is validated (solution must score 100%, the starting config must fail) and opens in the builder for review. Nothing is saved automatically.</p>
+    <label>Lab description<textarea data-help="ai.desc" id="ai-desc" rows="6" placeholder="e.g. OSPF multi-area with a totally stubby area and ABR summarization, 4 routers, difficulty 3"></textarea></label>
+    <div class="toolbar"><button data-help="ai.go" id="ai-go" class="primary">Generate</button><button data-help="ai.copy" id="ai-copy">Copy prompt for any AI instead</button></div>
+    <pre data-help="ai.log" id="ai-log" class="log">-</pre>
+  </div>
+</section>
+
+<!-- ===================== SETTINGS ===================== -->
+<section id="view-settings" hidden>
+  <form id="settings-form" class="card narrow" autocomplete="off">
+    <h2>CML connection</h2>
+    <label>CML URL <input data-help="s.cml_url" name="cml_url" placeholder="https://cml.example.ts.net"></label>
+    <label>Username <input data-help="s.username" name="username"></label>
+    <label>Password <input data-help="s.password" name="password" type="password"></label>
+    <label class="inline"><input data-help="s.remember_password" name="remember_password" type="checkbox"> Remember password in OS keyring</label>
+    <label>TLS verification <select data-help="s.verify_tls" name="verify_tls"><option value="true">On (recommended)</option><option value="false">Off</option></select></label>
+    <h2>Live console checks (SSH)</h2>
+    <p class="muted">Separate from the CML URL. Must reach the CML console server over SSH: directly, or through a <b>TCP passthrough</b> proxy (nginx <code>stream</code>, HAProxy <code>mode tcp</code>). An HTTP reverse proxy will not work for SSH.</p>
+    <label>Console server FQDN (port 22 proxy) <input data-help="s.console_host" name="console_host" placeholder="blank = host of the CML URL"></label>
+    <label>Console server port <input data-help="s.console_port" name="console_port" type="number" min="1" max="65535" placeholder="22"></label>
+    <label>Default grading mode <select data-help="s.grading_mode" name="grading_mode">
+      <option value="auto">Auto: live console, fall back to config</option>
+      <option value="live">Live only (SSH console)</option>
+      <option value="config">Config only (HTTPS API)</option></select></label>
+    <h2>Lab options</h2>
+    <label>Device images <select data-help="s.platform" name="platform"><option value="iol">IOL / IOL-L2 (light)</option><option value="iosv">IOSv / IOSvL2</option></select></label>
+    <label>Node limit <input data-help="s.node_limit" name="node_limit" type="number" min="1"></label>
+    <label class="inline"><input data-help="s.show_help" name="show_help" type="checkbox"> Show help icons</label>
+    <details><summary data-help="s.aiSection"><b>AI generator (optional)</b></summary>
+      <label>Preset <select data-help="s.ai_preset" name="ai_preset" id="ai-preset"><option value="">(none)</option></select></label>
+      <label>Base URL (OpenAI-compatible) <input data-help="s.ai_base_url" name="ai_base_url" placeholder="https://api.x.ai/v1"></label>
+      <label>Model <input data-help="s.ai_model" name="ai_model"></label>
+      <label>API key <input data-help="s.ai_api_key" name="ai_api_key" type="password"></label>
+      <label class="inline"><input data-help="s.remember_ai_key" name="remember_ai_key" type="checkbox"> Remember API key in OS keyring</label>
+    </details>
+    <div class="toolbar"><button data-help="s.save" type="submit" class="primary">Save</button></div>
+  </form>
+</section>
+</main>
+<script>window.APP_VERSION = "{{VERSION}}";</script>
+<script src="/static/help.js?v={{VERSION}}"></script>
+<script src="/static/app.js?v={{VERSION}}"></script>
+</body>
+</html>

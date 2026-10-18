@@ -1,0 +1,9 @@
+PE:
+  show vrf: ""
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+
+    Gateway of last resort is not set
+
+  show ip route vrf CUST-A: |
+    % IP routing table CUST-A does not exist

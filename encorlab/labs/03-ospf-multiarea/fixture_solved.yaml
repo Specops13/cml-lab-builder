@@ -1,0 +1,61 @@
+R1:
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    10.255.0.2        0   FULL/  -        00:00:35    10.0.12.2       %if0%
+    10.255.0.3        0   FULL/  -        00:00:31    10.0.13.2       %if1%
+  show ip ospf interface brief: |
+    Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+    Lo0          1     0               10.255.0.1/32      1     LOOP  0/0
+    %if0s%        1     0               10.0.12.1/30       10    P2P   1/1
+    %if1s%        1     1               10.0.13.1/30       10    P2P   1/1
+R2:
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    10.255.0.1        0   FULL/  -        00:00:38    10.0.12.1       %if0%
+    10.255.0.4        0   FULL/  -        00:00:33    10.0.24.1       %if1%
+R3:
+  show ip ospf: |
+     Routing Process "ospf 1" with ID 10.255.0.3
+     Start time: 00:00:12.345, Time elapsed: 00:10:01.002
+     Supports only single TOS(TOS0) routes
+     Supports opaque LSA
+     Router is not originating router-LSAs with maximum metric
+     Number of areas in this router is 1. 0 normal 1 stub 0 nssa
+        Area 1
+            Number of interfaces in this area is 4 (3 loopback)
+            It is a stub area
+            Area has no authentication
+  show ip route ospf: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+
+    Gateway of last resort is 10.0.13.1 to network 0.0.0.0
+
+    O*IA  0.0.0.0/0 [110/11] via 10.0.13.1, 00:05:12, %if0%
+          10.0.0.0/8 is variably subnetted, 7 subnets, 3 masks
+    O IA     10.0.12.0/30 [110/20] via 10.0.13.1, 00:05:12, %if0%
+    O IA     10.0.24.0/30 [110/30] via 10.0.13.1, 00:05:12, %if0%
+    O        10.255.0.1/32 [110/11] via 10.0.13.1, 00:05:12, %if0%
+R4:
+  show ip route ospf: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+
+    Gateway of last resort is not set
+
+          10.0.0.0/8 is variably subnetted, 8 subnets, 3 masks
+    O IA     10.0.12.0/30 [110/20] via 10.0.24.2, 00:05:40, %if0%
+    O IA     10.0.13.0/30 [110/30] via 10.0.24.2, 00:05:40, %if0%
+    O IA     10.255.0.1/32 [110/21] via 10.0.24.2, 00:05:40, %if0%
+    O IA     10.255.0.2/32 [110/11] via 10.0.24.2, 00:05:40, %if0%
+    O IA     10.255.0.3/32 [110/31] via 10.0.24.2, 00:05:40, %if0%
+          172.16.0.0/23 is subnetted, 1 subnets
+    O IA     172.16.30.0 [110/31] via 10.0.24.2, 00:05:40, %if0%
+  ping 172.16.30.1 source Loopback0 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 172.16.30.1, timeout is 2 seconds:
+    Packet sent with a source address of 10.255.0.4
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms

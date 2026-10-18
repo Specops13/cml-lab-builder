@@ -1,0 +1,72 @@
+# Builds and smoke-tests the ready-to-run Windows and Linux bundles.
+#  - push of a tag "v*": build + test only; bundles are kept as workflow artifacts (nothing is published, so
+#    assets uploaded to an existing release by hand are never overwritten).
+#  - Actions > build > Run workflow: same, and with "publish" ticked it creates/updates the GitHub Release for
+#    the given tag. Existing assets with the same name are NOT replaced (overwrite_files: false).
+name: build
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Attach the bundles to the GitHub Release for the tag below"
+        type: boolean
+        default: false
+      tag:
+        description: "Release tag, e.g. v1.4.1 (must exist)"
+        type: string
+        default: ""
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -e ".[dev]" && python -m pytest -q
+  bundle:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, artifact: windows}
+          - {os: ubuntu-22.04, artifact: linux}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        if: runner.os == 'Linux'
+      - name: Build + smoke test (Linux, glibc 2.28 baseline)
+        if: runner.os == 'Linux'
+        run: packaging/build_linux.sh --smoke
+      - uses: actions/setup-python@v5
+        if: runner.os == 'Windows'
+        with: {python-version: "3.12"}
+      - name: Build + smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: packaging\build_exe.bat --smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ENCORLab-${{ matrix.artifact }}
+          path: dist/ENCORLab-*
+          if-no-files-found: error
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && inputs.tag != ''
+    needs: bundle
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {path: dist, merge-multiple: true}
+      - run: cd dist && sha256sum ENCORLab-* > SHA256SUMS-ci.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          overwrite_files: false
+          files: |
+            dist/ENCORLab-*
+            dist/SHA256SUMS-ci.txt

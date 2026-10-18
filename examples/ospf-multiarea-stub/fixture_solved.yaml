@@ -1,0 +1,94 @@
+R1:
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    2.2.2.2           1   FULL/BDR        00:00:35    10.0.12.2       %if0%
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+           E1 - OSPF external type 1, E2 - OSPF external type 2
+           i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+           ia - IS-IS inter area, * - candidate default, U - per-user static route
+           o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+           a - application route
+           + - replicated route, % - next hop override, p - overrides from PfR
+
+    Gateway of last resort is not set
+
+          1.0.0.0/32 is subnetted, 1 subnets
+    C        1.1.1.1 is directly connected, Loopback0
+          2.0.0.0/32 is subnetted, 1 subnets
+    O        2.2.2.2 [110/11] via 10.0.12.2, 00:06:12, %if0%
+          10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+    C        10.0.12.0/24 is directly connected, %if0%
+    L        10.0.12.1/32 is directly connected, %if0%
+    O IA     10.0.23.0/24 [110/20] via 10.0.12.2, 00:05:40, %if0%
+    O IA     10.0.34.0/24 [110/30] via 10.0.12.2, 00:05:02, %if0%
+          172.16.0.0/22 is subnetted, 1 subnets
+    O IA     172.16.0.0 [110/21] via 10.0.12.2, 00:04:51, %if0%
+          192.168.1.0/24 is variably subnetted, 2 subnets, 2 masks
+    C        192.168.1.0/24 is directly connected, Loopback1
+    L        192.168.1.1/32 is directly connected, Loopback1
+R2:
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    1.1.1.1           1   FULL/DR         00:00:38    10.0.12.1       %if0%
+    3.3.3.3           1   FULL/BDR        00:00:31    10.0.23.3       %if1%
+R3:
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    2.2.2.2           1   FULL/DR         00:00:33    10.0.23.2       %if0%
+    4.4.4.4           1   FULL/BDR        00:00:36    10.0.34.4       %if1%
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           * - candidate default, U - per-user static route
+
+    Gateway of last resort is 10.0.23.2 to network 0.0.0.0
+
+    O*IA  0.0.0.0/0 [110/11] via 10.0.23.2, 00:05:40, %if0%
+          10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+    C        10.0.23.0/24 is directly connected, %if0%
+    L        10.0.23.3/32 is directly connected, %if0%
+    C        10.0.34.0/24 is directly connected, %if1%
+    L        10.0.34.3/32 is directly connected, %if1%
+          172.16.0.0/16 is variably subnetted, 6 subnets, 2 masks
+    C        172.16.0.0/24 is directly connected, Loopback0
+    L        172.16.0.1/32 is directly connected, Loopback0
+    C        172.16.1.0/24 is directly connected, Loopback1
+    L        172.16.1.1/32 is directly connected, Loopback1
+    O        172.16.2.1/32 [110/11] via 10.0.34.4, 00:05:02, %if1%
+    O        172.16.3.1/32 [110/11] via 10.0.34.4, 00:05:02, %if1%
+R4:
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    3.3.3.3           1   FULL/DR         00:00:34    10.0.34.3       %if0%
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           * - candidate default, U - per-user static route
+
+    Gateway of last resort is 10.0.34.3 to network 0.0.0.0
+
+    O*IA  0.0.0.0/0 [110/21] via 10.0.34.3, 00:05:02, %if0%
+          10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+    O        10.0.23.0/24 [110/20] via 10.0.34.3, 00:05:02, %if0%
+    C        10.0.34.0/24 is directly connected, %if0%
+    L        10.0.34.4/32 is directly connected, %if0%
+          172.16.0.0/16 is variably subnetted, 6 subnets, 2 masks
+    O        172.16.0.1/32 [110/11] via 10.0.34.3, 00:05:02, %if0%
+    O        172.16.1.1/32 [110/11] via 10.0.34.3, 00:05:02, %if0%
+    C        172.16.2.0/24 is directly connected, Loopback0
+    L        172.16.2.1/32 is directly connected, Loopback0
+    C        172.16.3.0/24 is directly connected, Loopback1
+    L        172.16.3.1/32 is directly connected, Loopback1
+  ping 1.1.1.1 source 172.16.2.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 1.1.1.1, timeout is 2 seconds:
+    Packet sent with a source address of 172.16.2.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms

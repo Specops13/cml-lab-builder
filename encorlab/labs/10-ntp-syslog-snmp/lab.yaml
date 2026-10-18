@@ -1,0 +1,172 @@
+id: 10-ntp-syslog-snmp
+title: NTP, Syslog, SNMPv3 and IP SLA
+blueprint: ["3.3.c", "4.1", "4.2"]
+domain: "3.0 Infrastructure - IP Services / 4.0 Network Assurance"
+difficulty: 3
+summary: Build an authenticated NTP hierarchy, remote syslog with timestamps, an SNMPv3 authPriv user and an ICMP IP SLA probe.
+nodes:
+  - name: R1
+    kind: router
+    x: -250
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 10.255.0.1 255.255.255.255
+       ip ospf 1 area 0
+      interface %if0%
+       ip address 10.0.12.1 255.255.255.252
+       ip ospf 1 area 0
+       no shutdown
+  - name: R2
+    kind: router
+    x: 0
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 10.255.0.2 255.255.255.255
+       ip ospf 1 area 0
+      interface %if0%
+       ip address 10.0.12.2 255.255.255.252
+       ip ospf 1 area 0
+       no shutdown
+      interface %if1%
+       ip address 10.0.23.2 255.255.255.252
+       ip ospf 1 area 0
+       no shutdown
+  - name: R3
+    kind: router
+    x: 250
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 10.255.0.3 255.255.255.255
+       ip ospf 1 area 0
+      interface %if0%
+       ip address 10.0.23.3 255.255.255.252
+       ip ospf 1 area 0
+       no shutdown
+links:
+  - {a: {node: R1, port: 0}, b: {node: R2, port: 0}}
+  - {a: {node: R2, port: 1}, b: {node: R3, port: 0}}
+task: |
+  # Lab 10 - Management services
+
+  R1 - R2 - R3 run OSPF; loopbacks are 10.255.0.N.
+
+  1. **NTP**: R1 is the authoritative clock (`ntp master 3`). R2 and R3 sync to R1's Loopback0 (10.255.0.1)
+     with NTP authentication: `ntp authentication-key 1 md5 ENCOR`, `ntp trusted-key 1`, `ntp authenticate`,
+     `ntp server 10.255.0.1 key 1` (configure the key on R1 too). Source NTP from Loopback0.
+  2. **Syslog** on R2: send logs to 10.255.0.1 at severity `informational`, use `service timestamps log datetime msec localtime`.
+  3. **SNMPv3** on R2: group `ENCOR-RO` with `v3 priv`; user `NMS-USER` in that group with `auth sha AuthPass123` and `priv aes 128 PrivPass123`.
+  4. **IP SLA** on R3: operation 10, `icmp-echo 10.255.0.1 source-interface Loopback0`, frequency 10s, scheduled `life forever start-time now`.
+
+  Allow a few minutes for NTP to synchronize. Verify with `show ntp status`, `show logging`, `show snmp user`, `show ip sla statistics`.
+checks:
+  - id: r2-ntp
+    description: R2 is synchronized to 10.255.0.1 at stratum 4
+    device: R2
+    command: show ntp status
+    match: ['Clock is synchronized, stratum 4, reference is 10\.255\.0\.1']
+    hint: NTP can take up to 5 minutes; check keys match on both sides.
+  - id: r3-ntp
+    description: R3 is synchronized to 10.255.0.1
+    device: R3
+    command: show ntp status
+    match: ['Clock is synchronized, stratum \d+, reference is 10\.255\.0\.1']
+  - id: r2-ntp-auth
+    description: NTP authentication enabled on R2 with trusted key 1
+    device: R2
+    command: show running-config | include ^ntp
+    match: ['^ntp authenticate', '^ntp trusted-key 1', '^ntp server 10\.255\.0\.1 key 1']
+  - id: r2-syslog
+    description: R2 logs to 10.255.0.1 at informational
+    device: R2
+    command: show logging
+    match: ['Trap logging: level informational', 'Logging to 10\.255\.0\.1']
+  - id: r2-snmp
+    description: SNMPv3 user NMS-USER (SHA/AES128) in group ENCOR-RO
+    device: R2
+    command: show snmp user
+    match: ['User name: NMS-USER', 'Authentication Protocol: SHA', 'Privacy Protocol: AES128', 'Group-name: ENCOR-RO']
+  - id: r3-sla
+    description: IP SLA 10 is running and returning OK
+    device: R3
+    command: show ip sla statistics 10
+    match: ['Latest operation return code: OK', 'Number of successes: [1-9]']
+  # ---- config-mode checks (running config via CML API) ----
+  - id: r1-cfg-master
+    mode: config
+    description: R1 is NTP master stratum 3
+    device: R1
+    match:
+    - ^ntp master 3\s*$
+  - id: r2-cfg-ntp
+    mode: config
+    description: R2 authenticated NTP to 10.255.0.1
+    device: R2
+    match:
+    - ^ntp authenticate
+    - ^ntp trusted-key 1
+    - ^ntp server 10\.255\.0\.1 key 1
+  - id: r2-cfg-syslog
+    mode: config
+    description: R2 logs to 10.255.0.1 at informational
+    device: R2
+    match:
+    - ^logging host 10\.255\.0\.1
+    - ^logging trap informational
+  - id: r2-cfg-snmp
+    mode: config
+    description: R2 SNMPv3 group ENCOR-RO priv
+    device: R2
+    match:
+    - ^snmp-server group ENCOR-RO v3 priv
+  - id: r3-cfg-sla
+    mode: config
+    description: R3 IP SLA 10 icmp-echo scheduled
+    device: R3
+    match:
+    - ^ip sla 10\s*\n\s+icmp-echo 10\.255\.0\.1 source-interface Loopback0
+    - ^ip sla schedule 10 life forever start-time now
+solution_summary: |
+  **What was missing:** no time source, no remote logging, no SNMPv3 and no IP SLA.
+
+  **Fix**
+  ```
+  ! R1 (NTP master, stratum 3)
+  ntp authentication-key 1 md5 ENCOR
+  ntp authenticate
+  ntp trusted-key 1
+  ntp source Loopback0
+  ntp master 3
+  ! R2 (NTP client + syslog + SNMPv3)
+  ntp authentication-key 1 md5 ENCOR
+  ntp authenticate
+  ntp trusted-key 1
+  ntp source Loopback0
+  ntp server 10.255.0.1 key 1
+  service timestamps log datetime msec localtime
+  logging trap informational
+  logging host 10.255.0.1
+  snmp-server group ENCOR-RO v3 priv
+  snmp-server user NMS-USER ENCOR-RO v3 auth sha AuthPass123 priv aes 128 PrivPass123
+  ! R3 (NTP client + IP SLA)
+  ntp authentication-key 1 md5 ENCOR
+  ntp authenticate
+  ntp trusted-key 1
+  ntp source Loopback0
+  ntp server 10.255.0.1 key 1
+  ip sla 10
+   icmp-echo 10.255.0.1 source-interface Loopback0
+   frequency 10
+  ip sla schedule 10 life forever start-time now
+  ```
+
+  **Why it works:** clients only sync to a server that answers with a trusted key (same key ID and MD5 string), and R1
+  serves its own clock as stratum 3. Syslog sends informational and more severe messages with millisecond timestamps.
+  The v3 `priv` group requires the user to authenticate (SHA) and encrypt (AES-128). The SLA probe has to be scheduled,
+  or it never runs.
+hints:
+  - "NTP first: R1 is the master. Clients only sync to a server they trust, so all three routers need the same authentication key."
+  - "NTP can take a few minutes to sync. Meanwhile, set up syslog (host, severity, timestamps) and the SNMPv3 group/user with authPriv."
+  - "An IP SLA operation does nothing until it is scheduled."

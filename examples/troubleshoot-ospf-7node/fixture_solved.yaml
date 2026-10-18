@@ -1,0 +1,181 @@
+# Recorded-style IOL output (after the fix)
+BR2:
+  ping 10.100.0.10 source 10.2.100.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.100.0.10, timeout is 2 seconds:
+    Packet sent with a source address of 10.2.100.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+           E1 - OSPF external type 1, E2 - OSPF external type 2, m - OMP
+           n - NAT, Ni - NAT inside, No - NAT outside, Nd - NAT DIA
+           i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+           ia - IS-IS inter area, * - candidate default, U - per-user static route
+           H - NHRP, G - NHRP registered, g - NHRP registration summary
+           o - ODR, P - periodic downloaded static route, l - LISP
+           a - application route
+           + - replicated route, % - next hop override, p - overrides from PfR
+           & - replicated local route overrides by connected
+
+    Gateway of last resort is 10.2.46.4 to network 0.0.0.0
+
+    O*E2  0.0.0.0/0 [110/1] via 10.2.46.4, 00:12:44, %if0%
+          1.0.0.0/32 is subnetted, 1 subnets
+    O IA     1.1.1.1 [110/31] via 10.2.46.4, 00:12:44, %if0%
+          2.0.0.0/32 is subnetted, 1 subnets
+    O IA     2.2.2.2 [110/21] via 10.2.46.4, 00:12:44, %if0%
+          3.0.0.0/32 is subnetted, 1 subnets
+    O IA     3.3.3.3 [110/41] via 10.2.46.4, 00:12:44, %if0%
+          4.0.0.0/32 is subnetted, 1 subnets
+    O IA     4.4.4.4 [110/11] via 10.2.46.4, 00:12:44, %if0%
+          5.0.0.0/32 is subnetted, 1 subnets
+    O IA     5.5.5.5 [110/51] via 10.2.46.4, 00:12:44, %if0%
+          6.0.0.0/32 is subnetted, 1 subnets
+    C        6.6.6.6 is directly connected, Loopback0
+          7.0.0.0/32 is subnetted, 1 subnets
+    O IA     7.7.7.7 [110/41] via 10.2.46.4, 00:12:44, %if0%
+          10.0.0.0/8 is variably subnetted, 11 subnets, 2 masks
+    O IA     10.0.12.0/24 [110/30] via 10.2.46.4, 00:12:44, %if0%
+    O IA     10.0.13.0/24 [110/40] via 10.2.46.4, 00:12:44, %if0%
+    O IA     10.0.17.0/24 [110/40] via 10.2.46.4, 00:12:44, %if0%
+    O IA     10.0.24.0/24 [110/20] via 10.2.46.4, 00:12:44, %if0%
+    O IA     10.1.35.0/24 [110/50] via 10.2.46.4, 00:12:44, %if0%
+    O IA     10.1.100.0/24 [110/51] via 10.2.46.4, 00:12:44, %if0%
+    C        10.2.46.0/24 is directly connected, %if0%
+    L        10.2.46.6/32 is directly connected, %if0%
+    C        10.2.100.0/24 is directly connected, Loopback1
+    L        10.2.100.1/32 is directly connected, Loopback1
+    O IA     10.100.0.0/24 [110/21] via 10.2.46.4, 00:12:44, %if0%
+  show ip route static: |+
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+           E1 - OSPF external type 1, E2 - OSPF external type 2, m - OMP
+           n - NAT, Ni - NAT inside, No - NAT outside, Nd - NAT DIA
+           i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+           ia - IS-IS inter area, * - candidate default, U - per-user static route
+           H - NHRP, G - NHRP registered, g - NHRP registration summary
+           o - ODR, P - periodic downloaded static route, l - LISP
+           a - application route
+           + - replicated route, % - next hop override, p - overrides from PfR
+           & - replicated local route overrides by connected
+
+    Gateway of last resort is 10.2.46.4 to network 0.0.0.0
+
+  show ip ospf interface brief: |
+    Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+    Lo1          1     2               10.2.100.1/24      1     P2P   0/0
+    Lo0          1     2               6.6.6.6/32         1     LOOP  0/0
+    %if0s%        1     2               10.2.46.6/24       10    DR   1/1
+DIST2:
+  show ip ospf neighbor: |2
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    2.2.2.2           1   FULL/BDR        00:00:35    10.0.24.2       %if0%
+    6.6.6.6           1   FULL/DR         00:00:38    10.2.46.6       %if1%
+  show ip route static: |+
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+           E1 - OSPF external type 1, E2 - OSPF external type 2, m - OMP
+           n - NAT, Ni - NAT inside, No - NAT outside, Nd - NAT DIA
+           i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+           ia - IS-IS inter area, * - candidate default, U - per-user static route
+           H - NHRP, G - NHRP registered, g - NHRP registration summary
+           o - ODR, P - periodic downloaded static route, l - LISP
+           a - application route
+           + - replicated route, % - next hop override, p - overrides from PfR
+           & - replicated local route overrides by connected
+
+    Gateway of last resort is 10.0.24.2 to network 0.0.0.0
+
+  show ip ospf interface %if1%: |
+    %if1% is up, line protocol is up
+      Internet Address 10.2.46.4/24, Interface ID 3, Area 2
+      Attached via Network Statement
+      Process ID 1, Router ID 4.4.4.4, Network Type BROADCAST, Cost: 10
+      Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+            0           10        no          no            Base
+      Enabled by interface config, including secondary ip addresses
+      Transmit Delay is 1 sec, State BDR, Priority 1
+      Designated Router (ID) 6.6.6.6, Interface address 10.2.46.6
+      Backup Designated router (ID) 4.4.4.4, Interface address 10.2.46.4
+      Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+        oob-resync timeout 40
+        Hello due in 00:00:06
+      Supports Link-local Signaling (LLS)
+      Cisco NSF helper support enabled
+      IETF NSF helper support enabled
+      Can be protected by per-prefix Loop-Free FastReroute
+      Can be used for per-prefix Loop-Free FastReroute repair paths
+      Not Protected by per-prefix TI-LFA
+      Index 1/2/2, flood queue length 0
+      Next 0x0(0)/0x0(0)/0x0(0)
+      Last flood scan length is 1, maximum is 1
+      Last flood scan time is 0 msec, maximum is 0 msec
+      Neighbor Count is 1, Adjacent neighbor count is 1
+        Adjacent with neighbor 6.6.6.6  (Designated Router)
+      Suppress hello for 0 neighbor(s)
+      Cryptographic authentication enabled
+        Youngest key id is 1
+CORE2:
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+           E1 - OSPF external type 1, E2 - OSPF external type 2, m - OMP
+           n - NAT, Ni - NAT inside, No - NAT outside, Nd - NAT DIA
+           i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+           ia - IS-IS inter area, * - candidate default, U - per-user static route
+           H - NHRP, G - NHRP registered, g - NHRP registration summary
+           o - ODR, P - periodic downloaded static route, l - LISP
+           a - application route
+           + - replicated route, % - next hop override, p - overrides from PfR
+           & - replicated local route overrides by connected
+
+    Gateway of last resort is 10.0.12.1 to network 0.0.0.0
+
+    O*E2  0.0.0.0/0 [110/1] via 10.0.12.1, 00:41:02, %if0%
+          1.0.0.0/32 is subnetted, 1 subnets
+    O        1.1.1.1 [110/11] via 10.0.12.1, 00:41:02, %if0%
+          2.0.0.0/32 is subnetted, 1 subnets
+    C        2.2.2.2 is directly connected, Loopback0
+          3.0.0.0/32 is subnetted, 1 subnets
+    O        3.3.3.3 [110/21] via 10.0.12.1, 00:41:02, %if0%
+          4.0.0.0/32 is subnetted, 1 subnets
+    O        4.4.4.4 [110/11] via 10.0.24.4, 00:41:02, %if1%
+          5.0.0.0/32 is subnetted, 1 subnets
+    O IA     5.5.5.5 [110/31] via 10.0.12.1, 00:40:51, %if0%
+          6.0.0.0/32 is subnetted, 1 subnets
+    O IA     6.6.6.6 [110/21] via 10.0.24.4, 00:12:40, %if1%
+          7.0.0.0/32 is subnetted, 1 subnets
+    O        7.7.7.7 [110/21] via 10.0.12.1, 00:41:02, %if0%
+          10.0.0.0/8 is variably subnetted, 12 subnets, 2 masks
+    C        10.0.12.0/24 is directly connected, %if0%
+    L        10.0.12.2/32 is directly connected, %if0%
+    O        10.0.13.0/24 [110/20] via 10.0.12.1, 00:41:02, %if0%
+    O        10.0.17.0/24 [110/20] via 10.0.12.1, 00:41:02, %if0%
+    C        10.0.24.0/24 is directly connected, %if1%
+    L        10.0.24.2/32 is directly connected, %if1%
+    O IA     10.1.35.0/24 [110/30] via 10.0.12.1, 00:40:51, %if0%
+    O IA     10.1.100.0/24 [110/31] via 10.0.12.1, 00:40:51, %if0%
+    O IA     10.2.46.0/24 [110/20] via 10.0.24.4, 00:41:02, %if1%
+    O IA     10.2.100.0/24 [110/21] via 10.0.24.4, 00:12:40, %if1%
+    C        10.100.0.0/24 is directly connected, Loopback1
+    L        10.100.0.10/32 is directly connected, Loopback1
+DIST1:
+  show ip ospf neighbor: |2
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    1.1.1.1           1   FULL/BDR        00:00:37    10.0.13.1       %if0%
+    5.5.5.5           1   FULL/DR         00:00:33    10.1.35.5       %if1%
+CORE1:
+  show ip ospf neighbor: |2
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    2.2.2.2           1   FULL/DR         00:00:34    10.0.12.2       %if0%
+    3.3.3.3           1   FULL/DR         00:00:39    10.0.13.3       %if1%
+    7.7.7.7           1   FULL/DR         00:00:31    10.0.17.7       %if2%

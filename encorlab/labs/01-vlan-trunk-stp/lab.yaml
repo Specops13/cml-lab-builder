@@ -1,0 +1,176 @@
+id: 01-vlan-trunk-stp
+title: VLANs, 802.1Q Trunks and Rapid PVST+
+blueprint: ["3.1.a", "3.1.c"]
+domain: "3.0 Infrastructure - Layer 2"
+difficulty: 2
+summary: Build VLANs, static 802.1Q trunks with a native VLAN, and control the Rapid PVST+ root bridge.
+nodes:
+  - name: SW1
+    kind: switch
+    x: 0
+    y: -150
+    config: |
+      interface %if0%
+       description to SW2
+      interface %if1%
+       description to SW3
+  - name: SW2
+    kind: switch
+    x: -200
+    y: 100
+    config: |
+      spanning-tree vlan 1-4094 priority 4096
+      interface %if0%
+       description to SW1
+      interface %if1%
+       description to SW3
+  - name: SW3
+    kind: switch
+    x: 200
+    y: 100
+    config: |
+      interface %if0%
+       description to SW2
+      interface %if1%
+       description to SW1
+links:
+  - {a: {node: SW1, port: 0}, b: {node: SW2, port: 0}}
+  - {a: {node: SW2, port: 1}, b: {node: SW3, port: 0}}
+  - {a: {node: SW3, port: 1}, b: {node: SW1, port: 1}}
+task: |
+  # Lab 1 - VLANs, 802.1Q trunks and Rapid PVST+
+
+  Three switches are cabled in a triangle (SW1-SW2, SW2-SW3, SW3-SW1).
+  SW2 currently has a low bridge priority for every VLAN.
+
+  1. On all switches create VLAN 10 named `USERS`, VLAN 20 named `VOICE` and VLAN 99 named `NATIVE`.
+  2. Make every inter-switch link a static 802.1Q trunk (`switchport mode trunk`, no DTP negotiation needed)
+     with native VLAN 99 and allowed VLANs 10,20,99 only.
+  3. Run Rapid PVST+ on all switches.
+  4. Make SW1 the root bridge for VLANs 10 and 20 (it must win even against SW2's current priority 4096,
+     so use priority 0 or `spanning-tree vlan 10,20 root primary` and verify).
+  5. Create SVI Vlan10 on each switch: SW1 10.10.10.1/24, SW2 10.10.10.2/24, SW3 10.10.10.3/24.
+     SW3 must be able to ping SW1 in VLAN 10.
+
+  Verify with `show vlan brief`, `show interfaces trunk`, `show spanning-tree vlan 10`.
+checks:
+  - id: sw1-vlans
+    description: SW1 has VLAN 10 USERS, 20 VOICE, 99 NATIVE
+    device: SW1
+    command: show vlan brief
+    match: ['^10\s+USERS\s+active', '^20\s+VOICE\s+active', '^99\s+NATIVE\s+active']
+    hint: Use 'vlan 10' then 'name USERS' in global config (same for 20 and 99).
+  - id: sw3-vlans
+    description: SW3 has VLAN 10 USERS and 20 VOICE
+    device: SW3
+    command: show vlan brief
+    match: ['^10\s+USERS\s+active', '^20\s+VOICE\s+active']
+    hint: VLANs are local to each switch (no VTP here) - create them on SW3 too.
+  - id: sw1-trunks
+    description: SW1 uplinks are static 802.1Q trunks with native VLAN 99
+    device: SW1
+    command: show interfaces trunk
+    match: ['^%if0s%\s+on\s+802\.1q\s+trunking\s+99', '^%if1s%\s+on\s+802\.1q\s+trunking\s+99']
+    hint: switchport trunk encapsulation dot1q / switchport mode trunk / switchport trunk native vlan 99
+  - id: sw2-trunks
+    description: SW2 uplinks are static 802.1Q trunks with native VLAN 99
+    device: SW2
+    command: show interfaces trunk
+    match: ['^%if0s%\s+on\s+802\.1q\s+trunking\s+99', '^%if1s%\s+on\s+802\.1q\s+trunking\s+99']
+    hint: Configure both ends of every link identically.
+  - id: sw1-allowed
+    description: Only VLANs 10,20,99 allowed on SW1 trunks
+    device: SW1
+    command: show interfaces trunk
+    match: ['Vlans allowed on trunk\s*\n%if0s%\s+10,20,99\s*\n%if1s%\s+10,20,99']
+    hint: switchport trunk allowed vlan 10,20,99
+  - id: sw1-root-v10
+    description: SW1 is the RSTP root for VLAN 10
+    device: SW1
+    command: show spanning-tree vlan 10
+    match: ['Spanning tree enabled protocol rstp', 'This bridge is the root']
+    hint: spanning-tree mode rapid-pvst and spanning-tree vlan 10,20 priority 0
+  - id: sw1-root-v20
+    description: SW1 is the root for VLAN 20
+    device: SW1
+    command: show spanning-tree vlan 20
+    match: ['This bridge is the root']
+    hint: Root priority must be lower than SW2's 4096 (+sys-id-ext).
+  - id: sw3-ping
+    description: SW3 can ping SW1 SVI 10.10.10.1
+    device: SW3
+    command: ping 10.10.10.1 repeat 5
+    min_success: 80
+    hint: Check 'interface Vlan10' addressing and 'no shutdown' on all SVIs.
+  # ---- config-mode checks (running config via CML API) ----
+  - id: sw1-cfg-rpvst
+    mode: config
+    description: SW1 runs Rapid PVST+
+    device: SW1
+    match:
+    - ^spanning-tree mode rapid-pvst
+    hint: spanning-tree mode rapid-pvst
+  - id: sw1-cfg-root
+    mode: config
+    description: SW1 root priority set for VLANs 10 and 20
+    device: SW1
+    match:
+    - ^spanning-tree vlan (\S*,)?10(,\S*)? priority \d+
+    - ^spanning-tree vlan (\S*,)?20(,\S*)? priority \d+
+    hint: spanning-tree vlan 10,20 priority 0
+  - id: sw1-cfg-trunk
+    mode: config
+    description: SW1 uplinks are static trunks with native VLAN 99
+    device: SW1
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+switchport mode trunk
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+switchport trunk native vlan 99
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+switchport mode trunk
+    hint: switchport mode trunk / switchport trunk native vlan 99
+  - id: sw3-cfg-svi
+    mode: config
+    description: SW3 SVI Vlan10 is 10.10.10.3/24
+    device: SW3
+    match:
+    - ^interface Vlan10\s*\n(?:[ \t].*\n)*?[ \t]+ip address 10\.10\.10\.3 255\.255\.255\.0
+    hint: interface Vlan10 / ip address 10.10.10.3 255.255.255.0
+solution_summary: |
+  **What was missing:** the three switches had no VLANs and no trunks, and STP was not tuned. Inter-switch links
+  stayed in VLAN 1 and SW1 was not the root.
+
+  **Fix: on SW1, SW2 and SW3** (identical)
+  ```
+  spanning-tree mode rapid-pvst
+  vlan 10
+   name USERS
+  vlan 20
+   name VOICE
+  vlan 99
+   name NATIVE
+  interface %if0%
+   switchport trunk encapsulation dot1q
+   switchport trunk native vlan 99
+   switchport trunk allowed vlan 10,20,99
+   switchport mode trunk
+  interface %if1%
+   switchport trunk encapsulation dot1q
+   switchport trunk native vlan 99
+   switchport trunk allowed vlan 10,20,99
+   switchport mode trunk
+  ```
+  **Per switch:** SVI addresses (SW1 .1, SW2 .2, SW3 .3) and, on SW1 only, the root priority.
+  ```
+  ! SW1
+  spanning-tree vlan 10,20 priority 0
+  interface Vlan10
+   ip address 10.10.10.1 255.255.255.0
+   no shutdown
+  ! SW2 / SW3: same Vlan10 block with 10.10.10.2 / 10.10.10.3
+  ```
+
+  **Why it works:** VLANs exist on every switch (there is no VTP). Static dot1q trunks with a matching native VLAN 99 and
+  allowed list carry 10/20/99 everywhere. Priority 0 beats SW2's 4096, so SW1 becomes root for VLANs 10 and 20.
+hints:
+  - "Start with the VLAN database: do all three switches know VLANs 10, 20 and 99? There is no VTP in this lab."
+  - "Every inter-switch link must be a static 802.1Q trunk, configured identically on both ends (native VLAN and allowed list)."
+  - "Root bridge: SW2 already uses priority 4096, so SW1 needs a lower one. Rapid PVST+ must be the STP mode everywhere."

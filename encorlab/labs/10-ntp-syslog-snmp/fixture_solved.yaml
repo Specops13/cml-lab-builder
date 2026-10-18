@@ -1,0 +1,37 @@
+R2:
+  show ntp status: |
+    Clock is synchronized, stratum 4, reference is 10.255.0.1
+    nominal freq is 250.0000 Hz, actual freq is 250.0000 Hz, precision is 2**10
+    ntp uptime is 60000 (1/100 of seconds), resolution is 4000
+  show logging: |
+    Syslog logging: enabled (0 messages dropped, 0 messages rate-limited, 0 flushes, 0 overruns, xml disabled, filtering disabled)
+
+        Console logging: disabled
+        Monitor logging: level debugging, 0 messages logged, xml disabled,
+        Buffer logging:  level debugging, 12 messages logged, xml disabled,
+        Trap logging: level informational, 15 message lines logged
+            Logging to 10.255.0.1  (udp port 514, audit disabled,
+                  link up),
+                  3 message lines logged,
+  show snmp user: |
+
+    User name: NMS-USER
+    Engine ID: 800000090300AABBCC000200
+    storage-type: nonvolatile        active
+    Authentication Protocol: SHA
+    Privacy Protocol: AES128
+    Group-name: ENCOR-RO
+R3:
+  show ntp status: |
+    Clock is synchronized, stratum 4, reference is 10.255.0.1
+    nominal freq is 250.0000 Hz, actual freq is 250.0000 Hz, precision is 2**10
+  show ip sla statistics 10: |
+    IPSLAs Latest Operation Statistics
+
+    IPSLA operation id: 10
+            Latest RTT: 1 milliseconds
+    Latest operation start time: 16:40:12 UTC Fri Oct 16 2026
+    Latest operation return code: OK
+    Number of successes: 18
+    Number of failures: 0
+    Operation time to live: Forever

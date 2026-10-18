@@ -1,0 +1,6 @@
+R1:
+  show interfaces Tunnel0: |2
+                            ^
+    % Invalid input detected at '^' marker.
+  show crypto ipsec sa: |
+    No SAs found

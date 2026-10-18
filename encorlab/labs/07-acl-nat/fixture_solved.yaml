@@ -1,0 +1,41 @@
+R1:
+  ping 198.51.100.1 source 192.168.1.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 198.51.100.1, timeout is 2 seconds:
+    Packet sent with a source address of 192.168.1.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+R2:
+  show ip nat statistics: |
+    Total active translations: 1 (1 static, 0 dynamic; 0 extended)
+    Outside interfaces:
+      %if1%
+    Inside interfaces:
+      %if0%
+    Hits: 10  Misses: 0
+    Dynamic mappings:
+    -- Inside Source
+    [Id: 1] access-list NAT-INSIDE interface %if1% refcount 0
+  show ip nat translations: |
+    Pro Inside global      Inside local       Outside local      Outside global
+    --- 203.0.113.5        192.168.1.10       ---                ---
+    Total number of translations: 1
+  show ip access-lists BLOCK-TELNET: |
+    Extended IP access list BLOCK-TELNET
+        10 deny tcp any any eq telnet
+        20 permit ip any any (25 matches)
+  show ip interface %if0%: |
+    %if0% is up, line protocol is up
+      Internet address is 10.0.12.2/30
+      Broadcast address is 255.255.255.255
+      Outgoing Common access list is not set
+      Outgoing access list is not set
+      Inbound Common access list is not set
+      Inbound  access list is BLOCK-TELNET
+      Proxy ARP is enabled
+R3:
+  ping 203.0.113.5 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 203.0.113.5, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms

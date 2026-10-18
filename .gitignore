@@ -1,0 +1,27 @@
+# Python / tooling
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# build output
+build/
+dist/
+*.spec.bak
+packaging/version_info.txt
+# local config and secrets (never commit)
+.env
+.env.*
+!.env.example
+settings.json
+*.log
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

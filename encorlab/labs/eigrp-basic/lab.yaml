@@ -1,0 +1,133 @@
+id: eigrp-basic
+title: EIGRP Basic Adjacency (AS 100)
+blueprint: ["3.2.a"]
+domain: "3.0 Infrastructure - Layer 3"
+difficulty: 1
+platforms: [iol, iosv]
+summary: Two routers, one link. Bring up EIGRP AS 100 so each router learns the other's loopback.
+nodes:
+  - name: R1
+    kind: router
+    x: -150
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 1.1.1.1 255.255.255.255
+      interface %if0%
+       description to R2
+       ip address 10.0.12.1 255.255.255.0
+       no shutdown
+  - name: R2
+    kind: router
+    x: 150
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 2.2.2.2 255.255.255.255
+      interface %if0%
+       description to R1
+       ip address 10.0.12.2 255.255.255.0
+       no shutdown
+links:
+  - {a: {node: R1, port: 0}, b: {node: R2, port: 0}}
+task: |
+  # EIGRP basic adjacency
+
+  R1 %if0% (10.0.12.1/24) is cabled to R2 %if0% (10.0.12.2/24).
+  Loopbacks: R1 Loopback0 = 1.1.1.1/32, R2 Loopback0 = 2.2.2.2/32. Addressing is already done.
+
+  1. Enable EIGRP **autonomous system 100** on both routers (classic `router eigrp 100` or named mode with AS 100).
+  2. Advertise the 10.0.12.0/24 link and each router's Loopback0.
+  3. R1 and R2 must become EIGRP neighbors.
+  4. Each router must learn the other's loopback as an EIGRP (D) route.
+  5. R1 must ping 2.2.2.2 sourced from Loopback0.
+
+  Verify with `show ip eigrp neighbors`, `show ip route eigrp`, `ping 2.2.2.2 source Loopback0`.
+checks:
+  - id: r1-neighbor
+    description: R1 has an EIGRP neighbor 10.0.12.2 on %if0%
+    device: R1
+    command: show ip eigrp neighbors
+    match: ['10\.0\.12\.2\s+%if0s%\s']
+    hint: Both routers need the same AS (100) and a network statement covering 10.0.12.0/24.
+  - id: r2-neighbor
+    description: R2 has an EIGRP neighbor 10.0.12.1 on %if0%
+    device: R2
+    command: show ip eigrp neighbors
+    match: ['10\.0\.12\.1\s+%if0s%\s']
+    hint: Check 'show ip protocols' on R2 - is EIGRP 100 running on the link?
+  - id: r1-route
+    description: R1 learns 2.2.2.2/32 as an EIGRP (D) route
+    device: R1
+    command: show ip route eigrp
+    match: ['^D\s+2\.2\.2\.2(/32)?\s+\[90/\d+\] via 10\.0\.12\.2']
+    hint: R2 must advertise its Loopback0 (network 2.2.2.2 0.0.0.0).
+  - id: r2-route
+    description: R2 learns 1.1.1.1/32 as an EIGRP (D) route
+    device: R2
+    command: show ip route eigrp
+    match: ['^D\s+1\.1\.1\.1(/32)?\s+\[90/\d+\] via 10\.0\.12\.1']
+    hint: R1 must advertise its Loopback0 (network 1.1.1.1 0.0.0.0).
+  - id: r1-ping
+    description: Loopback-to-loopback ping R1 1.1.1.1 -> 2.2.2.2
+    device: R1
+    command: ping 2.2.2.2 source Loopback0 repeat 5
+    min_success: 80
+  # ---- config-mode checks (HTTPS-only: running config extracted through the CML API) ----
+  - id: r1-cfg-eigrp100
+    mode: config
+    description: R1 runs EIGRP AS 100 (classic or named mode)
+    device: R1
+    match: ['^router eigrp 100\s*$|^ address-family ipv4 unicast autonomous-system 100\b']
+    hint: router eigrp 100
+  - id: r1-cfg-net-link
+    mode: config
+    description: R1 has a network statement covering 10.0.12.0/24
+    device: R1
+    match: ['^\s+network 10\.(0\.0\.0|0\.12\.\d+)( [0-9.]+)?\s*$']
+    hint: network 10.0.12.0 0.0.0.255
+  - id: r1-cfg-net-lo
+    mode: config
+    description: R1 has a network statement covering Loopback0 1.1.1.1
+    device: R1
+    match: ['^\s+network 1\.(0\.0\.0|1\.1\.1)( [0-9.]+)?\s*$']
+    hint: network 1.1.1.1 0.0.0.0
+  - id: r2-cfg-eigrp100
+    mode: config
+    description: R2 runs EIGRP AS 100 (classic or named mode)
+    device: R2
+    match: ['^router eigrp 100\s*$|^ address-family ipv4 unicast autonomous-system 100\b']
+    hint: router eigrp 100
+  - id: r2-cfg-net-link
+    mode: config
+    description: R2 has a network statement covering 10.0.12.0/24
+    device: R2
+    match: ['^\s+network 10\.(0\.0\.0|0\.12\.\d+)( [0-9.]+)?\s*$']
+    hint: network 10.0.12.0 0.0.0.255
+  - id: r2-cfg-net-lo
+    mode: config
+    description: R2 has a network statement covering Loopback0 2.2.2.2
+    device: R2
+    match: ['^\s+network 2\.(0\.0\.0|2\.2\.2)( [0-9.]+)?\s*$']
+    hint: network 2.2.2.2 0.0.0.0
+solution_summary: |
+  **What was missing:** EIGRP was not enabled on either router.
+
+  **Fix**
+  ```
+  ! R1
+  router eigrp 100
+   network 1.1.1.1 0.0.0.0
+   network 10.0.12.0 0.0.0.255
+  ! R2
+  router eigrp 100
+   network 2.2.2.2 0.0.0.0
+   network 10.0.12.0 0.0.0.255
+  ```
+
+  **Why it works:** `network` statements enable EIGRP on the matching interfaces. Both routers use AS 100, so they form a
+  neighborship over 10.0.12.0/24 and advertise their loopbacks as `D` routes.
+hints:
+  - "Both routers must run EIGRP with the same AS number. Which one does the task ask for?"
+  - "EIGRP must be enabled on the shared link (10.0.12.0/24) so the routers become neighbors."
+  - "Each router must also advertise its own Loopback0. A /32 is matched with a 0.0.0.0 wildcard."

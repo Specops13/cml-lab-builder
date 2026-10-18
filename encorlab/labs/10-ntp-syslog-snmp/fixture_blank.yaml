@@ -1,0 +1,5 @@
+R2:
+  show ntp status: |
+    Clock is unsynchronized, stratum 16, no reference clock
+  show logging: |
+        Trap logging: level informational, 15 message lines logged

@@ -1,0 +1,141 @@
+id: 08-vrf-lite
+title: VRF-Lite with Overlapping Customer Addressing
+blueprint: ["2.2.a"]
+domain: "2.0 Virtualization"
+difficulty: 3
+summary: Separate two customers with identical addressing on one router using VRF-lite and per-VRF static routing.
+nodes:
+  - name: PE
+    kind: router
+    x: 0
+    y: 0
+    config: |
+      interface %if0%
+       description to CE-A (customer A)
+       no shutdown
+      interface %if1%
+       description to CE-B (customer B)
+       no shutdown
+  - name: CEA
+    kind: router
+    x: -250
+    y: 0
+    config: |
+      interface Loopback1
+       ip address 192.168.100.1 255.255.255.0
+      interface %if0%
+       ip address 10.1.1.2 255.255.255.252
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 10.1.1.1
+  - name: CEB
+    kind: router
+    x: 250
+    y: 0
+    config: |
+      interface Loopback1
+       ip address 192.168.100.1 255.255.255.0
+      interface %if0%
+       ip address 10.1.1.2 255.255.255.252
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 10.1.1.1
+links:
+  - {a: {node: PE, port: 0}, b: {node: CEA, port: 0}}
+  - {a: {node: PE, port: 1}, b: {node: CEB, port: 0}}
+task: |
+  # Lab 8 - VRF-lite
+
+  Customers A and B use **identical** addressing (10.1.1.0/30 links, LAN 192.168.100.0/24).
+  CE routers are done. Configure only PE.
+
+  1. Create VRFs `CUST-A` and `CUST-B` using `vrf definition` with `address-family ipv4`.
+  2. Put %if0% in CUST-A and %if1% in CUST-B, each with IP 10.1.1.1/30.
+     (Remember: assigning a VRF removes the interface IP - apply it after `vrf forwarding`.)
+  3. Add a static route for 192.168.100.0/24 in each VRF toward the matching CE (10.1.1.2).
+  4. The global routing table must not contain 10.1.1.0/30 or 192.168.100.0/24.
+  5. `ping vrf CUST-A 192.168.100.1` and `ping vrf CUST-B 192.168.100.1` must both succeed.
+
+  Verify with `show vrf`, `show ip route vrf CUST-A`, `show ip route`.
+checks:
+  - id: pe-vrf-a
+    description: CUST-A exists (ipv4) with %if0%
+    device: PE
+    command: show vrf
+    match: ['^\s*CUST-A\s+.*\bipv4\s+%if0s%']
+    hint: vrf definition CUST-A / address-family ipv4 / interface ... vrf forwarding CUST-A
+  - id: pe-vrf-b
+    description: CUST-B exists (ipv4) with %if1%
+    device: PE
+    command: show vrf
+    match: ['^\s*CUST-B\s+.*\bipv4\s+%if1s%']
+  - id: pe-rt-a
+    description: CUST-A table has connected link and static LAN route
+    device: PE
+    command: show ip route vrf CUST-A
+    match: ['^C\s+10\.1\.1\.0/30 is directly connected, %if0%', '^S\s+192\.168\.100\.0/24 \[1/0\] via 10\.1\.1\.2']
+    hint: ip route vrf CUST-A 192.168.100.0 255.255.255.0 10.1.1.2
+  - id: pe-rt-b
+    description: CUST-B table has connected link and static LAN route
+    device: PE
+    command: show ip route vrf CUST-B
+    match: ['^C\s+10\.1\.1\.0/30 is directly connected, %if1%', '^S\s+192\.168\.100\.0/24 \[1/0\] via 10\.1\.1\.2']
+  - id: pe-ping-a
+    description: PE reaches customer A LAN inside VRF CUST-A
+    device: PE
+    command: ping vrf CUST-A 192.168.100.1 repeat 5
+    min_success: 80
+  - id: pe-ping-b
+    description: PE reaches customer B LAN inside VRF CUST-B
+    device: PE
+    command: ping vrf CUST-B 192.168.100.1 repeat 5
+    min_success: 80
+  # ---- config-mode checks (running config via CML API) ----
+  - id: pe-cfg-vrfs
+    mode: config
+    description: VRFs CUST-A and CUST-B defined
+    device: PE
+    match:
+    - ^vrf definition CUST-A
+    - ^vrf definition CUST-B
+  - id: pe-cfg-ifs
+    mode: config
+    description: Interfaces assigned to the VRFs
+    device: PE
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+vrf forwarding CUST-A
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+vrf forwarding CUST-B
+  - id: pe-cfg-routes
+    mode: config
+    description: Per-VRF static routes
+    device: PE
+    match:
+    - ^ip route vrf CUST-A 192\.168\.100\.0 255\.255\.255\.0 10\.1\.1\.2
+    - ^ip route vrf CUST-B 192\.168\.100\.0 255\.255\.255\.0 10\.1\.1\.2
+solution_summary: |
+  **What was missing:** PE had no VRFs and no addressing toward the customers. Both customers use 10.1.1.0/30 and
+  192.168.100.0/24, which can't coexist in one global routing table.
+
+  **Fix: PE**
+  ```
+  vrf definition CUST-A
+   address-family ipv4
+   exit-address-family
+  vrf definition CUST-B
+   address-family ipv4
+   exit-address-family
+  interface %if0%
+   vrf forwarding CUST-A
+   ip address 10.1.1.1 255.255.255.252
+  interface %if1%
+   vrf forwarding CUST-B
+   ip address 10.1.1.1 255.255.255.252
+  ip route vrf CUST-A 192.168.100.0 255.255.255.0 10.1.1.2
+  ip route vrf CUST-B 192.168.100.0 255.255.255.0 10.1.1.2
+  ```
+
+  **Why it works:** each VRF has its own routing table, so the same 10.1.1.0/30 and 192.168.100.0/24 can exist twice.
+  Enter `vrf forwarding` before the IP address, because it erases any address already on the interface. The per-VRF static routes send each
+  customer's LAN to its own CE.
+hints:
+  - "Two customers use identical addressing on one router. They need separate routing tables."
+  - "Moving an interface into a VRF wipes its IP address. Check the interface after you assign it."
+  - "Each customer LAN needs a route inside that customer's own table (`ip route vrf ...`)."

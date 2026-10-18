@@ -1,0 +1,305 @@
+id: troubleshoot-ospf-7node
+title: "Troubleshooting: Branch-2 Cannot Reach the Data-Center Server"
+blueprint: ["3.2.b"]
+domain: "3.0 Infrastructure - Layer 3"
+difficulty: 3
+platforms: [iol]
+summary: "Seven-router multi-area OSPF enterprise, fully configured. Users at Branch-2 can't reach the DC server. Find and fix the one fault."
+author: ENCOR Lab Builder
+version: "1"
+nodes:
+  - name: CORE1
+    kind: router
+    x: -120
+    y: -200
+    config: |
+      interface Loopback0
+       ip address 1.1.1.1 255.255.255.255
+      interface %if0%
+       description CORE1-CORE2
+       ip address 10.0.12.1 255.255.255.0
+       no shutdown
+      interface %if1%
+       description CORE1-DIST1
+       ip address 10.0.13.1 255.255.255.0
+       no shutdown
+      interface %if2%
+       description CORE1-EDGE
+       ip address 10.0.17.1 255.255.255.0
+       no shutdown
+      router ospf 1
+       router-id 1.1.1.1
+       network 1.1.1.1 0.0.0.0 area 0
+       network 10.0.12.0 0.0.0.255 area 0
+       network 10.0.13.0 0.0.0.255 area 0
+       network 10.0.17.0 0.0.0.255 area 0
+  - name: CORE2
+    kind: router
+    x: 120
+    y: -200
+    config: |
+      interface Loopback0
+       ip address 2.2.2.2 255.255.255.255
+      interface Loopback1
+       description DC server segment
+       ip address 10.100.0.10 255.255.255.0
+       ip ospf network point-to-point
+      interface %if0%
+       description CORE2-CORE1
+       ip address 10.0.12.2 255.255.255.0
+       no shutdown
+      interface %if1%
+       description CORE2-DIST2
+       ip address 10.0.24.2 255.255.255.0
+       no shutdown
+      router ospf 1
+       router-id 2.2.2.2
+       network 2.2.2.2 0.0.0.0 area 0
+       network 10.100.0.0 0.0.0.255 area 0
+       network 10.0.12.0 0.0.0.255 area 0
+       network 10.0.24.0 0.0.0.255 area 0
+  - name: DIST1
+    kind: router
+    x: -120
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 3.3.3.3 255.255.255.255
+      interface %if0%
+       description DIST1-CORE1
+       ip address 10.0.13.3 255.255.255.0
+       no shutdown
+      interface %if1%
+       description DIST1-BR1 WAN
+       ip address 10.1.35.3 255.255.255.0
+       no shutdown
+      router ospf 1
+       router-id 3.3.3.3
+       network 3.3.3.3 0.0.0.0 area 0
+       network 10.0.13.0 0.0.0.255 area 0
+       network 10.1.35.0 0.0.0.255 area 1
+  - name: DIST2
+    kind: router
+    x: 120
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 4.4.4.4 255.255.255.255
+      interface %if0%
+       description DIST2-CORE2
+       ip address 10.0.24.4 255.255.255.0
+       no shutdown
+      interface %if1%
+       description DIST2-BR2 WAN
+       ip address 10.2.46.4 255.255.255.0
+       ip ospf authentication message-digest
+       ip ospf message-digest-key 1 md5 ENCOR-TS1
+       no shutdown
+      router ospf 1
+       router-id 4.4.4.4
+       network 4.4.4.4 0.0.0.0 area 0
+       network 10.0.24.0 0.0.0.255 area 0
+       network 10.2.46.0 0.0.0.255 area 2
+  - name: BR1
+    kind: router
+    x: -120
+    y: 200
+    config: |
+      interface Loopback0
+       ip address 5.5.5.5 255.255.255.255
+      interface Loopback1
+       description Branch-1 users
+       ip address 10.1.100.1 255.255.255.0
+       ip ospf network point-to-point
+      interface %if0%
+       description BR1-DIST1 WAN
+       ip address 10.1.35.5 255.255.255.0
+       no shutdown
+      router ospf 1
+       router-id 5.5.5.5
+       network 5.5.5.5 0.0.0.0 area 1
+       network 10.1.100.0 0.0.0.255 area 1
+       network 10.1.35.0 0.0.0.255 area 1
+  - name: BR2
+    kind: router
+    x: 120
+    y: 200
+    config: |
+      interface Loopback0
+       ip address 6.6.6.6 255.255.255.255
+      interface Loopback1
+       description Branch-2 users
+       ip address 10.2.100.1 255.255.255.0
+       ip ospf network point-to-point
+      interface %if0%
+       description BR2-DIST2 WAN
+       ip address 10.2.46.6 255.255.255.0
+       no shutdown
+      router ospf 1
+       router-id 6.6.6.6
+       network 6.6.6.6 0.0.0.0 area 2
+       network 10.2.100.0 0.0.0.255 area 2
+       network 10.2.46.0 0.0.0.255 area 2
+  - name: EDGE
+    kind: router
+    x: -360
+    y: -200
+    config: |
+      interface Loopback0
+       ip address 7.7.7.7 255.255.255.255
+      interface Loopback1
+       description simulated Internet
+       ip address 198.51.100.1 255.255.255.255
+      interface %if0%
+       description EDGE-CORE1
+       ip address 10.0.17.7 255.255.255.0
+       no shutdown
+      router ospf 1
+       router-id 7.7.7.7
+       network 7.7.7.7 0.0.0.0 area 0
+       network 10.0.17.0 0.0.0.255 area 0
+       default-information originate always
+links:
+  - {a: {node: CORE1, port: 0}, b: {node: CORE2, port: 0}}
+  - {a: {node: CORE1, port: 1}, b: {node: DIST1, port: 0}}
+  - {a: {node: CORE1, port: 2}, b: {node: EDGE, port: 0}}
+  - {a: {node: CORE2, port: 1}, b: {node: DIST2, port: 0}}
+  - {a: {node: DIST1, port: 1}, b: {node: BR1, port: 0}}
+  - {a: {node: DIST2, port: 1}, b: {node: BR2, port: 0}}
+task: |
+  # Trouble ticket #4471: Branch-2 cannot reach the data-center server
+
+  **Reported by the Branch-2 site lead:** "Since last night's maintenance window, nobody at
+  Branch-2 can open the file server at **10.100.0.10**. Branch-1 says everything works for them."
+
+  The network is fully configured and was working before the change. Exactly **one** problem was
+  introduced. Find it and fix it.
+
+  ## Topology
+
+      EDGE --- CORE1 --- CORE2        (area 0, EDGE originates the default route)
+                 |         |
+               DIST1     DIST2        (ABRs: area 0 / area 1, area 0 / area 2)
+                 |         |
+                BR1       BR2         (Branch-1 = area 1, Branch-2 = area 2)
+
+  | Link | Subnet (.x = router number) |
+  |---|---|
+  | CORE1 %if0% - CORE2 %if0% | 10.0.12.0/24 |
+  | CORE1 %if1% - DIST1 %if0% | 10.0.13.0/24 |
+  | CORE1 %if2% - EDGE %if0% | 10.0.17.0/24 |
+  | CORE2 %if1% - DIST2 %if0% | 10.0.24.0/24 |
+  | DIST1 %if1% - BR1 %if0% | 10.1.35.0/24 |
+  | DIST2 %if1% - BR2 %if0% | 10.2.46.0/24 |
+
+  Router IDs (= Loopback0): CORE1 1.1.1.1, CORE2 2.2.2.2, DIST1 3.3.3.3, DIST2 4.4.4.4,
+  BR1 5.5.5.5, BR2 6.6.6.6, EDGE 7.7.7.7.
+
+  - DC server segment: CORE2 Loopback1, **10.100.0.10/24**
+  - Branch-1 users: BR1 Loopback1, 10.1.100.0/24
+  - Branch-2 users: BR2 Loopback1, **10.2.100.0/24**
+
+  ## Expected end state
+  - Every OSPF adjacency in the design is up (FULL), including the ones at Branch-2.
+  - Branch-2 learns the DC server segment through OSPF, and the core learns the Branch-2 user subnet.
+  - `ping 10.100.0.10 source 10.2.100.1` from BR2 succeeds.
+
+  ## Rules
+  - Fix the **root cause**. Make the smallest change that restores the original design.
+  - Do **not** remove or weaken existing features. Whatever the working routers are configured with stays.
+  - Do **not** add static routes, change OSPF areas or router IDs, or redistribute anything.
+  - Use show and debug commands to find the fault. Check when you think it's fixed.
+checks:
+  # ---------------- live: the fault and its consequences
+  - id: br2-ping-server
+    template: ping
+    device: BR2
+    params: {target: 10.100.0.10, source: 10.2.100.1}
+    hint: "start at the edge of the problem. Does BR2 have a route to 10.100.0.0/24 at all? Which OSPF neighbors does BR2 have?"
+  - id: dist2-nbr-br2
+    template: ospf_neighbor
+    device: DIST2
+    params: {neighbor_id: 6.6.6.6}
+    hint: "the WAN link is up/up and pings work across it, yet no adjacency forms. Compare `show ip ospf interface` on both ends, or run `debug ip ospf adj` on DIST2."
+  - id: br2-route-server
+    template: route_present
+    device: BR2
+    params: {prefix: 10.100.0.0/24, code: O IA}
+  - id: core2-route-br2-users
+    template: route_present
+    device: CORE2
+    params: {prefix: 10.2.100.0/24, code: O IA}
+  # ---------------- live guards: the rest of the design must stay intact (these pass before and after the fix)
+  - id: guard-br2-no-static
+    device: BR2
+    mode: live
+    description: "Guard: no static routes on BR2"
+    command: show ip route static
+    absent: ['^S[\s*]']
+    hint: Static routes are not allowed. Fix the OSPF problem instead.
+  - id: guard-dist2-no-static
+    device: DIST2
+    mode: live
+    description: "Guard: no static routes on DIST2"
+    command: show ip route static
+    absent: ['^S[\s*]']
+    hint: Static routes are not allowed. Fix the OSPF problem instead.
+  - id: guard-dist2-wan-security
+    device: DIST2
+    mode: live
+    description: "Guard: DIST2's WAN interface keeps its original OSPF settings"
+    command: show ip ospf interface %if1%
+    match: ['(Message digest|Cryptographic) authentication enabled', 'Youngest key id is 1']
+    hint: Don't remove features from the working router. Make the other end match it.
+  - id: guard-br2-area
+    device: BR2
+    mode: live
+    description: "Guard: BR2's WAN interface is still in OSPF process 1, area 2"
+    command: show ip ospf interface brief
+    match: ['^%if0s%\s+1\s+2\s+10\.2\.46\.6/24\s']
+  - id: guard-dist1-br1
+    template: ospf_neighbor
+    device: DIST1
+    params: {neighbor_id: 5.5.5.5}
+    description: "Guard: Branch-1 adjacency (DIST1-BR1) still FULL"
+  - id: guard-core1-edge
+    template: ospf_neighbor
+    device: CORE1
+    params: {neighbor_id: 7.7.7.7}
+    description: "Guard: core-edge adjacency (CORE1-EDGE) still FULL"
+  # ---------------- config: the root cause is corrected on the right device (and no static routes added there)
+  - id: br2-cfg-fix-mode
+    device: BR2
+    mode: config
+    description: "BR2 WAN interface: root cause corrected (part 1), no static routes"
+    match: ['(^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip ospf authentication message-digest\s*$|^ area 2 authentication message-digest\s*$)']
+    absent: ['^ip route ']
+    hint: "DIST2 authenticates OSPF on its WAN interface (MD5, key 1). BR2 must do the same. Look at DIST2's interface config for the details."
+  - id: br2-cfg-fix-key
+    device: BR2
+    mode: config
+    description: "BR2 WAN interface: root cause corrected (part 2)"
+    match: ['^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip ospf message-digest-key 1 md5 (?:7 \S+|ENCOR-TS1)\s*$']
+    absent: ['^ip route ']
+    hint: The key ID and key string must match DIST2 exactly.
+solution_summary: |
+  **Root cause:** OSPF authentication mismatch on the DIST2-BR2 WAN link (area 2). DIST2 %if1% uses MD5 authentication
+  with key 1, but BR2 %if0% had no authentication. DIST2 dropped BR2's hellos ("Mismatched Authentication type"), so the
+  adjacency never formed and area 2 was cut off from the rest of the network.
+
+  **Fix: BR2 only** (DIST2 is correct and must not be changed)
+  ```
+  interface %if0%
+   ip ospf authentication message-digest
+   ip ospf message-digest-key 1 md5 ENCOR-TS1
+  ```
+  `area 2 authentication message-digest` under `router ospf 1` is an accepted alternative to the first line.
+
+  **Why it works:** OSPF neighbors only accept each other's hellos when the authentication type, key ID and key string all
+  match. With matching MD5 settings, DIST2 and BR2 go FULL. BR2 then learns 10.100.0.0/24 (O IA) and the default route
+  (O*E2), and CORE2 learns 10.2.100.0/24, so the ping works in both directions. No static routes, area changes or
+  weakened security are needed.
+hints:
+  - "Start at the edge of the problem. Does BR2 have a route to 10.100.0.0/24 at all? Which OSPF neighbors does BR2 have?"
+  - "The WAN link is up/up and pings work across it, yet no adjacency forms. Compare `show ip ospf interface` on both ends, or run `debug ip ospf adj` on DIST2."
+  - "DIST2 authenticates OSPF on its WAN interface. BR2 must use exactly the same authentication type, key ID and key string. Look at DIST2's interface config for the details."

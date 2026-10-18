@@ -1,0 +1,197 @@
+id: 03-ospf-multiarea
+title: OSPFv2 Multi-Area, Stub Area and Summarization
+blueprint: ["3.2.b"]
+domain: "3.0 Infrastructure - Layer 3"
+difficulty: 3
+summary: Build a three-area OSPFv2 design with point-to-point links, a stub area and inter-area summarization.
+nodes:
+  - name: R1
+    kind: router
+    x: 0
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 10.255.0.1 255.255.255.255
+      interface %if0%
+       description to R2 (area 0)
+       ip address 10.0.12.1 255.255.255.252
+       no shutdown
+      interface %if1%
+       description to R3 (area 1)
+       ip address 10.0.13.1 255.255.255.252
+       no shutdown
+  - name: R2
+    kind: router
+    x: 250
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 10.255.0.2 255.255.255.255
+      interface %if0%
+       description to R1 (area 0)
+       ip address 10.0.12.2 255.255.255.252
+       no shutdown
+      interface %if1%
+       description to R4 (area 2)
+       ip address 10.0.24.2 255.255.255.252
+       no shutdown
+  - name: R3
+    kind: router
+    x: -250
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 10.255.0.3 255.255.255.255
+      interface Loopback1
+       ip address 172.16.30.1 255.255.255.0
+      interface Loopback2
+       ip address 172.16.31.1 255.255.255.0
+      interface %if0%
+       description to R1 (area 1)
+       ip address 10.0.13.2 255.255.255.252
+       no shutdown
+  - name: R4
+    kind: router
+    x: 500
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 10.255.0.4 255.255.255.255
+      interface %if0%
+       description to R2 (area 2)
+       ip address 10.0.24.1 255.255.255.252
+       no shutdown
+links:
+  - {a: {node: R1, port: 0}, b: {node: R2, port: 0}}
+  - {a: {node: R1, port: 1}, b: {node: R3, port: 0}}
+  - {a: {node: R2, port: 1}, b: {node: R4, port: 0}}
+task: |
+  # Lab 3 - OSPFv2 multi-area
+
+  Topology: R3 --(area 1)-- R1 --(area 0)-- R2 --(area 2)-- R4. Addressing is done.
+
+  1. Enable OSPF process 1 on all routers. Router IDs = Loopback0 address (10.255.0.N).
+  2. Area assignment: R1-R2 link and the R1/R2 loopbacks in area 0; R1-R3 link, R3 Loopback0/1/2 in area 1;
+     R2-R4 link and R4 Loopback0 in area 2.
+  3. Use OSPF network type point-to-point on all router-to-router links.
+  4. Make all loopbacks passive. On R3 advertise Loopback1 and Loopback2 as /24 networks
+     (`ip ospf network point-to-point` on those loopbacks).
+  5. Configure area 1 as a **stub area** (R1 and R3).
+  6. On the ABR R1, summarize 172.16.30.0/24 and 172.16.31.0/24 into a single 172.16.30.0/23 for other areas.
+  7. R4 must reach 172.16.30.1 sourced from its Loopback0.
+
+  Verify with `show ip ospf neighbor`, `show ip ospf interface brief`, `show ip route ospf`.
+checks:
+  - id: r1-nbrs
+    description: R1 has FULL adjacencies with R2 and R3
+    device: R1
+    command: show ip ospf neighbor
+    match: ['^10\.255\.0\.2\s+\d+\s+FULL/', '^10\.255\.0\.3\s+\d+\s+FULL/']
+    hint: Check network statements/areas, router-id, and that area 1 is stub on BOTH R1 and R3.
+  - id: r2-nbrs
+    description: R2 has a FULL adjacency with R4
+    device: R2
+    command: show ip ospf neighbor
+    match: ['^10\.255\.0\.4\s+\d+\s+FULL/']
+  - id: r1-p2p
+    description: R1 transit interfaces are point-to-point in the right areas
+    device: R1
+    command: show ip ospf interface brief
+    match: ['^%if0s%\s+1\s+0\s+10\.0\.12\.1/30\s+\d+\s+P2P', '^%if1s%\s+1\s+1\s+10\.0\.13\.1/30\s+\d+\s+P2P']
+    hint: ip ospf network point-to-point on each transit interface
+  - id: r3-stub
+    description: Area 1 is a stub area on R3
+    device: R3
+    command: show ip ospf
+    match: ['It is a stub area']
+  - id: r3-default
+    description: R3 receives an inter-area default route (stub)
+    device: R3
+    command: show ip route ospf
+    match: ['^O\*IA\s+0\.0\.0\.0/0']
+  - id: r4-summary
+    description: R4 sees only the 172.16.30.0/23 summary
+    device: R4
+    command: show ip route ospf
+    match: ['^O IA\s+172\.16\.30\.0(/23)?\s+\[110/', '172\.16\.(30\.0/23|0\.0/23 is subnetted)']
+    absent: ['172\.16\.31\.0', '172\.16\.30\.0/24', '172\.16\.0\.0/24 is subnetted']
+    hint: area 1 range 172.16.30.0 255.255.254.0 on R1
+  - id: r4-ping
+    description: R4 Loopback0 can reach 172.16.30.1
+    device: R4
+    command: ping 172.16.30.1 source Loopback0 repeat 5
+    min_success: 80
+  # ---- config-mode checks (running config via CML API) ----
+  - id: r1-cfg-range
+    mode: config
+    description: R1 summarizes area 1 to 172.16.30.0/23
+    device: R1
+    match:
+    - ^ area 1 range 172\.16\.30\.0 255\.255\.254\.0
+    hint: area 1 range 172.16.30.0 255.255.254.0
+  - id: r1-cfg-stub
+    mode: config
+    description: Area 1 is stub on R1
+    device: R1
+    match:
+    - ^ area 1 stub\b
+  - id: r3-cfg-stub
+    mode: config
+    description: Area 1 is stub on R3
+    device: R3
+    match:
+    - ^ area 1 stub\b
+  - id: r1-cfg-rid
+    mode: config
+    description: R1 router-id 10.255.0.1
+    device: R1
+    match:
+    - ^ router-id 10\.255\.0\.1\s*$
+  - id: r1-cfg-p2p
+    mode: config
+    description: R1 transit interfaces are point-to-point
+    device: R1
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip ospf network point-to-point
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+ip ospf network point-to-point
+solution_summary: |
+  **What was missing:** OSPF was not running. The design needs three areas, point-to-point links, a stub area 1 and a
+  summary of R3's 172.16.30.0/24 and 172.16.31.0/24 loopbacks.
+
+  **Fix**
+  ```
+  ! R1 (ABR area 0/1)
+  interface Loopback0
+   ip ospf 1 area 0
+  interface %if0%
+   ip ospf network point-to-point
+   ip ospf 1 area 0
+  interface %if1%
+   ip ospf network point-to-point
+   ip ospf 1 area 1
+  router ospf 1
+   router-id 10.255.0.1
+   area 1 stub
+   area 1 range 172.16.30.0 255.255.254.0
+   passive-interface Loopback0
+  ! R2 (ABR area 0/2): Loopback0 + %if0% in area 0, %if1% in area 2, both p2p
+  router ospf 1
+   router-id 10.255.0.2
+   passive-interface Loopback0
+  ! R3 (area 1): Loopback0/1/2 and %if0% in area 1, Loopback1/2 and %if0% p2p
+  router ospf 1
+   router-id 10.255.0.3
+   area 1 stub
+   passive-interface Loopback0
+   passive-interface Loopback1
+   passive-interface Loopback2
+  ! R4 (area 2): Loopback0 + %if0% (p2p) in area 2, router-id 10.255.0.4, passive Loopback0
+  ```
+
+  **Why it works:** interface-level `ip ospf 1 area N` puts each link in the right area. Point-to-point skips the DR election.
+  `area 1 stub` must match on R1 and R3 or the adjacency fails, and it replaces externals with a default route.
+  `area 1 range` on the ABR advertises one 172.16.30.0/23 instead of two /24s.
+hints:
+  - "Draw the areas first: which interfaces of R1 and R2 belong to area 0, and which to area 1 or 2?"
+  - "The links are point-to-point, and the stub flag must match on every router in area 1, or the adjacency never forms."
+  - "Summarize on the ABR that owns area 1, with a range that covers exactly 172.16.30.0/24 and 172.16.31.0/24."

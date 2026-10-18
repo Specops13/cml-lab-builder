@@ -1,0 +1,44 @@
+R1:
+  show interfaces Tunnel0: |
+    Tunnel0 is up, line protocol is up
+      Hardware is Tunnel
+      Internet address is 172.16.0.1/30
+      MTU 17862 bytes, BW 100 Kbit/sec, DLY 50000 usec,
+      Encapsulation TUNNEL, loopback not set
+      Tunnel source 203.0.113.1 (%if0%), destination 198.51.100.1
+      Tunnel protocol/transport GRE/IP
+      Tunnel protection via IPSec (profile "GRE-PROT")
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    2.2.2.2           0   FULL/  -        00:00:36    172.16.0.2      Tunnel0
+  show ip route ospf: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+
+    Gateway of last resort is 203.0.113.2 to network 0.0.0.0
+
+    O     192.168.2.0/24 [110/1001] via 172.16.0.2, 00:02:10, Tunnel0
+  show crypto isakmp sa: |
+    IPv4 Crypto ISAKMP SA
+    dst             src             state          conn-id status
+    198.51.100.1    203.0.113.1     QM_IDLE           1001 ACTIVE
+
+    IPv6 Crypto ISAKMP SA
+  show crypto ipsec sa: |
+
+    interface: Tunnel0
+        Crypto map tag: Tunnel0-head-0, local addr 203.0.113.1
+
+       protected vrf: (none)
+       local  ident (addr/mask/prot/port): (203.0.113.1/255.255.255.255/47/0)
+       remote ident (addr/mask/prot/port): (198.51.100.1/255.255.255.255/47/0)
+       current_peer 198.51.100.1 port 500
+         PERMIT, flags={origin_is_acl,}
+        #pkts encaps: 52, #pkts encrypt: 52, #pkts digest: 52
+        #pkts decaps: 51, #pkts decrypt: 51, #pkts verify: 51
+  ping 192.168.2.1 source Loopback1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.2.1, timeout is 2 seconds:
+    Packet sent with a source address of 192.168.1.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 2/3/5 ms

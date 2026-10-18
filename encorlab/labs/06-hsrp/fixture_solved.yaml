@@ -1,0 +1,41 @@
+R1:
+  show standby brief: |2
+                         P indicates configured to preempt.
+                         |
+    Interface   Grp  Pri P State   Active          Standby         Virtual IP
+    %if0s%       10   110 P Active  local           192.168.10.2    192.168.10.254
+  show standby: |
+    %if0% - Group 10 (version 2)
+      State is Active
+        2 state changes, last state change 00:03:12
+      Virtual IP address is 192.168.10.254
+      Active virtual MAC address is 0000.0c9f.f00a (MAC In Use)
+        Local virtual MAC address is 0000.0c9f.f00a (v2 default)
+      Hello time 3 sec, hold time 10 sec
+        Next hello sent in 1.024 secs
+      Authentication MD5, key-string
+      Preemption enabled
+      Active router is local
+      Standby router is 192.168.10.2, priority 100 (expires in 9.312 sec)
+      Priority 110 (configured 110)
+        Track object 1 state Up decrement 20
+      Group name is "hsrp-%if0s%-10" (default)
+  show track 1: |
+    Track 1
+      Interface %if1% line-protocol
+      Line protocol is Up
+        1 change, last change 00:03:30
+      Tracked by:
+        HSRP %if0% 10
+R2:
+  show standby brief: |2
+                         P indicates configured to preempt.
+                         |
+    Interface   Grp  Pri P State   Active          Standby         Virtual IP
+    %if0s%       10   100 P Standby 192.168.10.1    local           192.168.10.254
+SW1:
+  ping 198.51.100.100 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 198.51.100.100, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
