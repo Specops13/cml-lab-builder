@@ -37,6 +37,8 @@ _SINGLETON = [re.compile(p) for p in (
     r"^(frequency)\b", r"^(threshold)\b", r"^(timeout)\b", r"^(icmp-echo)\b",
     r"^(track \d+)\b", r"^(ip sla schedule \d+)\b", r"^(ip sla \d+)$",
     r"^(ip pim (?:sparse-mode|dense-mode|sparse-dense-mode))$", r"^(ip pim rp-address)\b", r"^(ip multicast-routing)\b",
+    r"^(ip igmp version)\b", r"^(ip pim rp-candidate \S+)", r"^(ip pim bsr-candidate \S+)", r"^(ip pim ssm)\b",
+    r"^(mpls ldp router-id)\b", r"^(mpls label protocol)\b", r"^(rd)\b",
     r"^(distribute-list \S+ (?:in|out))\b", r"^(redistribute \S+(?: \d+)?)\b", r"^(default-metric)\b",
     r"^(maximum-paths)\b", r"^(distance)\b", r"^(variance)\b",
 )]

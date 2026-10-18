@@ -1,0 +1,31 @@
+# Starting state: no multicast routing, no PIM, no RP, no receiver (synthesized, not recorded on real hardware).
+R2:
+  show ip pim neighbor: |
+    PIM Neighbor Table
+    Mode: B - Bidir Capable, DR - Designated Router, N - Default DR Priority,
+          P - Proxy Capable, S - State Refresh Capable, G - GenID Capable,
+          L - DR Load-balancing Capable
+    Neighbor          Interface                Uptime/Expires    Ver   DR
+    Address                                                            Prio/Mode
+R3:
+  show ip pim neighbor: |
+    PIM Neighbor Table
+    Mode: B - Bidir Capable, DR - Designated Router, N - Default DR Priority,
+          P - Proxy Capable, S - State Refresh Capable, G - GenID Capable,
+          L - DR Load-balancing Capable
+    Neighbor          Interface                Uptime/Expires    Ver   DR
+    Address                                                            Prio/Mode
+  show ip pim rp mapping: |
+    PIM Group-to-RP Mappings
+
+  show ip igmp groups 239.1.1.1: |
+    IGMP Connected Group Membership
+    Group Address    Interface                Uptime    Expires   Last Reporter   Group Accounted
+  show ip mroute 239.1.1.1: |
+    IP Multicast Forwarding is not enabled.
+    IP Multicast Routing Table
+SRC:
+  ping 239.1.1.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 239.1.1.1, timeout is 2 seconds:
+    .....

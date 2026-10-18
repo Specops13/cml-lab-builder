@@ -1,0 +1,307 @@
+id: 14-multicast-pim-sm
+title: "Multicast: PIM Sparse Mode with a Static RP"
+blueprint: ["3.3.d"]
+domain: "3.0 Infrastructure - IP services"
+difficulty: 3
+summary: Enable IP multicast routing and PIM sparse mode on three routers, point them at a static RP, join a receiver with IGMP and verify the shared tree, the source tree and the RPF check.
+nodes:
+  - name: SRC
+    kind: router
+    x: -450
+    y: 0
+    config: |
+      ! Multicast source (a router acting as a host): it pings the group 239.1.1.1
+      interface %if0%
+       description to R1 (source LAN)
+       ip address 10.0.1.10 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 10.0.1.1
+  - name: R1
+    kind: router
+    x: -200
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 1.1.1.1 255.255.255.255
+      interface %if0%
+       description to SRC (source LAN)
+       ip address 10.0.1.1 255.255.255.0
+       no shutdown
+      interface %if1%
+       description to R2
+       ip address 10.0.12.1 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      interface %if2%
+       description to R3
+       ip address 10.0.13.1 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 1.1.1.1
+       passive-interface %if0%
+       network 1.1.1.1 0.0.0.0 area 0
+       network 10.0.1.0 0.0.0.255 area 0
+       network 10.0.12.0 0.0.0.3 area 0
+       network 10.0.13.0 0.0.0.3 area 0
+  - name: R2
+    kind: router
+    x: 0
+    y: -170
+    config: |
+      ! R2 is the rendezvous point (RP): 2.2.2.2 on Loopback0
+      interface Loopback0
+       ip address 2.2.2.2 255.255.255.255
+      interface %if0%
+       description to R1
+       ip address 10.0.12.2 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to R3
+       ip address 10.0.23.2 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 2.2.2.2
+       network 2.2.2.2 0.0.0.0 area 0
+       network 10.0.12.0 0.0.0.3 area 0
+       network 10.0.23.0 0.0.0.3 area 0
+  - name: R3
+    kind: router
+    x: 200
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 3.3.3.3 255.255.255.255
+      interface %if0%
+       description to R2
+       ip address 10.0.23.3 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to R1
+       ip address 10.0.13.3 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      interface %if2%
+       description to RCV (receiver LAN)
+       ip address 10.0.3.1 255.255.255.0
+       no shutdown
+      router ospf 1
+       router-id 3.3.3.3
+       passive-interface %if2%
+       network 3.3.3.3 0.0.0.0 area 0
+       network 10.0.3.0 0.0.0.255 area 0
+       network 10.0.13.0 0.0.0.3 area 0
+       network 10.0.23.0 0.0.0.3 area 0
+  - name: RCV
+    kind: router
+    x: 450
+    y: 0
+    config: |
+      ! Multicast receiver (a router acting as a host)
+      interface %if0%
+       description to R3 (receiver LAN)
+       ip address 10.0.3.10 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 10.0.3.1
+links:
+  - {a: {node: SRC, port: 0}, b: {node: R1, port: 0}}
+  - {a: {node: R1, port: 1}, b: {node: R2, port: 0}}
+  - {a: {node: R2, port: 1}, b: {node: R3, port: 0}}
+  - {a: {node: R1, port: 2}, b: {node: R3, port: 1}}
+  - {a: {node: R3, port: 2}, b: {node: RCV, port: 0}}
+task: |
+  # Lab 14 - PIM sparse mode with a static RP
+
+  OSPF already gives full unicast reachability. SRC (10.0.1.10) is a video source that sends to group
+  **239.1.1.1**; RCV (10.0.3.10) is a receiver. Multicast is not enabled anywhere yet.
+
+  1. On **R1, R2 and R3**, enable IP multicast routing.
+  2. On **R1, R2 and R3**, enable **PIM sparse mode** on every interface in the multicast path: the core links, the
+     source LAN on R1 (%if0%), the receiver LAN on R3 (%if2%), and **Loopback0 on R2** (it carries the RP address).
+  3. On **R1, R2 and R3**, configure **2.2.2.2** (R2 Loopback0) as the static rendezvous point (RP).
+  4. On **RCV**, make %if0% join group **239.1.1.1** with IGMP, so RCV answers pings sent to the group.
+     Do not enable multicast routing on SRC or RCV (they act as hosts).
+
+  Verify:
+  - `show ip pim neighbor` on R2 and R3 (one PIM neighbor per core link)
+  - `show ip pim rp mapping` (RP 2.2.2.2 on every router)
+  - `show ip igmp groups` on R3 (RCV's membership on %if2%)
+  - `ping 239.1.1.1 repeat 5` on SRC (replies come from 10.0.3.10)
+  - `show ip mroute 239.1.1.1` on R3 right after the ping: a (*,G) entry rooted at RP 2.2.2.2 and an (S,G)
+    entry for 10.0.1.10. Look at the (S,G) **incoming interface**: R3 switched to the shortest-path tree, so it is
+    the direct link to R1 (%if1%), not the RP-facing link. `show ip rpf 10.0.1.10` explains why.
+
+  The Check runs the SRC ping before it reads R3's mroute table, because (S,G) state times out about three minutes
+  after the source stops sending.
+checks:
+  - id: r2-pim-nbrs
+    description: R2 has PIM neighbors R1 (10.0.12.1) and R3 (10.0.23.3)
+    device: R2
+    command: show ip pim neighbor
+    match: ['^10\.0\.12\.1\s+%if0%\s', '^10\.0\.23\.3\s+%if1%\s']
+    hint: PIM neighbors only form where both ends of a link run `ip pim sparse-mode` and `ip multicast-routing` is on.
+  - id: r3-pim-nbrs
+    description: R3 has PIM neighbors R2 (10.0.23.2) and R1 (10.0.13.1)
+    device: R3
+    command: show ip pim neighbor
+    match: ['^10\.0\.23\.2\s+%if0%\s', '^10\.0\.13\.1\s+%if1%\s']
+    hint: Check the R1-R3 link too; the source tree uses it.
+  - id: r3-rp-mapping
+    description: R3 knows 2.2.2.2 as the RP for 224.0.0.0/4 (static)
+    device: R3
+    command: show ip pim rp mapping
+    match: ['RP: 2\.2\.2\.2\b']
+    hint: Every PIM-SM router needs the same RP. With a static RP that means `ip pim rp-address` on each of them.
+  - id: r3-igmp-member
+    description: R3 sees an IGMP membership for 239.1.1.1 on the receiver LAN (%if2%)
+    device: R3
+    command: show ip igmp groups 239.1.1.1
+    match: ['^239\.1\.1\.1\s+%if2%\s']
+    hint: RCV joins with `ip igmp join-group` on its interface; R3 only tracks IGMP on PIM-enabled interfaces.
+  - id: src-ping-group
+    description: SRC's ping to 239.1.1.1 gets replies from RCV (10.0.3.10)
+    device: SRC
+    command: ping 239.1.1.1 repeat 5
+    match: ['Reply to request \d+ from 10\.0\.3\.10']
+    hint: Every router between SRC and RCV must forward multicast, including the PIM-enabled source LAN on R1.
+  - id: r3-mroute
+    description: R3 has (*,239.1.1.1) rooted at RP 2.2.2.2 and an (S,G) for 10.0.1.10 arriving on %if1% (the SPT via R1)
+    device: R3
+    command: show ip mroute 239.1.1.1
+    match: ['^\(\*, 239\.1\.1\.1\), .*RP 2\.2\.2\.2, flags: S', '^\(10\.0\.1\.10, 239\.1\.1\.1\)', 'Incoming interface: %if1%, RPF nbr 10\.0\.13\.1']
+    hint: The (S,G) only exists right after SRC has sent traffic. Its incoming interface follows the unicast route back to the source (the RPF check).
+  # ---- config-mode checks (running config via CML API) ----
+  - id: r1-cfg-mcast
+    mode: config
+    description: R1 runs multicast routing, PIM-SM on the source LAN and both core links, and static RP 2.2.2.2
+    device: R1
+    match:
+    - ^ip multicast-routing\s*$
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$
+    - ^interface %if2%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$
+    - ^ip pim rp-address 2\.2\.2\.2\s*$
+  - id: r2-cfg-mcast
+    mode: config
+    description: R2 runs multicast routing, PIM-SM on Loopback0 and both core links, and static RP 2.2.2.2
+    device: R2
+    match:
+    - ^ip multicast-routing\s*$
+    - ^interface Loopback0\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$
+    - ^ip pim rp-address 2\.2\.2\.2\s*$
+  - id: r3-cfg-mcast
+    mode: config
+    description: R3 runs multicast routing, PIM-SM on both core links and the receiver LAN, and static RP 2.2.2.2
+    device: R3
+    match:
+    - ^ip multicast-routing\s*$
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$
+    - ^interface %if2%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$
+    - ^ip pim rp-address 2\.2\.2\.2\s*$
+  - id: rcv-cfg-join
+    mode: config
+    description: RCV joins 239.1.1.1 on %if0% and does not route multicast
+    device: RCV
+    match: ['^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip igmp join-group 239\.1\.1\.1\s*$']
+    absent: ['^ip multicast-routing']
+solution_summary: |
+  **What was missing:** multicast routing, PIM and an RP. Without them, the routers drop SRC's packets to 239.1.1.1, and
+  RCV had not joined the group.
+
+  **Fix (R1, R2 and R3)**
+  ```
+  ip multicast-routing
+  ip pim rp-address 2.2.2.2
+  interface <every core link, plus R1 %if0% and R3 %if2%>
+   ip pim sparse-mode
+  ```
+  **R2 only:** `interface Loopback0` / `ip pim sparse-mode` (the RP address must be on a PIM interface).
+
+  **RCV**
+  ```
+  interface %if0%
+   ip igmp join-group 239.1.1.1
+  ```
+
+  **Why it works:** RCV sends an IGMP report and R3, the last-hop router and IGMP querier on the LAN, creates
+  (*,239.1.1.1) and sends a PIM (*,G) join toward the RP. Its RPF interface for 2.2.2.2 is the link to R2. R1, the
+  first-hop router, encapsulates SRC's first packets in PIM *Register* messages to the RP. The RP forwards them down the
+  shared tree and joins the source tree toward 10.0.1.10. After the first packet, R3 switches to the shortest-path tree
+  (default SPT threshold 0). It sends an (S,G) join out the interface that `show ip rpf 10.0.1.10` names, the direct link
+  to R1, so the (S,G) entry's incoming interface is %if1% (flag T). Every multicast packet must arrive on the RPF interface
+  for its source, or it is dropped: that is the RPF check, and it uses the unicast routing table (OSPF here).
+  IOL and IOS-XE use `ip multicast-routing` (the `distributed` keyword is only for platforms like the Catalyst 8000V).
+hints:
+  - "Multicast needs three things: the routers must forward multicast at all, they need PIM between them, and in sparse mode they must agree on a rendezvous point."
+  - "Enable `ip multicast-routing` on R1-R3, then `ip pim sparse-mode` on every interface packets cross: core links, both LANs, and the RP's loopback."
+  - "Static RP is one global line on each router: `ip pim rp-address 2.2.2.2`. The receiver side is `ip igmp join-group 239.1.1.1` on RCV's interface."
+faults:
+- id: r3-no-rp
+  title: R3 has no RP configured
+  device: R3
+  ticket: RCV stopped receiving the 239.1.1.1 stream after a config cleanup on R3. R3 still shows RCV's IGMP membership, and unicast pings between SRC and RCV work.
+  config: |
+    no ip pim rp-address 2.2.2.2
+  explanation: |-
+    **Root cause:** R3 lost its static RP. `show ip mroute 239.1.1.1` on R3 shows `RP 0.0.0.0` and `show ip pim rp mapping` is empty, so R3 has nowhere to send the (*,G) join. The IGMP membership alone is not enough.
+
+    **Fix (R3):**
+    ```
+    ip pim rp-address 2.2.2.2
+    ```
+  hints:
+  - The receiver's membership is fine. Where does the last-hop router send its join?
+  - Compare `show ip pim rp mapping` on R2 and R3, and look at the RP field of `show ip mroute 239.1.1.1` on R3.
+  checks: []
+- id: r1-no-pim-src-lan
+  title: PIM missing on R1's source LAN
+  device: R1
+  ticket: Pings from SRC to 239.1.1.1 get no replies. RCV's join reaches the RP, and R1 has PIM neighbors on both core links.
+  config: |
+    interface %if0%
+     no ip pim sparse-mode
+  explanation: |-
+    **Root cause:** R1 %if0% (the source LAN) no longer runs PIM. Without multicast on the incoming interface, R1 does not accept SRC's packets, so it never registers the source with the RP. There is no (10.0.1.10, 239.1.1.1) entry anywhere.
+
+    **Fix (R1):**
+    ```
+    interface %if0%
+     ip pim sparse-mode
+    ```
+  hints:
+  - The receiver side and the core look healthy. Does the first-hop router even see the source?
+  - '`show ip mroute 239.1.1.1` on R1 and R2: is there an (S,G) for 10.0.1.10? Then `show ip pim interface` on R1.'
+  checks: []
+- id: r3-rpf-static
+  title: Static route pulls the source tree through R2
+  device: R3
+  ticket: RCV still receives the 239.1.1.1 stream, but monitoring shows it now crosses R2 instead of the direct R1-R3 link, and R2's links are filling up. Nobody changed the PIM configuration.
+  config: |
+    ip route 10.0.1.0 255.255.255.0 10.0.23.2
+  explanation: |-
+    **Root cause:** a leftover static route on R3 sends the source LAN 10.0.1.0/24 via R2. A static route (AD 1) beats OSPF (AD 110), and the RPF check uses the unicast routing table. `show ip rpf 10.0.1.10` on R3 now names %if0% with `RPF type: unicast (static)`, so R3 sends its (S,G) join toward R2. The source tree is built R1 -> R2 -> R3 instead of over the direct link.
+
+    **Fix (R3):**
+    ```
+    no ip route 10.0.1.0 255.255.255.0 10.0.23.2
+    ```
+  hints:
+  - Which table decides the incoming interface of an (S,G) entry?
+  - '`show ip rpf 10.0.1.10` on R3: which interface and which routing source does it name? Then `show ip route 10.0.1.0`.'
+  checks:
+  - id: f-r3-no-static
+    mode: config
+    description: R3 has no static route for the source LAN 10.0.1.0/24
+    device: R3
+    absent: ['^ip route 10\.0\.1\.0 255\.255\.255\.0\s']
+  - id: f-r3-rpf-ospf
+    description: R3's RPF lookup for 10.0.1.10 uses OSPF via %if1%
+    device: R3
+    command: show ip rpf 10.0.1.10
+    match: ['RPF interface: %if1%', 'RPF type: unicast \(ospf 1\)']

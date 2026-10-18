@@ -32,16 +32,17 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [Version and changelog](#version-and-changelog)
 
 ## Features
-- **14 built-in labs** covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
+- **16 built-in labs** covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
   OSPFv2 multi-area/stub/summarization, EIGRP named mode with authentication and stub, eBGP/iBGP with next-hop-self,
   HSRPv2 with tracking, ACL/PAT/static NAT, VRF-lite, GRE over IPsec with OSPF, NTP/Syslog/SNMPv3/IP SLA,
-  HSRP failover driven by IP SLA object tracking, policy-based routing, and mutual OSPF/EIGRP redistribution with route tags.
-  (Multicast/PIM is not covered: its IOL output could not be verified.)
+  HSRP failover driven by IP SLA object tracking, policy-based routing, mutual OSPF/EIGRP redistribution with route tags,
+  and **IP multicast** (PIM sparse mode with a static RP, BSR RP election, IGMPv3 and SSM). See
+  [Multicast and MPLS labs](#multicast-and-mpls-labs).
 - **One-click lifecycle in CML:** Build (import + start + wait for boot), Check, Reset (back to the starting configs), Destroy.
   It only ever touches labs titled `ENCOR-…`.
 - **Two grading modes:** *live* (real adjacencies, routes, pings over the console server) and *config* (HTTPS only).
   *Auto* uses live when it can and falls back to config.
-- **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (42 in total). One click rebuilds
+- **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (48 in total). One click rebuilds
   the working lab with a random fault and gives you a symptom-only trouble ticket, so you get unlimited troubleshooting practice.
 - **Exam mode:** a timed, one-shot attempt with a countdown, the solution withheld, and hints disabled or costing
   points. *Submit exam* (or the timer running out) grades once and shows a score report (raw score, hint penalty,
@@ -183,6 +184,26 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `test-live <lab> [--keep]` | builds `ENCOR-TEST-<lab>` with the solution applied, grades it, deletes it |
 | `schema [-o f]`, `prompt ["request"]`, `docs` | JSON Schema, AI prompt, regenerate `docs/` |
 | `save-password`, `web [--no-open]` | keyring, web UI |
+
+### Multicast and MPLS labs
+These labs need nothing beyond the standard CML 2.9 images. Every node is a plain router (`iol-xe` by default, or
+`iosv` with *Settings > Device images*), so the receivers and sources are routers acting as hosts: a receiver joins
+with `ip igmp join-group`, and a source pings the group address. Both images use `ip multicast-routing` (the
+`distributed` keyword is rejected on IOL).
+
+| Lab | Topic | Nodes | Live checks use |
+|---|---|---|---|
+| `14-multicast-pim-sm` | `ip multicast-routing`, PIM-SM on every path interface, static RP, IGMP join, shared tree vs. SPT, RPF | 5 (SRC, R1-R3, RCV) | `show ip pim neighbor`, `show ip pim rp mapping`, `show ip igmp groups`, `ping 239.1.1.1`, `show ip mroute`, `show ip rpf` (fault) |
+| `15-multicast-bsr-ssm` | BSR election (higher priority wins) vs. C-RP election (lower wins), IGMPv3, SSM `(S,G)` channel without an RP | 6 (SRC, R1-R4, RCV) | `show ip pim bsr-router`, `show ip pim rp mapping`, `show ip igmp interface`, `show ip mroute`, pings to an ASM and an SSM group |
+
+Each one has config checks, a solution summary, 3 progressive hints and 3 *Break my lab* faults (for example a missing
+RP on the last-hop router, PIM missing on the source LAN, a static route that drags the source tree through the RP,
+a C-RP priority that flips the RP, or IGMPv2 silently breaking SSM). The checks read `show ip mroute` right after
+the source ping, because `(S,G)` state ages out about 3 minutes after the source stops.
+
+> **Not verified on real devices yet.** The recorded outputs these labs are tested against were written from Cisco
+> documentation and published CML `iol-xe` captures, not captured from your CML. If a live check fails on a
+> correctly solved lab, run it in *Config* grading mode and please report the device output.
 
 ### Break my lab (fault practice)
 **Break my lab** rebuilds the lab in CML from its *working* configuration (starting config + reference solution) plus one
@@ -402,7 +423,7 @@ encorlab/                 the application (Python package)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders
-  labs/<id>/              14 built-in labs (lab.yaml, solution.cfg, fixture_*.yaml)
+  labs/<id>/              16 built-in labs (lab.yaml, solution.cfg, fixture_*.yaml)
   web/                    FastAPI app, templates/index.html, static/ (app.js, help.js, help.json, style.css)
   resources/              authoring guide + example lab (source of docs/)
 docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example lab, images/

@@ -1,0 +1,69 @@
+# Synthesized from Cisco IOS / IOS-XE documentation and published CML iol-xe captures (not recorded on real hardware).
+R2:
+  show ip pim neighbor: |
+    PIM Neighbor Table
+    Mode: B - Bidir Capable, DR - Designated Router, N - Default DR Priority,
+          P - Proxy Capable, S - State Refresh Capable, G - GenID Capable,
+          L - DR Load-balancing Capable
+    Neighbor          Interface                Uptime/Expires    Ver   DR
+    Address                                                            Prio/Mode
+    10.0.12.1         %if0%              00:04:08/00:01:35 v2    1 / S P G
+    10.0.23.3         %if1%              00:04:04/00:01:39 v2    1 / DR S P G
+R3:
+  show ip pim neighbor: |
+    PIM Neighbor Table
+    Mode: B - Bidir Capable, DR - Designated Router, N - Default DR Priority,
+          P - Proxy Capable, S - State Refresh Capable, G - GenID Capable,
+          L - DR Load-balancing Capable
+    Neighbor          Interface                Uptime/Expires    Ver   DR
+    Address                                                            Prio/Mode
+    10.0.23.2         %if0%              00:04:04/00:01:41 v2    1 / S P G
+    10.0.13.1         %if1%              00:04:06/00:01:38 v2    1 / S P G
+  show ip pim rp mapping: |
+    PIM Group-to-RP Mappings
+
+    Group(s): 224.0.0.0/4, Static
+        RP: 2.2.2.2 (?)
+  show ip igmp groups 239.1.1.1: |
+    IGMP Connected Group Membership
+    Group Address    Interface                Uptime    Expires   Last Reporter   Group Accounted
+    239.1.1.1        %if2%              00:03:51  00:02:12  10.0.3.10
+  show ip mroute 239.1.1.1: |
+    IP Multicast Routing Table
+    Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+           L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+           T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+           X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+           U - URD, I - Received Source Specific Host Report,
+           Z - Multicast Tunnel, z - MDT-data group sender,
+           Y - Joined MDT-data group, y - Sending to MDT-data group
+    Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+     Timers: Uptime/Expires
+     Interface state: Interface, Next-Hop or VCD, State/Mode
+
+    (*, 239.1.1.1), 00:03:51/stopped, RP 2.2.2.2, flags: SJC
+      Incoming interface: %if0%, RPF nbr 10.0.23.2
+      Outgoing interface list:
+        %if2%, Forward/Sparse, 00:03:51/00:02:12
+
+    (10.0.1.10, 239.1.1.1), 00:00:08/00:02:51, flags: JT
+      Incoming interface: %if1%, RPF nbr 10.0.13.1
+      Outgoing interface list:
+        %if2%, Forward/Sparse, 00:00:08/00:02:51
+  show ip rpf 10.0.1.10: |
+    RPF information for ? (10.0.1.10)
+      RPF interface: %if1%
+      RPF neighbor: ? (10.0.13.1)
+      RPF route/mask: 10.0.1.0/24
+      RPF type: unicast (ospf 1)
+      Doing distance-preferred lookups across tables
+      RPF topology: ipv4 multicast base, originated from ipv4 unicast base
+SRC:
+  ping 239.1.1.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 239.1.1.1, timeout is 2 seconds:
+    .
+    Reply to request 1 from 10.0.3.10, 3 ms
+    Reply to request 2 from 10.0.3.10, 2 ms
+    Reply to request 3 from 10.0.3.10, 2 ms
+    Reply to request 4 from 10.0.3.10, 2 ms

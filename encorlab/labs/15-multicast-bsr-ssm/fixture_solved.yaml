@@ -1,0 +1,104 @@
+# Synthesized from Cisco IOS / IOS-XE documentation (not recorded on real hardware).
+R4:
+  show ip pim bsr-router: |
+    PIMv2 Bootstrap information
+      BSR address: 3.3.3.3 (?)
+      Uptime:      00:06:12, BSR Priority: 100, Hash mask length: 0
+      Expires:     00:01:58
+  show ip pim rp mapping: |
+    PIM Group-to-RP Mappings
+
+    Group(s) 224.0.0.0/4
+      RP 2.2.2.2 (?), v2
+        Info source: 3.3.3.3 (?), via bootstrap, priority 10, holdtime 150
+             Uptime: 00:05:40, expires: 00:02:01
+      RP 3.3.3.3 (?), v2
+        Info source: 3.3.3.3 (?), via bootstrap, priority 20, holdtime 150
+             Uptime: 00:05:40, expires: 00:02:01
+  show ip igmp interface %if2%: |
+    %if2% is up, line protocol is up
+      Internet address is 10.1.4.1/24
+      IGMP is enabled on interface
+      Current IGMP host version is 3
+      Current IGMP router version is 3
+      IGMP query interval is 60 seconds
+      IGMP configured query interval is 60 seconds
+      IGMP querier timeout is 120 seconds
+      IGMP configured querier timeout is 120 seconds
+      IGMP max query response time is 10 seconds
+      Last member query count is 2
+      Last member query response interval is 1000 ms
+      Inbound IGMP access group is not set
+      IGMP activity: 3 joins, 0 leaves
+      Multicast routing is enabled on interface
+      Multicast TTL threshold is 0
+      Multicast designated router (DR) is 10.1.4.1 (this system)
+      IGMP querying router is 10.1.4.1 (this system)
+      Multicast groups joined by this system (number of users):
+          224.0.1.40(1)
+  show ip igmp groups 239.2.2.2: |
+    IGMP Connected Group Membership
+    Group Address    Interface                Uptime    Expires   Last Reporter   Group Accounted
+    239.2.2.2        %if2%              00:04:51  00:02:38  10.1.4.10
+  show ip mroute 239.2.2.2: |
+    IP Multicast Routing Table
+    Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+           L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+           T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+           X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+           U - URD, I - Received Source Specific Host Report
+    Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+     Timers: Uptime/Expires
+     Interface state: Interface, Next-Hop or VCD, State/Mode
+
+    (*, 239.2.2.2), 00:04:51/stopped, RP 2.2.2.2, flags: SJC
+      Incoming interface: %if0%, RPF nbr 10.1.24.2
+      Outgoing interface list:
+        %if2%, Forward/Sparse, 00:04:51/00:02:38
+
+    (10.1.1.10, 239.2.2.2), 00:00:09/00:02:50, flags: JT
+      Incoming interface: %if1%, RPF nbr 10.1.34.3
+      Outgoing interface list:
+        %if2%, Forward/Sparse, 00:00:09/00:02:50
+  show ip mroute 232.1.1.1: |
+    IP Multicast Routing Table
+    Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+           L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+           T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+           X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+           U - URD, I - Received Source Specific Host Report
+    Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+     Timers: Uptime/Expires
+     Interface state: Interface, Next-Hop or VCD, State/Mode
+
+    (10.1.1.10, 232.1.1.1), 00:04:49/00:02:41, flags: sTI
+      Incoming interface: %if1%, RPF nbr 10.1.34.3
+      Outgoing interface list:
+        %if2%, Forward/Sparse, 00:04:49/00:02:41
+  show ip pim neighbor: |
+    PIM Neighbor Table
+    Mode: B - Bidir Capable, DR - Designated Router, N - Default DR Priority,
+          P - Proxy Capable, S - State Refresh Capable, G - GenID Capable,
+          L - DR Load-balancing Capable
+    Neighbor          Interface                Uptime/Expires    Ver   DR
+    Address                                                            Prio/Mode
+    10.1.24.2         %if0%              00:07:02/00:01:31 v2    1 / S P G
+    10.1.34.3         %if1%              00:07:01/00:01:42 v2    1 / S P G
+SRC:
+  ping 239.2.2.2 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 239.2.2.2, timeout is 2 seconds:
+    .
+    Reply to request 1 from 10.1.4.10, 4 ms
+    Reply to request 2 from 10.1.4.10, 2 ms
+    Reply to request 3 from 10.1.4.10, 2 ms
+    Reply to request 4 from 10.1.4.10, 2 ms
+  ping 232.1.1.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 232.1.1.1, timeout is 2 seconds:
+
+    Reply to request 0 from 10.1.4.10, 3 ms
+    Reply to request 1 from 10.1.4.10, 2 ms
+    Reply to request 2 from 10.1.4.10, 2 ms
+    Reply to request 3 from 10.1.4.10, 2 ms
+    Reply to request 4 from 10.1.4.10, 2 ms

@@ -1,0 +1,30 @@
+# Starting state: PIM runs but no RP is known, IGMPv2, no SSM, no receiver (synthesized, not recorded on real hardware).
+R4:
+  show ip pim bsr-router: |
+    PIMv2 Bootstrap information
+  show ip pim rp mapping: |
+    PIM Group-to-RP Mappings
+
+  show ip igmp interface %if2%: |
+    %if2% is up, line protocol is up
+      Internet address is 10.1.4.1/24
+      IGMP is enabled on interface
+      Current IGMP host version is 2
+      Current IGMP router version is 2
+      IGMP query interval is 60 seconds
+  show ip igmp groups 239.2.2.2: |
+    IGMP Connected Group Membership
+    Group Address    Interface                Uptime    Expires   Last Reporter   Group Accounted
+  show ip mroute 239.2.2.2: |
+    Group 239.2.2.2 not found
+  show ip mroute 232.1.1.1: |
+    Group 232.1.1.1 not found
+SRC:
+  ping 239.2.2.2 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 239.2.2.2, timeout is 2 seconds:
+    .....
+  ping 232.1.1.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 232.1.1.1, timeout is 2 seconds:
+    .....

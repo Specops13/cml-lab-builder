@@ -1,0 +1,356 @@
+id: 15-multicast-bsr-ssm
+title: "Multicast: BSR RP Election, IGMPv3 and SSM"
+blueprint: ["3.3.d"]
+domain: "3.0 Infrastructure - IP services"
+difficulty: 4
+summary: Replace static RPs with a Bootstrap Router (BSR) election between two candidates, run IGMPv3 at the receiver edge and add a source-specific multicast (SSM) channel that needs no RP at all.
+nodes:
+  - name: SRC
+    kind: router
+    x: -500
+    y: 0
+    config: |
+      ! Multicast source (a router acting as a host)
+      interface %if0%
+       description to R1 (source LAN)
+       ip address 10.1.1.10 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 10.1.1.1
+  - name: R1
+    kind: router
+    x: -250
+    y: 0
+    config: |
+      ip multicast-routing
+      interface Loopback0
+       ip address 1.1.1.1 255.255.255.255
+      interface %if0%
+       description to SRC (source LAN)
+       ip address 10.1.1.1 255.255.255.0
+       ip pim sparse-mode
+       no shutdown
+      interface %if1%
+       description to R2
+       ip address 10.1.12.1 255.255.255.252
+       ip pim sparse-mode
+       ip ospf network point-to-point
+       no shutdown
+      interface %if2%
+       description to R3
+       ip address 10.1.13.1 255.255.255.252
+       ip pim sparse-mode
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 1.1.1.1
+       passive-interface %if0%
+       network 1.1.1.1 0.0.0.0 area 0
+       network 10.1.1.0 0.0.0.255 area 0
+       network 10.1.12.0 0.0.0.3 area 0
+       network 10.1.13.0 0.0.0.3 area 0
+  - name: R2
+    kind: router
+    x: 0
+    y: -170
+    config: |
+      ip multicast-routing
+      interface Loopback0
+       ip address 2.2.2.2 255.255.255.255
+       ip pim sparse-mode
+      interface %if0%
+       description to R1
+       ip address 10.1.12.2 255.255.255.252
+       ip pim sparse-mode
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to R4
+       ip address 10.1.24.2 255.255.255.252
+       ip pim sparse-mode
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 2.2.2.2
+       network 2.2.2.2 0.0.0.0 area 0
+       network 10.1.12.0 0.0.0.3 area 0
+       network 10.1.24.0 0.0.0.3 area 0
+  - name: R3
+    kind: router
+    x: 0
+    y: 170
+    config: |
+      ip multicast-routing
+      interface Loopback0
+       ip address 3.3.3.3 255.255.255.255
+       ip pim sparse-mode
+      interface %if0%
+       description to R1
+       ip address 10.1.13.3 255.255.255.252
+       ip pim sparse-mode
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to R4
+       ip address 10.1.34.3 255.255.255.252
+       ip pim sparse-mode
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 3.3.3.3
+       network 3.3.3.3 0.0.0.0 area 0
+       network 10.1.13.0 0.0.0.3 area 0
+       network 10.1.34.0 0.0.0.3 area 0
+  - name: R4
+    kind: router
+    x: 250
+    y: 0
+    config: |
+      ip multicast-routing
+      interface Loopback0
+       ip address 4.4.4.4 255.255.255.255
+      interface %if0%
+       description to R2
+       ip address 10.1.24.4 255.255.255.252
+       ip pim sparse-mode
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to R3
+       ip address 10.1.34.4 255.255.255.252
+       ip pim sparse-mode
+       ip ospf network point-to-point
+       no shutdown
+      interface %if2%
+       description to RCV (receiver LAN)
+       ip address 10.1.4.1 255.255.255.0
+       ip pim sparse-mode
+       no shutdown
+      router ospf 1
+       router-id 4.4.4.4
+       passive-interface %if2%
+       network 4.4.4.4 0.0.0.0 area 0
+       network 10.1.4.0 0.0.0.255 area 0
+       network 10.1.24.0 0.0.0.3 area 0
+       network 10.1.34.0 0.0.0.3 area 0
+  - name: RCV
+    kind: router
+    x: 500
+    y: 0
+    config: |
+      ! Multicast receiver (a router acting as a host)
+      interface %if0%
+       description to R4 (receiver LAN)
+       ip address 10.1.4.10 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 10.1.4.1
+links:
+  - {a: {node: SRC, port: 0}, b: {node: R1, port: 0}}
+  - {a: {node: R1, port: 1}, b: {node: R2, port: 0}}
+  - {a: {node: R1, port: 2}, b: {node: R3, port: 0}}
+  - {a: {node: R2, port: 1}, b: {node: R4, port: 0}}
+  - {a: {node: R3, port: 1}, b: {node: R4, port: 1}}
+  - {a: {node: R4, port: 2}, b: {node: RCV, port: 0}}
+task: |
+  # Lab 15 - BSR, IGMPv3 and SSM
+
+  OSPF, `ip multicast-routing` and PIM sparse mode are already running on R1-R4, but no router knows an RP, so
+  any-source multicast (ASM) cannot work yet. SRC (10.1.1.10) sends to **239.2.2.2** (ASM) and to the SSM channel
+  **(10.1.1.10, 232.1.1.1)**. RCV (10.1.4.10) is the receiver.
+
+  **Part A - dynamic RP with BSR** (no static `ip pim rp-address` anywhere)
+  1. R2 and R3 are **candidate BSRs** sourced from Loopback0. Give R3 **BSR priority 100** so it wins the BSR
+     election (higher wins). Leave R2 at the default priority.
+  2. R2 and R3 are also **candidate RPs** from Loopback0: R2 with **priority 10**, R3 with **priority 20**.
+     In the C-RP election the *lower* priority wins, so R2 (2.2.2.2) becomes the RP and R3 is the backup.
+
+  **Part B - receiver edge and SSM**
+  3. R4's receiver LAN (%if2%) runs **IGMP version 3**.
+  4. On **R1-R4**, enable SSM for the default range 232.0.0.0/8 (`ip pim ssm default`).
+  5. On **RCV** %if0%: run IGMP version 3, join the ASM group **239.2.2.2**, and join the SSM channel
+     **232.1.1.1 from source 10.1.1.10 only**.
+
+  Verify with `show ip pim bsr-router`, `show ip pim rp mapping`, `show ip igmp interface %if2%` and
+  `show ip igmp groups` on R4, then ping both groups from SRC and look at `show ip mroute` on R4. The SSM entry is an
+  (S,G) with no RP and no (*,G).
+checks:
+  - id: r4-bsr
+    description: R4 learned 3.3.3.3 as the elected BSR
+    device: R4
+    command: show ip pim bsr-router
+    match: ['BSR address: 3\.3\.3\.3\b']
+    hint: The BSR election picks the highest BSR priority. Bootstrap messages flood hop by hop over PIM neighbors.
+  - id: r4-rp-mapping
+    description: R4 maps 224.0.0.0/4 to RP 2.2.2.2 (learned via bootstrap, priority 10)
+    device: R4
+    command: show ip pim rp mapping
+    match: ['RP 2\.2\.2\.2\b.*\n\s+Info source: 3\.3\.3\.3\b.*via bootstrap, priority 10\b']
+    hint: Candidate RPs unicast their advertisements to the BSR, which floods the RP set. The lowest C-RP priority wins.
+  - id: r4-igmpv3
+    description: R4 runs IGMPv3 on the receiver LAN (%if2%)
+    device: R4
+    command: show ip igmp interface %if2%
+    match: ['Current IGMP router version is 3']
+    hint: The IGMP version is set per interface.
+  - id: r4-igmp-asm
+    description: R4 sees RCV's membership for 239.2.2.2 on %if2%
+    device: R4
+    command: show ip igmp groups 239.2.2.2
+    match: ['^239\.2\.2\.2\s+%if2%\s']
+  - id: src-ping-asm
+    description: SRC's ping to 239.2.2.2 gets replies from RCV (10.1.4.10)
+    device: SRC
+    command: ping 239.2.2.2 repeat 5
+    match: ['Reply to request \d+ from 10\.1\.4\.10']
+    hint: ASM needs every router to agree on the RP, and the RP must be reachable over PIM-enabled interfaces.
+  - id: r4-mroute-asm
+    description: R4's (*,239.2.2.2) entry is rooted at RP 2.2.2.2
+    device: R4
+    command: show ip mroute 239.2.2.2
+    match: ['^\(\*, 239\.2\.2\.2\), .*RP 2\.2\.2\.2, flags: S']
+  - id: src-ping-ssm
+    description: SRC's ping to the SSM group 232.1.1.1 gets replies from RCV
+    device: SRC
+    command: ping 232.1.1.1 repeat 5
+    match: ['Reply to request \d+ from 10\.1\.4\.10']
+    hint: An SSM join names the source. That needs IGMPv3 on both RCV and R4, and the SSM range enabled on the routers.
+  - id: r4-mroute-ssm
+    description: R4 has the SSM entry (10.1.1.10, 232.1.1.1)
+    device: R4
+    command: show ip mroute 232.1.1.1
+    match: ['^\(10\.1\.1\.10, 232\.1\.1\.1\)']
+    absent: ['^\(\*, 232\.1\.1\.1\)']
+  # ---- config-mode checks (running config via CML API) ----
+  - id: r2-cfg-bsr
+    mode: config
+    description: R2 is a candidate BSR (default priority) and a candidate RP with priority 10, both from Loopback0
+    device: R2
+    match: ['^ip pim bsr-candidate Loopback0(?: \d+)?(?: 0)?\s*$', '^ip pim rp-candidate Loopback0\b.*\bpriority 10\s*$', '^ip pim ssm default\s*$']
+    absent: ['^ip pim rp-address']
+  - id: r3-cfg-bsr
+    mode: config
+    description: R3 is a candidate BSR with priority 100 and a candidate RP with priority 20, both from Loopback0
+    device: R3
+    match: ['^ip pim bsr-candidate Loopback0 \d+ 100\s*$', '^ip pim rp-candidate Loopback0\b.*\bpriority 20\s*$', '^ip pim ssm default\s*$']
+    absent: ['^ip pim rp-address']
+  - id: r1-cfg-ssm
+    mode: config
+    description: R1 enables the default SSM range and uses no static RP
+    device: R1
+    match: ['^ip pim ssm default\s*$']
+    absent: ['^ip pim rp-address']
+  - id: r4-cfg-edge
+    mode: config
+    description: R4 enables the SSM range and runs IGMPv3 on %if2%
+    device: R4
+    match: ['^ip pim ssm default\s*$', '^interface %if2%\s*\n(?:[ \t].*\n)*?[ \t]+ip igmp version 3\s*$']
+    absent: ['^ip pim rp-address']
+  - id: rcv-cfg-joins
+    mode: config
+    description: RCV runs IGMPv3, joins 239.2.2.2 and the SSM channel (10.1.1.10, 232.1.1.1)
+    device: RCV
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip igmp version 3\s*$
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip igmp join-group 239\.2\.2\.2\s*$
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip igmp join-group 232\.1\.1\.1 source 10\.1\.1\.10\s*$
+solution_summary: |
+  **What was missing:** an RP for the ASM range, IGMPv3 at the receiver edge, the SSM range, and RCV's joins.
+
+  **R2**
+  ```
+  ip pim bsr-candidate Loopback0
+  ip pim rp-candidate Loopback0 priority 10
+  ip pim ssm default
+  ```
+  **R3**
+  ```
+  ip pim bsr-candidate Loopback0 0 100
+  ip pim rp-candidate Loopback0 priority 20
+  ip pim ssm default
+  ```
+  **R1** `ip pim ssm default`. **R4** `ip pim ssm default`, plus `ip igmp version 3` on %if2%.
+
+  **RCV**
+  ```
+  interface %if0%
+   ip igmp version 3
+   ip igmp join-group 239.2.2.2
+   ip igmp join-group 232.1.1.1 source 10.1.1.10
+  ```
+
+  **Why it works:** candidate BSRs flood bootstrap messages hop by hop, and the highest BSR priority wins (R3,
+  100; the `0` before it is the hash-mask length). Candidate RPs unicast their advertisements to the elected BSR,
+  which floods the whole RP set. Every router then runs the same election, where the lowest C-RP priority wins, so
+  all of them pick 2.2.2.2. If R2 fails, its advertisement times out and R3 takes over. Nothing is configured per
+  router, unlike a static RP. SSM skips the RP entirely: the receiver names the source in an IGMPv3 report, and the
+  last-hop router sends an (S,G) join straight toward 10.1.1.10. That is why only (10.1.1.10, 232.1.1.1) exists,
+  with no (*,G). It needs IGMPv3 on the receiver and its router, and `ip pim ssm default` (232.0.0.0/8) on the routers.
+hints:
+  - "Part A needs two roles on R2 and R3: one router collects and floods the candidate list (the BSR), and the candidates themselves (the RPs). Watch which election prefers higher numbers and which prefers lower."
+  - "`ip pim bsr-candidate Loopback0 <hash-mask> <priority>` and `ip pim rp-candidate Loopback0 priority <n>`. R3 gets BSR priority 100, R2 gets C-RP priority 10."
+  - "SSM: `ip pim ssm default` on R1-R4, `ip igmp version 3` on R4 %if2% and on RCV, then `ip igmp join-group 232.1.1.1 source 10.1.1.10` on RCV."
+faults:
+- id: r3-crp-priority
+  title: R3 wins the RP election
+  device: R3
+  ticket: The design says R2 is the primary RP for every group, but the network now uses 3.3.3.3 as the RP for 239.2.2.2. Nothing failed on R2.
+  config: |
+    ip pim rp-candidate Loopback0 priority 5
+  explanation: |-
+    **Root cause:** R3's candidate-RP priority was changed to 5. In the BSR C-RP election the **lowest** priority wins, so R3 (5) now beats R2 (10) for 224.0.0.0/4. `show ip pim rp mapping` lists both candidates with their priorities.
+
+    **Fix (R3):**
+    ```
+    ip pim rp-candidate Loopback0 priority 20
+    ```
+  hints:
+  - BSR and C-RP elections use priorities in opposite directions.
+  - '`show ip pim rp mapping` on R4: which priority does each candidate advertise?'
+  checks: []
+- id: r4-no-pim-to-r2
+  title: PIM missing on R4's link to R2
+  device: R4
+  ticket: The ASM stream 239.2.2.2 stopped reaching RCV, but the SSM channel (10.1.1.10, 232.1.1.1) still works. OSPF on R4 shows two full adjacencies.
+  config: |
+    interface %if0%
+     no ip pim sparse-mode
+  explanation: |-
+    **Root cause:** R4 %if0% (toward R2) lost `ip pim sparse-mode`. R4's RPF interface toward the RP 2.2.2.2 is that link, so its (*,G) join for 239.2.2.2 has nowhere to go. SSM still works because the RPF path to the source 10.1.1.10 uses the equal-cost link via R3 (PIM picks the highest RPF neighbor address, 10.1.34.3).
+
+    **Fix (R4):**
+    ```
+    interface %if0%
+     ip pim sparse-mode
+    ```
+  hints:
+  - One stream works and the other doesn't. They differ in where their trees are rooted.
+  - '`show ip rpf 2.2.2.2` and `show ip pim neighbor` on R4.'
+  checks:
+  - id: f-r4-pim-links
+    mode: config
+    description: R4 runs PIM sparse mode on both uplinks
+    device: R4
+    match: ['^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$', '^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+ip pim sparse-mode\s*$']
+  - id: f-r4-pim-nbrs
+    description: R4 has PIM neighbors on both uplinks
+    device: R4
+    command: show ip pim neighbor
+    match: ['^10\.1\.24\.2\s+%if0%\s', '^10\.1\.34\.3\s+%if1%\s']
+- id: r4-igmpv2
+  title: IGMPv2 on the receiver LAN
+  device: R4
+  ticket: The SSM channel (10.1.1.10, 232.1.1.1) went dark after a change on R4, while the 239.2.2.2 stream is fine.
+  config: |
+    interface %if2%
+     ip igmp version 2
+  explanation: |-
+    **Root cause:** R4's receiver LAN was set back to IGMPv2. RCV falls back to v2 when it hears v2 queries, and IGMPv2 reports cannot name a source, so the SSM join for (10.1.1.10, 232.1.1.1) is never signalled. ASM groups do not need a source and keep working.
+
+    **Fix (R4):**
+    ```
+    interface %if2%
+     ip igmp version 3
+    ```
+  hints:
+  - What can an SSM receiver express that an ASM receiver doesn't need to?
+  - '`show ip igmp interface %if2%` on R4: which IGMP version is running?'
+  checks: []

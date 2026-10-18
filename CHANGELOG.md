@@ -2,6 +2,21 @@
 
 All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
+## [1.6.0] - Unreleased
+### Added
+- **Multicast labs** (16 built-in labs, 48 faults). Both run on IOL or IOSv routers, with routers acting as the
+  source and receiver hosts:
+  - `14-multicast-pim-sm` (5 nodes, ENCOR 3.3.d): `ip multicast-routing`, PIM sparse mode on every path interface, a
+    static RP, an IGMP join, shared tree vs. shortest-path tree, and the RPF check.
+  - `15-multicast-bsr-ssm` (6 nodes, 3.3.d): BSR election with two candidate BSRs and two candidate RPs, IGMPv3 at the
+    receiver edge, and an SSM channel `(10.1.1.10, 232.1.1.1)` that needs no RP.
+  - Live checks use `show ip pim neighbor`, `show ip pim rp mapping`, `show ip pim bsr-router`, `show ip igmp groups`,
+    `show ip igmp interface`, `show ip mroute` and a ping to the group; a fault check uses `show ip rpf`. Each lab has
+    config checks, a solution summary, 3 hints and 3 *Break my lab* faults. The recorded outputs are synthesized from
+    Cisco documentation and are not verified on real hardware.
+- The offline config merge (used to validate faults) knows `ip igmp version`, `ip pim rp-candidate`, `ip pim bsr-candidate`,
+  `ip pim ssm`, `mpls ldp router-id`, `mpls label protocol` and `rd` as single-value lines.
+
 ## [1.5.0] - 2026-10-18
 ### Added
 - **Three new built-in labs** (14 in total), each with a solution summary, 3 progressive hints and 3 faults:
