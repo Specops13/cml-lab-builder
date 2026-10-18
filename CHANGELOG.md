@@ -4,7 +4,13 @@ All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
 ## [Unreleased]
 ### Added
-- **Break my lab (fault practice).** Each built-in lab has 3 predefined faults (33 in total). *Break my lab* rebuilds the
+- **Three new built-in labs** (14 in total), each with a solution summary, 3 progressive hints and 3 faults:
+  `11-ipsla-tracking` (IP SLA ICMP probe + object tracking driving the default route and an HSRP priority decrement;
+  4.4 / 3.3.c), `12-pbr` (source-based policy routing to a second ISP with ACL + route-map + `ip policy`; 3.2.d) and
+  `13-redistribution` (two-point mutual OSPF/EIGRP redistribution with route-map tagging and tag filtering; 3.2.a / 3.2.b).
+  All use plain IOL/IOSv routers. A multicast (PIM) lab was not added because its output could not be verified on IOL.
+- The *ENCOR routing track* course now ends with the PBR and redistribution labs.
+- **Break my lab (fault practice).** Each built-in lab has 3 predefined faults (42 in total). *Break my lab* rebuilds the
   working lab with a random fault (not one used recently) and shows a symptom-only trouble ticket. Check grades the lab
   checks plus fault-specific checks; when it passes, you see the root cause and fix. Fault-specific hints,
   *Reveal the answer*, *End fault practice*, and Reset re-applies the same broken config.

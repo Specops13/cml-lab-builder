@@ -1,0 +1,63 @@
+R1:
+  show ip sla statistics 1: |
+    IPSLAs Latest Operation Statistics
+
+    IPSLA operation id: 1
+            Latest RTT: 1 milliseconds
+    Latest operation start time: 10:15:20 UTC Sun Oct 18 2026
+    Latest operation return code: OK
+    Number of successes: 37
+    Number of failures: 0
+    Operation time to live: Forever
+  show track 1: |
+    Track 1
+      IP SLA 1 reachability
+      Reachability is Up
+        1 change, last change 00:03:05
+      Latest operation return code: OK
+      Latest RTT (millisecs) 1
+      Tracked by:
+        Static IP Routing 0
+        HSRP %if0% 20
+  show ip route static: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           * - candidate default, U - per-user static route
+
+    Gateway of last resort is 10.1.1.2 to network 0.0.0.0
+
+    S*    0.0.0.0/0 [1/0] via 10.1.1.2
+          203.0.113.0/32 is subnetted, 1 subnets
+    S        203.0.113.1 [1/0] via 10.1.1.2
+  show standby brief: |2
+                         P indicates configured to preempt.
+                         |
+    Interface   Grp  Pri P State   Active          Standby         Virtual IP
+    %if0s%       20   110 P Active  local           192.168.20.2    192.168.20.254
+  show standby: |
+    %if0% - Group 20 (version 2)
+      State is Active
+        2 state changes, last state change 00:02:51
+      Virtual IP address is 192.168.20.254
+      Active virtual MAC address is 0000.0c9f.f014 (MAC In Use)
+        Local virtual MAC address is 0000.0c9f.f014 (v2 default)
+      Hello time 3 sec, hold time 10 sec
+        Next hello sent in 0.512 secs
+      Preemption enabled
+      Active router is local
+      Standby router is 192.168.20.2, priority 100 (expires in 9.840 sec)
+      Priority 110 (configured 110)
+        Track object 1 state Up decrement 20
+      Group name is "hsrp-%if0s%-20" (default)
+R2:
+  show standby brief: |2
+                         P indicates configured to preempt.
+                         |
+    Interface   Grp  Pri P State   Active          Standby         Virtual IP
+    %if0s%       20   100 P Standby 192.168.20.1    local           192.168.20.254
+SW1:
+  ping 203.0.113.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 203.0.113.1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms

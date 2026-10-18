@@ -4,7 +4,7 @@
         --data-dir <expected user data folder> [--pack x.encorlab ...] [--runner wine] [--port 8791]
 
 Checks: CLI runs (version, list); the launcher serves the UI on 127.0.0.1 with versioned (cache-busted)
-assets; /api/labs lists the 11 built-in labs; packs import into the user data folder; the solution
+assets; /api/labs lists the 14 built-in labs; packs import into the user data folder; the solution
 endpoint works; a second launch detects the running instance; the server stops cleanly."""
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ def main() -> int:
         check(st == 200 and "json" in ct, "help.json served")
         labs = json.loads(get(base + "/api/labs")[2])
         builtin = [l for l in labs["labs"] if l["source"] == "builtin"]
-        check(len(builtin) == 11 and not labs["broken"], f"/api/labs: {len(builtin)} built-in labs, broken={labs['broken']}")
+        check(len(builtin) == 14 and not labs["broken"], f"/api/labs: {len(builtin)} built-in labs, broken={labs['broken']}")
         for p in a.pack:
             rep = post_file(base + "/api/import?replace=true", Path(p))
             check(rep.get("ok") and rep.get("lab_id"), f"import {Path(p).name} -> {rep.get('lab_id')}")
@@ -108,7 +108,7 @@ def main() -> int:
             sol = json.loads(get(base + f"/api/labs/{lid}/solution")[2])
             check(sol.get("summary") and not sol.get("auto_generated"), "solution summary available")
         ids = {l["id"] for l in json.loads(get(base + "/api/labs")[2])["labs"]}
-        check(len(ids) == 11 + len(a.pack), f"catalog now has {len(ids)} labs")
+        check(len(ids) == 14 + len(a.pack), f"catalog now has {len(ids)} labs")
         code, out = run(exe + ["--no-browser", "--port", base.rsplit(":", 1)[1]], timeout=60)
         check(code == 0 and "already running" in out, "second launch detects the running instance")
     finally:

@@ -1,0 +1,21 @@
+R1:
+  show ip sla statistics 1: |
+    IPSLAs Latest Operation Statistics
+
+  show track 1: |
+    Track 1 does not exist
+  show ip route static: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           * - candidate default, U - per-user static route
+
+    Gateway of last resort is not set
+
+  show standby brief: |2
+                         P indicates configured to preempt.
+                         |
+SW1:
+  ping 203.0.113.1 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 203.0.113.1, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)

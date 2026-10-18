@@ -1,0 +1,67 @@
+R1:
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           E1 - OSPF external type 1, E2 - OSPF external type 2
+
+    Gateway of last resort is not set
+
+          1.0.0.0/32 is subnetted, 1 subnets
+    C        1.1.1.1 is directly connected, Loopback0
+          4.0.0.0/32 is subnetted, 1 subnets
+    O E2     4.4.4.4 [110/20] via 10.0.13.3, 00:02:10, %if1%
+                     [110/20] via 10.0.12.2, 00:02:10, %if0%
+          10.0.0.0/8 is variably subnetted, 8 subnets, 2 masks
+    C        10.0.12.0/30 is directly connected, %if0%
+    L        10.0.12.1/32 is directly connected, %if0%
+    C        10.0.13.0/30 is directly connected, %if1%
+    L        10.0.13.1/32 is directly connected, %if1%
+    O E2     10.0.24.0/30 [110/20] via 10.0.12.2, 00:02:10, %if0%
+    O E2     10.0.34.0/30 [110/20] via 10.0.13.3, 00:02:10, %if1%
+  show ip route 4.4.4.4: |
+    Routing entry for 4.4.4.4/32
+      Known via "ospf 1", distance 110, metric 20
+      Tag 90, type extern 2, forward metric 10
+      Last update from 10.0.12.2 on %if0%, 00:02:10 ago
+      Routing Descriptor Blocks:
+        10.0.13.3, from 3.3.3.3, 00:02:10 ago, via %if1%
+          Route metric is 20, traffic share count is 1
+          Route tag 90
+      * 10.0.12.2, from 2.2.2.2, 00:02:10 ago, via %if0%
+          Route metric is 20, traffic share count is 1
+          Route tag 90
+R4:
+  show ip route: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+
+    Gateway of last resort is not set
+
+          1.0.0.0/32 is subnetted, 1 subnets
+    D EX     1.1.1.1 [170/2560025856] via 10.0.34.3, 00:02:05, %if1%
+                     [170/2560025856] via 10.0.24.2, 00:02:05, %if0%
+          4.0.0.0/32 is subnetted, 1 subnets
+    C        4.4.4.4 is directly connected, Loopback0
+          10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+    D EX     10.0.12.0/30 [170/2560025856] via 10.0.24.2, 00:02:05, %if0%
+    D EX     10.0.13.0/30 [170/2560025856] via 10.0.34.3, 00:02:05, %if1%
+  show ip route 1.1.1.1: |
+    Routing entry for 1.1.1.1/32
+      Known via "eigrp 100", distance 170, metric 2560025856
+      Tag 110, type external
+      Redistributing via eigrp 100
+      Last update from 10.0.24.2 on %if0%, 00:02:05 ago
+      Routing Descriptor Blocks:
+        10.0.34.3, from 10.0.34.3, 00:02:05 ago, via %if1%
+          Route metric is 2560025856, traffic share count is 1
+          Total delay is 1010 microseconds, minimum bandwidth is 1 Kbit
+          Route tag 110
+      * 10.0.24.2, from 10.0.24.2, 00:02:05 ago, via %if0%
+          Route metric is 2560025856, traffic share count is 1
+          Route tag 110
+  ping 1.1.1.1 source Loopback0 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 1.1.1.1, timeout is 2 seconds:
+    Packet sent with a source address of 4.4.4.4
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms

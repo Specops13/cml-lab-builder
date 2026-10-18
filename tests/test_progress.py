@@ -57,7 +57,9 @@ def test_compute_from_history():
     assert hsrp["mastery_pct"] == 95
     ip = next(d for d in p["domains"] if d["id"] == "3.0")
     assert ip["attempted"] == 2 and 0 < ip["mastery_pct"] < 100
-    assert next(i for i in p["items"] if i["id"] == "3.3.c")["mastery_pct"] == 95
+    # item mastery averages every lab tagged with the item (unattempted labs count as 0)
+    n_fhrp = sum("3.3.c" in e.lab.blueprint for e in catalog.entries().values())
+    assert next(i for i in p["items"] if i["id"] == "3.3.c")["mastery_pct"] == round(95 / n_fhrp, 1)
     assert p["weakest"][0]["mastery_pct"] == 0
     assert {f["check_id"] for f in p["failed_checks"]} == {"r1-auth", "r1-ping", "r1-route"}
     assert p["streak"]["current"] == 1 and p["activity"][-1]["checks"] == 4

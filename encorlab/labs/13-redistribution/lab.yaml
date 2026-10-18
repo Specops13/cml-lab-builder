@@ -1,0 +1,255 @@
+id: 13-redistribution
+title: Mutual OSPF/EIGRP Redistribution with Route Tags
+blueprint: ["3.2.a", "3.2.b"]
+domain: "3.0 Infrastructure - Layer 3"
+difficulty: 4
+summary: Redistribute between OSPF and EIGRP at two border routers, using route-maps that tag routes and filter them on the tag to prevent feedback loops.
+nodes:
+  - name: R1
+    kind: router
+    x: -250
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 1.1.1.1 255.255.255.255
+      interface %if0%
+       description to R2
+       ip address 10.0.12.1 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to R3
+       ip address 10.0.13.1 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      router ospf 1
+       router-id 1.1.1.1
+       network 1.1.1.1 0.0.0.0 area 0
+       network 10.0.12.0 0.0.0.3 area 0
+       network 10.0.13.0 0.0.0.3 area 0
+  - name: R2
+    kind: router
+    x: 0
+    y: -150
+    config: |
+      interface Loopback0
+       ip address 2.2.2.2 255.255.255.255
+      interface %if0%
+       description to R1 (OSPF)
+       ip address 10.0.12.2 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to R4 (EIGRP)
+       ip address 10.0.24.2 255.255.255.252
+       no shutdown
+      router ospf 1
+       router-id 2.2.2.2
+       network 10.0.12.0 0.0.0.3 area 0
+      router eigrp 100
+       eigrp router-id 2.2.2.2
+       network 10.0.24.0 0.0.0.3
+  - name: R3
+    kind: router
+    x: 0
+    y: 150
+    config: |
+      interface Loopback0
+       ip address 3.3.3.3 255.255.255.255
+      interface %if0%
+       description to R1 (OSPF)
+       ip address 10.0.13.3 255.255.255.252
+       ip ospf network point-to-point
+       no shutdown
+      interface %if1%
+       description to R4 (EIGRP)
+       ip address 10.0.34.3 255.255.255.252
+       no shutdown
+      router ospf 1
+       router-id 3.3.3.3
+       network 10.0.13.0 0.0.0.3 area 0
+      router eigrp 100
+       eigrp router-id 3.3.3.3
+       network 10.0.34.0 0.0.0.3
+  - name: R4
+    kind: router
+    x: 250
+    y: 0
+    config: |
+      interface Loopback0
+       ip address 4.4.4.4 255.255.255.255
+      interface %if0%
+       description to R2
+       ip address 10.0.24.4 255.255.255.252
+       no shutdown
+      interface %if1%
+       description to R3
+       ip address 10.0.34.4 255.255.255.252
+       no shutdown
+      router eigrp 100
+       eigrp router-id 4.4.4.4
+       network 4.4.4.4 0.0.0.0
+       network 10.0.24.0 0.0.0.3
+       network 10.0.34.0 0.0.0.3
+links:
+  - {a: {node: R1, port: 0}, b: {node: R2, port: 0}}
+  - {a: {node: R1, port: 1}, b: {node: R3, port: 0}}
+  - {a: {node: R2, port: 1}, b: {node: R4, port: 0}}
+  - {a: {node: R3, port: 1}, b: {node: R4, port: 1}}
+task: |
+  # Lab 13 - Mutual redistribution with route tags
+
+  The company merged with another one. R1 runs **OSPF 1** (area 0), R4 runs **EIGRP 100**, and R2 and R3 sit on the
+  border and run both protocols. Both domains must reach each other through **both** border routers, without
+  redistribution feedback loops.
+
+  On **both R2 and R3**:
+  1. Create route-map **E2O** (EIGRP into OSPF). Sequence 10 **denies** routes with tag **110**, and sequence 20
+     **permits** everything else and **sets tag 90**.
+  2. Create route-map **O2E** (OSPF into EIGRP). Sequence 10 **denies** routes with tag **90**, and sequence 20
+     **permits** everything else and **sets tag 110**.
+  3. Redistribute EIGRP 100 into OSPF 1 (including subnets) with route-map E2O.
+  4. Redistribute OSPF 1 into EIGRP 100 with seed metric **10000 100 255 1 1500** and route-map O2E.
+
+  Result: R1 learns 4.4.4.4/32 as an OSPF external route with tag 90, R4 learns 1.1.1.1/32 as an EIGRP external route
+  with tag 110, and R4 can ping 1.1.1.1 from its Loopback0.
+  Verify with `show ip route 4.4.4.4`, `show ip route 1.1.1.1` and `show route-map`.
+checks:
+  - id: r1-ext-route
+    template: route_present
+    device: R1
+    params: {prefix: 4.4.4.4/32, code: O E2}
+    hint: EIGRP must be redistributed into OSPF on the border routers.
+  - id: r1-tag
+    description: R1's route to 4.4.4.4 is OSPF external type 2 with tag 90
+    device: R1
+    command: show ip route 4.4.4.4
+    match: ['Known via "ospf 1"', 'Tag 90, type extern 2']
+    hint: route-map E2O permit 20 must set tag 90.
+  - id: r4-ext-route
+    template: route_present
+    device: R4
+    params: {prefix: 1.1.1.1/32, code: D EX}
+    hint: Redistributing into EIGRP needs a seed metric, or the routes are not advertised.
+  - id: r4-tag
+    description: R4's route to 1.1.1.1 is EIGRP external with tag 110
+    device: R4
+    command: show ip route 1.1.1.1
+    match: ['Known via "eigrp 100", distance 170', 'Tag 110']
+  - id: r4-ping
+    template: ping
+    device: R4
+    params: {target: 1.1.1.1, source: Loopback0}
+  # ---- config-mode checks (running config via CML API) ----
+  - id: r2-cfg-maps
+    mode: config
+    description: R2 route-maps E2O (deny tag 110, set tag 90) and O2E (deny tag 90, set tag 110)
+    device: R2
+    match: &maps
+    - ^route-map E2O deny 10\s*\n(?:[ \t].*\n)*?[ \t]+match tag 110\s*$
+    - ^route-map E2O permit 20\s*\n(?:[ \t].*\n)*?[ \t]+set tag 90\s*$
+    - ^route-map O2E deny 10\s*\n(?:[ \t].*\n)*?[ \t]+match tag 90\s*$
+    - ^route-map O2E permit 20\s*\n(?:[ \t].*\n)*?[ \t]+set tag 110\s*$
+  - id: r2-cfg-redist
+    mode: config
+    description: R2 redistributes both ways through the route-maps (EIGRP seed metric set)
+    device: R2
+    match: &redist
+    - ^router ospf 1\s*\n(?:[ \t].*\n)*?[ \t]+redistribute eigrp 100( subnets)? route-map E2O(\s+subnets)?\s*$
+    - ^router eigrp 100\s*\n(?:[ \t].*\n)*?[ \t]+redistribute ospf 1 metric 10000 100 255 1 1500 route-map O2E\s*$
+  - id: r3-cfg-maps
+    mode: config
+    description: R3 route-maps E2O and O2E with the same tags
+    device: R3
+    match: *maps
+  - id: r3-cfg-redist
+    mode: config
+    description: R3 redistributes both ways through the route-maps (EIGRP seed metric set)
+    device: R3
+    match: *redist
+solution_summary: |
+  **What was missing:** no redistribution, so the OSPF and EIGRP domains could not see each other's routes.
+
+  **Fix (R2 and R3, identical)**
+  ```
+  route-map E2O deny 10
+   match tag 110
+  route-map E2O permit 20
+   set tag 90
+  route-map O2E deny 10
+   match tag 90
+  route-map O2E permit 20
+   set tag 110
+  router ospf 1
+   redistribute eigrp 100 subnets route-map E2O
+  router eigrp 100
+   redistribute ospf 1 metric 10000 100 255 1 1500 route-map O2E
+  ```
+
+  **Why it works:** every route that enters OSPF from EIGRP is tagged 90, and every route that enters EIGRP from OSPF is
+  tagged 110. With two border routers, a route can leave a domain at one border router and come back at the other. The
+  deny sequences stop that: OSPF→EIGRP drops anything tagged 90 (it came from EIGRP), and EIGRP→OSPF drops anything
+  tagged 110 (it came from OSPF). EIGRP needs a seed metric for redistributed routes (bandwidth, delay, reliability, load,
+  MTU); without one, they get an infinite metric and are not advertised. `subnets` makes OSPF take non-classful
+  prefixes (it is the default on recent IOS-XE).
+hints:
+  - "Routes only cross between routing protocols where you redistribute them, and you have two border routers (R2 and R3)."
+  - "Redistribution into EIGRP needs a seed metric. With two border routers, mark the routes on the way in (set tag) so you can recognise them later."
+  - "Each route-map first denies the tag the *other* direction sets (E2O denies 110, O2E denies 90), then permits the rest and sets its own tag."
+faults:
+- id: r3-o2e-no-filter
+  title: Feedback filter missing on R3
+  device: R3
+  ticket: An audit found R3 re-advertising EIGRP-originated routes into EIGRP as externals learned from OSPF, creating a potential routing loop between the borders.
+  config: |
+    no route-map O2E deny 10
+  explanation: |-
+    **Root cause:** sequence 10 of route-map O2E (deny tag 90) was removed on R3. Routes that came from EIGRP (tagged 90 at the other border) can now be redistributed from OSPF back into EIGRP, which is a classic two-point redistribution feedback loop.
+
+    **Fix (R3):**
+    ```
+    route-map O2E deny 10
+     match tag 90
+    ```
+  hints:
+  - What stops a route that came from EIGRP from going back into EIGRP at the other border router?
+  - Compare `show route-map O2E` on R2 and R3.
+  checks: []
+- id: r2-no-redist-ospf
+  title: OSPF no longer redistributed into EIGRP on R2
+  device: R2
+  ticket: During R3's maintenance window, R4 lost every route to the OSPF domain, including 1.1.1.1. With R3 up, everything looks fine.
+  config: |
+    router eigrp 100
+     no redistribute ospf 1
+  explanation: |-
+    **Root cause:** R2 no longer redistributes OSPF into EIGRP, so R3 was the only source of the OSPF routes in EIGRP. The design needs both border routers to redistribute in both directions.
+
+    **Fix (R2):**
+    ```
+    router eigrp 100
+     redistribute ospf 1 metric 10000 100 255 1 1500 route-map O2E
+    ```
+  hints:
+  - The problem only appears when R3 is down. Which router should be providing the same routes?
+  - '`show running-config | section router eigrp` on R2 and R3.'
+  checks: []
+- id: r3-wrong-tag
+  title: R3 sets the wrong tag
+  device: R3
+  ticket: R1 sees 4.4.4.4 with two different route tags depending on the path, and R2's OSPF→EIGRP filter no longer catches some of them.
+  config: |
+    route-map E2O permit 20
+     set tag 99
+  explanation: |-
+    **Root cause:** R3's route-map E2O sets tag 99 instead of 90. Routes that R3 redistributes into OSPF don't carry the tag that R2's O2E filter (deny tag 90) looks for, so R2 can feed them back into EIGRP.
+
+    **Fix (R3):**
+    ```
+    route-map E2O permit 20
+     set tag 90
+    ```
+  hints:
+  - Loop prevention depends on both border routers using the same tags.
+  - '`show ip route 4.4.4.4` on R1, then `show route-map E2O` on R3.'
+  checks: []

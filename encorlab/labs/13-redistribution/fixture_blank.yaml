@@ -1,0 +1,12 @@
+R1:
+  show ip route 4.4.4.4: |
+    % Network not in table
+R4:
+  show ip route 1.1.1.1: |
+    % Network not in table
+  ping 1.1.1.1 source Loopback0 repeat 5: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 1.1.1.1, timeout is 2 seconds:
+    Packet sent with a source address of 4.4.4.4
+    .....
+    Success rate is 0 percent (0/5)

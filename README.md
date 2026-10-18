@@ -32,14 +32,16 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [Version and changelog](#version-and-changelog)
 
 ## Features
-- **11 built-in labs** covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
+- **14 built-in labs** covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
   OSPFv2 multi-area/stub/summarization, EIGRP named mode with authentication and stub, eBGP/iBGP with next-hop-self,
-  HSRPv2 with tracking, ACL/PAT/static NAT, VRF-lite, GRE over IPsec with OSPF, and NTP/Syslog/SNMPv3/IP SLA.
+  HSRPv2 with tracking, ACL/PAT/static NAT, VRF-lite, GRE over IPsec with OSPF, NTP/Syslog/SNMPv3/IP SLA,
+  HSRP failover driven by IP SLA object tracking, policy-based routing, and mutual OSPF/EIGRP redistribution with route tags.
+  (Multicast/PIM is not covered: its IOL output could not be verified.)
 - **One-click lifecycle in CML:** Build (import + start + wait for boot), Check, Reset (back to the starting configs), Destroy.
   It only ever touches labs titled `ENCOR-…`.
 - **Two grading modes:** *live* (real adjacencies, routes, pings over the console server) and *config* (HTTPS only).
   *Auto* uses live when it can and falls back to config.
-- **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (33 in total). One click rebuilds
+- **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (42 in total). One click rebuilds
   the working lab with a random fault and gives you a symptom-only trouble ticket, so you get unlimited troubleshooting practice.
 - **Exam mode:** a timed, one-shot attempt with a countdown, the solution withheld, and hints disabled or costing
   points. *Submit exam* (or the timer running out) grades once and shows a score report (raw score, hint penalty,
@@ -400,7 +402,7 @@ encorlab/                 the application (Python package)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders
-  labs/<id>/              11 built-in labs (lab.yaml, solution.cfg, fixture_*.yaml)
+  labs/<id>/              14 built-in labs (lab.yaml, solution.cfg, fixture_*.yaml)
   web/                    FastAPI app, templates/index.html, static/ (app.js, help.js, help.json, style.css)
   resources/              authoring guide + example lab (source of docs/)
 docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example lab, images/

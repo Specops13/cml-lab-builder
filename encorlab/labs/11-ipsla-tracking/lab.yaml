@@ -1,0 +1,250 @@
+id: 11-ipsla-tracking
+title: IP SLA Reachability Tracking with HSRP Failover
+blueprint: ["4.4", "3.3.c"]
+domain: "3.0 Infrastructure - IP Services / 4.0 Network Assurance"
+difficulty: 3
+summary: Detect an upstream outage that keeps the link up with an IP SLA probe, then withdraw the static default route and fail HSRP over to the backup router.
+nodes:
+  - name: R1
+    kind: router
+    x: -150
+    y: 0
+    config: |
+      interface %if0%
+       description LAN
+       ip address 192.168.20.1 255.255.255.0
+       no shutdown
+      interface %if1%
+       description uplink to ISP (primary)
+       ip address 10.1.1.1 255.255.255.252
+       no shutdown
+  - name: R2
+    kind: router
+    x: 150
+    y: 0
+    config: |
+      interface %if0%
+       description LAN
+       ip address 192.168.20.2 255.255.255.0
+       no shutdown
+      interface %if1%
+       description uplink to ISP (backup)
+       ip address 10.2.2.1 255.255.255.252
+       no shutdown
+  - name: ISP
+    kind: router
+    x: 0
+    y: -200
+    config: |
+      interface Loopback0
+       description probe target / Internet
+       ip address 203.0.113.1 255.255.255.255
+      interface %if0%
+       description to R1
+       ip address 10.1.1.2 255.255.255.252
+       no shutdown
+      interface %if1%
+       description to R2
+       ip address 10.2.2.2 255.255.255.252
+       no shutdown
+      ip route 192.168.20.0 255.255.255.0 10.1.1.1
+      ip route 192.168.20.0 255.255.255.0 10.2.2.1
+  - name: SW1
+    kind: switch
+    x: 0
+    y: 200
+    config: |
+      interface Vlan1
+       ip address 192.168.20.10 255.255.255.0
+       no shutdown
+      ip default-gateway 192.168.20.254
+      ip route 0.0.0.0 0.0.0.0 192.168.20.254
+links:
+  - {a: {node: R1, port: 0}, b: {node: SW1, port: 0}}
+  - {a: {node: R2, port: 0}, b: {node: SW1, port: 1}}
+  - {a: {node: R1, port: 1}, b: {node: ISP, port: 0}}
+  - {a: {node: R2, port: 1}, b: {node: ISP, port: 1}}
+task: |
+  # Lab 11 - IP SLA tracking with HSRP failover
+
+  R1 is the primary Internet router and R2 the backup. Both connect LAN 192.168.20.0/24 (SW1 = 192.168.20.10) to the ISP.
+  An upstream failure inside the ISP does **not** bring R1's uplink down, so interface tracking would miss it.
+  Detect it with an IP SLA probe instead.
+
+  1. On R1, create **IP SLA 1**: ICMP echo to **203.0.113.1** sourced from R1's uplink (%if1%), every **5** seconds,
+     scheduled to run **forever starting now**.
+  2. Add a host route to 203.0.113.1/32 via 10.1.1.2 (untracked) so the probe always leaves through the uplink.
+  3. Create **track 1** that follows the **reachability** of IP SLA 1.
+  4. On R1, add the default route via 10.1.1.2 **tracked by object 1**. On R2, add a plain default route via 10.2.2.2.
+  5. Configure HSRP **version 2**, group **20**, virtual IP **192.168.20.254** on the LAN interfaces (%if0%). R1: priority **110**,
+     preempt, and decrement the priority by **20** when track 1 goes down. R2: default priority, preempt.
+  6. SW1 must reach 203.0.113.1 through the virtual gateway.
+
+  Verify with `show ip sla statistics 1`, `show track 1`, `show ip route static` and `show standby brief`.
+checks:
+  - id: r1-sla-ok
+    description: IP SLA 1 on R1 is running and its last probe succeeded
+    device: R1
+    command: show ip sla statistics 1
+    match: ['IPSLA operation id: 1', 'Latest operation return code: OK']
+    hint: The probe needs both its definition and `ip sla schedule 1 life forever start-time now`.
+  - id: r1-track-up
+    description: Track 1 follows IP SLA 1 reachability and is Up
+    device: R1
+    command: show track 1
+    match: ['IP SLA 1 reachability', 'Reachability is Up']
+    hint: track 1 ip sla 1 reachability
+  - id: r1-default-tracked
+    description: R1 has the default route via 10.1.1.2
+    device: R1
+    command: show ip route static
+    match: ['^S\*\s+0\.0\.0\.0/0 \[1/0\] via 10\.1\.1\.2']
+    hint: The tracked route is only installed while track 1 is Up.
+  - id: r1-active
+    description: R1 is HSRP Active for group 20 with priority 110 and preempt
+    device: R1
+    command: show standby brief
+    match: ['^%if0s%\s+20\s+110\s+P\s+Active\s+local\s+192\.168\.20\.2\s+192\.168\.20\.254']
+  - id: r1-hsrp-track
+    description: R1's HSRP group tracks object 1 with decrement 20
+    device: R1
+    command: show standby
+    match: ['Group 20 \(version 2\)', 'Track object 1 state Up decrement 20']
+    hint: standby 20 track 1 decrement 20
+  - id: r2-standby
+    description: R2 is HSRP Standby for group 20
+    device: R2
+    command: show standby brief
+    match: ['^%if0s%\s+20\s+100\s+P?\s*Standby\s+192\.168\.20\.1\s+local\s+192\.168\.20\.254']
+  - id: sw1-ping
+    description: SW1 reaches 203.0.113.1 through the virtual gateway
+    device: SW1
+    command: ping 203.0.113.1 repeat 5
+    min_success: 80
+  # ---- config-mode checks (running config via CML API) ----
+  - id: r1-cfg-sla
+    mode: config
+    description: R1 IP SLA 1 probes 203.0.113.1 from the uplink every 5 s, scheduled forever
+    device: R1
+    match:
+    - ^ip sla 1\s*\n(?:[ \t].*\n)*?[ \t]+icmp-echo 203\.0\.113\.1 source-interface %if1%
+    - ^ip sla 1\s*\n(?:[ \t].*\n)*?[ \t]+frequency 5\s*$
+    - ^ip sla schedule 1 life forever start-time now
+  - id: r1-cfg-track-route
+    mode: config
+    description: R1 track 1 on SLA reachability, tracked default route and probe host route
+    device: R1
+    match:
+    - ^track 1 ip sla 1 reachability
+    - ^ip route 0\.0\.0\.0 0\.0\.0\.0 10\.1\.1\.2 track 1
+    - ^ip route 203\.0\.113\.1 255\.255\.255\.255 10\.1\.1\.2\s*$
+  - id: r1-cfg-hsrp
+    mode: config
+    description: R1 HSRPv2 group 20, VIP .254, priority 110, preempt, track 1 decrement 20
+    device: R1
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+standby version 2
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+standby 20 ip 192\.168\.20\.254
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+standby 20 priority 110
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+standby 20 preempt
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+standby 20 track 1 decrement 20
+  - id: r2-cfg
+    mode: config
+    description: R2 HSRPv2 group 20 with preempt and a default route via 10.2.2.2
+    device: R2
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+standby version 2
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+standby 20 ip 192\.168\.20\.254
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+standby 20 preempt
+    - ^ip route 0\.0\.0\.0 0\.0\.0\.0 10\.2\.2\.2
+solution_summary: |
+  **What was missing:** no gateway redundancy and no way to notice an upstream failure. The LAN had no virtual gateway,
+  and neither router had a default route.
+
+  **Fix**
+  ```
+  ! R1 (primary)
+  ip sla 1
+   icmp-echo 203.0.113.1 source-interface %if1%
+   frequency 5
+  ip sla schedule 1 life forever start-time now
+  track 1 ip sla 1 reachability
+  ip route 203.0.113.1 255.255.255.255 10.1.1.2
+  ip route 0.0.0.0 0.0.0.0 10.1.1.2 track 1
+  interface %if0%
+   standby version 2
+   standby 20 ip 192.168.20.254
+   standby 20 priority 110
+   standby 20 preempt
+   standby 20 track 1 decrement 20
+  ! R2 (backup)
+  ip route 0.0.0.0 0.0.0.0 10.2.2.2
+  interface %if0%
+   standby version 2
+   standby 20 ip 192.168.20.254
+   standby 20 preempt
+  ```
+
+  **Why it works:** the IP SLA probe tests the path *through* the ISP, not just the link. When 203.0.113.1 stops
+  answering, track 1 goes Down. Two things follow: R1 withdraws its tracked default route, and its HSRP priority drops to
+  90, so R2 (100, preempt) becomes Active and forwards via its own uplink. The untracked /32 host route keeps the probe on
+  R1's uplink. Without it the probe would depend on the default route it controls, and once Down it could never recover.
+  When the probe succeeds again, track 1 comes Up and R1 preempts back.
+hints:
+  - "Interface tracking only sees link state. You need a probe that tests reachability through the ISP, plus a track object that follows it."
+  - "An IP SLA operation does nothing until it is scheduled. The probe also needs its own route that doesn't depend on the route being tracked."
+  - "Tie the same track object to two things on R1: the default route (`... track 1`) and the HSRP priority (`standby 20 track 1 decrement 20`)."
+faults:
+- id: r1-sla-unscheduled
+  title: IP SLA probe not scheduled
+  device: R1
+  ticket: Since this morning's change window, R2 is the active gateway and R1 has no default route, although R1's uplink and the ISP are healthy.
+  config: |
+    no ip sla schedule 1
+  explanation: |-
+    **Root cause:** the `ip sla schedule 1` line was removed from R1. The probe is defined but never runs, so track 1 stays Down. R1 withdraws its tracked default route and drops its HSRP priority to 90.
+
+    **Fix (R1):**
+    ```
+    ip sla schedule 1 life forever start-time now
+    ```
+  hints:
+  - Track 1 is Down. Is the probe it follows actually running?
+  - '`show ip sla statistics 1` and `show ip sla configuration 1` on R1: look at the schedule.'
+  checks: []
+- id: r1-no-hsrp-track
+  title: HSRP no longer tracks the probe
+  device: R1
+  ticket: During the ISP's planned upstream outage on R1's path, SW1 lost Internet access for the whole maintenance window. R2 never took over.
+  config: |
+    interface %if0%
+     no standby 20 track 1 decrement 20
+  explanation: |-
+    **Root cause:** the `standby 20 track 1 decrement 20` line was removed. When the probe failed, R1 removed its default route but kept priority 110, so it stayed Active and black-holed the LAN's traffic.
+
+    **Fix (R1):**
+    ```
+    interface %if0%
+     standby 20 track 1 decrement 20
+    ```
+  hints:
+  - R1 lost its default route, yet it stayed the active gateway.
+  - Check `show standby` on R1 for a tracked object.
+  checks: []
+- id: r1-no-probe-route
+  title: Probe host route missing
+  device: R1
+  ticket: After R1 was reloaded, it never became the active gateway again. `show track 1` on R1 has said Down ever since, but the ISP answers pings from R1's uplink.
+  config: |
+    no ip route 203.0.113.1 255.255.255.255 10.1.1.2
+  explanation: |-
+    **Root cause:** the /32 host route for the probe target was removed. Now the probe needs the default route to reach 203.0.113.1, but that route is only installed while the probe succeeds. After a reload, track 1 starts Down and can never come Up (chicken-and-egg).
+
+    **Fix (R1):**
+    ```
+    ip route 203.0.113.1 255.255.255.255 10.1.1.2
+    ```
+  hints:
+  - How does R1 route the probe packets to 203.0.113.1 when its default route is not installed?
+  - Compare `show ip route 203.0.113.1` with what the probe needs.
+  checks: []
