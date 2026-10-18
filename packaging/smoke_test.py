@@ -112,10 +112,10 @@ def main() -> int:
         code, out = run(exe + ["--no-browser", "--port", base.rsplit(":", 1)[1]], timeout=60)
         check(code == 0 and "already running" in out, "second launch detects the running instance")
     finally:
-        if os.name == "nt":
-            proc.send_signal(signal.CTRL_BREAK_EVENT)
-        else:
-            proc.send_signal(signal.SIGINT)
+        try:
+            proc.send_signal(signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT)
+        except OSError:  # e.g. CTRL_BREAK unsupported (Wine): fall back to terminate
+            proc.terminate()
         try:
             proc.wait(timeout=20)
         except subprocess.TimeoutExpired:

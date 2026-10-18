@@ -146,3 +146,8 @@ def test_docs_require_summary():
     assert "## Solution summary and hints" in guide and "validator warns" in guide
     ex = Lab.model_validate(yaml.safe_load((ROOT / "docs" / "example-lab.yaml").read_text(encoding="utf-8")))
     assert ex.solution_summary and ex.hints
+
+
+def test_markdown_soft_wrap_joins_paragraph_lines():
+    js = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "consecutive plain lines form one paragraph" in js

@@ -77,7 +77,10 @@ function md(src) {
     if ((m = l.match(/^\s*([-*]|\d+\.)\s+(.*)/))) { const tag = /\d/.test(m[1]) ? "ol" : "ul", items = [m[2]];
       while (i + 1 < lines.length && /^\s*([-*]|\d+\.)\s+|^\s{2,}\S/.test(lines[i + 1])) { const n = lines[++i]; const mm = n.match(/^\s*([-*]|\d+\.)\s+(.*)/); if (mm) items.push(mm[2]); else items[items.length - 1] += " " + n.trim(); }
       out.push(`<${tag}>${items.map((x) => `<li>${inline(x)}</li>`).join("")}</${tag}>`); continue; }
-    out.push(l.trim() ? `<p>${inline(l)}</p>` : "");
+    if (!l.trim()) { out.push(""); continue; }
+    const para = [l.trim()];  // consecutive plain lines form one paragraph (Markdown soft wrap)
+    while (i + 1 < lines.length && lines[i + 1].trim() && !/^(```|\||#{1,4}\s|\s*([-*]|\d+\.)\s| {4})/.test(lines[i + 1])) para.push(lines[++i].trim());
+    out.push(`<p>${inline(para.join(" "))}</p>`);
   }
   return out.join("\n");
 }
