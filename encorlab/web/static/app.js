@@ -1,6 +1,6 @@
 "use strict";
 /* ENCOR Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "1.6.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "1.7.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -832,44 +832,130 @@ $("#settings-form").addEventListener("submit", async (e) => {
   } catch (err) { toast("Settings not saved: " + err.message, "err", 9000); }
 });
 
-/* ---------------------------------------------------------------- update check (GitHub Releases; on click, or daily if enabled) */
+/* ---------------------------------------------------------------- updates
+   The packaged app checks GitHub in the background (server side, see autoupdate.py), downloads and verifies a new
+   version's patch, and this page asks: Update now / Later / Skip this version. Nothing installs without a click. */
+const fmtSize = (n) => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+const fmtWhen = (ts) => ts ? new Date(ts * 1000).toLocaleString([], {dateStyle: "short", timeStyle: "short"}) : "never";
+const Upd = {timer: null, key: "", restarting: false, toasted: false};
 async function checkUpdates(manual) {
   const out = $("#update-result");
-  if (manual && out) out.textContent = "Checking…";
+  if (out) out.textContent = "Checking…";
   let r;
-  try { r = await api("/api/update-check"); }
+  try { r = await api("/api/update/check", {method: "POST"}); }
   catch (e) {
     const msg = `Could not check for updates: ${(e.data && e.data.error) || e.message}`;
-    if (out) out.textContent = msg; if (manual) toast(msg, "err", 8000);
+    if (out) out.textContent = msg;
+    if (manual) toast(msg, "err", 8000);
     return;
   }
-  localStorage.setItem("updateChecked", String(Date.now()));
-  const text = r.update_available ? `Version ${r.latest} is available (you have ${r.current}).`
-    : `You have the latest version (${r.current}).`;
-  if (out) out.innerHTML = `${esc(text)} <a data-help="s.releaseLink" href="${esc(r.url)}" target="_blank" rel="noopener">Release page ↗</a>`;
-  if (r.update_available) {
-    const seen = localStorage.getItem("updateDismissed");
-    if (manual || seen !== r.latest) {
-      banner(`ENCOR Lab Builder ${r.latest} is available (you have ${r.current}). Download it from ${r.url}`);
-      localStorage.setItem("updateDismissed", r.latest);
-    }
-  } else if (manual) toast(text, "ok");
-  showPatchOffer(r).catch(() => {});
+  let text;
+  if (r.status === "source") {
+    const i = r.info;
+    text = i.update_available ? `Version ${i.latest} is available (you have ${i.current}). Running from source: update with git pull.`
+      : `You have the latest version (${i.current}).`;
+    if (out) out.innerHTML = `${esc(text)} <a data-help="s.releaseLink" href="${esc(i.url)}" target="_blank" rel="noopener">Release page ↗</a>`;
+  } else {
+    text = {up_to_date: `You have the latest version (${r.latest || APP_JS_VERSION}).`,
+      staged: `Version ${r.version} is downloaded and verified: see the prompt at the bottom left.`,
+      full_download: `Version ${r.version} needs a full download (${r.reason}).`}[r.status] || "Done.";
+    if (out) out.textContent = text;
+  }
+  if (manual) toast(text, "ok", 6000);
+  pollUpdates();
 }
-/* ---- patch updates: install the small app-code patch of a release, restart, roll back */
-const fmtSize = (n) => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
-async function showPatchOffer(r) {
-  const box = $("#update-patch"), note = $("#update-install-note"), btn = $("#s-update-install");
-  if (!box) return;
-  box.hidden = !r.update_available;
-  if (!r.update_available) return;
-  const st = await api("/api/update/status");
-  const patch = (r.assets || []).find((a) => a.name === `encorlab-patch-${r.latest}.zip`);
-  const full = (r.assets || []).filter((a) => /^ENCORLab-.*-(windows|linux)-x64\./.test(a.name)).map((a) => a.size || 0);
-  btn.disabled = !(patch && st.patchable);
-  if (!patch) note.textContent = "This release has no app patch: download the full release from the release page.";
-  else if (!st.patchable) note.textContent = `Patch available (${fmtSize(patch.size || 0)}), but ${st.reason}.`;
-  else note.textContent = `Downloads ${fmtSize(patch.size || 0)}` + (full.length ? ` instead of ${fmtSize(Math.max(...full))} for the full download.` : ".");
+function scheduleUpdatePoll(ms) {
+  clearTimeout(Upd.timer);
+  Upd.timer = setTimeout(pollUpdates, ms);
+}
+async function pollUpdates() {
+  let st;
+  try { st = await api("/api/update/auto"); } catch (e) { scheduleUpdatePoll(60000); return; }
+  renderUpdatePrompt(st);
+  renderFullBanner(st);
+  const el = $("#update-auto-status");
+  if (el) {
+    let t = st.enabled ? `Automatic checks on · last check ${fmtWhen(st.last_check)} · next ${fmtWhen(st.next_check)}`
+      : `Automatic checks off${st.reason ? ": " + st.reason : ""}`;
+    if (st.enabled && st.failures) t += ` · last attempt failed, retrying later (${st.last_error || "error"})`;
+    if (st.failed_update) t += ` · update ${st.failed_update.version} could not start and was rolled back; it will not be offered again`;
+    el.textContent = t;
+  }
+  if (st.just_updated && !Upd.toasted) {
+    Upd.toasted = true;
+    toast(`Updated to ${st.just_updated.version}`, "ok", 10000);
+    api("/api/update/ack", {method: "POST"}).catch(() => {});
+  }
+  const a = st.apply;
+  if (a && a.state === "restarting" && st.offer) waitForRestart(st.offer.version);
+  scheduleUpdatePoll(a && ["waiting", "installing", "restarting"].includes(a.state) ? 2000 : 60000);
+}
+function renderUpdatePrompt(st) {
+  const box = $("#update-prompt"), o = st.offer, a = st.apply || {};
+  const key = JSON.stringify([o, a.state, a.waiting_for, a.error]);
+  if (key === Upd.key) return;
+  Upd.key = key;
+  if (!o) { box.hidden = true; box.innerHTML = ""; return; }
+  const v = esc(o.version), busy = (a.waiting_for && a.waiting_for.length ? a.waiting_for : o.busy) || [];
+  let msg = `A small update (${fmtSize(o.size || 0)}) is downloaded and verified. You have ${esc(APP_JS_VERSION)}.`;
+  let buttons = `<button data-help="u.updateNow" type="button" class="primary" data-upd="now">Update now</button>
+    <button data-help="u.later" type="button" data-upd="later">Later</button>
+    <button data-help="u.skip" type="button" data-upd="skip">Skip this version</button>`;
+  if (a.state === "waiting") {
+    msg = `Waiting for ${esc(busy.join(", ") || "the running work")} to finish; then the update installs and the app restarts. Nothing is interrupted.`;
+    buttons = `<button data-help="u.cancel" type="button" data-upd="cancel">Cancel</button>`;
+  } else if (a.state === "installing") { msg = "Installing the update…"; buttons = ""; }
+  else if (a.state === "restarting") { msg = "Restarting ENCOR Lab… this page reconnects by itself."; buttons = ""; }
+  else if (a.state === "installed") { msg = `Installed. ${esc(a.error || "Close the app and start it again to finish.")}`; buttons = ""; }
+  else {
+    if (a.state === "error") msg = `The update could not be installed: ${esc(a.error || "unknown error")}. You can try again.`;
+    if (busy.length) msg += ` Update now will wait until ${esc(busy.join(", "))} finishes.`;
+  }
+  box.innerHTML = `<h3>ENCOR Lab ${v} is ready</h3><p>${msg}</p>
+    <p class="small"><a data-help="u.notes" href="${esc(o.url)}" target="_blank" rel="noopener">Release notes ↗</a> ·
+    <a data-help="u.notes" href="${esc(o.changelog)}" target="_blank" rel="noopener">Changelog ↗</a></p>
+    <div class="toolbar">${buttons}</div>`;
+  box.hidden = false;
+  box.querySelectorAll("[data-upd]").forEach((b) => { b.onclick = () => updateAnswer(b.dataset.upd, o.version); });
+}
+async function updateAnswer(what, version) {
+  const q = encodeURIComponent(version);
+  const path = {now: `/api/update/apply?version=${q}`, later: "/api/update/later", skip: `/api/update/skip?version=${q}`,
+    cancel: "/api/update/cancel"}[what];
+  try { await api(path, {method: "POST"}); }
+  catch (e) { toast(`Update: ${(e.data && e.data.error) || e.message}`, "err", 9000); }
+  if (what === "skip") toast(`Version ${version} will not be offered again. Settings > Check for updates now still finds it.`, "ok", 8000);
+  Upd.key = "";
+  pollUpdates();
+}
+function renderFullBanner(st) {
+  const b = $("#update-full"), f = st.full_download;
+  if (!f) { b.hidden = true; b.innerHTML = ""; return; }
+  if (b.dataset.version === f.version && !b.hidden) return;
+  b.dataset.version = f.version;
+  b.innerHTML = `<button data-help="u.fullDismiss" type="button" class="hint-btn">Dismiss</button>
+    ENCOR Lab ${esc(f.version)} is available but needs a <b>full download</b> (${esc(f.reason || "new runtime")}); it cannot be installed as a patch.
+    <a data-help="u.fullLink" href="${esc(f.url)}" target="_blank" rel="noopener">Download it from the release page ↗</a>`;
+  b.hidden = false;
+  b.querySelector("button").onclick = async () => {
+    b.hidden = true;
+    await api(`/api/update/dismiss-full?version=${encodeURIComponent(f.version)}`, {method: "POST"}).catch(() => {});
+  };
+}
+async function waitForRestart(version) {
+  if (Upd.restarting) return;
+  Upd.restarting = true;
+  const t0 = Date.now();
+  await new Promise((res) => setTimeout(res, 1500));
+  while (Date.now() - t0 < 120000) {
+    try {
+      const h = await fetch("/api/health", {cache: "no-store"}).then((x) => x.json());
+      if (h.ok && (h.version === version || Date.now() - t0 > 20000)) { location.reload(); return; }
+    } catch (e) { /* still restarting */ }
+    await new Promise((res) => setTimeout(res, 1000));
+  }
+  Upd.restarting = false;
+  banner("The app did not come back within 2 minutes. Start it again from the ENCORLab shortcut or folder.");
 }
 async function loadUpdateStatus() {
   const el = $("#update-status");
@@ -887,23 +973,6 @@ async function loadUpdateStatus() {
   $("#s-update-rollback").hidden = !st.can_rollback;
   $("#s-update-restart").hidden = !(st.restart_needed && st.can_restart);
 }
-$("#s-update-install").onclick = async () => {
-  const btn = $("#s-update-install"), note = $("#update-install-note");
-  btn.disabled = true; note.textContent = "Downloading and verifying…";
-  try {
-    const r = await api("/api/update/install", {method: "POST"});
-    if (r.status === "installed") {
-      note.textContent = `Version ${r.version} installed (${fmtSize(r.size || 0)}, SHA-256 verified). Restart to use it.`;
-      toast(`Update ${r.version} installed. Click "Restart now" to use it.`, "ok", 9000);
-    } else if (r.status === "full_download") {
-      note.innerHTML = `${esc(r.reason)}. <a data-help="s.fullDownload" href="${esc(r.url)}" target="_blank" rel="noopener">Download the full release ↗</a>`;
-    } else note.textContent = `You already have the latest version (${r.current}).`;
-  } catch (e) {
-    note.textContent = `Update not installed: ${(e.data && e.data.error) || e.message}`;
-    btn.disabled = false;
-  }
-  loadUpdateStatus();
-};
 $("#s-update-rollback").onclick = async () => {
   if (!confirm("Go back to the previous app code? It takes effect after a restart.")) return;
   try {
@@ -930,11 +999,6 @@ $("#s-update-restart").onclick = async () => {
 };
 $("#s-update-check").onclick = () => checkUpdates(true);
 $("#update-link").onclick = (e) => { e.preventDefault(); show("settings"); location.hash = "settings"; checkUpdates(true); };
-async function autoUpdateCheck() {
-  const s = await api("/api/settings");
-  const last = Number(localStorage.getItem("updateChecked") || 0);
-  if (s.check_updates === true && Date.now() - last > 86400000) await checkUpdates(false);
-}
 
 /* ---------------------------------------------------------------- version check (stale cache / app updated while open) */
 async function versionCheck() {
@@ -954,12 +1018,12 @@ async function versionCheck() {
 (async () => {
   const step = async (name, fn) => { try { await fn(); } catch (e) { if (!e.shown) banner(`Startup step "${name}" failed: ${e.message}`); } };
   await step("version check", versionCheck);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) versionCheck().catch(() => {}); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { versionCheck().catch(() => {}); pollUpdates(); } });
   await step("settings", async () => { const s = await api("/api/settings"); if (window.Help) Help.setVisible(s.show_help !== false); });
   await step("check templates", async () => { templates = await api("/api/templates"); });
   await step("lab list", loadLabs);
   await step("courses", loadCourses);
-  autoUpdateCheck().catch(() => {});   // opt-in, at most once a day; never blocks startup
+  pollUpdates();   // the update prompt (the server does the checking); never blocks startup
   const v = (location.hash || "#labs").slice(1);
   show(VIEWS.includes(v) ? v : "labs");
 })();

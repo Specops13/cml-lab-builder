@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, catalog, config, courses, exam, faults, history, library, packs, progress, report, service, snapshots, updates
+from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, packs, progress, report, service, snapshots, updates
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -78,11 +78,30 @@ class CmlDraftIn(BaseModel):
     lab_id: str
 
 
+JOB_LABELS = {"build": "a lab build", "check": "grading", "test-live": "a live test", "break": "fault injection",
+              "restore": "a snapshot restore", "snapshot": "a snapshot", "reset": "a lab reset",
+              "destroy": "a lab teardown", "ai": "AI lab generation"}
+
+
 def create_app(store: config.SettingsStore | None = None, client_factory=None, runner_factory=None,
                config_factory=None, probe=None, persist: bool = True, ai_transport=None,
-               library_fetch=None, update_fetch=None) -> FastAPI:
+               library_fetch=None, update_fetch=None, update_http=None, auto_update: bool = False,
+               restart=None) -> FastAPI:
+    """auto_update=True (the desktop launcher) starts the background update checker; update_http / restart are
+    test hooks for it (see autoupdate.Updater)."""
     store = store or config.SettingsStore()
     jobs = service.JobManager()
+
+    def _busy() -> list[str]:
+        """Work an update must not interrupt."""
+        out = [f"{JOB_LABELS.get(j.kind, j.kind)} ({j.lab_id})" if not j.lab_id.startswith("__") else JOB_LABELS.get(j.kind, j.kind)
+               for j in jobs.running()]
+        out += [f"an exam ({lab})" for lab in exam.running()]
+        return out
+
+    updater = autoupdate.Updater(settings=store.get, fetch=update_http, busy=_busy, restart=restart)
+    if auto_update:
+        updater.start()
     app = FastAPI(title="ENCOR Lab Builder", version=__version__)
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
@@ -110,7 +129,12 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         if not s.is_configured():
             raise HTTPException(400, "Configure CML URL, username and password on the Settings page first")
 
+    def _not_updating():
+        if updater.applying():
+            raise HTTPException(409, "An update is being installed and the app restarts in a moment; try again then.")
+
     def _start(kind, lab_id, fn, need_cml=True):
+        _not_updating()
         s = store.get()
         if need_cml:
             _need_cml(s)
@@ -188,6 +212,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
 
     @app.post("/api/labs/{lab_id}/exam/start")
     def exam_start(lab_id: str, minutes: int | None = None, hints: str = "penalty", penalty: int = exam.DEFAULT_PENALTY):
+        _not_updating()
         e = _entry(lab_id)
         if exam.active(lab_id):
             raise HTTPException(409, "an exam is already running for this lab")
@@ -411,7 +436,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     def update_check():
         """One GET to the GitHub Releases API; only called on a click or when check_updates is on."""
         try:
-            return updates.check(__version__, fetch=update_fetch or library.http_fetch)
+            return updates.check(__version__, fetch=update_fetch or updates.fetch, url=updates.release_url())
         except library.LibraryError as e:
             return JSONResponse({"error": str(e), "current": __version__, "url": updates.RELEASES_PAGE}, status_code=502)
 
@@ -424,11 +449,61 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     def update_install():
         """Download, verify (SHA256SUMS + manifest) and install the latest release's app patch."""
         try:
-            return updates.install(__version__, fetch=update_fetch or library.http_fetch)
+            return updates.install(__version__, fetch=update_fetch or updates.fetch)
         except updates.UpdateError as e:
             return JSONResponse({"error": str(e)}, status_code=400)
         except library.LibraryError as e:
             return JSONResponse({"error": str(e)}, status_code=502)
+
+    # ---- automatic updates: background check + staged patch, the prompt answers, idle-gated install
+    def _upd_err(e: Exception):
+        code = 502 if isinstance(e, library.LibraryError) and not isinstance(e, updates.UpdateError) else 400
+        return JSONResponse({"error": str(e)}, status_code=code)
+
+    @app.get("/api/update/auto")
+    def update_auto():
+        """Prompt state: staged offer, full-download banner, Update now progress, 'Updated to x' after a restart."""
+        return updater.state()
+
+    @app.post("/api/update/check")
+    def update_check_now():
+        """Manual check (Check now): from source it only reports; packaged, it also downloads + verifies the patch,
+        and may offer a skipped or rolled-back version again."""
+        try:
+            if not updates.patchable()[0]:
+                info = updates.check(__version__, fetch=update_fetch or updates.fetch, url=updates.release_url())
+                return {"status": "source", "info": info, "state": updater.state()}
+            return {**updater.check(manual=True), "state": updater.state()}
+        except (library.LibraryError, updates.UpdateError) as e:
+            return _upd_err(e)
+
+    @app.post("/api/update/apply")
+    def update_apply(version: str):
+        """Update now: install as soon as no build / grading / snapshot / fault / exam is running, then restart."""
+        try:
+            return updater.apply(version)
+        except updates.UpdateError as e:
+            return _upd_err(e)
+
+    @app.post("/api/update/cancel")
+    def update_cancel():
+        return updater.cancel()
+
+    @app.post("/api/update/later")
+    def update_later():
+        return updater.later()
+
+    @app.post("/api/update/skip")
+    def update_skip(version: str):
+        return updater.skip(version)
+
+    @app.post("/api/update/dismiss-full")
+    def update_dismiss_full(version: str):
+        return updater.dismiss_full(version)
+
+    @app.post("/api/update/ack")
+    def update_ack():
+        return updater.ack()
 
     @app.post("/api/update/rollback")
     def update_rollback():
@@ -456,10 +531,13 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         data = body.model_dump(exclude_none=True)
         remember = data.pop("remember_password", False)
         remember_ai = data.pop("remember_ai_key", False)
+        before = store.get().check_updates
         try:
             s = store.update(**data)
         except ValueError as e:
             raise HTTPException(400, str(e))
+        if s.check_updates != before:
+            updater.wake()
         saved = config.keyring_set(s.username, s.password) if (remember and s.username and s.password) else False
         ai_saved = (config.keyring_set("ai-key:" + s.ai_base_url, s.ai_api_key)
                     if (remember_ai and s.ai_base_url and s.ai_api_key) else False)

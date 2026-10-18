@@ -47,7 +47,7 @@ class Settings:
     ai_model: str = ""
     ai_api_key: str = field(default="", repr=False)
     show_help: bool = True          # web UI: show the small "?" help icons
-    check_updates: bool = False     # web UI: check GitHub Releases for a new version once a day (off by default)
+    check_updates: bool = True      # packaged app: check GitHub Releases in the background and offer patch updates
 
     def __repr__(self) -> str:  # never leak secrets
         parts = []
@@ -140,19 +140,30 @@ def settings_file(env=None) -> Path:
     return base / "encorlab" / "settings.json"
 
 
+# settings.json format. 2 (1.7.0): automatic update checks are on by default. Files written before (no "_format")
+# always contained check_updates=false because that was the default and every save wrote all keys, so an explicit
+# opt-out cannot be told apart from the default: those files are migrated to "on" (turn it off again in Settings).
+SETTINGS_FORMAT = 2
+
+
 def load_saved(env=None) -> dict:
     f = settings_file(env)
     try:
         data = json.loads(f.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}
+    if not isinstance(data, dict):
+        return {}
+    if int(data.get("_format") or 1) < 2:
+        data.pop("check_updates", None)
+    return data
 
 
 def save_settings(s: "Settings", env=None) -> Path:
     f = settings_file(env)
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(json.dumps({k: getattr(s, k) for k in PERSISTED}, indent=2), encoding="utf-8")
+    data = {"_format": SETTINGS_FORMAT, **{k: getattr(s, k) for k in PERSISTED}}
+    f.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return f
 
 

@@ -303,3 +303,7 @@ class JobManager:
 
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)
+
+    def running(self) -> list[Job]:
+        with self._lock:
+            return [j for j in self._jobs.values() if j.state == "running"]

@@ -49,13 +49,13 @@ def test_check_sanitizes_and_rejects_bad_responses():
         updates.check("1.0.0", fetch=lambda u, n: b"<html>")
 
 
-def test_api_update_check_and_setting_default_off(tmp_path):
-    assert config.Settings().check_updates is False
+def test_api_update_check_and_setting_default_on(tmp_path):
+    assert config.Settings().check_updates is True
     c = TestClient(create_app(config.SettingsStore(config.Settings()), persist=False, update_fetch=rel("v99.0.0")))
     r = c.get("/api/update-check").json()
     assert r["update_available"] and r["current"] == __version__ and r["latest"] == "99.0.0"
-    assert c.get("/api/settings").json()["check_updates"] is False
-    assert c.post("/api/settings", json={"check_updates": True}).json()["check_updates"] is True
+    assert c.get("/api/settings").json()["check_updates"] is True
+    assert c.post("/api/settings", json={"check_updates": False}).json()["check_updates"] is False
 
     def down(u, n):
         raise library.LibraryError("network error fetching x: ConnectError")
@@ -67,9 +67,23 @@ def test_api_update_check_and_setting_default_off(tmp_path):
 def test_check_updates_is_persisted(tmp_path, monkeypatch):
     f = tmp_path / "s.json"
     monkeypatch.setenv("ENCOR_SETTINGS_FILE", str(f))
-    s = config.SettingsStore(config.Settings()).update(check_updates="true")
+    s = config.SettingsStore(config.Settings()).update(check_updates="false")
     config.save_settings(s)
-    assert json.loads(f.read_text())["check_updates"] is True and config.from_env().check_updates is True
+    saved = json.loads(f.read_text())
+    assert saved["check_updates"] is False and saved["_format"] == 2 and config.from_env().check_updates is False
+
+
+def test_old_settings_file_is_migrated_to_auto_updates_on(tmp_path, monkeypatch):
+    """1.6 and older always wrote check_updates=false (it was the default), so it is not an explicit opt-out."""
+    f = tmp_path / "s.json"
+    monkeypatch.setenv("ENCOR_SETTINGS_FILE", str(f))
+    f.write_text(json.dumps({"cml_url": "https://cml.lab", "check_updates": False, "show_help": False}))
+    s = config.from_env()
+    assert s.check_updates is True and s.show_help is False and s.cml_url == "https://cml.lab"
+    config.save_settings(s)                                  # the next save records the format ...
+    s2 = config.SettingsStore(config.from_env()).update(check_updates=False)
+    config.save_settings(s2)
+    assert config.from_env().check_updates is False          # ... so an opt-out from now on is kept
 
 
 def test_cli_update_check(monkeypatch):

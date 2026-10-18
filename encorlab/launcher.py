@@ -143,7 +143,7 @@ def serve(port: int = DEFAULT_PORT, browser: bool = True, ready: threading.Event
     url = f"http://{HOST}:{real}/"
     if restarted:
         browser = real != port   # the open tab reconnects by itself unless the port changed
-    server = uvicorn.Server(uvicorn.Config(create_app(), log_level="warning", lifespan="off"))
+    server = uvicorn.Server(uvicorn.Config(create_app(auto_update=True), log_level="warning", lifespan="off"))
     _SERVER, _RESTART = server, False
 
     def _when_up():

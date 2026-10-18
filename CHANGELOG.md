@@ -2,6 +2,42 @@
 
 All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
+## [1.7.0] - 2026-10-18
+### Added
+- **Automatic updates that ask first** (packaged app, Windows and Linux):
+  - **Background check:** a background task checks GitHub Releases about 45 s after start and then every 6 hours,
+    using ETag conditional requests. If a newer release has a patch for this runtime, the task downloads it and
+    verifies it (SHA256SUMS, manifest hashes, safe paths, version, `min_runtime`), then keeps it in
+    `<data>/updates/staged/` without installing it.
+  - **Prompt:** a non-modal card says *ENCOR Lab x.y.z is ready* with *Update now / Later / Skip this version* and
+    links to the release notes and the changelog.
+  - **Update now:** installs the patch, restarts on the same port and reconnects the page, which then shows the
+    toast *Updated to x.y.z*. If a lab build, grading run, live test, snapshot or restore, fault injection or exam is
+    running, it waits until that finishes (the card says what it waits for, and *Cancel* is available). New work is
+    refused for the few seconds of installing and restarting.
+  - **Later** hides the card until the next launch or for 4 hours. **Skip** stops offering that version.
+  - **Rollback:** rollback stays as before (automatic when a new version cannot start, plus manual). A version that
+    was rolled back is never offered again automatically, only by *Check for updates now*.
+  - **Full download needed:** if the release needs a newer runtime (or has no patch), nothing is patched; a
+    dismissible banner links the full download instead.
+  - **Quiet failures:** network errors, rate limits and bad downloads are logged to `<data>/updates/update.log` and
+    retried with exponential backoff (15 min up to 12 h, or GitHub's rate-limit reset time). No popups.
+  - **API:** `/api/update/auto`, `/api/update/check`, `/api/update/apply`, `/api/update/cancel`, `/api/update/later`,
+    `/api/update/skip`, `/api/update/dismiss-full`, `/api/update/ack`.
+- **Testing:** `packaging/fake_release.py` serves a fake GitHub release on 127.0.0.1 (`ENCOR_UPDATE_URL`; plain http
+  is accepted only for loopback). The smoke test's `--auto-update-test` runs the whole automatic flow on both frozen
+  builds.
+### Changed
+- **Default on:** *Check for updates automatically* is now on by default and switches the background updater on and
+  off. Settings files from 1.6.x and older (which always stored the old default `false`) are migrated to on once.
+  `settings.json` now records `_format: 2`, so a later opt-out is kept.
+- **Removed:** the page's once-a-day client-side check and the separate *Install update* button. *Check for updates
+  now* downloads, verifies and shows the prompt. `ENCORLab update-install` and `/api/update/install` are unchanged.
+- **From source:** automatic checks are disabled; *Check for updates now* only reports and suggests `git pull`.
+### Upgrading
+- 1.7.0 uses the same runtime (1) as 1.6.0. In 1.6.0, use *Settings > Updates > Check for updates now > Install
+  update > Restart now* once; 1.7.0 then updates itself (with the prompt). From 1.5.x, download the full release.
+
 ## [1.6.0] - 2026-10-18
 ### Added
 - **Multicast labs**. Both run on IOL or IOSv routers, with routers acting as the

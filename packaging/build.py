@@ -89,7 +89,7 @@ def main() -> int:
 
     if a.smoke:
         data = Path(os.environ["APPDATA"]) / "encorlab" if WIN else Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "encorlab"
-        sh(sys.executable, HERE / "smoke_test.py", exe, "--version", v, "--data-dir", data, "--patch-test",
+        sh(sys.executable, HERE / "smoke_test.py", exe, "--version", v, "--data-dir", data, "--patch-test", "--auto-update-test",
            *[x for p in sorted(packs.glob("*.encorlab")) for x in ("--pack", p)])
     return 0
 

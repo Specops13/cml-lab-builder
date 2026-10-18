@@ -126,6 +126,86 @@ def patch_tests(exe, version: str, data_dir: Path, port: int, check) -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def post_json(url, timeout=15):
+    req = urllib.request.Request(url, data=b"", method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre) -> None:
+    """End to end against a fake release served on 127.0.0.1: background check -> staged (not installed) -> prompt
+    -> Update now waits for a running exam -> installs -> restarts on the same port -> 'Updated to' state."""
+    import shutil
+    import tempfile
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from fake_release import FakeRelease
+    tmp = Path(tempfile.mkdtemp(prefix="encor-auto-"))
+    new = "99.2.0"
+    fake = FakeRelease(new, {f"encorlab-patch-{new}.zip": make_patch(tmp, new).read_bytes()}).start()
+    env = dict(os.environ, ENCOR_UPDATE_URL=fake.url, ENCOR_UPDATE_DELAY="1")
+    proc = subprocess.Popen(exe + ["--no-browser", "--port", str(port)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace", env=env,
+                            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    lines: list[str] = []
+    threading.Thread(target=lambda: [lines.append(l) for l in proc.stdout], daemon=True).start()
+    base = f"http://127.0.0.1:{port}"
+    try:
+        st = None
+        for _ in range(120):
+            try:
+                st = json.loads(get(base + "/api/update/auto", 3)[2])
+                if st.get("offer"):
+                    break
+            except Exception:
+                pass
+            time.sleep(0.5)
+        check(st and st.get("enabled") and (st.get("offer") or {}).get("version") == new,
+              f"background check found and staged {new}: offer={st and st.get('offer')}")
+        check(not (data_dir / "app" / new).exists() and (data_dir / "updates" / "staged" / f"encorlab-patch-{new}.zip").is_file(),
+              "patch downloaded + verified into updates/staged, not installed")
+        labs = json.loads(get(base + "/api/labs")[2])
+        lab_id = sorted(x["id"] for x in labs["labs"] if x["source"] == "builtin")[0]
+        post_json(f"{base}/api/labs/{lab_id}/exam/start")
+        a = post_json(f"{base}/api/update/apply?version={new}")
+        check(a.get("state") == "waiting" and any("exam" in w for w in a.get("waiting_for", [])),
+              f"Update now waits for the running exam: {a.get('waiting_for')}")
+        time.sleep(3)
+        h = json.loads(get(base + "/api/health")[2])
+        check(h.get("version") == version and not (data_dir / "app" / new).exists(), "nothing installed while the exam runs")
+        post_json(f"{base}/api/labs/{lab_id}/exam/abort")
+        health = None
+        for _ in range(180):
+            try:
+                health = json.loads(get(base + "/api/health", 2)[2])
+                if health.get("version") == new:
+                    break
+            except Exception:
+                pass
+            time.sleep(0.5)
+        check(health and health.get("version") == new, f"installed and restarted on the same port: {health}")
+        st = json.loads(get(base + "/api/update/auto")[2])
+        check((st.get("just_updated") or {}).get("version") == new, f"page gets 'Updated to {new}': {st.get('just_updated')}")
+        time.sleep(1.5)
+        boot = json.loads((data_dir / "app" / "state.json").read_text(encoding="utf-8"))
+        check(boot.get("current") == new and not boot.get("pending"), "new version confirmed by the boot loader")
+        etags = [r for r in fake.requests if r[0].endswith("/releases/latest")]
+        check(bool(etags) and etags[0][1] is None, f"release API polled ({len(etags)} request(s))")
+    finally:
+        try:
+            proc.send_signal(signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT)
+            proc.wait(timeout=20)
+        except Exception:
+            proc.kill()
+        if os.name == "nt" or pre:   # Windows: the restarted app runs in a new console (not our child)
+            subprocess.run(pre + ["taskkill", "/F", "/IM", "ENCORLab.exe"], capture_output=True, timeout=60)
+        fake.stop()
+        code, out = run(exe + ["update-rollback"])
+        check(code == 0 and "Rolled back" in out, "update-rollback after the auto update")
+        shutil.rmtree(data_dir / "app", ignore_errors=True)
+        shutil.rmtree(data_dir / "updates", ignore_errors=True)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("exe")
@@ -135,6 +215,7 @@ def main() -> int:
     ap.add_argument("--runner", default="", help="e.g. 'wine'")
     ap.add_argument("--port", type=int, default=18765)
     ap.add_argument("--patch-test", action="store_true")
+    ap.add_argument("--auto-update-test", action="store_true")
     a = ap.parse_args()
     pre = a.runner.split() if a.runner else []
     exe = pre + [a.exe]
@@ -211,6 +292,8 @@ def main() -> int:
     check("Web UI:" in out and "127.0.0.1" in out, "launcher printed its banner")
     if a.patch_test:
         patch_tests(exe, a.version, Path(a.data_dir), a.port + 1, check)
+    if a.auto_update_test:
+        auto_update_test(exe, a.version, Path(a.data_dir), a.port + 2, check, pre)
     print("SMOKE TEST " + ("PASSED" if ok else "FAILED"))
     return 0 if ok else 1
 

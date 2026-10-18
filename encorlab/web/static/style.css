@@ -85,3 +85,9 @@ code.cmd{font-family:Consolas,"DejaVu Sans Mono",monospace;font-size:.8rem;word-
 .exam-report{border:2px solid var(--accent);border-radius:8px;padding:.5rem .9rem;margin:.4rem 0 .8rem}.exam-report h3{margin:.2rem 0 .4rem}
 table.kv{width:auto}table.kv td{padding:.15rem .8rem .15rem 0}
 a.btn.small{padding:.2rem .5rem;font-size:.8rem}
+
+/* update prompt (bottom-left, never modal) and the full-download banner */
+.update-prompt{position:fixed;left:1rem;bottom:1rem;z-index:55;max-width:420px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:8px;padding:.7rem .9rem;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.update-prompt[hidden]{display:none}.update-prompt h3{margin:0 0 .3rem;font-size:1rem}.update-prompt p{margin:.25rem 0;font-size:.88rem}
+.update-prompt .toolbar{margin-top:.5rem}
+.update-full{background:var(--warn-bg);border-bottom:1px solid var(--warn-line);padding:.45rem 1.2rem;font-size:.9rem}.update-full[hidden]{display:none}.update-full button{float:right}

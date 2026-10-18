@@ -1,8 +1,12 @@
-"""Update check against GitHub Releases. Only runs when the user clicks "Check for updates" or has turned on
-the (off by default) automatic check. It sends one anonymous GET to api.github.com; nothing is downloaded or installed."""
+"""Update check against GitHub Releases, plus app-code patches for the packaged app.
+
+check() sends one anonymous GET to the GitHub Releases API. In the packaged app the background updater
+(autoupdate.py) calls it every few hours (Settings > Updates), downloads and verifies a newer release's patch and
+asks before installing it. Nothing is installed without the user's "Update now" / "Install update"."""
 from __future__ import annotations
 
 import json
+import os
 import re
 
 from . import __version__, library
@@ -18,12 +22,91 @@ def parse_version(v: str) -> tuple[int, int, int] | None:
     return (int(m[1]), int(m[2]), int(m[3] or 0)) if m else None
 
 
+def release_url() -> str:
+    """The Releases API URL. ENCOR_UPDATE_URL overrides it (smoke tests against a local fake release; an http URL is
+    only accepted for 127.0.0.1 / localhost)."""
+    u = os.environ.get("ENCOR_UPDATE_URL", "").strip()
+    return u if u and allowed_url(u) else LATEST_URL
+
+
+def asset_prefixes() -> tuple[str, ...]:
+    """Download URLs accepted for release assets: github.com, or the origin of the ENCOR_UPDATE_URL override."""
+    u = release_url()
+    if u == LATEST_URL:
+        return ("https://github.com/",)
+    from urllib.parse import urlsplit
+    p = urlsplit(u)
+    return ("https://github.com/", f"{p.scheme}://{p.netloc}/")
+
+
+def allowed_url(url: str) -> bool:
+    """https anywhere; plain http only to the loopback interface (local test servers)."""
+    from urllib.parse import urlsplit
+    try:
+        p = urlsplit(url)
+    except ValueError:
+        return False
+    return p.scheme == "https" and bool(p.hostname) or (p.scheme == "http" and p.hostname in ("127.0.0.1", "localhost"))
+
+
+class HTTPStatusError(library.LibraryError):
+    def __init__(self, status: int, url: str, headers: dict | None = None):
+        super().__init__(f"HTTP {status} for {url}")
+        self.status, self.headers = status, dict(headers or {})
+
+
+def http_get(url: str, limit: int, etag: str | None = None, timeout: float = 20) -> tuple[int, bytes, dict]:
+    """GET with a size cap, an optional If-None-Match (ETag) and the URL rules of allowed_url() applied to every
+    request, redirects included. Returns (status, body, headers): 200 with the body, or 304 with b"".
+    Raises HTTPStatusError for other statuses and library.LibraryError for network errors."""
+    import httpx
+
+    def guard(request):
+        if not allowed_url(str(request.url)):
+            raise library.LibraryError(f"refusing to fetch {request.url} (https only)")
+    if not allowed_url(url):
+        raise library.LibraryError(f"refusing to fetch {url} (https only)")
+    headers = {"User-Agent": f"encorlab/{__version__}", "Accept": "application/vnd.github+json, */*"}
+    if etag:
+        headers["If-None-Match"] = etag
+    try:
+        with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers,
+                          event_hooks={"request": [guard]}) as c:
+            with c.stream("GET", url) as r:
+                hdrs = {k.lower(): v for k, v in r.headers.items()}
+                if r.status_code == 304:
+                    return 304, b"", hdrs
+                if r.status_code != 200:
+                    raise HTTPStatusError(r.status_code, url, hdrs)
+                if int(r.headers.get("content-length") or 0) > limit:
+                    raise library.LibraryError(f"{url} is larger than {limit // 1024} KB")
+                buf = bytearray()
+                for chunk in r.iter_bytes():
+                    buf += chunk
+                    if len(buf) > limit:
+                        raise library.LibraryError(f"{url} is larger than {limit // 1024} KB")
+                return 200, bytes(buf), hdrs
+    except httpx.HTTPError as e:
+        raise library.LibraryError(f"network error fetching {url}: {e.__class__.__name__}: {e}")
+
+
+def fetch(url: str, limit: int) -> bytes:
+    """Plain GET (no ETag) with the update URL rules; the default fetcher of check() / install()."""
+    return http_get(url, limit)[1]
+
+
 def check(current: str = __version__, fetch=library.http_fetch, url: str = LATEST_URL) -> dict:
     """Compare the running version with the latest published release. Raises library.LibraryError on failure."""
     raw = fetch(url, 512 * 1024)
+    return parse_release(raw, current)
+
+
+def parse_release(raw: bytes, current: str = __version__) -> dict:
     try:
         d = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
+        raise library.LibraryError("GitHub returned an invalid response")
+    if not isinstance(d, dict):
         raise library.LibraryError("GitHub returned an invalid response")
     tag = str(d.get("tag_name") or "")
     latest = parse_version(tag)
@@ -33,9 +116,10 @@ def check(current: str = __version__, fetch=library.http_fetch, url: str = LATES
     html = str(d.get("html_url") or RELEASES_PAGE)
     if not html.startswith("https://github.com/"):
         html = RELEASES_PAGE
+    ok = asset_prefixes()
     assets = [{"name": str(a.get("name", "")), "size": a.get("size"), "url": str(a.get("browser_download_url", ""))}
-              for a in d.get("assets", []) if isinstance(a, dict)
-              and str(a.get("browser_download_url", "")).startswith("https://github.com/")]
+              for a in (d.get("assets") or []) if isinstance(a, dict)
+              and str(a.get("browser_download_url", "")).startswith(ok)]
     return {"current": current, "latest": ".".join(map(str, latest)), "tag": tag,
             "update_available": bool(cur and latest > cur), "newer_than_latest": bool(cur and cur > latest),
             "url": html, "name": str(d.get("name") or tag), "published_at": d.get("published_at"),
@@ -236,13 +320,13 @@ def _precompile(d: Path) -> None:
         pass
 
 
-def install(current: str = __version__, fetch=library.http_fetch, url: str = LATEST_URL) -> dict:
+def install(current: str = __version__, fetch=fetch, url: str | None = None) -> dict:
     """Check GitHub, download the patch for the latest release, verify it and install it.
     Returns {"status": "installed" | "up_to_date" | "full_download", ...}."""
     ok, why = patchable()
     if not ok:
         raise UpdateError(f"Install update is not available: {why}")
-    info = check(current, fetch=fetch, url=url)
+    info = check(current, fetch=fetch, url=url or release_url())
     if not info["update_available"]:
         return {"status": "up_to_date", "current": current, "latest": info["latest"], "url": info["url"]}
     by_name = {a["name"]: a for a in info["assets"]}

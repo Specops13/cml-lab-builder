@@ -70,6 +70,17 @@ def start(lab: Lab, minutes: int | None = None, hints: str = "penalty", penalty:
     return status(lab.id, now)
 
 
+def running(now: float | None = None) -> list[str]:
+    """Labs with an exam that is still on the clock (an expired exam no longer blocks anything)."""
+    from .history import data_dir
+    out = []
+    for f in sorted((data_dir() / "exams").glob("*.json")):
+        st = status(f.stem, now)
+        if st and not st["expired"]:
+            out.append(f.stem)
+    return out
+
+
 def status(lab_id: str, now: float | None = None) -> dict | None:
     d = active(lab_id)
     if not d:

@@ -72,9 +72,10 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   placeholders, so one lab file works on both.
 - **Safe by design:** loopback-only UI, read-only checks, secrets kept in memory or the OS keyring and never written to
   settings.json or logs. TLS verification stays on.
-- **Update check and patch updates:** *More > Check for updates* (or *Settings > Updates*) asks GitHub Releases whether a
-  newer version exists. From 1.6.0 the packaged app can **Install update**: it downloads only the app-code patch
-  (about 0.25 MB instead of 30+ MB), verifies it, and you restart. The automatic daily check is **off by default**.
+- **Automatic updates that ask first:** the packaged app checks GitHub Releases in the background (every 6 hours) and
+  downloads and verifies the new version's small patch (about 0.25 MB instead of 30+ MB). It then asks
+  *Update now / Later / Skip this version*. **Update now** installs, restarts and reconnects the page by itself, and it
+  waits for a running lab build, grading run or exam to finish first. You can turn this off in *Settings > Updates*.
 - **Ready-to-run downloads** for Windows 11 and Linux (no Python needed), plus a `?` help tooltip on every control and a dark mode.
 
 ## Screenshots
@@ -113,16 +114,36 @@ Since 1.6.0 the download is split in two parts:
 - **The app code:** the `encorlab` package. It ships in `_internal/appcode/` and can be replaced by a small patch
   (`encorlab-patch-<version>.zip`, about 0.25 MB, attached to each release).
 
-**How to update** (Windows 11 and Linux, all in the GUI; every button has a `?` tooltip):
-1. *Settings > Updates > Check now* (or *More > Check for updates*). If a newer release has a patch, an **Install update** button appears.
-2. **Install update** downloads the patch and verifies it before anything is installed:
+**How it works (1.7.0 and later)** on Windows 11 and Linux, all in the GUI. Every button has a `?` tooltip.
+1. **Background check.** About 45 seconds after the app starts, and then every 6 hours, it asks the GitHub Releases API
+   for the latest release. It sends a conditional request (ETag), so an unchanged release costs nothing against
+   GitHub's rate limit.
+2. **Download and verify, without installing.** If the release is newer and has a patch for your runtime, the app
+   downloads it in the background and verifies it:
    - the zip's SHA-256 must match the release's `SHA256SUMS.txt`;
    - every file must match the SHA-256 in the patch's `manifest.json`, with no extra or missing files and no paths outside `encorlab/`;
    - the version must match the release, and the patch's `min_runtime` must not be newer than your runtime.
 
-   The patch is then unpacked into your data folder (`%APPDATA%\encorlab\app\<version>` or
-   `~/.config/encorlab/app/<version>`). The app folder itself is never modified.
-3. **Restart now** restarts the app on the same port, and the page reconnects by itself. Closing and starting the app works too.
+   The verified patch is kept in `<data>/updates/staged/`. Nothing is installed yet.
+3. **The prompt.** A small card at the bottom left says *ENCOR Lab x.y.z is ready*, with links to the release notes
+   and the changelog:
+   - **Update now** installs the patch into your data folder (`%APPDATA%\encorlab\app\<version>` or
+     `~/.config/encorlab/app/<version>`), restarts the app on the same port and reloads the page, which then shows
+     *Updated to x.y.z*. If a lab build, grading run, live test, snapshot or restore, *Break my lab* fault injection
+     or an exam is running, the card says so. Update now then waits until that work is finished and never interrupts
+     it. New work cannot start during the few seconds of installing and restarting. *Cancel* stops the waiting.
+   - **Later** hides the card until the next start of the app, or for 4 hours.
+   - **Skip this version** stops offering that version.
+4. **Turning it off.** Untick *Settings > Updates > Check for updates automatically*. *Check for updates now* still
+   works, and it also offers a version you skipped or rolled back.
+
+**Quiet failures.** Being offline, hitting a GitHub rate limit or getting a bad download never shows a popup. The
+app writes it to `<data>/updates/update.log` and tries again later: 15 min, 30 min, 1 h and so on, up to 12 h. After
+a rate limit it waits until GitHub's reset time. *Settings > Updates* shows the last and next check and the last error.
+
+**Settings migration:** automatic checks are **on by default** from 1.7.0. Before 1.7.0, every save wrote
+`check_updates=false` (the old default), so settings files from 1.6.x and older are switched on once. If you don't
+want automatic checks, turn them off again; from then on your choice is kept.
 
 **Safety net:**
 - **Automatic rollback:** a new version counts as good once its web UI has started. If it fails to import, exits with an
@@ -130,20 +151,27 @@ Since 1.6.0 the download is split in two parts:
   (or the built-in copy) and *Settings > Updates* shows why.
 - **Manual rollback:** *Roll back* returns to the version you used before (or the built-in copy) from the next restart.
   Only the current and the previous patch are kept.
+- **No second offer:** a version that was rolled back, automatically or by you, is never offered again automatically.
+  Only *Check for updates now* brings it back.
 - **Newer full download wins:** if you unzip a full release that is newer than your installed patch, its built-in code is used.
 
 **When a full download is needed:** if a release changes the runtime (a new Python, a new or upgraded library, or a
-change to the launcher), its patch declares a higher `min_runtime`. *Install update* then says **Full download needed**
-and links the release page. Your data is kept. 1.6.0 is the first patchable runtime, so **coming from 1.5.x you need one
-full download of 1.6.0**. After that, patches work.
+change to the launcher), its patch declares a higher `min_runtime`. In that case nothing is downloaded or installed as a patch. A dismissible
+banner at the top says **a full download is needed** and links the release page. Your data is kept.
+
+**Coming from an older version:**
+- **From 1.6.0:** 1.6.0 has no background updater. Install 1.7.0 once with *Settings > Updates > Check for updates
+  now > Install update > Restart now*. From then on, updates are automatic (with the prompt).
+- **From 1.5.x or older:** download the full 1.7.0 release once.
 
 **Command line:** `ENCORLab update-status`, `ENCORLab update-install` (latest release),
 `ENCORLab update-install --file encorlab-patch-<v>.zip [--sha256 …]` (offline) and `ENCORLab update-rollback`.
 
 > **Security note:** the checksums come from the same GitHub release as the patch. This proves the download is complete
 > and unmodified in transit, but it is not a code signature: whoever can publish releases on this repo can publish a
-> patch. The app never installs anything on its own; it only acts when you click *Install update*.
-> When you run from source (`run.sh` / `pip install -e .`), use `git pull` instead; the patch buttons are disabled there.
+> patch. The app downloads and verifies patches by itself, but it installs one only after you click *Update now*
+> (or `update-install`). When you run from source (`run.sh` / `pip install -e .`), use `git pull` instead; automatic
+> checks and patches are disabled there (*Check for updates now* only reports).
 
 ## Running from source
 Needs Python **3.10 to 3.13** (3.13 recommended). Python 3.14+ is not supported yet: some dependencies have no prebuilt wheels for it.
@@ -408,9 +436,10 @@ Everything can be set on the **Settings** page; `.env` / environment variables p
 - Only touches labs titled `ENCOR-…`. Deleting anything else is refused.
 - Checks never change device configuration (only `show` and `ping` commands are allowed in labs).
 - Imported packs are size-limited (5 MB) and path-checked. A lab file only contains data (YAML/regex), never code.
-- Internet access happens only when you ask for it: *Load library* / *Install* (raw.githubusercontent.com or your URL) and
-  *Check for updates* (api.github.com), or once a day if you turn on *Settings > Updates*, and *Install update*
-  (the patch and `SHA256SUMS.txt` from github.com). Nothing is installed automatically.
+- Internet access: *Load library* / *Install* (raw.githubusercontent.com or your URL) when you click them. The packaged
+  app also makes an anonymous update check against api.github.com every 6 hours, which you can turn off in *Settings >
+  Updates*. When there is a new release, it downloads the patch and `SHA256SUMS.txt` from github.com. Nothing is
+  installed until you click *Update now*.
 - Patches are verified (SHA256SUMS, per-file manifest hashes, safe paths, version, runtime) before they are unpacked into
   your data folder, and are rolled back automatically if they cannot start.
 - Library downloads are https-only (redirects included), size-limited and verified against the sha256 in the index before
@@ -466,7 +495,7 @@ far fewer antivirus false positives.
   (`encorboot.py`), which picks the newest valid copy (an installed patch or the built-in one), imports it, and handles
   rollback. Most of the standard library is frozen in, so patches can use modules the current code does not import yet.
 - **Smoke test:** `python packaging/smoke_test.py <exe> --version <v> --data-dir <user data dir> --pack x.encorlab` checks the CLI, the launcher, the UI assets, the lab list and imports
-  (`build.py --smoke` runs it; it imports the example packs into the user data folder). With `--patch-test` it also builds test patches and checks, on the frozen build,
+  (`build.py --smoke` runs it; it imports the example packs into the user data folder). With `--auto-update-test` it serves a fake release on 127.0.0.1 (`packaging/fake_release.py`) and checks the whole automatic flow: background check, staged but not installed, *Update now* waiting for a running exam, install, restart on the same port, and *Updated to*. With `--patch-test` it also builds test patches and checks, on the frozen build,
   install → the patched version runs and serves the UI → rollback, automatic fallback from a broken patch, and refusal of a patch that needs a newer runtime.
 
 The UI checks versions on load and whenever the tab becomes visible again. It shows a banner if the cached `app.js` is older than
@@ -482,6 +511,7 @@ encorlab/                 the application (Python package)
   courses.py, library.py  .encorcourse + online library    faults.py     "Break my lab" faults (iosmerge.py: config merge)
   blueprint.py            ENCOR v1.2 exam topics           progress.py   progress dashboard
   exam.py, snapshots.py   exam mode, config snapshots      updates.py    update check + patch verify/install/rollback
+  autoupdate.py           background update checker: ETag + backoff, staging, Update now / Later / Skip, idle gating
   report.py               printable HTML reports (web/templates/report_*.html)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
@@ -494,7 +524,7 @@ examples/                 example packs and courses/ (sources of labs/)
 labs/                     online library: built packs, courses and index.json (packaging/build_library.py)
 encorboot.py              boot loader for packaged builds: picks the app-code bundle, rollback, RUNTIME_VERSION
 encor_launcher.py         frozen entry point (runs encorboot, then encorlab.launcher)
-packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, icon
+packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, fake_release.py, icon
 tests/                    pytest suite (no CML needed)
 .github/workflows/        CI: test + build/smoke-test Windows and Linux bundles
 run.bat, run.ps1, run.sh  from-source launchers (create .venv, install, start)
@@ -511,5 +541,5 @@ become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv
 After changing the schema, templates, guide or example, run `python -m encorlab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **1.6.0**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
+Current version: **1.7.0**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/encore-lab-app/releases) for downloads.
