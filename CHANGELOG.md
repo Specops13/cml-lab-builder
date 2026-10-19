@@ -2,6 +2,37 @@
 
 All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
+## [1.8.0] - 2026-10-19
+### Added
+- **Debian package** `encorlab_1.8.0_amd64.deb` (Debian 10+, Ubuntu 20.04+). Install it with
+  `sudo apt install ./encorlab_1.8.0_amd64.deb`. It is the same frozen build as the Linux tar.gz.
+  - **Layout:** the app is in `/opt/encorlab`, with the `encorlab` command in `/usr/bin`, a menu entry
+    (*ENCOR Lab Builder*, hicolor icons from 16 to 256 px) and a man page.
+  - **Launch:** like the exe, the menu entry opens a terminal with the server and your browser. Starting it again only
+    opens the browser on the running copy.
+  - **Dependencies:** `libc6 (>= 2.28)`, `libgcc-s1 | libgcc1` and `zlib1g`. `xdg-utils` is recommended.
+  - **Maintainer scripts:** they refresh the desktop and icon caches. `apt remove` and `apt purge` never delete
+    `~/.config/encorlab`.
+  - **Checks:** the package is clean under `lintian --pedantic` and `desktop-file-validate`.
+- **Auto-updates for the .deb, exactly like the exe:** patches install into `~/.config/encorlab/app/<version>` and
+  never into `/opt`, so no root is needed. The prompt, the waiting while work is busy, and rollback are unchanged.
+  - **Install type:** the app detects it (`install-type` marker: deb / linux-tar / windows-zip / source).
+    `update-status` and `/api/update/status` show it.
+  - **Full download needed:** the banner now links the right file for the install type: the `.deb` with its
+    `sudo apt install ./…` command, the tar.gz, or the Windows zip.
+- **Upgrades:** `apt install ./newer.deb` upgrades cleanly over an older package. An installed patch that is newer than
+  the package's built-in copy keeps running; a newer package wins over an older patch. Unit tests and the chroot test
+  cover this.
+- **Build and test:** `packaging/build_deb.py` builds the .deb from the Linux tar.gz (`dpkg-deb --root-owner-group`,
+  reproducible, no root needed). `packaging/deb_chroot_test.sh` runs an end-to-end test in a clean Debian 12 chroot
+  (install, validate, launch, single instance, smoke test with patches and auto-update as a normal user, upgrades,
+  remove/purge). CI builds and lints the .deb, installs and smoke-tests it in a `debian:12` container, and releases
+  it with the other files in `SHA256SUMS.txt`.
+- `tests/test_deb.py`: install-type detection, the asset for each install type, the deb banner, patch-vs-package
+  precedence, the package layout, metadata and permissions, and the maintainer scripts.
+### Unchanged
+- The runtime (RUNTIME_VERSION 1). 1.7.0 installs update to 1.8.0 as a patch through the normal prompt.
+
 ## [1.7.0] - 2026-10-18
 ### Added
 - **Automatic updates that ask first** (packaged app, Windows and Linux):

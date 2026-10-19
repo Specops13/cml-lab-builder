@@ -1,6 +1,6 @@
 "use strict";
 /* ENCOR Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "1.7.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "1.8.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -935,7 +935,8 @@ function renderFullBanner(st) {
   b.dataset.version = f.version;
   b.innerHTML = `<button data-help="u.fullDismiss" type="button" class="hint-btn">Dismiss</button>
     ENCOR Lab ${esc(f.version)} is available but needs a <b>full download</b> (${esc(f.reason || "new runtime")}); it cannot be installed as a patch.
-    <a data-help="u.fullLink" href="${esc(f.url)}" target="_blank" rel="noopener">Download it from the release page ↗</a>`;
+    <a data-help="u.fullLink" href="${esc(f.url)}" target="_blank" rel="noopener">${f.asset ? "Download " + esc(f.asset) : "Download it from the release page"} ↗</a>${f.how ? ", then " + esc(f.how) : ""}.
+    Your data and settings are kept.`;
   b.hidden = false;
   b.querySelector("button").onclick = async () => {
     b.hidden = true;

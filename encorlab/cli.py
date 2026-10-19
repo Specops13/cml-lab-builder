@@ -391,6 +391,7 @@ def update_status():
     st = updates.status()
     a = st["active"] or {"version": st["version"], "source": "source tree"}
     typer.echo(f"App code: {a['version']} ({a['source']})   runtime: {st['runtime']}   built-in copy: {st['bundled_version'] or '-'}")
+    typer.echo(f"Install type: {st['install_type']}" + (f"   app folder: {st['app_dir']}" if st["app_dir"] else ""))
     if not st["patchable"]:
         typer.echo(f"Patch updates: not available ({st['reason']})")
         return

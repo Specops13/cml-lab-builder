@@ -44,4 +44,4 @@ def test_schema_prompt_docs(tmp_path):
     assert res.exit_code == 0 and "BGP lab" in res.output
     assert r.invoke(app, ["docs", "-o", str(tmp_path / "d")]).exit_code == 0
     assert (tmp_path / "d" / "AI-PROMPT.md").is_file()
-    assert "1.7.0" in r.invoke(app, ["version"]).output
+    assert "1.8.0" in r.invoke(app, ["version"]).output

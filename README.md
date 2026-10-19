@@ -19,6 +19,7 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Quick start (ready-to-run download)](#quick-start-ready-to-run-download)
+- [Install on Debian / Ubuntu (.deb)](#install-on-debian--ubuntu-deb)
 - [Updating (small patches instead of a full download)](#updating-small-patches-instead-of-a-full-download)
 - [Running from source](#running-from-source)
 - [CML requirements](#cml-requirements)
@@ -94,6 +95,7 @@ Download from **[Releases](https://github.com/Specops13/encore-lab-app/releases/
 | Download | Start it |
 |---|---|
 | `ENCORLab-<version>-windows-x64.zip` (Windows 10/11 x64) | Unzip anywhere (e.g. `Documents\ENCORLab`) and double-click **ENCORLab.exe** |
+| `encorlab_<version>_amd64.deb` (Debian 10+, Ubuntu 20.04+, Mint, …) | `sudo apt install ./encorlab_<version>_amd64.deb`, then start **ENCOR Lab Builder** from the app menu or run `encorlab` (see [the .deb section](#install-on-debian--ubuntu-deb)) |
 | `ENCORLab-<version>-linux-x64.tar.gz` (glibc 2.28+: Debian 10+, Ubuntu 20.04+) | `tar xzf ENCORLab-*.tar.gz && ./ENCORLab-*/ENCORLab` (optional: `./install-desktop-entry.sh` adds a menu entry) |
 
 - A small console window opens and your default browser shows the app at http://127.0.0.1:8765. If the port is busy, the next free port is used and the window shows the real address.
@@ -106,6 +108,63 @@ Download from **[Releases](https://github.com/Specops13/encore-lab-app/releases/
   You can also right-click the downloaded zip, choose *Properties* > *Unblock*, then extract it. Check the download against `SHA256SUMS.txt` from the release.
 
 Then open **Settings**, enter your CML URL and credentials, pick a lab and click **Build**.
+
+## Install on Debian / Ubuntu (.deb)
+Since 1.8.0 every release also has `encorlab_<version>_amd64.deb`. It contains exactly the same frozen build as the
+Linux tar.gz, and it behaves like the Windows exe: a menu entry, a single instance, and automatic updates that ask first.
+
+**Install** (apt resolves the few dependencies: `libc6 (>= 2.28)`, `libgcc-s1`, `zlib1g`; `xdg-utils` is recommended so the browser opens):
+```bash
+sudo apt install ./encorlab_1.8.0_amd64.deb
+```
+The `./` matters, because it tells apt this is a local file. The package installs:
+- the app in `/opt/encorlab/`, with the `encorlab` command in `/usr/bin`;
+- a menu entry, **ENCOR Lab Builder** (in *Education*), with icons in `/usr/share/icons/hicolor/`;
+- the man page `man encorlab`.
+
+**Start it** from the app menu, or run `encorlab` in a terminal. As with the exe:
+- a terminal window opens with the server, and your browser shows http://127.0.0.1:8765;
+- starting it again while it runs only opens the browser on the running copy (no second server);
+- closing the terminal window, or pressing Ctrl+C, quits.
+
+The command line is the same as `ENCORLab`: `encorlab list`, `encorlab update-status`, `encorlab --no-browser`, …
+
+**Updating:**
+- **Patches (normal case):** automatic updates work exactly as in the exe (see [Updating](#updating-small-patches-instead-of-a-full-download)).
+  The app downloads, verifies and, after you click *Update now*, installs the patch into
+  `~/.config/encorlab/app/<version>`. It never writes to `/opt`, so it needs no root and no password, and
+  `dpkg --verify encorlab` stays clean.
+- **New runtime:** when a release needs a new runtime, the banner says *a full download is needed* and links that
+  release's `.deb`. Install it the same way, `sudo apt install ./encorlab_<new>_amd64.deb`. It upgrades the old
+  package in place, and your data and installed patches are kept.
+- **Which copy runs after an upgrade:** an installed patch that is newer than the package's built-in copy keeps running
+  (e.g. patch 1.8.5 over the 1.8.1 package). A package that is newer than your patch wins (e.g. the 1.9.0 package over
+  patch 1.8.5).
+- **Running app:** if the app is running while you upgrade the package, restart it afterwards.
+- **No apt repository:** the `.deb` is not in an apt repository, so `apt upgrade` does not update it. The app's own
+  updater does.
+
+**Uninstall:**
+```bash
+sudo apt remove encorlab      # removes /opt/encorlab, /usr/bin/encorlab and the menu entry
+sudo apt purge encorlab       # the same; the package has no system-wide config files
+```
+**Neither command deletes your data.** Settings, imported labs, history, exam results and installed patches stay in
+`~/.config/encorlab` (each user has their own). Purge does not touch it either. To delete it as well, run
+`rm -rf ~/.config/encorlab`.
+
+**Where things live:**
+
+| What | Where |
+|---|---|
+| App (read-only, owned by the package) | `/opt/encorlab/` (`install-type` marks it as a deb install) |
+| Command, menu entry, icons | `/usr/bin/encorlab`, `/usr/share/applications/encorlab.desktop`, `/usr/share/icons/hicolor/*/apps/encorlab.png` |
+| Your settings, labs, history | `~/.config/encorlab/` (`$XDG_CONFIG_HOME/encorlab`) |
+| Installed patches, staged downloads, update log | `~/.config/encorlab/app/`, `~/.config/encorlab/updates/` |
+
+**From the tar.gz:** install the .deb, start it once and check that your labs are there, then delete the old unpacked
+folder. If you used `install-desktop-entry.sh`, also remove `~/.local/share/applications/encorlab.desktop`. Both use
+the same `~/.config/encorlab`.
 
 ## Updating (small patches instead of a full download)
 Since 1.6.0 the download is split in two parts:
@@ -157,7 +216,10 @@ want automatic checks, turn them off again; from then on your choice is kept.
 
 **When a full download is needed:** if a release changes the runtime (a new Python, a new or upgraded library, or a
 change to the launcher), its patch declares a higher `min_runtime`. In that case nothing is downloaded or installed as a patch. A dismissible
-banner at the top says **a full download is needed** and links the release page. Your data is kept.
+banner at the top says **a full download is needed** and links the file for your install type: the `.zip` for the
+exe, the `.tar.gz` for the Linux folder, or the `.deb` with its `sudo apt install ./…` command for the Debian package.
+The app finds its install type from the `install-type` marker file that the .deb adds; `encorlab update-status`
+shows it. Your data is kept.
 
 **Coming from an older version:**
 - **From 1.6.0:** 1.6.0 has no background updater. Install 1.7.0 once with *Settings > Updates > Check for updates
@@ -482,9 +544,19 @@ far fewer antivirus false positives.
   The result is `dist\ENCORLab-<version>-windows-x64.zip`. Use `set PYTHON=C:\path\python.exe` to pick a specific interpreter.
 - **Linux:** `packaging/build_linux.sh` produces `dist/ENCORLab-<version>-linux-x64.tar.gz`. With `uv` installed, it uses
   python-build-standalone Python 3.12 and manylinux_2_28 wheels, so the binary runs on glibc 2.28+ even when built on a newer distro.
+- **Debian package:** `python3 packaging/build_deb.py --tar dist/ENCORLab-<version>-linux-x64.tar.gz` wraps the
+  smoke-tested Linux build into `dist/encorlab_<version>_amd64.deb` with `dpkg-deb --root-owner-group`. No root is
+  needed, and the result is reproducible (`SOURCE_DATE_EPOCH`). It does not rebuild or strip anything, so the runtime
+  and its fingerprint stay the same as in the tar.gz. Check it with `lintian --pedantic encorlab_*.deb`; the intended
+  exceptions (a bundled app in `/opt`, embedded libraries, …) are listed in the package's lintian overrides.
+  `packaging/deb_chroot_test.sh <debian-12-chroot> <deb>` runs the full end-to-end test in a clean chroot (made with
+  `debootstrap --variant=minbase bookworm`): apt install, `desktop-file-validate`, a menu launch and a second launch,
+  the smoke test with patches and auto-update as a normal user (`/opt` must stay unchanged), upgrades to newer test
+  packages over a user patch, and remove/purge (data kept).
 - **GitHub Actions:** `.github/workflows/build.yml` builds and smoke-tests both bundles (windows-latest + ubuntu-22.04) on every `v*` tag.
   The bundles are kept as workflow artifacts. To publish them, run it by hand (*Actions > build > Run workflow*), tick *publish* and enter the tag.
-  Existing release assets are never overwritten. CI also builds `encorlab-patch-<version>.zip` and adds it to `SHA256SUMS.txt`.
+  Existing release assets are never overwritten. CI also builds `encorlab-patch-<version>.zip` and the `.deb` (lintian +
+  `desktop-file-validate`). It installs the .deb in a clean `debian:12` container, smoke-tests it there, and adds all files to `SHA256SUMS.txt`.
 - **App-code patch:** `python packaging/build_patch.py --out dist` writes `encorlab-patch-<version>.zip`, a deterministic
   zip with `manifest.json` (version, `min_runtime`, SHA-256 per file). The runtime is fingerprinted in
   `packaging/runtime.lock.json`: the dependencies, `encorboot.py`, `encor_launcher.py`, the spec and `build_linux.sh`.
@@ -511,6 +583,7 @@ encorlab/                 the application (Python package)
   courses.py, library.py  .encorcourse + online library    faults.py     "Break my lab" faults (iosmerge.py: config merge)
   blueprint.py            ENCOR v1.2 exam topics           progress.py   progress dashboard
   exam.py, snapshots.py   exam mode, config snapshots      updates.py    update check + patch verify/install/rollback
+  install.py              install type (deb / linux-tar / windows-zip / source) and the matching full-download asset
   autoupdate.py           background update checker: ETag + backoff, staging, Update now / Later / Skip, idle gating
   report.py               printable HTML reports (web/templates/report_*.html)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
@@ -525,8 +598,9 @@ labs/                     online library: built packs, courses and index.json (p
 encorboot.py              boot loader for packaged builds: picks the app-code bundle, rollback, RUNTIME_VERSION
 encor_launcher.py         frozen entry point (runs encorboot, then encorlab.launcher)
 packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, fake_release.py, icon
+                          build_deb.py (.deb from the Linux build), icons/hicolor/, deb_chroot_test.sh (+ _inner.sh)
 tests/                    pytest suite (no CML needed)
-.github/workflows/        CI: test + build/smoke-test Windows and Linux bundles
+.github/workflows/        CI: test + build/smoke-test Windows and Linux bundles, the .deb (+ Debian 12 install test)
 run.bat, run.ps1, run.sh  from-source launchers (create .venv, install, start)
 ```
 
@@ -541,5 +615,5 @@ become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv
 After changing the schema, templates, guide or example, run `python -m encorlab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **1.7.0**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
+Current version: **1.8.0**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/encore-lab-app/releases) for downloads.

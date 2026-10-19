@@ -71,6 +71,9 @@ def test_build_files_present_and_consistent():
     entry = (ROOT / "encor_launcher.py").read_text(encoding="utf-8")
     assert "from encorlab.launcher import main" in entry and "encorboot.activate" in entry
     assert "build_patch.py" in wf and "encorlab-patch-" in wf and "--check-lock" in wf
+    # the .deb is built from the smoke-tested Linux build, linted, tested on Debian 12 and released
+    assert "build_deb.py" in wf and "lintian" in wf and "container: debian:12" in wf
+    assert "sha256sum ENCORLab-* encorlab_*.deb encorlab-patch-*.zip" in wf and wf.count("dist/encorlab_*.deb") >= 3
 
 
 def test_frozen_paths_are_package_relative():

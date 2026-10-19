@@ -283,7 +283,7 @@ class Updater:
             return {"status": "staged", "version": latest, "cached": True}
         patch = by_name.get(pname)
         if not patch:
-            return self._full(latest, rel["url"], f"release {rel['tag']} has no app patch")
+            return self._full(latest, rel, f"release {rel['tag']} has no app patch")
         sums = next((by_name[n] for n in updates.SUMS_NAMES if n in by_name), None)
         if not sums:
             raise updates.UpdateError(f"release {rel['tag']} has no SHA256SUMS.txt; the patch cannot be verified")
@@ -298,7 +298,7 @@ class Updater:
         try:
             m = updates.verify_patch(data, latest, getattr(b, "RUNTIME_VERSION", None))
         except updates.RuntimeTooOld as e:
-            return self._full(latest, rel["url"], str(e), needed=e.needed)
+            return self._full(latest, rel, str(e), needed=e.needed)
         d = staged_dir()
         d.mkdir(parents=True, exist_ok=True)
         tmp = d / f".{pname}.{os.getpid()}"
@@ -316,10 +316,19 @@ class Updater:
         note(f"staged {pname} ({len(data)} bytes, verified); waiting for the user")
         return {"status": "staged", "version": latest, "size": len(data)}
 
-    def _full(self, version: str, url: str, reason: str, needed: int | None = None) -> dict:
+    def _full(self, version: str, rel: dict, reason: str, needed: int | None = None) -> dict:
+        """Banner: a full download is needed. Points at the asset for this install type (the .deb for a deb
+        install, the zip on Windows, the tar.gz on Linux), falling back to the release page."""
+        from . import install
+        kind = install.install_type()
+        asset = install.full_download(rel.get("assets") or [], version, kind)
+        url = asset["url"] if asset else rel["url"]
         with _LOCK:
             st = load()
-            st["full_download"] = {"version": version, "url": url, "reason": reason, "needed_runtime": needed}
+            st["full_download"] = {"version": version, "url": url, "page": rel["url"], "reason": reason,
+                                   "needed_runtime": needed, "install_type": kind,
+                                   "asset": asset["name"] if asset else None,
+                                   "how": install.how_to_install(kind, asset["name"] if asset else None)}
             st.pop("staged", None)
             save(st)
         note(f"{version} needs a full download: {reason}")

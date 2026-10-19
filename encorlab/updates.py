@@ -120,7 +120,10 @@ def parse_release(raw: bytes, current: str = __version__) -> dict:
     assets = [{"name": str(a.get("name", "")), "size": a.get("size"), "url": str(a.get("browser_download_url", ""))}
               for a in (d.get("assets") or []) if isinstance(a, dict)
               and str(a.get("browser_download_url", "")).startswith(ok)]
-    return {"current": current, "latest": ".".join(map(str, latest)), "tag": tag,
+    from . import install as _inst
+    kind = _inst.install_type()
+    dl = _inst.full_download(assets, ".".join(map(str, latest)), kind)
+    return {"current": current, "latest": ".".join(map(str, latest)), "tag": tag, "install_type": kind, "download": dl,
             "update_available": bool(cur and latest > cur), "newer_than_latest": bool(cur and cur > latest),
             "url": html, "name": str(d.get("name") or tag), "published_at": d.get("published_at"),
             "notes": str(d.get("body") or "")[:4000], "assets": assets}
@@ -184,7 +187,9 @@ def status() -> dict:
     """What the Updates panel shows: running app code, runtime, installed patch, rollback and restart state."""
     b = _boot()
     ok, why = patchable()
+    from . import install as _inst
     out = {"version": __version__, "patchable": ok, "reason": why, "runtime": getattr(b, "RUNTIME_VERSION", None),
+           "install_type": _inst.install_type(), "app_dir": str(_inst.app_dir() or ""),
            "active": None, "bundled_version": None, "installed": None, "previous": None, "pending": False,
            "failed": None, "can_rollback": False, "next_start": None, "restart_needed": False, "can_restart": False}
     if b is None:
@@ -320,6 +325,11 @@ def _precompile(d: Path) -> None:
         pass
 
 
+def _dl_url(info: dict) -> str:
+    """Full download for this install type (the .deb for deb installs), else the release page."""
+    return (info.get("download") or {}).get("url") or info["url"]
+
+
 def install(current: str = __version__, fetch=fetch, url: str | None = None) -> dict:
     """Check GitHub, download the patch for the latest release, verify it and install it.
     Returns {"status": "installed" | "up_to_date" | "full_download", ...}."""
@@ -334,8 +344,8 @@ def install(current: str = __version__, fetch=fetch, url: str | None = None) -> 
     patch = by_name.get(pname)
     sums = next((by_name[n] for n in SUMS_NAMES if n in by_name), None)
     if not patch:
-        return {"status": "full_download", "latest": info["latest"], "url": info["url"],
-                "reason": f"release {info['tag']} has no app patch ({pname})"}
+        return {"status": "full_download", "latest": info["latest"], "url": _dl_url(info), "page": info["url"],
+                "download": info.get("download"), "reason": f"release {info['tag']} has no app patch ({pname})"}
     if not sums:
         raise UpdateError(f"release {info['tag']} has no SHA256SUMS.txt, so the patch cannot be verified")
     try:
@@ -354,8 +364,8 @@ def install(current: str = __version__, fetch=fetch, url: str | None = None) -> 
     try:
         res = install_bytes(data, expected_version=info["latest"])
     except RuntimeTooOld as e:
-        return {"status": "full_download", "latest": info["latest"], "url": info["url"], "reason": str(e),
-                "needed_runtime": e.needed, "runtime": e.have}
+        return {"status": "full_download", "latest": info["latest"], "url": _dl_url(info), "page": info["url"],
+                "download": info.get("download"), "reason": str(e), "needed_runtime": e.needed, "runtime": e.have}
     res.update({"size": len(data), "sha256": got, "url": info["url"], "previous": current})
     return res
 
