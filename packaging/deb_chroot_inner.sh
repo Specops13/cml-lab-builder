@@ -56,17 +56,17 @@ find /opt/encorlab -printf '%p %s %m\n' | sort > /tmp/opt.after
 chk "/opt/encorlab untouched by patch installs" cmp /tmp/opt.before /tmp/opt.after
 chk "dpkg --verify clean after patching" test -z "$(dpkg --verify encorlab)"
 
-echo "== upgrades: user patch 1.8.5 vs newer debs"
+echo "== upgrades: user patch $PV vs newer debs"
 rm -rf "$DATA/app" "$DATA/updates"
-as "encorlab update-install --file $D/user-patch-1.8.5.zip" | tail -1 | sed 's/^/   /'
-v=$(appver); [ "$v" = 1.8.5 ] && ok "user patch 1.8.5 runs over deb $VER" || bad "after patch -> $v"
-apt-get install -y "$D/encorlab_1.8.1_amd64.deb" > /tmp/apt-up1.log 2>&1 && ok "apt install ./encorlab_1.8.1_amd64.deb over $VER" || { bad "upgrade to 1.8.1"; tail /tmp/apt-up1.log; }
+as "encorlab update-install --file $D/user-patch-$PV.zip" | tail -1 | sed 's/^/   /'
+v=$(appver); [ "$v" = "$PV" ] && ok "user patch $PV runs over deb $VER" || bad "after patch -> $v"
+apt-get install -y "$D/encorlab_${UP1}_amd64.deb" > /tmp/apt-up1.log 2>&1 && ok "apt install ./encorlab_${UP1}_amd64.deb over $VER" || { bad "upgrade to $UP1"; tail /tmp/apt-up1.log; }
 chk "dpkg --verify clean after upgrade" test -z "$(dpkg --verify encorlab)"
-[ "$(dpkg-query -W -f='${Version}' encorlab)" = 1.8.1 ] && ok "dpkg now has 1.8.1"
-v=$(appver); [ "$v" = 1.8.5 ] && ok "newer user patch 1.8.5 keeps winning over bundled 1.8.1" || bad "after 1.8.1 deb -> $v"
-apt-get install -y "$D/encorlab_1.9.0_amd64.deb" > /tmp/apt-up2.log 2>&1 && ok "apt install ./encorlab_1.9.0_amd64.deb over 1.8.1" || bad "upgrade to 1.9.0"
-v=$(appver); [ "$v" = 1.9.0 ] && ok "newer bundled 1.9.0 beats the 1.8.5 patch" || bad "after 1.9.0 deb -> $v"
-chk "user data dir untouched by upgrades" test -d "$DATA/app/1.8.5" -a -d "$DATA/labs/ospf-multiarea-stub"
+[ "$(dpkg-query -W -f='${Version}' encorlab)" = "$UP1" ] && ok "dpkg now has $UP1"
+v=$(appver); [ "$v" = "$PV" ] && ok "newer user patch $PV keeps winning over bundled $UP1" || bad "after $UP1 deb -> $v"
+apt-get install -y "$D/encorlab_${UP2}_amd64.deb" > /tmp/apt-up2.log 2>&1 && ok "apt install ./encorlab_${UP2}_amd64.deb over $UP1" || bad "upgrade to $UP2"
+v=$(appver); [ "$v" = "$UP2" ] && ok "newer bundled $UP2 beats the $PV patch" || bad "after $UP2 deb -> $v"
+chk "user data dir untouched by upgrades" test -d "$DATA/app/$PV" -a -d "$DATA/labs/ospf-multiarea-stub"
 
 echo "== remove / purge"
 apt-get remove -y encorlab > /tmp/apt-rm.log 2>&1 && ok "apt remove encorlab" || bad "apt remove"
@@ -77,6 +77,6 @@ chk "~/.config/encorlab kept after remove" test -d "$DATA/labs/ospf-multiarea-st
 apt-get purge -y encorlab > /tmp/apt-purge.log 2>&1 && ok "apt purge encorlab" || bad "apt purge"
 grep -i "kept" /tmp/apt-purge.log | sed 's/^/   /'
 chk "package fully gone from dpkg" test -z "$(dpkg -l encorlab 2>/dev/null | grep -E '^(ii|rc)')"
-chk "~/.config/encorlab kept after purge" test -d "$DATA/labs/ospf-multiarea-stub" -a -d "$DATA/app/1.8.5"
+chk "~/.config/encorlab kept after purge" test -d "$DATA/labs/ospf-multiarea-stub" -a -d "$DATA/app/$PV"
 
 echo; [ $FAILS = 0 ] && echo "DEB CHROOT TEST PASSED" || { echo "DEB CHROOT TEST FAILED ($FAILS)"; exit 1; }

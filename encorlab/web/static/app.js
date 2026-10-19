@@ -1,6 +1,6 @@
 "use strict";
 /* ENCOR Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "1.8.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "1.8.1";  // must equal encorlab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));

@@ -5,7 +5,8 @@
 Layout:  /opt/encorlab/            the PyInstaller one-folder app (same files as the tar.gz) + install-type marker "deb"
          /usr/bin/encorlab         wrapper: exec /opt/encorlab/ENCORLab "$@"
          /usr/share/applications/encorlab.desktop, /usr/share/icons/hicolor/<size>/apps/encorlab.png
-         /usr/share/man/man1/encorlab.1.gz, /usr/share/doc/encorlab/{copyright,changelog.gz}
+         /usr/share/man/man1/encorlab.1.gz,
+         /usr/share/doc/encorlab/{copyright,changelog.gz,LICENSE.txt,THIRD-PARTY-NOTICES.txt}
 The runtime is not rebuilt: the .deb carries exactly the frozen build that was smoke-tested, so the boot loader,
 patch updates (into ~/.config/encorlab/app/<version>, never into /opt) and rollback behave as in the tar.gz.
 Needs dpkg-deb (no root: --root-owner-group). --app-src <dir with encorlab/> swaps in other app code (tests)."""
@@ -134,19 +135,49 @@ settings, imported labs, history and installed updates; kept when the package is
 {homepage}
 """
 
+DOC_FILES = ("LICENSE.txt", "THIRD-PARTY-NOTICES.txt")
+
 COPYRIGHT = """Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: ENCOR Lab Builder
 Upstream-Contact: {maintainer}
 Source: {homepage}
 
 Files: *
-Copyright: 2026 Specops13
-License: other
- ENCOR Lab Builder has not been published under an open-source license; all rights are reserved by the author.
- You may install and use this package for your own study.
+Copyright: 2026 Dylan Vaughan (Specops13)
+License: MIT
+
+Files: opt/encorlab/_internal/*
+Copyright: the respective authors, see /usr/share/doc/encorlab/THIRD-PARTY-NOTICES.txt
+License: bundled-third-party
+ The frozen runtime in /opt/encorlab/_internal bundles CPython (PSF-2.0), the
+ PyInstaller bootloader (GPL-2.0-or-later WITH Bootloader-exception) and
+ run-time hooks (Apache-2.0), and third-party Python packages under MIT, BSD,
+ Apache-2.0, ISC, PSF-2.0, MPL-2.0 (certifi) and LGPL-2.1 (paramiko) licenses,
+ all unmodified. The full list with versions, project pages and complete
+ license texts is in /usr/share/doc/encorlab/THIRD-PARTY-NOTICES.txt.
+
+Files: opt/encorlab/_internal/appcode/*
+Copyright: 2026 Dylan Vaughan (Specops13)
+License: MIT
+
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
  .
- The application folder /opt/encorlab bundles CPython (PSF-2.0) and third-party Python packages, each under its own
- license; their license files are in /opt/encorlab/_internal/*.dist-info/ and /opt/encorlab/_internal/.
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
 """
 
 CHANGELOG = """encorlab ({version}) stable; urgency=medium
@@ -219,8 +250,9 @@ def build(stage: Path, out: Path, version: str | None = None, app_src: Path | No
     try:
         root = work / f"{PACKAGE}_{version}_amd64"
         opt = root / "opt" / "encorlab"
+        top = {"install-desktop-entry.sh", "README-FIRST.txt", *DOC_FILES}    # only at the top of the bundle
         shutil.copytree(stage, opt, symlinks=True,
-                        ignore=shutil.ignore_patterns("install-desktop-entry.sh", "README-FIRST.txt"))
+                        ignore=lambda d, names: [n for n in names if n in top and Path(d) == Path(stage)])
         if app_src is not None:
             swap_app_code(opt, app_src)
         (opt / "install-type").write_text("deb\n", encoding="utf-8")
@@ -235,6 +267,13 @@ def build(stage: Path, out: Path, version: str | None = None, app_src: Path | No
                 date=time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.gmtime(EPOCH))).encode()), 0o644),
             "usr/share/lintian/overrides/encorlab": (LINTIAN_OVERRIDES.encode(), 0o644),
         }
+        # LICENSE.txt and THIRD-PARTY-NOTICES.txt of the bundle go to the package's doc folder
+        for name in DOC_FILES:
+            src = stage / name if (stage / name).is_file() else (ROOT / "LICENSE" if name == "LICENSE.txt" else None)
+            if src is None or not src.is_file():
+                print(f"warning: {name} is not in the build (built before 1.8.1?)", file=sys.stderr)
+                continue
+            files[f"usr/share/doc/encorlab/{name}"] = (src.read_bytes(), 0o644)
         for icon in sorted((HERE / "icons" / "hicolor").glob("*/apps/encorlab.png")):
             files[f"usr/share/icons/hicolor/{icon.parent.parent.name}/apps/encorlab.png"] = (icon.read_bytes(), 0o644)
         for rel, (data, mode) in files.items():

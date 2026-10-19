@@ -5,6 +5,7 @@
 [![Latest release](https://img.shields.io/github/v/release/Specops13/encore-lab-app)](https://github.com/Specops13/encore-lab-app/releases/latest)
 ![Python 3.10-3.13](https://img.shields.io/badge/python-3.10--3.13-blue)
 ![Windows 11 | Debian/Ubuntu](https://img.shields.io/badge/platform-Windows%2011%20%7C%20Debian%2FUbuntu-lightgrey)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Pick a lab and click **Build**: the topology is imported into your CML server, booted and pre-configured.
 Solve the task on the device consoles, then click **Check**. The app grades you with read-only `show`/`ping`
@@ -32,6 +33,7 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [Project layout](#project-layout)
 - [Development / tests](#development--tests)
 - [Version and changelog](#version-and-changelog)
+- [License](#license)
 
 ## Features
 - **18 built-in labs** covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
@@ -102,7 +104,8 @@ Download from **[Releases](https://github.com/Specops13/encore-lab-app/releases/
 - Starting it again while it runs just opens the browser on the running copy.
 - **Quit:** close the console window or press Ctrl+C.
 - **Your data stays outside the app folder,** in `%APPDATA%\encorlab` or `~/.config/encorlab`. That covers settings, imported labs, history and installed updates. To update, use *Settings > Updates > Install update* (see [Updating](#updating-small-patches-instead-of-a-full-download)), or delete the old app folder and unzip the new one.
-- The bundle includes `example-packs/` (drag them onto the Labs page), `docs/` and this README.
+- The bundle includes `example-packs/` (drag them onto the Labs page), `docs/`, this README, `LICENSE.txt` and
+  `THIRD-PARTY-NOTICES.txt` (the .deb puts the last two in `/usr/share/doc/encorlab/`).
 - The command line works too: `ENCORLab list`, `ENCORLab check <lab>`, `ENCORLab --port 9000`, `ENCORLab --no-browser`.
 - **Windows SmartScreen:** the exe is not code-signed, so the first start may show "Windows protected your PC". Click *More info* > *Run anyway*.
   You can also right-click the downloaded zip, choose *Properties* > *Unblock*, then extract it. Check the download against `SHA256SUMS.txt` from the release.
@@ -553,6 +556,12 @@ far fewer antivirus false positives.
   `debootstrap --variant=minbase bookworm`): apt install, `desktop-file-validate`, a menu launch and a second launch,
   the smoke test with patches and auto-update as a normal user (`/opt` must stay unchanged), upgrades to newer test
   packages over a user patch, and remove/purge (data kept).
+- **License notices:** `build.py` copies `LICENSE` into the bundle as `LICENSE.txt` and runs
+  `packaging/third_party_notices.py`. That script reads PyInstaller's tables of what was really bundled (not just what
+  is installed in the build venv), maps the files to their Python distributions and writes `THIRD-PARTY-NOTICES.txt`
+  with name, version, license, project page and the full license texts. The build fails if a bundled package has an
+  unknown license, no license text, or a strong copyleft license (GPL/AGPL; the PyInstaller bootloader's exception and
+  LGPL are allowed).
 - **GitHub Actions:** `.github/workflows/build.yml` builds and smoke-tests both bundles (windows-latest + ubuntu-22.04) on every `v*` tag.
   The bundles are kept as workflow artifacts. To publish them, run it by hand (*Actions > build > Run workflow*), tick *publish* and enter the tag.
   Existing release assets are never overwritten. CI also builds `encorlab-patch-<version>.zip` and the `.deb` (lintian +
@@ -599,6 +608,8 @@ encorboot.py              boot loader for packaged builds: picks the app-code bu
 encor_launcher.py         frozen entry point (runs encorboot, then encorlab.launcher)
 packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, fake_release.py, icon
                           build_deb.py (.deb from the Linux build), icons/hicolor/, deb_chroot_test.sh (+ _inner.sh)
+                          third_party_notices.py (THIRD-PARTY-NOTICES.txt from the PyInstaller build)
+LICENSE                   MIT license
 tests/                    pytest suite (no CML needed)
 .github/workflows/        CI: test + build/smoke-test Windows and Linux bundles, the .deb (+ Debian 12 install test)
 run.bat, run.ps1, run.sh  from-source launchers (create .venv, install, start)
@@ -615,5 +626,25 @@ become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv
 After changing the schema, templates, guide or example, run `python -m encorlab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **1.8.0**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
+Current version: **1.8.1**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/encore-lab-app/releases) for downloads.
+
+## License
+ENCOR Lab Builder is released under the **[MIT License](LICENSE)**, Copyright (c) 2026 Dylan Vaughan (Specops13).
+You may use, copy, modify and redistribute it, including commercially, as long as the copyright and license notice
+stay with it. It comes without any warranty.
+
+The ready-to-run downloads also contain the Python runtime and third-party packages. Each keeps its own license,
+and all of them allow redistribution with an MIT app. `THIRD-PARTY-NOTICES.txt` in every download lists them with
+their full license texts. The .deb puts it in `/usr/share/doc/encorlab/`.
+- **Most packages** are under MIT, BSD, Apache-2.0, ISC or PSF-2.0 (e.g. FastAPI, Starlette, uvicorn, pydantic,
+  Jinja2, Typer and virl2_client, which is Apache-2.0).
+- **paramiko** (the console server SSH client) is under **LGPL-2.1**. It is included unmodified, its source is at
+  https://github.com/paramiko/paramiko, and because this app is open source with its build scripts, you can rebuild
+  it with a modified paramiko.
+- **certifi** (CA bundle) is under MPL-2.0 and included unmodified.
+- **The PyInstaller bootloader** is under GPL-2.0-or-later with the Bootloader exception, which allows shipping it
+  with any program. PyInstaller's run-time hooks are Apache-2.0.
+
+*Cisco*, *CCNP*, *ENCOR* and *Cisco Modeling Labs* are trademarks of Cisco Systems, Inc. This project is not
+affiliated with or endorsed by Cisco.

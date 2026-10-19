@@ -4,7 +4,7 @@
 
 Windows -> dist/ENCORLab-<version>-windows-x64.zip     Linux -> dist/ENCORLab-<version>-linux-x64.tar.gz
 Contents: ENCORLab(.exe) + _internal/ (PyInstaller one-folder runtime; the app code is in _internal/appcode/),
-README-FIRST.txt, README.md, docs/, example-packs/. The app-code patch is built separately by build_patch.py.
+README-FIRST.txt, README.md, LICENSE.txt, THIRD-PARTY-NOTICES.txt, docs/, example-packs/. The app-code patch is built separately by build_patch.py.
 --smoke runs packaging/smoke_test.py against the staged build (it imports the example packs into YOUR user
 data folder, so it is meant for CI machines)."""
 from __future__ import annotations
@@ -55,6 +55,10 @@ def main() -> int:
     shutil.copytree(ROOT / "docs", stage / "docs")
     shutil.copy2(ROOT / "README.md", stage / "README.md")
     shutil.copy2(HERE / "README-BINARY.txt", stage / "README-FIRST.txt")
+    # MIT license of the app + licenses of everything PyInstaller bundled (fails on an incompatible license)
+    shutil.copy2(ROOT / "LICENSE", stage / "LICENSE.txt")
+    sh(sys.executable, HERE / "third_party_notices.py", "--work", work / "pyi" / "encorlab", "--version", v,
+       "--out", stage / "THIRD-PARTY-NOTICES.txt")
     packs = stage / "example-packs"
     packs.mkdir()
     for d in sorted(p for p in (ROOT / "examples").iterdir() if (p / "lab.yaml").is_file()):

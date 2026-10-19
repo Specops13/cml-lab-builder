@@ -2,6 +2,23 @@
 
 All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
+## [1.8.1] - 2026-10-19
+### Added
+- **MIT License** (`LICENSE`, Copyright (c) 2026 Dylan Vaughan (Specops13)).
+  - `pyproject.toml` declares `license = "MIT"` (SPDX, with `license-files`).
+  - The README has a license section and badge.
+  - The .deb's `copyright` file is now DEP-5 with MIT for the app and a pointer to the third-party notices for the
+    bundled runtime.
+- **`THIRD-PARTY-NOTICES.txt`** in the Windows zip, the Linux tar.gz and the .deb (`/usr/share/doc/encorlab/`, next
+  to `LICENSE.txt`). It is generated at build time by `packaging/third_party_notices.py` from PyInstaller's tables of
+  what was actually bundled: every component with its version, license, project page and full license text (CPython,
+  paramiko, virl2_client, FastAPI, …).
+- **License check:** the build stops if a bundled package has an unknown license, no license text, or a strong
+  copyleft license (GPL/AGPL).
+### Changed
+- The build requires setuptools 77 or newer (for SPDX license expressions). The runtime is unchanged
+  (RUNTIME_VERSION 1), so 1.7.x and 1.8.0 update to 1.8.1 as a normal patch.
+
 ## [1.8.0] - 2026-10-19
 ### Added
 - **Debian package** `encorlab_1.8.0_amd64.deb` (Debian 10+, Ubuntu 20.04+). Install it with

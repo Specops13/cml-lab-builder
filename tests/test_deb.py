@@ -221,3 +221,25 @@ def test_build_deb_from_tar_and_with_other_app_code(tmp_path):
     deb = build_deb.build(unpacked, tmp_path / "out", "1.8.1", app_src=src)
     m = json.loads(deb_file(deb, "/opt/encorlab/_internal/appcode/manifest.json"))
     assert deb.name == "encorlab_1.8.1_amd64.deb" and m["app_version"] == "1.8.1" and "encorlab/autoupdate.py" in m["files"]
+
+
+@needs_dpkg
+def test_deb_license_files_and_dep5_copyright(tmp_path):
+    s = fake_stage(tmp_path)
+    (s / "LICENSE.txt").write_text((build_deb.ROOT / "LICENSE").read_text())
+    (s / "THIRD-PARTY-NOTICES.txt").write_text("THIRD-PARTY NOTICES\n paramiko LGPL-2.1\n")
+    (s / "_internal" / "click-8.5.0.dist-info" / "licenses").mkdir(parents=True)     # same names deeper: kept in /opt
+    (s / "_internal" / "click-8.5.0.dist-info" / "licenses" / "LICENSE.txt").write_text("BSD\n")
+    deb = build_deb.build(s, tmp_path / "out")
+    files = deb_contents(deb)
+    assert "/usr/share/doc/encorlab/LICENSE.txt" in files and "/usr/share/doc/encorlab/THIRD-PARTY-NOTICES.txt" in files
+    assert "/opt/encorlab/LICENSE.txt" not in files and "/opt/encorlab/THIRD-PARTY-NOTICES.txt" not in files
+    assert "/opt/encorlab/_internal/click-8.5.0.dist-info/licenses/LICENSE.txt" in files
+    assert "MIT License" in deb_file(deb, "/usr/share/doc/encorlab/LICENSE.txt")
+    cr = deb_file(deb, "/usr/share/doc/encorlab/copyright")
+    assert cr.startswith("Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\n")
+    assert "Copyright: 2026 Dylan Vaughan (Specops13)\nLicense: MIT\n" in cr and "\nLicense: MIT\n Permission is hereby" in cr
+    assert "THIRD-PARTY-NOTICES.txt" in cr and "all rights" not in cr.lower()
+    for para in cr.split("\n\n"):                  # DEP-5: continuation lines start with a space, "." for blank lines
+        for line in para.splitlines()[1:]:
+            assert line.startswith((" ", "Files:", "Copyright:", "License:", "Upstream", "Source:")), line

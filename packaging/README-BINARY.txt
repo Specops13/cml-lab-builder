@@ -27,3 +27,5 @@ FILES
   example-packs/   importable .encorlab packs (drag onto the Labs page)
   docs/            lab authoring guide, AI prompt, JSON Schema
   _internal/       the bundled Python runtime and app files (don't move files out of it)
+  LICENSE.txt      ENCOR Lab Builder is MIT-licensed (Copyright (c) 2026 Dylan Vaughan (Specops13))
+  THIRD-PARTY-NOTICES.txt  licenses of the bundled Python runtime and packages (paramiko: LGPL-2.1, ...)

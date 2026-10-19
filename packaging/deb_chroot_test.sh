@@ -9,14 +9,17 @@ CHROOT=$(realpath "$1"); DEB=$(realpath "$2")
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 WORK=$(mktemp -d /tmp/debtest-XXXX)
 VER=$(dpkg-deb -f "$DEB" Version)
+# test versions around VER=x.y.z: newer package UP1=x.y.(z+1) < user patch PV=x.y.(z+5) < newer package UP2=x.(y+1).0
+IFS=. read -r X Y Z <<<"$VER"; UP1=$X.$Y.$((Z+1)); PV=$X.$Y.$((Z+5)); UP2=$X.$((Y+1)).0
 STAGE=$WORK/stage
 mkdir -p "$STAGE" && dpkg-deb -x "$DEB" "$STAGE"
 
 # test packages: same frozen runtime with app code A.B.C, plus a user patch
-python3 - "$ROOT" "$WORK" "$STAGE/opt/encorlab" <<'PY'
+python3 - "$ROOT" "$WORK" "$STAGE/opt/encorlab" "$UP1" "$UP2" "$PV" <<'PY'
 import re, shutil, subprocess, sys
 from pathlib import Path
 root, work, opt = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+up1, up2, pv = sys.argv[4:7]
 sys.path.insert(0, str(root / "packaging")); sys.path.insert(0, str(root))
 import build_patch
 def src(v):
@@ -25,13 +28,13 @@ def src(v):
     i = s / "encorlab" / "__init__.py"
     i.write_text(re.sub(r'__version__ = "[^"]+"', f'__version__ = "{v}"', i.read_text()))
     return s
-for v in ("1.8.1", "1.9.0"):
+for v in (up1, up2):
     subprocess.run([sys.executable, str(root / "packaging/build_deb.py"), "--stage", opt, "--app-src", str(src(v)),
                     "--version", v, "--out", str(work / "debs")], check=True)
-print(build_patch.build_patch(src("1.8.5"), work / "patch", "1.8.5", None))
+print(build_patch.build_patch(src(pv), work / "patch", pv, None))
 PY
 mkdir -p "$WORK/debs"; cp "$DEB" "$WORK/debs/"
-cp "$WORK"/patch/*.zip "$WORK/debs/user-patch-1.8.5.zip"
+cp "$WORK"/patch/*.zip "$WORK/debs/user-patch-$PV.zip"
 
 cleanup() { set +e; for m in src tmp/debtest dev/pts dev sys proc; do sudo umount -l "$CHROOT/$m" 2>/dev/null; done; rm -rf "$WORK"; }
 trap cleanup EXIT
@@ -40,4 +43,4 @@ sudo mount -t proc proc "$CHROOT/proc"; sudo mount --rbind /sys "$CHROOT/sys"; s
 sudo mount --bind "$ROOT" "$CHROOT/src"; sudo mount -o remount,bind,ro "$CHROOT/src"
 sudo mount --bind "$WORK/debs" "$CHROOT/tmp/debtest"
 sudo cp /etc/resolv.conf "$CHROOT/etc/resolv.conf"
-sudo chroot "$CHROOT" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root VER="$VER" bash /src/packaging/deb_chroot_inner.sh
+sudo chroot "$CHROOT" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root VER="$VER" UP1="$UP1" UP2="$UP2" PV="$PV" bash /src/packaging/deb_chroot_inner.sh

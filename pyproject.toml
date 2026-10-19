@@ -1,11 +1,14 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]   # >=77: SPDX license expression (PEP 639)
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "encorlab"
-version = "1.8.0"
+version = "1.8.1"
 description = "Build CCNP ENCOR (350-401) practice labs in Cisco Modeling Labs 2.9 and grade them"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Dylan Vaughan (Specops13)"}]
 requires-python = ">=3.10,<3.14"
 dependencies = [
   "virl2_client>=2.9.0,<2.10",   # must match CML controller 2.9.x
