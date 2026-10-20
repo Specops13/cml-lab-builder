@@ -530,6 +530,7 @@
     },
     "version": {
       "default": "1",
+      "description": "Content version of the lab, e.g. '1', '2' or '1.1' (default '1'). Raise it whenever you change a published lab, so installed copies show 'Update available' in the library",
       "title": "Version",
       "type": "string"
     }

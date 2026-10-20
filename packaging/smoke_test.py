@@ -4,8 +4,10 @@
         --data-dir <expected user data folder> [--pack x.encorlab ...] [--runner wine] [--port 8791] [--patch-test]
 
 Checks: CLI runs (version, list); the launcher serves the UI on 127.0.0.1 with versioned (cache-busted)
-assets; /api/labs lists all built-in labs; packs import into the user data folder; the solution
-endpoint works; a second launch detects the running instance; the server stops cleanly.
+assets; a first run has no labs (2.0.0 ships none) and no migration to do; the lab library is served from this
+source tree's labs/ on 127.0.0.1 (ENCOR_LIBRARY_URL): the starter set and a course (with the labs it lists)
+install from it; packs import into the user data folder; the solution endpoint works; a second launch detects
+the running instance; the server stops cleanly.
 --patch-test also builds test patches from this source tree and checks, on the frozen build: installing a patch
 (the next start runs it), the web UI on a patched build, rollback, automatic fallback from a patch that fails
 to import, and refusal of a patch that needs a newer runtime. It removes the installed test patches at the end."""
@@ -20,12 +22,34 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BUILTIN = len([d for d in (ROOT / "encorlab" / "labs").iterdir() if (d / "lab.yaml").is_file()])
+LIBRARY = ROOT / "labs"
+
+
+def serve_library(folder: Path = LIBRARY):
+    """Serve a library folder (index.json + packs) on 127.0.0.1; returns (server, index URL)."""
+    import functools
+    import http.server
+    h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(folder))
+    h.log_message = lambda *a, **k: None
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), h)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, f"http://127.0.0.1:{srv.server_address[1]}/index.json"
+
+
+def post_body(url, body: dict, timeout=120):
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        return {"http_error": e.code, "body": e.read().decode("utf-8", "replace")[:300]}
 
 
 def run(cmd, timeout=180):
@@ -164,7 +188,7 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre) -
         check(not (data_dir / "app" / new).exists() and (data_dir / "updates" / "staged" / f"encorlab-patch-{new}.zip").is_file(),
               "patch downloaded + verified into updates/staged, not installed")
         labs = json.loads(get(base + "/api/labs")[2])
-        lab_id = sorted(x["id"] for x in labs["labs"] if x["source"] == "builtin")[0]
+        lab_id = sorted(x["id"] for x in labs["labs"] if not x.get("walkthrough"))[0]
         post_json(f"{base}/api/labs/{lab_id}/exam/start")
         a = post_json(f"{base}/api/update/apply?version={new}")
         check(a.get("state") == "waiting" and any("exam" in w for w in a.get("waiting_for", [])),
@@ -231,11 +255,14 @@ def main() -> int:
     code, out = run(exe + ["version"])
     check(code == 0 and a.version in out, f"CLI 'version' -> {out.strip()[-40:]!r}")
     code, out = run(exe + ["list"])
-    check(code == 0 and "eigrp-basic" in out and "troubleshoot" not in out, "CLI 'list' shows the built-in catalog")
+    check(code == 0 and "no labs installed yet" in out and "eigrp-basic" not in out, "CLI 'list' on a first run: no labs, points to the library")
+    lib_srv, lib_url = serve_library()
+    index = json.loads((LIBRARY / "index.json").read_text(encoding="utf-8"))
+    packs_given = a.pack or [str(LIBRARY / "troubleshoot-ospf-7node.encorlab")]
 
     t0 = time.time()
     proc = subprocess.Popen(exe + ["--no-browser", "--port", str(a.port)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, encoding="utf-8", errors="replace",
+                            text=True, encoding="utf-8", errors="replace", env=dict(os.environ, ENCOR_LIBRARY_URL=lib_url),
                             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
     lines: list[str] = []
     threading.Thread(target=lambda: [lines.append(l) for l in proc.stdout], daemon=True).start()
@@ -263,9 +290,30 @@ def main() -> int:
         st, ct, _ = get(base + "/static/help.json")
         check(st == 200 and "json" in ct, "help.json served")
         labs = json.loads(get(base + "/api/labs")[2])
-        builtin = [l for l in labs["labs"] if l["source"] == "builtin"]
-        check(len(builtin) == BUILTIN and not labs["broken"], f"/api/labs: {len(builtin)} built-in labs, broken={labs['broken']}")
-        for p in a.pack:
+        check(labs["labs"] == [] and not labs["broken"], f"first run: no labs, broken={labs['broken']}")
+        mig = labs.get("migration") or {}
+        check(mig.get("state") == "done" and mig.get("fresh"), f"first run: nothing to migrate ({mig})")
+        lib = json.loads(get(base + "/api/library", 30)[2])
+        check(len(lib.get("items", [])) == len(index["items"]) and lib.get("starter") == index["starter"],
+              f"library served from 127.0.0.1: {len(lib.get('items', []))} items, starter={lib.get('starter')}")
+        check(all(i.get("size") and (i["kind"] == "course" or i.get("ram_gb")) for i in lib.get("items", [])),
+              "library items carry sizes and RAM estimates")
+        r = post_body(base + "/api/library/install-set", {"starter": True})
+        check(r.get("ok") and sorted(r.get("installed", [])) == sorted(index["starter"]), f"Install starter set -> {r}")
+        ids = {l["id"]: l for l in json.loads(get(base + "/api/labs")[2])["labs"]}
+        check(set(ids) == set(index["starter"]) and all(l["source"] == "user" for l in ids.values()),
+              f"starter labs installed into the user labs folder: {sorted(ids)}")
+        check(all((Path(a.data_dir) / "labs" / lid / ".library.json").is_file() for lid in ids), "library origin recorded")
+        course = next(i for i in index["items"] if i["file"] == "data-center.encorcourse")
+        r = post_body(base + "/api/library/install", {"file": course["file"]})
+        check(r.get("kind") == "course" and set(course["labs"]) <= set(r.get("installed", [])),
+              f"course Install all -> course + its labs from the library: {r.get('installed')}")
+        cs = json.loads(get(base + "/api/courses")[2])["courses"]
+        check(any(c["id"] == "data-center" and all(l["available"] for l in c["labs"]) for c in cs), "course listed with all labs available")
+        evpn = next((l for l in json.loads(get(base + "/api/labs")[2])["labs"] if l["id"] == "18-evpn-vxlan"), {})
+        check(evpn.get("ram", {}).get("heavy") and evpn.get("type") == "walkthrough", "EVPN walkthrough installed, tagged RAM heavy")
+        n_before = len(json.loads(get(base + "/api/labs")[2])["labs"])
+        for p in packs_given:
             rep = post_file(base + "/api/import?replace=true", Path(p))
             check(rep.get("ok") and rep.get("lab_id"), f"import {Path(p).name} -> {rep.get('lab_id')}")
             lid = rep.get("lab_id")
@@ -274,7 +322,7 @@ def main() -> int:
             sol = json.loads(get(base + f"/api/labs/{lid}/solution")[2])
             check(sol.get("summary") and not sol.get("auto_generated"), "solution summary available")
         ids = {l["id"] for l in json.loads(get(base + "/api/labs")[2])["labs"]}
-        check(len(ids) == BUILTIN + len(a.pack), f"catalog now has {len(ids)} labs")
+        check(len(ids) == n_before + len(packs_given), f"catalog now has {len(ids)} labs")
         code, out = run(exe + ["--no-browser", "--port", base.rsplit(":", 1)[1]], timeout=60)
         check(code == 0 and "already running" in out, "second launch detects the running instance")
     finally:
@@ -290,6 +338,9 @@ def main() -> int:
         out = "".join(lines)
         print(f"---- launcher output (exit {proc.returncode}) ----\n" + out.strip() + "\n-------------------------")
     check("Web UI:" in out and "127.0.0.1" in out, "launcher printed its banner")
+    code, out = run(exe + ["list"])
+    check(code == 0 and "eigrp-basic" in out and "18-evpn-vxlan" in out, "CLI 'list' shows the installed labs")
+    lib_srv.shutdown()
     if a.patch_test:
         patch_tests(exe, a.version, Path(a.data_dir), a.port + 1, check)
     if a.auto_update_test:

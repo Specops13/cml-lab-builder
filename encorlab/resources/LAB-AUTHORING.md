@@ -11,7 +11,7 @@ The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocompl
 `# yaml-language-server: $schema=./encorlab-lab.schema.json` as the first line.
 
 ## Hard rules (the validator enforces them)
-1. `id`: lowercase letters, digits and dashes, 2-41 characters (e.g. `ospf-multiarea-stub`). It must not reuse a built-in lab id.
+1. `id`: lowercase letters, digits and dashes, 2-41 characters (e.g. `ospf-multiarea-stub`). It must not reuse the id of a lab in the online library (e.g. `03-ospf-multiarea`) unless you are publishing a new version of that lab.
 2. Nodes: `kind` is `router` or `switch`. Names start with a letter (`R1`, `SW1`, `ABR`). Keep labs small: 2-6 nodes, max 20.
 3. **Interfaces**: each node has 4 data ports, numbered 0-3. Never write literal interface names. Use placeholders:
    - `%if0%` .. `%if3%` -> long name (`Ethernet0/0` on IOL, `GigabitEthernet0/0` on IOSv)
@@ -47,7 +47,8 @@ The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocompl
 | faults | optional | Predefined faults for *Break my lab* (see below) |
 | type | no | `challenge` (default) or `walkthrough` (a guided build in `steps`, see below) |
 | ram_gb | no | CML server RAM the lab needs, in GB. Default: estimated from the node types (see "RAM estimate") |
-| author, version | no | free text |
+| author | no | free text |
+| version | no | content version, e.g. `"1"`, `"2"` or `"1.1"` (default `"1"`). Raise it whenever you change a lab that is already published: installed copies then show *Update available* in the library |
 
 ## RAM estimate and the "RAM heavy" tag
 The app shows an estimated CML RAM figure on every lab (catalog, lab page, build confirmation, courses, library). It adds
@@ -276,9 +277,20 @@ author: Your Name                # optional
 version: "1.0"                   # optional
 labs: [03-ospf-multiarea, ospf-multiarea-stub, troubleshoot-ospf-7node]   # study order (max 50)
 ```
-Every listed lab must be bundled, built in, or already installed. Each bundle folder must be named after its lab id, and
-every bundled lab must pass the normal validation, otherwise nothing is installed. Build and validate one with
+Every listed lab must be bundled in the course file, already installed, or published in the lab library: installing a
+course from the library (or importing a course file while online) installs the listed labs it doesn't bundle from the
+library first (*Install all*). Each bundle folder must be named after its lab id, and every bundled lab must pass the
+normal validation, otherwise nothing is installed. Build and validate one with
 `python -m encorlab course build <folder> [--labs-from examples/] -o my.encorcourse`.
+
+## Publishing in the lab library
+Since 2.0.0 the app ships without labs; every lab, including the former built-in labs, is a pack in the online library
+(`labs/` in the project repo). Lab sources live in `labsrc/<id>/` (and `examples/<id>/`), courses in `examples/courses/`.
+`python packaging/build_library.py` packs them reproducibly, validates every lab strictly (solution 100%, starting config
+0%) and writes `labs/index.json` with each file's sha256, size, version, RAM estimate and the recommended starter set
+(`labsrc/library.yaml`). It refuses a changed pack whose `version:` was not raised. Anyone can host a library: serve a
+folder with `index.json` and the packs over https and set *Settings > Library URL* (http is accepted only for
+localhost).
 
 ## Full example
 See the example below (also shipped as `example-lab.yaml`).

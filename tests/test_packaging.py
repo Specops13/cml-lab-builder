@@ -1,4 +1,5 @@
 """Packaging: launcher behaviour and build files (the frozen build itself is smoke-tested by packaging/smoke_test.py)."""
+import os
 import re
 import socket
 import threading
@@ -80,5 +81,6 @@ def test_frozen_paths_are_package_relative():
     """Data files are found next to the modules, which PyInstaller preserves (collect_data_files)."""
     from encorlab import catalog, prompt
     from encorlab.web import app
-    assert catalog.LABS_DIR.parent == Path(catalog.__file__).parent
+    assert catalog.LABS_DIR == Path(os.environ["ENCOR_BUILTIN_LABS_DIR"])   # the suite uses labsrc/ in place
+    assert not (Path(catalog.__file__).parent / "labs").exists()           # 2.0.0: the package ships no labs
     assert prompt.RES.parent == Path(prompt.__file__).parent and app.HERE == Path(app.__file__).parent

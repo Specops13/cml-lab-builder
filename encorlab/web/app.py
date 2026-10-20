@@ -228,6 +228,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                             "best": max((x.get("score_pct") or 0 for x in h), default=None) if not wt else None,
                             "solved": bool(wt["completed"]) if wt else any(x.get("passed") for x in h),
                             "type": l.type, "walkthrough": wt, "ram": _ram(l, s), "version": l.version,
+                            "library": e.source == "builtin" or bool(library.origin(lid)),
                             "update_available": lid in library.last_index().get("updates", [])})
             except Exception as ex:  # pragma: no cover - defensive
                 errors[str(e.path)] = f"{type(ex).__name__}: {ex}"

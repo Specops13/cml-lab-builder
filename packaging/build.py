@@ -4,7 +4,7 @@
 
 Windows -> dist/ENCORLab-<version>-windows-x64.zip     Linux -> dist/ENCORLab-<version>-linux-x64.tar.gz
 Contents: ENCORLab(.exe) + _internal/ (PyInstaller one-folder runtime; the app code is in _internal/appcode/),
-README-FIRST.txt, README.md, LICENSE.txt, THIRD-PARTY-NOTICES.txt, docs/, example-packs/. The app-code patch is built separately by build_patch.py.
+README-FIRST.txt, README.md, LICENSE.txt, THIRD-PARTY-NOTICES.txt, docs/ (no labs: they come from the online library). The app-code patch is built separately by build_patch.py.
 --smoke runs packaging/smoke_test.py against the staged build (it imports the example packs into YOUR user
 data folder, so it is meant for CI machines)."""
 from __future__ import annotations
@@ -59,10 +59,7 @@ def main() -> int:
     shutil.copy2(ROOT / "LICENSE", stage / "LICENSE.txt")
     sh(sys.executable, HERE / "third_party_notices.py", "--work", work / "pyi" / "encorlab", "--version", v,
        "--out", stage / "THIRD-PARTY-NOTICES.txt")
-    packs = stage / "example-packs"
-    packs.mkdir()
-    for d in sorted(p for p in (ROOT / "examples").iterdir() if (p / "lab.yaml").is_file()):
-        sh(sys.executable, "-m", "encorlab", "pack", d, "-o", packs / f"{d.name}.encorlab", stdout=subprocess.DEVNULL)
+    # no labs in the download (2.0.0): they are installed from the online library (labs/ in the repo)
     if not WIN:
         shutil.copy2(HERE / "encorlab.png", stage / "_internal" / "encorlab.png")
         shutil.copy2(HERE / "install-desktop-entry.sh", stage / "install-desktop-entry.sh")
@@ -94,7 +91,7 @@ def main() -> int:
     if a.smoke:
         data = Path(os.environ["APPDATA"]) / "encorlab" if WIN else Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "encorlab"
         sh(sys.executable, HERE / "smoke_test.py", exe, "--version", v, "--data-dir", data, "--patch-test", "--auto-update-test",
-           *[x for p in sorted(packs.glob("*.encorlab")) for x in ("--pack", p)])
+           *[x for p in sorted((ROOT / "labs").glob("*.encorlab"))[-2:] for x in ("--pack", p)])
     return 0
 
 

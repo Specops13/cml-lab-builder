@@ -16,7 +16,10 @@ _NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,30}$")
 def version_key(v) -> tuple:
     """Comparable form of a lab version ('2' > '1.10' > '1.9' > '1'); unparsable parts count as 0."""
     import re as _re
-    return tuple(int(x) if x.isdigit() else 0 for x in _re.split(r"[.\-]", str(v or "1").strip().lstrip("vV"))) or (1,)
+    parts = [int(x) if x.isdigit() else 0 for x in _re.split(r"[.\-]", str(v or "1").strip().lstrip("vV"))]
+    while len(parts) > 1 and parts[-1] == 0:     # '1.0' == '1'
+        parts.pop()
+    return tuple(parts) or (1,)
 
 
 class _Strict(BaseModel):

@@ -37,6 +37,7 @@
 <main>
 <!-- ===================== LABS ===================== -->
 <section id="view-labs">
+  <div id="mig-banner" class="mig-banner" role="status" hidden></div>
   <div class="cols">
     <aside class="catalog">
       <div class="import-box">
@@ -48,7 +49,7 @@
         <input data-help="filter.search" id="f-search" aria-label="Search labs" placeholder="Search labs…">
         <select data-help="filter.domain" id="f-domain" aria-label="Domain"><option value="">All domains</option></select>
         <select data-help="filter.diff" id="f-diff" aria-label="Difficulty"><option value="">Any difficulty</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
-        <select data-help="filter.source" id="f-source" aria-label="Source"><option value="">All sources</option><option value="builtin">Built-in</option><option value="user">Imported</option></select>
+        <select data-help="filter.source" id="f-source" aria-label="Source"><option value="">All sources</option><option value="library">From the library</option><option value="user">My own / imported</option></select>
         <select data-help="filter.course" id="f-course" aria-label="Course"><option value="">No course filter</option></select>
       </div>
       <ul id="lab-list"></ul>
@@ -124,6 +125,7 @@
     <label>Device images <select data-help="s.platform" name="platform"><option value="iol">IOL / IOL-L2 (light)</option><option value="iosv">IOSv / IOSvL2</option></select></label>
     <label>Node limit <input data-help="s.node_limit" name="node_limit" type="number" min="1"></label>
     <label>Mark labs "RAM heavy" from (GB of CML RAM) <input data-help="s.ram_heavy_gb" name="ram_heavy_gb" type="number" min="1" max="1024"></label>
+    <label>Library URL <input data-help="s.library_url" name="library_url" placeholder="(default: the project's GitHub repo)" style="min-width:28em"></label>
     <label class="inline"><input data-help="s.show_help" name="show_help" type="checkbox"> Show help icons</label>
     <h2>Updates</h2>
     <label class="inline"><input data-help="s.check_updates" name="check_updates" type="checkbox"> Check for updates automatically and ask before installing (every 6 hours)</label>

@@ -130,6 +130,9 @@ def _copy(src: Path, lid: str) -> bool:
         shutil.rmtree(tmp)
     tmp.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(src, tmp, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    from .library import DEFAULT_INDEX, ORIGIN_FILE
+    (tmp / ORIGIN_FILE).write_text(json.dumps({"index": DEFAULT_INDEX, "file": f"{lid}.encorlab", "version": lab.version,
+                                               "migrated_from": str(src)}, indent=1), encoding="utf-8")
     tmp.rename(dest)
     return True
 

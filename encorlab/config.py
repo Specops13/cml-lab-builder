@@ -124,6 +124,8 @@ def from_env(env: dict | None = None) -> Settings:
     s.ai_model = e.get("ENCOR_AI_MODEL", s.ai_model)
     s.ai_api_key = e.get("ENCOR_AI_API_KEY", s.ai_api_key)
     for k, v in load_saved(e).items():  # values saved from the Settings page win over env
+        if k == "library_url" and not v:
+            continue                    # empty = "the default", so ENCOR_LIBRARY_URL still applies
         if k in PERSISTED:
             setattr(s, k, v)
     if e.get("ENCOR_USE_KEYRING", "1") != "0":

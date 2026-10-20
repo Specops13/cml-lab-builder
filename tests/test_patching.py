@@ -191,7 +191,8 @@ def test_patch_is_deterministic_and_complete(tmp_path):
     assert a == b and len(a) < 2_000_000
     names = zipfile.ZipFile(io.BytesIO(a)).namelist()
     assert names[0] == "manifest.json" and not any("__pycache__" in n or n.endswith(".pyc") for n in names)
-    assert {"encorlab/__init__.py", "encorlab/web/static/app.js", "encorlab/labs/17-mpls-l3vpn/lab.yaml"} <= set(names)
+    assert {"encorlab/__init__.py", "encorlab/web/static/app.js", "encorlab/migrate.py"} <= set(names)
+    assert not any(n.startswith("encorlab/labs/") for n in names)    # labs come from the online library (2.0.0)
     m = updates.verify_patch(a, __version__, encorboot.RUNTIME_VERSION)
     assert m["app_version"] == __version__ and m["min_runtime"] == encorboot.RUNTIME_VERSION
     assert set(m["files"]) == set(names) - {"manifest.json"}

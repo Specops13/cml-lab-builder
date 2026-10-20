@@ -70,7 +70,10 @@ def test_course_install_list_progress_delete():
     c = cs[0]
     assert (c["solved"], c["total"], c["pct"], c["next"]) == (1, 3, 33, "ospf-multiarea-stub")
     assert c["labs"][1]["best"] == 60 and not c["labs"][1]["solved"]
-    with pytest.raises(packs.LabError, match="already exists"):
+    courses.install((LIB / "ospf-mastery.encorcourse").read_bytes())   # identical labs: not a conflict
+    f = catalog.user_labs_dir() / "troubleshoot-ospf-7node" / "lab.yaml"
+    f.write_text(f.read_text(encoding="utf-8") + "\n# my edit\n", encoding="utf-8")
+    with pytest.raises(packs.LabError, match="already exists"):     # a changed lab is never overwritten silently
         courses.install((LIB / "ospf-mastery.encorcourse").read_bytes())
     courses.install((LIB / "ospf-mastery.encorcourse").read_bytes(), overwrite=True)
     assert courses.delete("ospf-mastery", remove_labs=True) == ["ospf-multiarea-stub", "troubleshoot-ospf-7node"]
@@ -223,6 +226,8 @@ def test_api_library_and_courses():
     assert any(i["file"] == "ospf-mastery.encorcourse" for i in idx["items"])
     r = c.post("/api/library/install", json={"file": "ospf-mastery.encorcourse"})
     assert r.status_code == 200 and r.json()["kind"] == "course"
+    f = catalog.user_labs_dir() / "ospf-multiarea-stub" / "lab.yaml"
+    f.write_text(f.read_text(encoding="utf-8") + "\n# edited\n", encoding="utf-8")
     assert c.post("/api/library/install", json={"file": "ospf-mastery.encorcourse"}).status_code == 409
     assert c.post("/api/library/install", json={"file": "ospf-mastery.encorcourse", "replace": True}).status_code == 200
     history.add("03-ospf-multiarea", {"score_pct": 100, "passed": True, "earned": 1, "total": 1, "results": []})
@@ -248,6 +253,8 @@ def test_api_import_course_file():
     data = (LIB / "ospf-mastery.encorcourse").read_bytes()
     r = c.post("/api/import", files={"file": ("ospf-mastery.encorcourse", data)})
     assert r.status_code == 200 and r.json()["course_id"] == "ospf-mastery"
+    f = catalog.user_labs_dir() / "ospf-multiarea-stub" / "lab.yaml"
+    f.write_text(f.read_text(encoding="utf-8") + "\n# edited\n", encoding="utf-8")
     r = c.post("/api/import", files={"file": ("ospf-mastery.encorcourse", data)})
     assert r.status_code == 409
     r = c.post("/api/import", files={"file": ("x.zip", zipped({"course.yaml": b"id: q\n"}))})
@@ -274,7 +281,8 @@ def test_cli_course_build_import_list_delete(tmp_path):
 def test_cli_library_install(monkeypatch):
     monkeypatch.setattr(library, "http_fetch", fake_fetch())
     monkeypatch.setattr(library.index, "__defaults__", (INDEX, fake_fetch()))
-    monkeypatch.setattr(library.install_item, "__defaults__", (INDEX, fake_fetch(), 20, False))
+    monkeypatch.setattr(library.install_item, "__defaults__", (INDEX, fake_fetch(), 20, False, None))
+    monkeypatch.setattr(library, "default_url", lambda: INDEX)
     r = CliRunner().invoke(cli_app, ["library", "list"])
     assert r.exit_code == 0 and "ospf-mastery.encorcourse" in r.output
     r = CliRunner().invoke(cli_app, ["library", "install", "troubleshoot-ospf-7node.encorlab"])

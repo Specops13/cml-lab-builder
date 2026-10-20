@@ -1,6 +1,6 @@
 "use strict";
 /* ENCOR Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "1.9.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "2.0.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -13,6 +13,10 @@ function ramTag(r) {
   return `<span data-help="lab.ram" class="tag ram${r.heavy ? " ram-heavy" : ""}" title="${esc(r.tooltip)}">${r.heavy ? "RAM heavy · " : "RAM "}${esc(r.label)}</span>`;
 }
 const walkTag = (l) => l.type === "walkthrough" ? '<span class="tag walk">walkthrough</span>' : "";
+/* where a lab came from: library labs need no tag; labs you made or imported yourself say so */
+const srcTag = (l) => (l.library || l.source === "builtin") ? "" : '<span class="tag user">imported</span>';
+const updTag = (l) => l.update_available ? '<span data-help="lab.updateTag" class="tag warn">update available</span>' : "";
+let migration = null, libraryUrl = "", libStarter = [];
 
 /* ---------------------------------------------------------------- error banner */
 function banner(msg) {
@@ -152,6 +156,9 @@ async function loadLabs() {
   let data;
   try { data = await api("/api/labs"); } catch (e) { banner(`Could not load the lab list: ${e.message}`); e.shown = true; throw e; }
   labs = data.labs;
+  migration = data.migration || null;
+  renderMigration();
+  if (!labs.length && !current && !$("#library")) renderEmpty();
   const sel = $("#f-domain"), cur = sel.value;
   const doms = [...new Set(labs.map((l) => l.domain))].sort();
   sel.innerHTML = `<option value="">All domains</option>` + doms.map((d) => `<option ${d === cur ? "selected" : ""}>${esc(d)}</option>`).join("");
@@ -165,18 +172,99 @@ function renderList() {
   const q = $("#f-search").value.toLowerCase(), dom = $("#f-domain").value, diff = $("#f-diff").value, src = $("#f-source").value;
   const crs = courseList.find((c) => c.id === $("#f-course").value);
   let items = labs.filter((l) => (!q || (l.title + l.summary + l.id + l.blueprint.join(" ")).toLowerCase().includes(q)) &&
-    (!dom || l.domain === dom) && (!diff || String(l.difficulty) === diff) && (!src || l.source === src));
+    (!dom || l.domain === dom) && (!diff || String(l.difficulty) === diff) && (!src || (src === "library" ? (l.library || l.source === "builtin") : !(l.library || l.source === "builtin"))));
   if (crs) { const order = crs.labs.map((x) => x.id); items = items.filter((l) => order.includes(l.id)).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); }
   $("#lab-list").innerHTML = items.map((l) => `<li data-help="lab.item" data-id="${esc(l.id)}" class="${l.id === current ? "sel" : ""}">
     <b>${esc(l.title)}</b><br>
     ${walkTag(l)}<span class="tag">${"★".repeat(l.difficulty)}</span><span class="tag">${l.nodes} nodes</span>${ramTag(l.ram)}<span class="tag">${esc(l.blueprint.join(", "))}</span>
-    ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${l.walkthrough
+    ${srcTag(l)}${updTag(l)}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${l.walkthrough
       ? (l.walkthrough.completed ? '<span class="tag ok">completed</span>' : (l.walkthrough.required_passed ? `<span class="tag">${l.walkthrough.required_passed}/${l.walkthrough.required} steps</span>` : ""))
       : (l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : ""))}
-    <div class="muted small">${esc(l.summary)}</div></li>`).join("") || `<li class="muted">No labs match.</li>`;
+    <div class="muted small">${esc(l.summary)}</div></li>`).join("") || `<li class="muted">${labs.length ? "No labs match." : "No labs installed yet."}</li>`;
   $$("#lab-list li[data-id]").forEach((li) => li.addEventListener("click", () => selectLab(li.dataset.id)));
 }
 ["#f-search", "#f-domain", "#f-diff", "#f-source", "#f-course"].forEach((s) => $(s).addEventListener("input", renderList));
+
+/* ---------------------------------------------------------------- first run (no labs) + labs kept from 1.x */
+function renderEmpty(note = "") {
+  $("#lab-detail").innerHTML = `<div class="welcome" data-help="lab.empty">
+    <h2>Welcome to ENCOR Lab Builder</h2>
+    <p>No labs are installed yet. To keep the download small, labs come from the online <b>lab library</b>
+      (every download is checked against its sha256 and validated before it is installed).</p>
+    <div class="toolbar"><button data-help="lab.starter" id="e-starter" class="primary big">Install recommended starter set</button>
+      <button data-help="lab.browse" id="e-browse">📚 Browse library &amp; courses</button>
+      <button data-help="import.button" id="e-import">⬆ Import a .encorlab file</button></div>
+    <p class="muted small">The starter set is a handful of small labs (a few GB of CML RAM each) covering VLANs and STP,
+      EtherChannel, EIGRP, OSPF, BGP and HSRP. Courses can install all of their labs in one click.</p>
+    <div id="e-note">${note}</div></div>`;
+  $("#e-starter").onclick = () => installStarter($("#e-starter"));
+  $("#e-browse").onclick = () => openLibrary(true);
+  $("#e-import").onclick = () => $("#import-file").click();
+}
+function offlineNote(msg) {
+  return `<div class="err" data-help="lab.offline">Could not reach the lab library: ${esc(msg)}</div>
+    <p class="muted small">Are you offline? Everything else keeps working. You can <a href="#" data-retry="1">try again</a>,
+    import a .encorlab file you downloaded, or point Settings &gt; Library URL at another copy of the library.</p>`;
+}
+function libErr(e) { const d = e.data || {}; return (d.errors && d.errors.length) ? d.errors.join("; ") : e.message; }
+async function installStarter(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "Installing…"; }
+  try {
+    const r = await api("/api/library/install-set", {method: "POST", body: JSON.stringify({starter: true})});
+    const failed = Object.entries(r.failed || {});
+    toast(`Installed ${r.installed.length} lab(s)` + (r.skipped.length ? `, ${r.skipped.length} already installed` : "") +
+      (failed.length ? `\nFailed: ${failed.map(([k, v]) => `${k}: ${v}`).join("\n")}` : ""), failed.length ? "err" : "ok", 9000);
+    current = null; await loadLabs();
+    if (labs.length && !$("#library")) selectLab(labs[0].id);
+    if ($("#library")) loadLibrary();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Install recommended starter set"; }
+    const box = $("#e-note") || $("#lib-items");
+    if (box) { box.innerHTML = offlineNote(libErr(e)); const a = $("[data-retry]", box); if (a) a.onclick = (ev) => { ev.preventDefault(); installStarter(btn); }; }
+    else toast("Could not install the starter set: " + libErr(e), "err", 12000);
+  }
+}
+function renderMigration() {
+  const b = $("#mig-banner"); if (!b) return;
+  const m = migration;
+  if (!m || m.state !== "pending" || !m.pending.length) { b.hidden = true; b.innerHTML = ""; return; }
+  b.hidden = false;
+  b.innerHTML = `<span data-help="mig.banner"><b>${m.pending.length} lab(s) from your previous version</b> are not installed yet
+    (they now come from the lab library)${m.pending_with_data.length ? `, including ${m.pending_with_data.length} with your results history` : ""}.
+    Your history and progress are kept and link up again as soon as the labs are back.${m.last_error ? ` <span class="muted">Last try: ${esc(m.last_error)}</span>` : ""}</span>
+    <button data-help="mig.retry" id="mig-retry" class="primary">Restore now</button><button data-help="mig.dismiss" id="mig-dismiss" class="hint-btn">Dismiss</button>`;
+  $("#mig-retry").onclick = async () => {
+    $("#mig-retry").disabled = true; $("#mig-retry").textContent = "Restoring…";
+    try { migration = await api("/api/migration/restore", {method: "POST"});
+      toast(migration.state === "pending" ? `Still missing: ${migration.pending.join(", ")}` : "Your labs are back.", migration.state === "pending" ? "err" : "ok", 9000);
+    } catch (e) { toast(e.message, "err"); }
+    await loadLabs();
+  };
+  $("#mig-dismiss").onclick = async () => {
+    if (!confirm("Stop offering to restore these labs? You can still install them from the library at any time; your history is kept.")) return;
+    migration = await api("/api/migration/dismiss", {method: "POST"}); renderMigration();
+  };
+}
+function libNote(id) {
+  const l = labs.find((x) => x.id === id);
+  return l && l.update_available ? `<div class="notice" data-help="lab.update">A newer version of this lab is in the library.
+    <button id="a-update" class="primary" data-id="${esc(id)}">Update lab</button> <span class="muted small">Your history and progress are kept;
+    changes you made to the lab's files are replaced.</span></div>` : "";
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("#a-update"); if (!b) return;
+  b.disabled = true;
+  try { const r = await api("/api/library/install-set", {method: "POST", body: JSON.stringify({ids: [b.dataset.id], updates: true})});
+    toast(r.installed.length ? "Lab updated" : `Not updated: ${Object.values(r.failed).join("; ") || "already current"}`, r.installed.length ? "ok" : "err");
+    await loadLabs(); selectLab(b.dataset.id);
+  } catch (err) { b.disabled = false; toast("Update failed: " + libErr(err), "err", 12000); }
+});
+async function deleteLab(id, title) {
+  if (!confirm(`Delete the lab "${title}" from this app? (It is not removed from CML.) You can install it again from the library.`)) return;
+  const clear = confirm("Also delete your results history and progress for this lab?\n\nOK = delete history too, Cancel = keep it (it links up again if you re-install the lab).");
+  try { await api(`/api/user-labs/${encodeURIComponent(id)}?clear_history=${clear}`, {method: "DELETE"}); toast("Lab deleted" + (clear ? " with its history" : " (history kept)"), "ok"); current = null;
+    $("#lab-detail").innerHTML = '<div class="empty">Select a lab, or import one.</div>'; loadLabs(); } catch (e) { toast(e.message, "err"); }
+}
 
 /* ---------------------------------------------------------------- courses + online library */
 let courseList = [];
@@ -188,7 +276,7 @@ async function loadCourses() {
   return courseList;
 }
 async function afterCourseInstall(rep) {
-  toast(`Installed course "${rep.title}": ${rep.labs.length} labs` + (rep.installed.length ? `, ${rep.installed.length} imported` : "") +
+  toast(`Installed course "${rep.title}": ${rep.labs.length} labs` + (rep.installed.length ? `, ${rep.installed.length} installed` : "") +
     (rep.warnings.length ? `\nNote: ${rep.warnings.join("\n")}` : ""), "ok", 8000);
   try { await loadLabs(); } catch (e) { /* banner shown */ }
   await loadCourses(); $("#f-course").value = rep.course_id; renderList();
@@ -198,13 +286,14 @@ $("#lib-btn").onclick = () => openLibrary(true);
 async function openLibrary(fetchIndex) {
   current = null; renderList();
   await loadCourses();
-  const url = localStorage.getItem("libraryUrl") || LIB_DEFAULT;
+  const url = libraryUrl || LIB_DEFAULT;
   $("#lab-detail").innerHTML = `<div id="library">
     <div class="toolbar"><h2 style="margin:0">Library &amp; courses</h2></div>
     <h3 data-help="lib.courses">Your courses</h3><div id="lib-courses"></div>
     <h3 data-help="lib.online">Online library</h3>
     <div class="toolbar"><input data-help="lib.url" id="lib-url" style="flex:1;min-width:20em" aria-label="Library index URL" value="${esc(url)}">
       <button data-help="lib.load" id="lib-load">Load library</button><button data-help="lib.default" id="lib-default" class="hint-btn">Default</button></div>
+    <div class="muted small">The address is saved in Settings &gt; Library URL; changing it here only applies until you reload the page.</div>
     <div id="lib-items" class="muted">Click "Load library" to see the labs and courses published in the project repository.</div>
     <h3 data-help="lib.fromUrl">Install from a URL</h3>
     <div class="toolbar"><input data-help="lib.fileUrl" id="lib-file-url" style="flex:1;min-width:20em" placeholder="https://…/my-lab.encorlab or .encorcourse" aria-label="File URL">
@@ -212,7 +301,7 @@ async function openLibrary(fetchIndex) {
       <button data-help="lib.installUrl" id="lib-install-url">Install</button></div></div>`;
   renderCourses();
   $("#lib-load").onclick = () => loadLibrary();
-  $("#lib-default").onclick = () => { $("#lib-url").value = LIB_DEFAULT; localStorage.removeItem("libraryUrl"); loadLibrary(); };
+  $("#lib-default").onclick = () => { $("#lib-url").value = libraryUrl || LIB_DEFAULT; loadLibrary(); };
   $("#lib-install-url").onclick = () => libInstall({url: $("#lib-file-url").value.trim(), sha256: $("#lib-sha").value.trim()});
   if (fetchIndex) loadLibrary();
 }
@@ -232,7 +321,7 @@ function renderCourses() {
   $$("#lib-courses [data-filter]").forEach((b) => b.addEventListener("click", () => { $("#f-course").value = b.dataset.filter; renderList(); }));
   $$("#lib-courses [data-rmcourse]").forEach((b) => b.addEventListener("click", async () => {
     if (!confirm(`Remove the course "${b.dataset.rmcourse}"? Your history is kept.`)) return;
-    const labsToo = Number(b.dataset.bundled) > 0 && confirm(`Also delete the ${b.dataset.bundled} lab(s) this course imported? (Built-in labs are never deleted.)`);
+    const labsToo = Number(b.dataset.bundled) > 0 && confirm(`Also delete the ${b.dataset.bundled} lab(s) that came inside this course file? (Labs installed from the library on their own are kept; your history is kept either way.)`);
     try {
       const r = await api(`/api/courses/${encodeURIComponent(b.dataset.rmcourse)}?labs=${labsToo}`, {method: "DELETE"});
       toast("Course removed" + (r.removed_labs.length ? ` with ${r.removed_labs.length} lab(s)` : ""), "ok");
@@ -243,23 +332,47 @@ function renderCourses() {
   }));
 }
 async function loadLibrary() {
-  const url = $("#lib-url").value.trim() || LIB_DEFAULT;
-  if (url !== LIB_DEFAULT) localStorage.setItem("libraryUrl", url); else localStorage.removeItem("libraryUrl");
+  const url = $("#lib-url").value.trim() || libraryUrl || LIB_DEFAULT;
   $("#lib-items").textContent = "Loading…";
   try {
     const idx = await api(`/api/library?url=${encodeURIComponent(url)}`);
-    $("#lib-items").innerHTML = idx.items.length ? `<table><tr><th>Item</th><th>Type</th><th>Topics</th><th>Size</th><th></th></tr>${idx.items.map((it) => `<tr>
-      <td><b>${esc(it.title)}</b><div class="muted small">${esc(it.description)}</div>${it.kind === "course" ? `<div class="muted small">Labs: ${esc(it.labs.join(", "))}</div>` : ""}</td>
+    libStarter = idx.starter || [];
+    const starterLeft = idx.items.filter((it) => it.starter && !it.installed).length;
+    const ups = idx.updates || [];
+    const libBtn = (it) => {
+      if (it.builtin) return '<span class="tag">built in</span>';
+      if (it.kind === "course") {
+        const n = (it.missing || []).length;
+        if (n && !it.installable) return `<span class="tag warn" title="The library has no pack for: ${esc(it.missing.join(", "))}">labs missing</span>`;
+        return `<button data-help="lib.installAll" data-file="${esc(it.file)}" data-installed="${it.installed && !n ? 1 : ""}" class="${it.installed && !n ? "" : "primary"}">${n ? `Install all (${n} lab${n > 1 ? "s" : ""})` : (it.installed ? "Reinstall" : "Install")}</button>`;
+      }
+      if (it.update_available) return `<button data-help="lib.update" data-file="${esc(it.file)}" data-installed="1" class="primary">Update to v${esc(it.version)}</button>`;
+      return `<button data-help="lib.install" data-file="${esc(it.file)}" data-installed="${it.installed ? 1 : ""}" class="${it.installed ? "" : "primary"}">${it.installed ? "Reinstall" : "Install"}</button>`;
+    };
+    $("#lib-items").innerHTML = idx.items.length ? `<div class="toolbar">
+      ${starterLeft ? `<button data-help="lib.starter" id="lib-starter" class="primary">Install recommended starter set (${starterLeft})</button>` : ""}
+      ${ups.length ? `<button data-help="lib.updateAll" id="lib-update-all" class="warn">Update all (${ups.length})</button>` : ""}</div>
+      <table><tr><th>Item</th><th>Type</th><th>Topics</th><th>Size</th><th></th></tr>${idx.items.map((it) => `<tr>
+      <td><b>${esc(it.title)}</b>${it.starter ? ' <span class="tag ok" data-help="lib.starterTag">starter</span>' : ""}${it.update_available ? ' <span class="tag warn">update available</span>' : ""}${it.kind === "lab" && it.installed ? ` <span class="tag">installed v${esc(it.installed_version || "1")}</span>` : ""}<div class="muted small">${esc(it.description)}</div>${it.kind === "course" ? `<div class="muted small">Labs: ${esc(it.labs.join(", "))}</div>` : ""}</td>
       <td><span class="tag">${it.kind}</span>${it.type === "walkthrough" ? walkTag(it) : ""}${it.nodes ? `<span class="tag">${it.nodes} nodes</span>` : ""}${it.difficulty ? `<span class="tag">${"★".repeat(it.difficulty)}</span>` : ""}${it.ram_gb ? ramTag({heavy: it.ram_heavy, label: `~${Math.round(it.ram_gb)} GB`,
         tooltip: `About ${Math.round(it.ram_gb)} GB of CML server RAM${it.kind === "course" ? " for its heaviest lab" : ""}, estimated from the CML 2.9 node-definition defaults.${it.ram_heavy ? " Marked RAM heavy (threshold in Settings)." : ""}`}) : ""}</td>
       <td>${esc(it.blueprint.join(", "))}</td><td class="small">${(it.size / 1024).toFixed(1)} KB</td>
-      <td>${it.builtin ? '<span class="tag">built in</span>' : `<button data-help="lib.install" data-file="${esc(it.file)}" data-installed="${it.installed ? 1 : ""}" class="${it.installed ? "" : "primary"}">${it.installed ? "Reinstall" : "Install"}</button>`}</td></tr>`).join("")}</table>
+      <td>${libBtn(it)}</td></tr>`).join("")}</table>
       <div class="muted small" data-help="lib.integrity">Every download is checked against the sha256 and size in the index, then validated like an imported file.</div>`
       : `<div class="muted">The library is empty.</div>`;
     $$("#lib-items [data-file]").forEach((b) => b.addEventListener("click", () => libInstall({file: b.dataset.file, index_url: url}, !!b.dataset.installed)));
+    if ($("#lib-starter")) $("#lib-starter").onclick = () => installStarter($("#lib-starter"));
+    if ($("#lib-update-all")) $("#lib-update-all").onclick = async () => {
+      if (!confirm(`Update ${ups.length} lab(s) to the library version? Your history and progress are kept; changes you made to those labs' files are replaced.`)) return;
+      try { const r = await api("/api/library/install-set", {method: "POST", body: JSON.stringify({updates: true, index_url: url})});
+        toast(`Updated ${r.installed.length} lab(s)` + (Object.keys(r.failed).length ? `\nFailed: ${Object.entries(r.failed).map(([k, v]) => `${k}: ${v}`).join("\n")}` : ""), "ok", 8000);
+      } catch (e) { toast("Update failed: " + libErr(e), "err", 12000); }
+      try { await loadLabs(); } catch (e) { /* banner */ }
+      loadLibrary();
+    };
   } catch (e) {
-    const d = e.data || {};
-    $("#lib-items").innerHTML = `<div class="err">Could not load the library: ${esc((d.errors || [e.message]).join("; "))}</div>`;
+    $("#lib-items").innerHTML = offlineNote(libErr(e));
+    const a = $("#lib-items [data-retry]"); if (a) a.onclick = (ev) => { ev.preventDefault(); loadLibrary(); };
   }
 }
 async function libInstall(body, replace = false) {
@@ -301,7 +414,7 @@ async function selectLab(id) {
   $("#lab-detail").innerHTML = `
     <div class="toolbar"><h2 style="margin:0">${esc(l.title)}</h2><span class="sep"></span>
       <span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
-      ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}</div>
+      ${srcTag(labs.find((x) => x.id === l.id) || l)}</div>${libNote(l.id)}
     <div class="toolbar">
       <button data-help="lab.build" id="a-build" class="primary">Build</button>${l.exam ? '<button data-help="lab.examSubmit" id="a-check" class="primary">Submit exam</button>' : '<button data-help="lab.check" id="a-check">Check</button>'}<button data-help="lab.hintNext" id="a-hint">Hint</button>
       <label class="inline">Grading<select data-help="lab.mode" id="mode"><option value="">Mode: default</option><option value="auto">Auto</option><option value="live">Live only</option><option value="config">Config only</option></select></label>
@@ -374,11 +487,7 @@ async function selectLab(id) {
   $("#a-destroy").onclick = () => confirm("Delete this lab from CML?") && run("destroy");
   if ($("#a-edit")) $("#a-edit").onclick = () => openInBuilder(id);
   if ($("#a-export")) $("#a-export").onclick = () => { location.href = `/api/labs/${encodeURIComponent(id)}/export`; };
-  if ($("#a-delete")) $("#a-delete").onclick = async () => {
-    if (!confirm(`Delete imported lab "${l.title}" from this app? (It is not removed from CML.)`)) return;
-    try { await api(`/api/user-labs/${id}`, {method: "DELETE"}); toast("Lab deleted", "ok"); current = null;
-      $("#lab-detail").innerHTML = '<div class="empty">Select a lab, or import one.</div>'; loadLabs(); } catch (e) { toast(e.message, "err"); }
-  };
+  if ($("#a-delete")) $("#a-delete").onclick = () => deleteLab(id, l.title);
   $("#t-toggle").onclick = () => (timerState(id).start ? timerPause(id) : timerStart(id));
   $("#t-reset").onclick = () => confirm("Reset the timer?") && timerSet(id, {acc: 0, start: null});
   bindHints($("#lab-detail"));
@@ -592,7 +701,7 @@ function renderWalkthrough(l) {
   $("#lab-detail").innerHTML = `
     <div class="toolbar"><h2 style="margin:0">${esc(l.title)}</h2><span class="sep"></span>
       ${walkTag(l)}<span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
-      ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}</div>
+      ${srcTag(labs.find((x) => x.id === l.id) || l)}</div>${libNote(l.id)}
     <div class="toolbar">
       <button data-help="lab.build" id="a-build" class="primary">Build</button>
       <button data-help="w.checkAll" id="w-check-all">Check every step</button>
@@ -619,11 +728,7 @@ function renderWalkthrough(l) {
   };
   $("#a-edit").onclick = () => openInBuilder(l.id);
   $("#a-export").onclick = () => { location.href = `/api/labs/${encodeURIComponent(l.id)}/export`; };
-  if ($("#a-delete")) $("#a-delete").onclick = async () => {
-    if (!confirm(`Delete imported lab "${l.title}" from this app? (It is not removed from CML.)`)) return;
-    try { await api(`/api/user-labs/${l.id}`, {method: "DELETE"}); toast("Lab deleted", "ok"); current = null;
-      $("#lab-detail").innerHTML = '<div class="empty">Select a lab, or import one.</div>'; loadLabs(); } catch (e) { toast(e.message, "err"); }
-  };
+  if ($("#a-delete")) $("#a-delete").onclick = () => deleteLab(l.id, l.title);
   renderWalkStep(); refreshStatus();
 }
 function walkStepState(i) {
@@ -951,7 +1056,8 @@ async function loadSettings() {
   loadUpdateStatus().catch(() => {});
   const s = await api("/api/settings");
   const f = $("#settings-form");
-  for (const k of ["cml_url", "username", "console_host", "console_port", "grading_mode", "platform", "node_limit", "ram_heavy_gb", "ai_base_url", "ai_model"]) f[k].value = s[k] ?? "";
+  for (const k of ["cml_url", "username", "console_host", "console_port", "grading_mode", "platform", "node_limit", "ram_heavy_gb", "library_url", "ai_base_url", "ai_model"]) f[k].value = s[k] ?? "";
+  libraryUrl = s.library_url || "";
   f.verify_tls.value = s.verify_tls === false ? "false" : "true";
   f.show_help.checked = s.show_help !== false; if (window.Help) Help.setVisible(f.show_help.checked);
   f.check_updates.checked = s.check_updates === true;
@@ -966,7 +1072,7 @@ $("#settings-form").addEventListener("submit", async (e) => {
   const f = e.target;
   const body = {cml_url: f.cml_url.value, username: f.username.value, password: f.password.value, verify_tls: f.verify_tls.value,
     console_host: f.console_host.value, console_port: Number(f.console_port.value) || 22, grading_mode: f.grading_mode.value,
-    platform: f.platform.value, node_limit: Number(f.node_limit.value) || 20, ram_heavy_gb: Number(f.ram_heavy_gb.value) || 16, remember_password: f.remember_password.checked,
+    platform: f.platform.value, node_limit: Number(f.node_limit.value) || 20, ram_heavy_gb: Number(f.ram_heavy_gb.value) || 16, library_url: f.library_url.value.trim(), remember_password: f.remember_password.checked,
     ai_preset: f.ai_preset.value, ai_base_url: f.ai_base_url.value, ai_model: f.ai_model.value, ai_api_key: f.ai_api_key.value,
     remember_ai_key: f.remember_ai_key.checked, show_help: f.show_help.checked, check_updates: f.check_updates.checked};
   try {
@@ -1166,7 +1272,7 @@ async function versionCheck() {
   const step = async (name, fn) => { try { await fn(); } catch (e) { if (!e.shown) banner(`Startup step "${name}" failed: ${e.message}`); } };
   await step("version check", versionCheck);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { versionCheck().catch(() => {}); pollUpdates(); } });
-  await step("settings", async () => { const s = await api("/api/settings"); if (window.Help) Help.setVisible(s.show_help !== false); });
+  await step("settings", async () => { const s = await api("/api/settings"); libraryUrl = s.library_url || ""; if (window.Help) Help.setVisible(s.show_help !== false); });
   await step("check templates", async () => { templates = await api("/api/templates"); });
   await step("lab list", loadLabs);
   await step("courses", loadCourses);

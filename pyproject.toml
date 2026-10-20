@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "encorlab"
-version = "1.9.0"
+version = "2.0.0"
 description = "Build CCNP ENCOR (350-401) practice labs in Cisco Modeling Labs 2.9 and grade them"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -39,7 +39,7 @@ py-modules = ["encorboot"]   # boot loader of the packaged app (part of the froz
 include = ["encorlab*"]
 
 [tool.setuptools.package-data]
-encorlab = ["labs/*/*.yaml", "labs/*/*.cfg", "web/templates/*.html", "web/static/*", "resources/*"]
+encorlab = ["web/templates/*.html", "web/static/*", "resources/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

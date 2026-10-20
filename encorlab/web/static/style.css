@@ -106,3 +106,11 @@ a.btn.small{padding:.2rem .5rem;font-size:.8rem}
 .walk-step{border:1px solid var(--line);border-radius:8px;padding:.3rem 1rem .6rem;margin:.6rem 0}
 .walk-step .cfg pre.code{background:var(--code-bg);color:var(--code-fg);padding:.5rem .7rem;border-radius:6px;overflow:auto;margin:.2rem 0 .6rem;font-size:.84rem}
 .walk-step .cfg .toolbar{margin:.4rem 0 0}.walk-nav{margin-top:1rem}
+
+/* first run (no labs) and labs kept from 1.x */
+.welcome { padding: 1.5em 1em; max-width: 52em; }
+.welcome h2 { margin-top: 0; }
+.mig-banner { background: #fff4e5; border: 1px solid #f0b357; color: #4a3200; border-radius: 6px; padding: .6em .9em;
+  margin: 0 0 .8em; display: flex; gap: .6em; align-items: center; flex-wrap: wrap; }
+.mig-banner[hidden] { display: none; }
+.notice { background: #eef6ff; border: 1px solid #9cc3f0; border-radius: 6px; padding: .5em .8em; margin: .4em 0; }

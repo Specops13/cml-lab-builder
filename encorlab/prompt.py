@@ -43,7 +43,8 @@ OUTPUT RULES
 - Every config check must pass when `solution` is applied to the starting config, and fail on the starting config alone.
   Match running-config lines exactly as IOS prints them (see "Writing regexes").
 - Keep to 2-6 nodes; use only kind router/switch; platforms [iol, iosv] unless a feature needs one.
-- id: lowercase-with-dashes, unique and descriptive.
+- id: lowercase-with-dashes, unique and descriptive (never the id of a lab in the online library, e.g. 03-ospf-multiarea).
+  Leave `version:` out for a new lab (it defaults to "1"); raise it only when revising a published lab.
 - Default to a challenge lab (`type` omitted). Only when the request asks for a guided, step-by-step build, write
   `type: walkthrough` with ordered `steps` (explain, config per device, verify with expected output, checks) and no
   lab-level checks, solution or faults (see "Walkthrough labs" in the guide).

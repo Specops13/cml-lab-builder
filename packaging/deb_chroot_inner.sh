@@ -48,7 +48,7 @@ pkill -f '^/opt/encorlab/ENCORLab'; sleep 1
 
 echo "== smoke test of the installed package as $U (patches + auto-update against a fake release)"
 find /opt/encorlab -printf '%p %s %m\n' | sort > /tmp/opt.before
-PACKS=$(ls /opt/encorlab/example-packs/*.encorlab | sed 's/^/--pack /' | tr '\n' ' ')
+PACKS="--pack /src/labs/ospf-multiarea-stub.encorlab --pack /src/labs/troubleshoot-ospf-7node.encorlab"
 as "python3 /src/packaging/smoke_test.py /usr/bin/encorlab --version $VER --data-dir $DATA --patch-test --auto-update-test $PACKS" > /tmp/smoke.log 2>&1; rc=$?
 grep -E "^(PASS|FAIL)" /tmp/smoke.log | sed 's/^/   /'
 [ $rc = 0 ] && ok "smoke test passed ($(grep -c ^PASS /tmp/smoke.log) checks)" || { bad "smoke test rc=$rc"; tail -30 /tmp/smoke.log; }
