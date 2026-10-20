@@ -1,9 +1,14 @@
+import os
 import sys
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
+# The app ships without labs (they come from the online library). The suite uses the lab sources in labsrc/
+# in place, as read-only "built-in" labs (see catalog.LABS_DIR); tests of the empty first run point it elsewhere.
+LABSRC = Path(__file__).resolve().parents[1] / "labsrc"
+os.environ["ENCOR_BUILTIN_LABS_DIR"] = str(LABSRC)
 
 from encorlab.config import Settings  # noqa: E402
 

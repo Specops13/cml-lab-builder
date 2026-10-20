@@ -2,13 +2,327 @@
   "format": 1,
   "items": [
     {
+      "file": "01-vlan-trunk-stp.encorlab",
+      "sha256": "7496f7eb3b75075301f4af9b81c55fb73f874103388488255cdc120348aee1c3",
+      "size": 4526,
+      "kind": "lab",
+      "id": "01-vlan-trunk-stp",
+      "title": "VLANs, 802.1Q Trunks and Rapid PVST+",
+      "version": "1",
+      "description": "Build VLANs, static 802.1Q trunks with a native VLAN, and control the Rapid PVST+ root bridge.",
+      "blueprint": [
+        "3.1.a",
+        "3.1.c"
+      ],
+      "nodes": 3,
+      "difficulty": 2,
+      "type": "challenge",
+      "ram_gb": 3.0
+    },
+    {
+      "file": "02-etherchannel.encorlab",
+      "sha256": "984d3d970a4386db617555d0c07cbec8590c0b2f8ae6761f054598fdcc1152ea",
+      "size": 4200,
+      "kind": "lab",
+      "id": "02-etherchannel",
+      "title": "EtherChannel with LACP and PAgP",
+      "version": "1",
+      "description": "Bundle parallel links into an LACP trunk port-channel and a PAgP access port-channel.",
+      "blueprint": [
+        "3.1.b"
+      ],
+      "nodes": 2,
+      "difficulty": 2,
+      "type": "challenge",
+      "ram_gb": 2.0
+    },
+    {
+      "file": "03-ospf-multiarea.encorlab",
+      "sha256": "b053c79895b13892903e4374d61423d35b962d1badb99d0b8f33afeb55343d1c",
+      "size": 4396,
+      "kind": "lab",
+      "id": "03-ospf-multiarea",
+      "title": "OSPFv2 Multi-Area, Stub Area and Summarization",
+      "version": "1",
+      "description": "Build a three-area OSPFv2 design with point-to-point links, a stub area and inter-area summarization.",
+      "blueprint": [
+        "3.2.b"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 4.0
+    },
+    {
+      "file": "04-eigrp-named.encorlab",
+      "sha256": "8e8718d423c5d0dda1b398d9e7408cbfb72dccaf726b79460b5aa1133990e1e4",
+      "size": 3795,
+      "kind": "lab",
+      "id": "04-eigrp-named",
+      "title": "EIGRP Named Mode, Authentication and Stub",
+      "version": "1",
+      "description": "Configure EIGRP named mode with MD5 authentication, a stub router and passive loopbacks.",
+      "blueprint": [
+        "3.2.a"
+      ],
+      "nodes": 3,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 3.0
+    },
+    {
+      "file": "05-bgp-ebgp-ibgp.encorlab",
+      "sha256": "7364ba7205c98ad8b40df5303c7e3019196a941ec0a6a75035ce0d1dd14488c4",
+      "size": 4046,
+      "kind": "lab",
+      "id": "05-bgp-ebgp-ibgp",
+      "title": "BGP - eBGP and iBGP with next-hop-self",
+      "version": "1",
+      "description": "Peer three autonomous systems, run iBGP between loopbacks over OSPF, fix the next-hop problem and advertise prefixes.",
+      "blueprint": [
+        "3.2.c"
+      ],
+      "nodes": 4,
+      "difficulty": 4,
+      "type": "challenge",
+      "ram_gb": 4.0
+    },
+    {
+      "file": "06-hsrp.encorlab",
+      "sha256": "3def19d3206adf807a67fca6f5e29e03f97569fbfcb72ef689a17153411ce14c",
+      "size": 3788,
+      "kind": "lab",
+      "id": "06-hsrp",
+      "title": "HSRPv2 First-Hop Redundancy with Object Tracking",
+      "version": "1",
+      "description": "Provide a redundant default gateway with HSRP version 2, priority, preemption and interface tracking.",
+      "blueprint": [
+        "3.3.c"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 4.0
+    },
+    {
+      "file": "07-acl-nat.encorlab",
+      "sha256": "7b76643fceaebd5d31ec870e69089d1bd8b0c1af91b5b174b99cb1c448d9d133",
+      "size": 4113,
+      "kind": "lab",
+      "id": "07-acl-nat",
+      "title": "ACLs, PAT and Static NAT",
+      "version": "1",
+      "description": "Translate a private LAN with PAT, publish an internal host with static NAT and filter Telnet with a named extended ACL.",
+      "blueprint": [
+        "3.3.b",
+        "5.2.a"
+      ],
+      "nodes": 3,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 3.0
+    },
+    {
+      "file": "08-vrf-lite.encorlab",
+      "sha256": "a4c3bb111345dfd0cfdfa6466ee0a2bf3a96cf317165da0761add7b47a078cb6",
+      "size": 3483,
+      "kind": "lab",
+      "id": "08-vrf-lite",
+      "title": "VRF-Lite with Overlapping Customer Addressing",
+      "version": "1",
+      "description": "Separate two customers with identical addressing on one router using VRF-lite and per-VRF static routing.",
+      "blueprint": [
+        "2.2.a"
+      ],
+      "nodes": 3,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 3.0
+    },
+    {
+      "file": "09-gre-ipsec.encorlab",
+      "sha256": "9806fb68a916fac1afc4b0e968b991d1a268c81deb73d3155f27d663bce779fb",
+      "size": 4541,
+      "kind": "lab",
+      "id": "09-gre-ipsec",
+      "title": "GRE over IPsec with OSPF",
+      "version": "1",
+      "description": "Build a GRE tunnel between two sites across an ISP, run OSPF over it, and protect it with an IPsec profile.",
+      "blueprint": [
+        "2.2.b"
+      ],
+      "nodes": 3,
+      "difficulty": 4,
+      "type": "challenge",
+      "ram_gb": 3.0
+    },
+    {
+      "file": "10-ntp-syslog-snmp.encorlab",
+      "sha256": "71b4dcf40412e70a86ea9f110a3dda479ea3449a4b6592d684c1a09625cfc370",
+      "size": 4104,
+      "kind": "lab",
+      "id": "10-ntp-syslog-snmp",
+      "title": "NTP, Syslog, SNMPv3 and IP SLA",
+      "version": "1",
+      "description": "Build an authenticated NTP hierarchy, remote syslog with timestamps, an SNMPv3 authPriv user and an ICMP IP SLA probe.",
+      "blueprint": [
+        "3.3.a",
+        "4.1",
+        "4.4"
+      ],
+      "nodes": 3,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 3.0
+    },
+    {
+      "file": "11-ipsla-tracking.encorlab",
+      "sha256": "d31e8d0f47e7c3ef48913ebbd7847189c9f8beba11a2a2154bb685dbc9c108f2",
+      "size": 5228,
+      "kind": "lab",
+      "id": "11-ipsla-tracking",
+      "title": "IP SLA Reachability Tracking with HSRP Failover",
+      "version": "1",
+      "description": "Detect an upstream outage that keeps the link up with an IP SLA probe, then withdraw the static default route and fail HSRP over to the backup router.",
+      "blueprint": [
+        "4.4",
+        "3.3.c"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 4.0
+    },
+    {
+      "file": "12-pbr.encorlab",
+      "sha256": "768d63631aebaf6972525cb181ed403c41edd12909c48b7eb37c2ec10b6a658e",
+      "size": 4249,
+      "kind": "lab",
+      "id": "12-pbr",
+      "title": "Policy-Based Routing for a Second ISP",
+      "version": "1",
+      "description": "Send Engineering's traffic out a second ISP with a route-map and ip policy, while everyone else follows the default route.",
+      "blueprint": [
+        "3.2.d"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 4.0
+    },
+    {
+      "file": "13-redistribution.encorlab",
+      "sha256": "c94081cb4d021184dd36fcea5e31abe06de3a90bd8c2c18aa2295996b8696747",
+      "size": 4631,
+      "kind": "lab",
+      "id": "13-redistribution",
+      "title": "Mutual OSPF/EIGRP Redistribution with Route Tags",
+      "version": "1",
+      "description": "Redistribute between OSPF and EIGRP at two border routers, using route-maps that tag routes and filter them on the tag to prevent feedback loops.",
+      "blueprint": [
+        "3.2.a",
+        "3.2.b"
+      ],
+      "nodes": 4,
+      "difficulty": 4,
+      "type": "challenge",
+      "ram_gb": 4.0
+    },
+    {
+      "file": "14-multicast-pim-sm.encorlab",
+      "sha256": "9b3f0f5cde620916c77389b73e5aad0201510effcd727d920194556a89be6e87",
+      "size": 6210,
+      "kind": "lab",
+      "id": "14-multicast-pim-sm",
+      "title": "Multicast: PIM Sparse Mode with a Static RP",
+      "version": "1",
+      "description": "Enable IP multicast routing and PIM sparse mode on three routers, point them at a static RP, join a receiver with IGMP and verify the shared tree, the source tree and the RPF check.",
+      "blueprint": [
+        "3.3.d"
+      ],
+      "nodes": 5,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 5.0
+    },
+    {
+      "file": "15-multicast-bsr-ssm.encorlab",
+      "sha256": "ba36a69aec5abd10e844ac82c51a25358c5c72371e7b0bcc0d3bffd24e7d9db5",
+      "size": 6425,
+      "kind": "lab",
+      "id": "15-multicast-bsr-ssm",
+      "title": "Multicast: BSR RP Election, IGMPv3 and SSM",
+      "version": "1",
+      "description": "Replace static RPs with a Bootstrap Router (BSR) election between two candidates, run IGMPv3 at the receiver edge and add a source-specific multicast (SSM) channel that needs no RP at all.",
+      "blueprint": [
+        "3.3.d"
+      ],
+      "nodes": 6,
+      "difficulty": 4,
+      "type": "challenge",
+      "ram_gb": 6.0
+    },
+    {
+      "file": "16-mpls-ldp.encorlab",
+      "sha256": "c6bbe8b76526929c657bbcbaf4be26676cce6fcc43563c8b6c117a38700f4e43",
+      "size": 5446,
+      "kind": "lab",
+      "id": "16-mpls-ldp",
+      "title": "MPLS: LDP Label Distribution in the Core",
+      "version": "1",
+      "description": "Turn an OSPF core into an MPLS core with LDP, pin the LDP router ID to a reachable loopback, and read label bindings, the forwarding table, penultimate-hop popping and an LSP ping.",
+      "blueprint": [
+        "2.2"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 4.0
+    },
+    {
+      "file": "17-mpls-l3vpn.encorlab",
+      "sha256": "45cbf27a6c4892862b88719d33c8e0a54e2f847eeedaf1ce962541d5d8a5e473",
+      "size": 6342,
+      "kind": "lab",
+      "id": "17-mpls-l3vpn",
+      "title": "MPLS L3VPN: VRFs and MP-BGP VPNv4 (advanced)",
+      "version": "1",
+      "description": "Build a basic MPLS Layer 3 VPN over an existing LDP core - customer VRF with RD and route targets on both PEs, an iBGP VPNv4 session between the PE loopbacks, and eBGP to the customer sites inside the VRF.",
+      "blueprint": [
+        "2.2",
+        "2.2.a"
+      ],
+      "nodes": 5,
+      "difficulty": 5,
+      "type": "challenge",
+      "ram_gb": 5.0
+    },
+    {
+      "file": "18-evpn-vxlan.encorlab",
+      "sha256": "cfa3f857f1e4b4c17bb5abdaa14293f788d76d6bf089549f1cb5c95102c1c883",
+      "size": 14551,
+      "kind": "lab",
+      "id": "18-evpn-vxlan",
+      "title": "Walkthrough: BGP EVPN VXLAN spine-and-leaf (NX-OS 9000v)",
+      "version": "1",
+      "description": "Step-by-step build of a VXLAN EVPN fabric - OSPF underlay, iBGP EVPN with the spines as route reflectors, NVE/VTEPs with ingress replication, and VLANs 10 and 20 stretched across both leaves (optional L3VNI with an anycast gateway).",
+      "blueprint": [
+        "2.3",
+        "1.1.a"
+      ],
+      "nodes": 8,
+      "difficulty": 5,
+      "type": "walkthrough",
+      "ram_gb": 52.0
+    },
+    {
       "file": "data-center.encorcourse",
-      "sha256": "6dd83d78ae6f3d52c34f0c70e1b532033333a4f7cb824ae852c82559710d843a",
-      "size": 492,
+      "sha256": "adee696347287c669cc01cac075160799b967c9e1fb6c977ae93e8f3b1144fe9",
+      "size": 476,
       "kind": "course",
       "id": "data-center",
       "title": "Data center: VXLAN EVPN fabrics",
-      "description": "Data center fabric basics on Nexus 9000v: a guided walkthrough that builds a spine-and-leaf VXLAN fabric with a BGP EVPN control plane and stretches VLANs between leaves (optional L3VNI and anycast gateway). RAM heavy: about 52 GB of CML RAM (4 x nxosv9000 at 12 GB). Uses built-in labs only (needs ENCOR Lab Builder 1.9.0 or newer), so the course just records the study order and your progress.",
+      "description": "Data center fabric basics on Nexus 9000v: a guided walkthrough that builds a spine-and-leaf VXLAN fabric with a BGP EVPN control plane and stretches VLANs between leaves (optional L3VNI and anycast gateway). RAM heavy: about 52 GB of CML RAM (4 x nxosv9000 at 12 GB). Its labs come from the lab library (installed with the course; built in before ENCOR Lab Builder 2.0.0).",
       "labs": [
         "08-vrf-lite",
         "18-evpn-vxlan"
@@ -16,13 +330,30 @@
       "ram_gb": 52.0
     },
     {
+      "file": "eigrp-basic.encorlab",
+      "sha256": "0422969f170dd6d0811a20a669a28b90590075367915185233dbc608f864d47e",
+      "size": 3294,
+      "kind": "lab",
+      "id": "eigrp-basic",
+      "title": "EIGRP Basic Adjacency (AS 100)",
+      "version": "1",
+      "description": "Two routers, one link. Bring up EIGRP AS 100 so each router learns the other's loopback.",
+      "blueprint": [
+        "3.2.a"
+      ],
+      "nodes": 2,
+      "difficulty": 1,
+      "type": "challenge",
+      "ram_gb": 2.0
+    },
+    {
       "file": "encor-multicast-mpls.encorcourse",
-      "sha256": "0198e5aa9ca1b70e482581cc9c381ccc248296db8c4a164f1d962756d16f1a70",
-      "size": 466,
+      "sha256": "ca2e4cd7c74946b7a2d2e58b6c5102a878b85969a233720d61947d164bb04a53",
+      "size": 448,
       "kind": "course",
       "id": "encor-multicast-mpls",
       "title": "Multicast and MPLS track",
-      "description": "IP multicast, then MPLS: PIM sparse mode with a static RP, BSR with IGMPv3 and SSM, VRF-lite as a warm-up for VRFs, LDP in a provider core, and finally an MPLS L3VPN with MP-BGP VPNv4. Uses built-in labs only (needs ENCOR Lab Builder 1.6.0 or newer), so the course just records the study order and your progress.",
+      "description": "IP multicast, then MPLS: PIM sparse mode with a static RP, BSR with IGMPv3 and SSM, VRF-lite as a warm-up for VRFs, LDP in a provider core, and finally an MPLS L3VPN with MP-BGP VPNv4. Its labs come from the lab library (installed with the course; built in before ENCOR Lab Builder 2.0.0).",
       "labs": [
         "14-multicast-pim-sm",
         "15-multicast-bsr-ssm",
@@ -34,12 +365,12 @@
     },
     {
       "file": "encor-routing.encorcourse",
-      "sha256": "1a3c6c68986955bb36e646107b445364ae5765300789633c712fbb71c422e882",
-      "size": 427,
+      "sha256": "3060f4dd03c352a66f2e2aa0fa6a1125c76869d280bff9dbc3f41eb88ecc47c8",
+      "size": 425,
       "kind": "course",
       "id": "encor-routing",
       "title": "ENCOR Infrastructure: routing track",
-      "description": "The built-in routing labs in a sensible order: EIGRP, OSPF, BGP, VRF-lite, PBR and OSPF/EIGRP redistribution. No labs are bundled, so this course is tiny and only records the study order and your progress through it.",
+      "description": "The core routing labs in a sensible order: EIGRP, OSPF, BGP, VRF-lite, PBR and OSPF/EIGRP redistribution. No labs are bundled, so this course is tiny and only records the study order and your progress through it.",
       "labs": [
         "eigrp-basic",
         "04-eigrp-named",
@@ -73,6 +404,7 @@
       "kind": "lab",
       "id": "ospf-multiarea-stub",
       "title": "OSPFv2 Multi-Area: ABR Summarization and a Totally Stubby Area",
+      "version": "1",
       "description": "Four routers, two OSPF areas. Make area 1 totally stubby and summarize its loopbacks to a /22 on the ABR.",
       "blueprint": [
         "3.2.b"
@@ -89,6 +421,7 @@
       "kind": "lab",
       "id": "troubleshoot-ospf-7node",
       "title": "Troubleshooting: Branch-2 Cannot Reach the Data-Center Server",
+      "version": "1",
       "description": "Seven-router multi-area OSPF enterprise, fully configured. Users at Branch-2 can't reach the DC server. Find and fix the one fault.",
       "blueprint": [
         "3.2.b"
@@ -98,5 +431,13 @@
       "type": "challenge",
       "ram_gb": 7.0
     }
+  ],
+  "starter": [
+    "eigrp-basic",
+    "01-vlan-trunk-stp",
+    "02-etherchannel",
+    "03-ospf-multiarea",
+    "05-bgp-ebgp-ibgp",
+    "06-hsrp"
   ]
 }

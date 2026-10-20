@@ -112,14 +112,14 @@ def install(data: bytes, node_limit: int = 20, overwrite: bool = False) -> dict:
             errors.append(f"labs/{folder}/ contains lab id {rep.lab_id!r}; the folder must be named after the lab id")
     if errors:
         raise packs.LabError(errors, warnings)
-    known = set(catalog.entries())
-    missing = [lid for lid in course.labs if lid not in bundled and lid not in known]
+    missing = missing_labs(course, bundled)
     if missing:
-        raise packs.LabError([f"course lists lab {m!r}, which is neither bundled nor installed" for m in missing], warnings)
+        raise packs.LabError([f"course lists lab {m!r}, which is neither bundled nor installed (install it from the "
+                              "lab library first, or install the course from the library)" for m in missing], warnings)
     extra = sorted(set(bundled) - set(course.labs))
     if extra:
         warnings.append(f"bundled labs not listed in course.yaml are installed but not part of the course: {', '.join(extra)}")
-    existing = [f for f in bundled if (catalog.user_labs_dir() / f).exists()]
+    existing = [f for f in bundled if (catalog.user_labs_dir() / f).exists() and not _same_lab(f, bundled[f])]
     if existing and not overwrite:
         raise packs.LabError([f"a user lab with id {f!r} already exists (choose replace to overwrite)" for f in existing], warnings)
     installed = []
@@ -135,6 +135,21 @@ def install(data: bytes, node_limit: int = 20, overwrite: bool = False) -> dict:
     (d / f"{course.id}.yaml").write_text(yaml.safe_dump(meta, sort_keys=False), encoding="utf-8")
     return {"ok": True, "kind": "course", "course_id": course.id, "title": course.title, "labs": course.labs,
             "installed": sorted(installed), "warnings": warnings, "errors": []}
+
+
+def missing_labs(course: Course, bundled: dict) -> list[str]:
+    """Labs a course lists that are neither bundled in the course file nor installed."""
+    known = set(catalog.entries())
+    return [lid for lid in course.labs if lid not in bundled and lid not in known]
+
+
+def _same_lab(folder: str, pk: packs.Pack) -> bool:
+    """An installed lab identical to the bundled copy is not a conflict (e.g. installed earlier from the library)."""
+    f = catalog.user_labs_dir() / folder / "lab.yaml"
+    try:
+        return f.read_text(encoding="utf-8") == pk.lab_yaml
+    except OSError:
+        return False
 
 
 def _load(path: Path) -> dict | None:
@@ -226,9 +241,11 @@ def deterministic_pack(path: Path) -> bytes:
     return buf.getvalue()
 
 
-def build(source: Path, search: list[Path] | None = None) -> bytes:
+def build(source: Path, search: list[Path] | None = None, known: set[str] | None = None) -> bytes:
     """Build a .encorcourse from a folder: course.yaml + labs/<id>/ (optional). Labs listed in course.yaml that
-    are not built in and not under labs/ are taken from <search dir>/<id>/. Validates the result."""
+    are not built in, not in `known` (labs the library publishes as packs; the app installs them from the library
+    with the course) and not under labs/ are taken from <search dir>/<id>/. Validates the result."""
+    known = set(known or ()) | packs.builtin_ids()
     source = Path(source)
     if not (source / "course.yaml").is_file():
         raise packs.LabError([f"{source} has no course.yaml"])
@@ -240,7 +257,7 @@ def build(source: Path, search: list[Path] | None = None) -> bytes:
         dirs = {p.name: p for p in labs_dir.iterdir() if p.is_dir()} if labs_dir.is_dir() else {}
         for lid in course.labs:
             for root in search or []:
-                if lid not in dirs and lid not in packs.builtin_ids() and (Path(root) / lid / "lab.yaml").is_file():
+                if lid not in dirs and lid not in known and (Path(root) / lid / "lab.yaml").is_file():
                     dirs[lid] = Path(root) / lid
         for _, d in sorted(dirs.items()):
             for n in packs.PACK_FILES:
@@ -252,7 +269,7 @@ def build(source: Path, search: list[Path] | None = None) -> bytes:
         rep = packs.lint(pk, builtin_ids=packs.builtin_ids())
         if not rep.ok:
             raise packs.LabError([f"{folder}: {e}" for e in rep.errors])
-    missing = [lid for lid in course.labs if lid not in bundled and lid not in packs.builtin_ids()]
+    missing = [lid for lid in course.labs if lid not in bundled and lid not in known]
     if missing:
-        raise packs.LabError([f"course lists {m!r}, which is neither bundled nor a built-in lab" for m in missing])
+        raise packs.LabError([f"course lists {m!r}, which is neither bundled nor a library lab" for m in missing])
     return data

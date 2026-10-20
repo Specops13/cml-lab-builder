@@ -13,6 +13,16 @@ from .render import to_yaml
 app = typer.Typer(add_completion=False, help=f"ENCOR Lab Builder {__version__}: build CCNP ENCOR labs in CML 2.9 and grade them.")
 
 
+@app.callback()
+def _main():
+    """ENCOR Lab Builder command line."""
+    from . import migrate
+    st = migrate.run_local()      # keep the labs 1.x bundled (once, see migrate.py)
+    if st.get("state") == "pending" and st.get("pending"):
+        typer.echo(f"note: {len(st.get('pending', []))} lab(s) from your previous version still need to be restored "
+                   "from the online library: encorlab library restore", err=True)
+
+
 def _settings():
     s = config.from_env()
     errs = s.validate()
@@ -43,11 +53,17 @@ def version():
 
 @app.command("list")
 def list_labs():
-    """List the lab catalog (built-in and imported)."""
+    """List the installed labs."""
     from . import sizing
     s = config.from_env()
     plat = get_platform(s.platform)
-    for lid, e in catalog.entries().items():
+    es = catalog.entries()
+    if not es:
+        typer.echo("no labs installed yet. Labs come from the online library:\n"
+                   "  encorlab library install --starter     the recommended starter set\n"
+                   "  encorlab library list                  everything the library offers\n"
+                   "  encorlab import <file.encorlab>        a lab pack you downloaded")
+    for lid, e in es.items():
         lab = e.lab
         fl = f"  faults:{len(lab.faults)}" if lab.faults else ""
         r = sizing.estimate(lab, s.platform, s.ram_heavy_gb)
@@ -111,9 +127,9 @@ def import_lab(file: Path, replace: bool = typer.Option(False, help="overwrite a
     data = file.read_bytes()
     if courses.is_course(file.name, data):
         try:
-            r = courses.install(data, node_limit=config.from_env().node_limit, overwrite=replace)
-        except packs.LabError as e:
-            for err in e.errors:
+            r = library.install_course_file(data, library.default_url(), node_limit=config.from_env().node_limit, overwrite=replace)
+        except (packs.LabError, library.LibraryError) as e:
+            for err in getattr(e, "errors", [str(e)]):
                 typer.echo(f"ERROR: {err}")
             raise typer.Exit(1)
         for w in r["warnings"]:
@@ -153,7 +169,7 @@ def export(lab_id: str, out: Path = typer.Option(None, "-o", "--out"),
 
 @app.command()
 def delete(lab_id: str, yes: bool = typer.Option(False, "--yes", "-y")):
-    """Delete an imported (user) lab."""
+    """Delete an installed lab (your results history is kept; re-installing the lab links it up again)."""
     if not yes and not typer.confirm(f"Delete user lab {lab_id}?"):
         raise typer.Exit(1)
     try:
@@ -680,26 +696,57 @@ def course_delete(course_id: str, labs: bool = typer.Option(False, "--labs", hel
     typer.echo(f"removed course {course_id}" + (f" and labs: {', '.join(removed)}" if removed else ""))
 
 
+_URL_HELP = "library index URL (default: Settings > Library URL, else the project's GitHub repo)"
+
+
 @library_app.command("list")
-def library_list(url: str = typer.Option(library.DEFAULT_INDEX, help="library index URL (https)")):
-    """Show what the online library offers."""
+def library_list(url: str = typer.Option("", help=_URL_HELP)):
+    """Show what the online library offers (RAM estimate, size, installed / update available)."""
+    st = config.from_env()
     try:
-        idx = library.index(url)
+        idx = library.index(url or library.default_url(), heavy_gb=st.ram_heavy_gb)
     except (library.LibraryError, packs.LabError) as e:
         typer.echo(f"ERROR: {e}")
         raise typer.Exit(1)
     for it in idx["items"]:
-        mark = "installed" if it["installed"] else ""
-        typer.echo(f"{it['file']:<36} {it['kind']:<6} {mark:<9} {it['title']}")
+        mark = "update" if it.get("update_available") else ("installed" if it["installed"] else "")
+        ram = ""
+        if it.get("ram_gb"):
+            ram = ("RAM heavy " if it.get("ram_heavy") else "") + f"~{it['ram_gb']:g} GB"
+        star = " *" if it.get("starter") else ""
+        typer.echo(f"{it['file']:<36} {it['kind']:<6} {mark:<9} {ram:>16} {it['size'] / 1024:6.1f} KB  {it['title']}{star}")
+    if idx.get("starter"):
+        typer.echo("* = recommended starter set (encorlab library install --starter)")
 
 
 @library_app.command("install")
-def library_install(target: str = typer.Argument(..., help="a file name from 'library list', or an https URL"),
+def library_install(target: str = typer.Argument(None, help="a file name from 'library list', or an https URL"),
                     sha256: str = typer.Option("", help="expected sha256 (recommended for URLs)"),
-                    url: str = typer.Option(library.DEFAULT_INDEX, help="library index URL (https)"),
-                    replace: bool = typer.Option(False, help="overwrite existing imported labs")):
-    """Download, verify (sha256) and install a pack or course."""
+                    url: str = typer.Option("", help=_URL_HELP),
+                    replace: bool = typer.Option(False, help="overwrite existing imported labs"),
+                    starter: bool = typer.Option(False, "--starter", help="install the recommended starter set"),
+                    all_labs: bool = typer.Option(False, "--all", help="install every lab in the library"),
+                    updates: bool = typer.Option(False, "--updates", help="update installed labs that have a newer version")):
+    """Download, verify (sha256) and install a pack or course (a course also installs the labs it lists)."""
     lim = config.from_env().node_limit
+    url = url or library.default_url()
+    if starter or all_labs or updates:
+        try:
+            ids = [i["id"] for i in library.parse_index(library.http_fetch(url, library.MAX_INDEX_BYTES))
+                   if i["kind"] == "lab"] if all_labs else []
+            r = library.install_many(ids, starter=starter, updates=updates, url=url, node_limit=lim)
+        except (library.LibraryError, packs.LabError) as e:
+            typer.echo(f"ERROR: {e}")
+            raise typer.Exit(1)
+        typer.echo(f"installed: {', '.join(r['installed']) or '-'}")
+        if r["skipped"]:
+            typer.echo(f"already installed: {', '.join(r['skipped'])}")
+        for k, v in r["failed"].items():
+            typer.echo(f"ERROR: {k}: {v}")
+        raise typer.Exit(0 if r["ok"] else 1)
+    if not target:
+        typer.echo("ERROR: give a file name or URL, or --starter / --all / --updates")
+        raise typer.Exit(2)
     try:
         if target.startswith(("https://", "http://")):
             r = library.install_url(target, sha256, node_limit=lim, overwrite=replace)
@@ -713,6 +760,20 @@ def library_install(target: str = typer.Argument(..., help="a file name from 'li
         typer.echo(f"warning: {w}")
     what = f"course {r['course_id']}" if r.get("kind") == "course" else f"lab {r['lab_id']}"
     typer.echo(f"installed {what}: {r['title']}" + ("" if r.get("verified", True) else " (no sha256 given: integrity not verified)"))
+    if r.get("from_library"):
+        typer.echo(f"also installed from the library: {', '.join(r['from_library'])}")
+
+
+@library_app.command("restore")
+def library_restore(url: str = typer.Option("", help=_URL_HELP)):
+    """Install the labs your previous version bundled that could not be copied from disk (after an update)."""
+    from . import migrate
+    st = migrate.restore(url or library.default_url(), node_limit=config.from_env().node_limit)
+    if st["state"] != "pending":
+        typer.echo("nothing to restore" + (f" (restored: {', '.join(st['restored'])})" if st["restored"] else ""))
+        return
+    typer.echo(f"still missing: {', '.join(st['pending'])}" + (f"\nERROR: {st['last_error']}" if st["last_error"] else ""))
+    raise typer.Exit(1)
 
 
 if __name__ == "__main__":

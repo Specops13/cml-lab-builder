@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import mimetypes
+import threading
 from pathlib import Path
 
 import yaml
@@ -11,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, packs, progress, report, service, sizing, snapshots, updates, walkthrough
+from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, migrate, packs, progress, report, service, sizing, snapshots, updates, walkthrough
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -30,9 +31,16 @@ for _type, _ext in (("text/javascript", ".js"), ("text/javascript", ".mjs"), ("t
 class LibInstall(BaseModel):
     file: str = ""
     url: str = ""
-    index_url: str = library.DEFAULT_INDEX
+    index_url: str = ""          # empty: Settings > Library URL (default: the project's repo)
     sha256: str = ""
     replace: bool = False
+
+
+class LibInstallSet(BaseModel):
+    ids: list[str] = []
+    starter: bool = False        # the recommended starter set from the library index
+    updates: bool = False        # every installed library lab with a newer version in the library
+    index_url: str = ""
 
 
 class SettingsIn(BaseModel):
@@ -55,6 +63,7 @@ class SettingsIn(BaseModel):
     show_help: bool | None = None
     check_updates: bool | None = None
     ram_heavy_gb: int | None = None
+    library_url: str | None = None
     remember_password: bool = False
     remember_ai_key: bool = False
 
@@ -88,9 +97,11 @@ JOB_LABELS = {"build": "a lab build", "check": "grading", "test-live": "a live t
 def create_app(store: config.SettingsStore | None = None, client_factory=None, runner_factory=None,
                config_factory=None, probe=None, persist: bool = True, ai_transport=None,
                library_fetch=None, update_fetch=None, update_http=None, auto_update: bool = False,
-               restart=None) -> FastAPI:
+               restart=None, auto_restore: bool | None = None) -> FastAPI:
     """auto_update=True (the desktop launcher) starts the background update checker; update_http / restart are
-    test hooks for it (see autoupdate.Updater)."""
+    test hooks for it (see autoupdate.Updater). auto_restore (default: same as auto_update) installs labs an older
+    version bundled from the library in the background when they could not be copied from disk (migrate.py)."""
+    migrate.run_local()          # keep the labs 1.x bundled (copies them once into the user labs folder)
     store = store or config.SettingsStore()
     jobs = service.JobManager()
 
@@ -104,6 +115,14 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     updater = autoupdate.Updater(settings=store.get, fetch=update_http, busy=_busy, restart=restart)
     if auto_update:
         updater.start()
+    fetch = library_fetch or library.http_fetch
+
+    def _lib_url(u: str = "") -> str:
+        return (u or "").strip() or store.get().library_url or library.DEFAULT_INDEX
+
+    if (auto_update if auto_restore is None else auto_restore) and migrate.status()["state"] == "pending":
+        threading.Thread(target=lambda: migrate.restore(_lib_url(), fetch, store.get().node_limit),
+                         name="restore-labs", daemon=True).start()
     app = FastAPI(title="ENCOR Lab Builder", version=__version__)
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
@@ -208,10 +227,24 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                             "faults": len(l.faults), "fault_active": bool(faults.active(lid)), "exam_active": bool(exam.active(lid)),
                             "best": max((x.get("score_pct") or 0 for x in h), default=None) if not wt else None,
                             "solved": bool(wt["completed"]) if wt else any(x.get("passed") for x in h),
-                            "type": l.type, "walkthrough": wt, "ram": _ram(l, s)})
+                            "type": l.type, "walkthrough": wt, "ram": _ram(l, s), "version": l.version,
+                            "update_available": lid in library.last_index().get("updates", [])})
             except Exception as ex:  # pragma: no cover - defensive
                 errors[str(e.path)] = f"{type(ex).__name__}: {ex}"
-        return {"labs": out, "broken": errors}
+        return {"labs": out, "broken": errors, "migration": migrate.status()}
+
+    # ------------------------------------------------------------ labs from 1.x (see migrate.py)
+    @app.get("/api/migration")
+    def migration_status():
+        return migrate.status()
+
+    @app.post("/api/migration/restore")
+    def migration_restore():
+        return migrate.restore(_lib_url(), fetch, store.get().node_limit)
+
+    @app.post("/api/migration/dismiss")
+    def migration_dismiss():
+        return migrate.dismiss()
 
     @app.get("/api/labs/{lab_id}")
     def lab(lab_id: str):
@@ -314,15 +347,13 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         status = 502 if str(e).startswith(("network error", "download failed")) else 400
         return JSONResponse({"ok": False, "errors": [str(e)], "warnings": []}, status_code=status)
 
-    fetch = library_fetch or library.http_fetch
-
     @app.post("/api/import")
     async def import_file(file: UploadFile = File(...), replace: bool = False):
         data = await file.read()
         if courses.is_course(file.filename or "", data):
-            try:
-                return courses.install(data, node_limit=store.get().node_limit, overwrite=replace)
-            except packs.LabError as e:
+            try:   # labs the course lists but doesn't bundle come from the library (when online)
+                return library.install_course_file(data, _lib_url(), fetch, node_limit=store.get().node_limit, overwrite=replace)
+            except (packs.LabError, library.LibraryError) as e:
                 return _lib_err(e)
         try:
             pk = packs.read_upload(file.filename or "upload", data)
@@ -358,9 +389,9 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
             raise HTTPException(404, "; ".join(e.errors))
 
     @app.get("/api/library")
-    def library_index(url: str = library.DEFAULT_INDEX):
+    def library_index(url: str = ""):
         try:
-            return library.index(url, fetch=fetch, heavy_gb=store.get().ram_heavy_gb)
+            return library.index(_lib_url(url), fetch=fetch, heavy_gb=store.get().ram_heavy_gb)
         except (library.LibraryError, packs.LabError) as e:  # shown in the UI
             return _lib_err(e)
 
@@ -369,12 +400,26 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         lim = store.get().node_limit
         try:
             if body.file:
-                return library.install_item(body.file, url=body.index_url, fetch=fetch, node_limit=lim, overwrite=body.replace)
+                return library.install_item(body.file, url=_lib_url(body.index_url), fetch=fetch, node_limit=lim, overwrite=body.replace)
             if body.url:
                 return library.install_url(body.url, body.sha256, fetch=fetch, node_limit=lim, overwrite=body.replace)
         except (library.LibraryError, packs.LabError) as e:
             return _lib_err(e)
         raise HTTPException(400, "give a library file or a URL")
+
+    @app.post("/api/library/install-set")
+    def library_install_set(body: LibInstallSet):
+        """Several labs in one go: the starter set, a list of ids, or all available updates."""
+        if not (body.ids or body.starter or body.updates):
+            raise HTTPException(400, "give ids, starter or updates")
+        try:
+            r = library.install_many(body.ids, starter=body.starter, updates=body.updates, url=_lib_url(body.index_url),
+                                     fetch=fetch, node_limit=store.get().node_limit)
+        except (library.LibraryError, packs.LabError) as e:
+            return _lib_err(e)
+        if body.updates:
+            library.last_index()["updates"] = [x for x in library.last_index().get("updates", []) if x not in r["installed"]]
+        return r
 
     def _pack_from_body(body: YamlIn) -> packs.Pack:
         """Builder edits don't carry fixtures; reuse the source lab's recorded outputs while they still
@@ -410,14 +455,17 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         return rep.to_dict()
 
     @app.delete("/api/user-labs/{lab_id}")
-    def delete_user_lab(lab_id: str):
+    def delete_user_lab(lab_id: str, clear_history: bool = False):
+        """Removes the lab files. Results history and progress stay (re-installing the lab links them up again)
+        unless clear_history=true."""
         _entry(lab_id)
         try:
             packs.delete_user_lab(lab_id)
         except packs.LabError as e:
             raise HTTPException(400, str(e))
-        history.clear(lab_id)
-        return {"deleted": lab_id}
+        if clear_history:
+            history.clear(lab_id)
+        return {"deleted": lab_id, "history_cleared": clear_history}
 
     @app.post("/api/validate")
     def validate(body: YamlIn):

@@ -13,6 +13,12 @@ from .platforms import DEFINITIONS, MAX_PORTS, PLATFORMS, placeholders
 _NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,30}$")
 
 
+def version_key(v) -> tuple:
+    """Comparable form of a lab version ('2' > '1.10' > '1.9' > '1'); unparsable parts count as 0."""
+    import re as _re
+    return tuple(int(x) if x.isdigit() else 0 for x in _re.split(r"[.\-]", str(v or "1").strip().lstrip("vV"))) or (1,)
+
+
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -183,7 +189,13 @@ class Lab(_Strict):
     faults: list[Fault] = Field(default=[], description=(
         "Optional predefined faults for 'Break my lab' (random troubleshooting practice on the solved lab)"))
     author: str = ""
-    version: str = "1"
+    version: str = Field(default="1", description=(
+        "Content version of the lab, e.g. '1', '2' or '1.1' (default '1'). Raise it whenever you change a published "
+        "lab, so installed copies show 'Update available' in the library"))
+
+    @property
+    def version_key(self) -> tuple:
+        return version_key(self.version)
 
     @model_validator(mode="before")
     @classmethod

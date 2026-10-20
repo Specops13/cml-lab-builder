@@ -39,6 +39,7 @@ class Settings:
     node_limit: int = 20
     lab_prefix: str = "ENCOR-"
     boot_timeout: int = 900
+    library_url: str = ""           # lab library index (labs/index.json); empty = the project's GitHub repo
     ram_heavy_gb: int = 16          # labs estimated at or above this many GB of CML RAM get a red "RAM heavy" tag
     device_username: str = "cisco"
     device_password: str = field(default="cisco", repr=False)
@@ -90,6 +91,10 @@ class Settings:
             errs.append("node_limit must be between 1 and 1000")
         if not (1 <= int(self.ram_heavy_gb) <= 1024):
             errs.append("ram_heavy_gb must be between 1 and 1024")
+        if self.library_url:
+            u = urlparse(self.library_url)
+            if not ((u.scheme == "https" and u.netloc) or (u.scheme == "http" and u.hostname in ("localhost", "127.0.0.1", "::1"))):
+                errs.append("library_url must start with https:// (http:// only for localhost)")
         if self.cml_url and urlparse(self.cml_url).scheme not in ("https", "http"):
             errs.append("cml_url must start with https://")
         return errs
@@ -111,6 +116,7 @@ def from_env(env: dict | None = None) -> Settings:
     s.lab_prefix = e.get("ENCOR_LAB_PREFIX", s.lab_prefix)
     s.boot_timeout = int(e.get("ENCOR_BOOT_TIMEOUT", s.boot_timeout))
     s.ram_heavy_gb = int(e.get("ENCOR_RAM_HEAVY_GB", s.ram_heavy_gb))
+    s.library_url = e.get("ENCOR_LIBRARY_URL", s.library_url).strip()
     s.device_username = e.get("ENCOR_DEVICE_USERNAME", s.device_username)
     s.device_password = e.get("ENCOR_DEVICE_PASSWORD", s.device_password)
     s.device_enable = e.get("ENCOR_DEVICE_ENABLE", s.device_enable)
@@ -131,7 +137,7 @@ def from_env(env: dict | None = None) -> Settings:
 # Non-secret settings saved from the web Settings page. Passwords are never written here.
 PERSISTED = ("cml_url", "username", "verify_tls", "console_host", "console_port", "grading_mode",
              "platform", "node_limit", "boot_timeout", "ai_preset", "ai_base_url", "ai_model", "show_help",
-             "check_updates", "ram_heavy_gb")
+             "check_updates", "ram_heavy_gb", "library_url")
 
 
 def settings_file(env=None) -> Path:
@@ -213,6 +219,8 @@ class SettingsStore:
                     v = _bool_or_path(v, True)
                 if k in ("show_help", "check_updates"):
                     v = v if isinstance(v, bool) else str(v).strip().lower() in ("1", "true", "yes", "on")
+                if k == "library_url":
+                    v = str(v or "").strip()
                 if k == "cml_url" and isinstance(v, str):
                     v = v.strip().rstrip("/")
                 setattr(new, k, v)

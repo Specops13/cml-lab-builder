@@ -1,0 +1,10 @@
+# Online library settings read by packaging/build_library.py.
+# starter: the labs the app's "Install recommended starter set" button installs on a first run.
+# Small labs (a few GB of CML RAM each) that cover the core ENCOR topics.
+starter:
+  - eigrp-basic
+  - 01-vlan-trunk-stp
+  - 02-etherchannel
+  - 03-ospf-multiarea
+  - 05-bgp-ebgp-ibgp
+  - 06-hsrp

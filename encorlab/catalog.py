@@ -1,5 +1,10 @@
-"""Lab catalog: built-in labs (package labs/ folder) + user labs
+"""Lab catalog: the labs installed in the user labs folder
 (%APPDATA%\\encorlab\\labs or ~/.config/encorlab/labs, or ENCOR_USER_LABS_DIR).
+
+Since 2.0.0 the app ships without labs: every lab is a pack in the online library (labs/index.json in the repo,
+sources in labsrc/) and is installed into the user labs folder. A read-only "built-in" folder still exists for
+developers and the test suite: set ENCOR_BUILTIN_LABS_DIR (e.g. to the repo's labsrc/) to use lab folders in
+place. The packaged app has none (the package's own labs/ folder no longer exists).
 
 A lab folder contains lab.yaml and optionally solution.cfg, fixture_solved.yaml,
 fixture_blank.yaml. A reference solution may instead be embedded in lab.yaml
@@ -15,7 +20,8 @@ import yaml
 
 from .schema import Lab
 
-LABS_DIR = Path(__file__).parent / "labs"
+LAB_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
+LABS_DIR = Path(os.environ.get("ENCOR_BUILTIN_LABS_DIR") or (Path(__file__).parent / "labs"))
 
 
 class LabNotFound(KeyError):
@@ -36,7 +42,8 @@ def user_labs_dir() -> Path:
     return settings_file().parent / "labs"
 
 
-def lab_dirs(root: Path = LABS_DIR) -> list[Path]:
+def lab_dirs(root: Path | None = None) -> list[Path]:
+    root = LABS_DIR if root is None else Path(root)
     if not root.is_dir():
         return []
     return sorted(p for p in root.iterdir() if (p / "lab.yaml").is_file())
@@ -65,9 +72,9 @@ def _scan(root: Path, source: str, errors: dict | None) -> dict[str, Entry]:
     return out
 
 
-def entries(root: Path = LABS_DIR, user_root: Path | None = None, errors: dict | None = None) -> dict[str, Entry]:
-    """Built-in labs first; user labs with a clashing id are ignored."""
-    res = _scan(root, "builtin", errors)
+def entries(root: Path | None = None, user_root: Path | None = None, errors: dict | None = None) -> dict[str, Entry]:
+    """Built-in (developer) labs first; user labs with a clashing id are ignored."""
+    res = _scan(LABS_DIR if root is None else root, "builtin", errors)
     ur = user_labs_dir() if user_root is None else user_root
     for k, v in _scan(ur, "user", errors).items():
         if k in res:
@@ -78,8 +85,8 @@ def entries(root: Path = LABS_DIR, user_root: Path | None = None, errors: dict |
     return res
 
 
-def load_all(root: Path = LABS_DIR) -> dict[str, Lab]:
-    if root != LABS_DIR:  # explicit root (tests): only that folder, strict
+def load_all(root: Path | None = None) -> dict[str, Lab]:
+    if root is not None and Path(root) != LABS_DIR:  # explicit root (tests): only that folder, strict
         labs = {}
         for d in lab_dirs(root):
             lab = load_lab_file(d / "lab.yaml")
@@ -97,8 +104,8 @@ def entry(lab_id: str) -> Entry:
     return es[lab_id]
 
 
-def get(lab_id: str, root: Path = LABS_DIR) -> Lab:
-    if root != LABS_DIR:
+def get(lab_id: str, root: Path | None = None) -> Lab:
+    if root is not None and Path(root) != LABS_DIR:
         labs = load_all(root)
         if lab_id not in labs:
             raise LabNotFound(lab_id)

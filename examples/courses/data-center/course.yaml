@@ -3,8 +3,7 @@ title: "Data center: VXLAN EVPN fabrics"
 description: >-
   Data center fabric basics on Nexus 9000v: a guided walkthrough that builds a spine-and-leaf VXLAN fabric with a
   BGP EVPN control plane and stretches VLANs between leaves (optional L3VNI and anycast gateway). RAM heavy:
-  about 52 GB of CML RAM (4 x nxosv9000 at 12 GB). Uses built-in labs only (needs ENCOR Lab Builder 1.9.0 or
-  newer), so the course just records the study order and your progress.
+  about 52 GB of CML RAM (4 x nxosv9000 at 12 GB). Its labs come from the lab library (installed with the course; built in before ENCOR Lab Builder 2.0.0).
 author: ENCOR Lab Builder
 version: "1.0"
 labs:
