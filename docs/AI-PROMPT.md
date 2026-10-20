@@ -38,6 +38,12 @@ which builds the lab in Cisco Modeling Labs 2.9 and grades it automatically.
   Match running-config lines exactly as IOS prints them (see "Writing regexes").
 - Keep to 2-6 nodes; use only kind router/switch; platforms [iol, iosv] unless a feature needs one.
 - id: lowercase-with-dashes, unique and descriptive.
+- Default to a challenge lab (`type` omitted). Only when the request asks for a guided, step-by-step build, write
+  `type: walkthrough` with ordered `steps` (explain, config per device, verify with expected output, checks) and no
+  lab-level checks, solution or faults (see "Walkthrough labs" in the guide).
+- Mind CML server RAM: IOL nodes need about 1 GB each. Only use a `definition:` such as nxosv9000 (about 12 GB each,
+  literal Ethernet1/1-1/4 names) when the request needs NX-OS, and say in the task how much RAM the lab needs.
+  Set `ram_gb:` only if the estimate from the node types would be wrong. Labs from 16 GB up are tagged RAM heavy.
 
 ## Check templates (machine-readable)
 ```json
@@ -274,6 +280,7 @@ The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocompl
 5. `checks` must contain **both** live checks (`mode: live`, the default) **and** config checks (`mode: config`).
 6. Include a **reference solution** (`solution:` map, device -> config lines to add). The validator applies it to the starting
    configs and requires every config check to pass (100%). On the untouched starting config, the checks must fail (0% when packing).
+   Exception: nodes with an explicit `definition:` (e.g. `nxosv9000`) use their literal names, see "Node definitions".
 7. Starting configs only contain what the student is given (usually IP addressing and `no shutdown`). Never put the answer there.
    The app adds `hostname`, `no ip domain lookup`, `no logging console` and console line settings automatically.
 8. Live commands must be read-only: they start with `show ` or `ping `.
@@ -295,7 +302,72 @@ The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocompl
 | solution_summary | yes (new labs) | Markdown shown when the student scores 100% (or clicks *Reveal solution*). See below |
 | hints | recommended | Ordered list, vaguest first. The *Hint* button reveals them one at a time ("Hint 2 of 3") |
 | faults | optional | Predefined faults for *Break my lab* (see below) |
+| type | no | `challenge` (default) or `walkthrough` (a guided build in `steps`, see below) |
+| ram_gb | no | CML server RAM the lab needs, in GB. Default: estimated from the node types (see "RAM estimate") |
 | author, version | no | free text |
+
+## RAM estimate and the "RAM heavy" tag
+The app shows an estimated CML RAM figure on every lab (catalog, lab page, build confirmation, courses, library). It adds
+up the default RAM of each node's CML 2.9 node definition: iol-xe / ioll2-xe 1 GB, iosv 0.5 GB, iosvl2 0.75 GB,
+csr1000v 3 GB, cat8000v 4 GB, nxosv9000 12 GB, cat9000v 18 GB, iosxrv9000 20 GB. Labs at or above the threshold in
+Settings (default 16 GB) get a red **RAM heavy** tag. If your lab needs a different figure (for example you know the
+nodes run with less), set `ram_gb:`; the tooltip then says the figure comes from the author.
+
+## Node definitions other than IOL / IOSv (`definition:`)
+A node can ask for a specific CML node definition instead of the platform's router/switch image:
+`definition: nxosv9000` (Cisco Nexus 9300v, NX-OS 10.5 in CML 2.9, about 12 GB RAM and 2 vCPUs per node, 10-15 minutes to boot).
+- Such a node always uses its own interface names: ports 0-3 are `Ethernet1/1`-`Ethernet1/4` (short `Eth1/1`-`Eth1/4`).
+  Write them **literally** in that node's config, steps and checks; `%ifN%` placeholders are not allowed on these nodes.
+  The management port `mgmt0` is created unconnected.
+- The app writes the NX-OS day-0 config for you: hostname, `no password strength-check`, users `admin` and your device
+  username (Settings) with your device password, `no ip domain-lookup`, and CML's boot-variable workaround.
+- NX-OS running configs indent by 2 spaces; match lines with `'^\s+...'` rather than a fixed number of spaces.
+- NX-OS ping output is `5 packets transmitted, 5 packets received, 0.00% packet loss`, so use a `match:` regex such as
+  `'\b[3-5] packets received'`; `min_success` only understands IOS output.
+- Other nodes in the same lab (IOL/IOSv hosts) keep using `%ifN%` placeholders as usual.
+- The build fails early with a clear message when the CML server doesn't have the node definition.
+
+## Walkthrough labs (`type: walkthrough`)
+A walkthrough is a guided build instead of a challenge: ordered steps, each with an explanation, the exact config per
+device, verification commands with what good output looks like, and checks for **Check this step**. Walkthroughs have no
+faults, no exam mode and no score: the app records which steps passed and when every required step passed (completed),
+separately from your mastery. Rules:
+- `type: walkthrough`, at least 2 `steps`, no lab-level `checks`, `solution` or `faults` (the solution is the step
+  configs in order, and *Break my lab* / exam mode don't apply).
+- At least one live check in a required (non-optional) step. Check ids must be unique across all steps.
+- Starting configs are the real starting point (often nothing but the hostname the app adds).
+```yaml
+steps:
+  - id: underlay-ospf                 # lowercase-with-dashes, unique
+    title: "Underlay: OSPF between the loopbacks"
+    explain: |                        # Markdown: what this step builds and why. Concepts first, short.
+      ...
+    config:                           # device -> exact config lines for this step (copy buttons in the UI)
+      LEAF1: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.0.0.11
+    verify:                           # read-only commands the student runs, with the expected result
+      - device: LEAF1
+        command: show ip ospf neighbors
+        expect: "Two neighbors in `FULL/ -`."
+    checks:                           # same format as lab checks; live and/or config
+      - id: ospf-leaf1-nbrs
+        description: LEAF1 is FULL with both spines
+        device: LEAF1
+        command: show ip ospf neighbors
+        match: ['^\s*10\.0\.0\.1\s+\d+\s+FULL']
+    optional: false                   # true: an extra step that is not needed to complete the walkthrough
+    apply: true                       # offer "Apply this step for me" (types the config over the console)
+```
+- **Apply this step for me** types the step's config in configuration mode on each device: it sends `exit` whenever the
+  indentation steps back out of a sub-mode (on NX-OS also after a mode command with nothing under it, such as a bare
+  `address-family l2vpn evpn`), starts every top-level block from global configuration mode, and stops at the first
+  line the device rejects. So indent sub-mode lines consistently (NX-OS style: 2 spaces per level).
+- Steps are checked with the step's own checks only. **Check every step** checks them all in one pass.
+- `solution_summary` is shown on the final summary page next to the complete config per device.
+- Offline validation applies every step's config and requires all step checks (optional steps too) to pass; on the
+  starting config, checks may pass in early steps (for example a cabling check), but not all of them.
 
 ## Solution summary and hints
 `solution_summary` is a short Markdown block with three parts:
@@ -838,6 +910,19 @@ hints:
      "description": "Starting IOS config (no hostname line needed). Use %if0%..%if3% for data interfaces",
      "title": "Config",
      "type": "string"
+    },
+    "definition": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Optional explicit CML node definition instead of the platform profile's router/switch, e.g. 'nxosv9000' (NX-OS 9000v, ports 0-3 = Ethernet1/1-1/4). Write literal interface names in its config, not %ifN%",
+     "title": "Definition"
     }
    },
    "required": [
@@ -847,6 +932,99 @@ hints:
    ],
    "title": "Node",
    "type": "object"
+  },
+  "Step": {
+   "additionalProperties": false,
+   "description": "One step of a walkthrough lab: why, the exact config per device, how to verify it, and optional checks.",
+   "properties": {
+    "id": {
+     "description": "Short unique id, e.g. 'underlay-ospf'",
+     "title": "Id",
+     "type": "string"
+    },
+    "title": {
+     "title": "Title",
+     "type": "string"
+    },
+    "explain": {
+     "description": "Markdown: what this step builds and why (concepts first, concise)",
+     "title": "Explain",
+     "type": "string"
+    },
+    "config": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "default": {},
+     "description": "device -> exact config for this step (copy buttons in the UI)",
+     "title": "Config",
+     "type": "object"
+    },
+    "verify": {
+     "default": [],
+     "description": "Verification commands with the expected output",
+     "items": {
+      "$ref": "#/$defs/Verify"
+     },
+     "title": "Verify",
+     "type": "array"
+    },
+    "checks": {
+     "default": [],
+     "description": "Checks run by 'Check this step' (live and/or config)",
+     "items": {
+      "$ref": "#/$defs/Check"
+     },
+     "title": "Checks",
+     "type": "array"
+    },
+    "optional": {
+     "default": false,
+     "description": "Optional step: not needed to complete the walkthrough",
+     "title": "Optional",
+     "type": "boolean"
+    },
+    "apply": {
+     "default": true,
+     "description": "Offer 'Apply this step for me' (push the config over the console)",
+     "title": "Apply",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "id",
+    "title",
+    "explain"
+   ],
+   "title": "Step",
+   "type": "object"
+  },
+  "Verify": {
+   "additionalProperties": false,
+   "description": "A verification command shown in a walkthrough step, with what good output looks like.",
+   "properties": {
+    "device": {
+     "title": "Device",
+     "type": "string"
+    },
+    "command": {
+     "description": "Read-only 'show ...' or 'ping ...' command to run on the device",
+     "title": "Command",
+     "type": "string"
+    },
+    "expect": {
+     "description": "Markdown: what to look for in good output (a short excerpt is fine)",
+     "title": "Expect",
+     "type": "string"
+    }
+   },
+   "required": [
+    "device",
+    "command",
+    "expect"
+   ],
+   "title": "Verify",
+   "type": "object"
   }
  },
  "additionalProperties": false,
@@ -855,6 +1033,16 @@ hints:
   "id": {
    "description": "Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name",
    "title": "Id",
+   "type": "string"
+  },
+  "type": {
+   "default": "challenge",
+   "description": "challenge (default): a graded task. walkthrough: a guided build in ordered `steps` (not graded; no faults or exam mode; completion is tracked separately)",
+   "enum": [
+    "challenge",
+    "walkthrough"
+   ],
+   "title": "Type",
    "type": "string"
   },
   "title": {
@@ -922,12 +1110,37 @@ hints:
    "type": "string"
   },
   "checks": {
-   "description": "Needs at least one live and one config check",
+   "default": [],
+   "description": "Challenge labs: needs at least one live and one config check. Walkthroughs: leave empty and put the checks in the steps",
    "items": {
     "$ref": "#/$defs/Check"
    },
    "title": "Checks",
    "type": "array"
+  },
+  "steps": {
+   "default": [],
+   "description": "Walkthrough labs only: the ordered steps",
+   "items": {
+    "$ref": "#/$defs/Step"
+   },
+   "title": "Steps",
+   "type": "array"
+  },
+  "ram_gb": {
+   "anyOf": [
+    {
+     "exclusiveMinimum": 0,
+     "maximum": 512,
+     "type": "number"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "Optional: CML server RAM the lab needs in GB. Default: estimated from the node definitions",
+   "title": "Ram Gb"
   },
   "solution": {
    "anyOf": [
@@ -989,8 +1202,7 @@ hints:
   "summary",
   "nodes",
   "links",
-  "task",
-  "checks"
+  "task"
  ],
  "title": "ENCOR Lab Builder lab definition",
  "type": "object",

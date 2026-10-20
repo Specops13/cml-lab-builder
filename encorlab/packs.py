@@ -19,7 +19,7 @@ from pydantic import ValidationError
 
 from . import catalog
 from .grader import grade
-from .platforms import MAX_PORTS, PLATFORMS, get as get_platform
+from .platforms import MAX_PORTS, PLATFORMS, get as get_platform, node_def
 from .render import to_yaml
 from .schema import Lab
 
@@ -179,6 +179,8 @@ def _literal_ifs(text: str) -> set[str]:
 
 
 def solution_of(lab: Lab, pack: Pack) -> dict[str, str]:
+    if lab.is_walkthrough:
+        return lab.step_solution()
     if pack.solution_cfg:
         return catalog.parse_solution_cfg(pack.solution_cfg)
     return dict(lab.solution or {})
@@ -200,19 +202,39 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
         errors.append(f"lab has {lab.node_count} nodes; your node limit is {node_limit}")
     if lab.node_count > 8:
         warnings.append("labs with more than 8 nodes are slow to boot; keep labs small")
-    # literal interface names: only OK when the lab supports exactly one platform and the name fits it
-    texts = [n.config for n in lab.nodes] + [c.command for c in lab.checks] + [p for c in lab.checks for p in c.match + c.absent]
+    # literal interface names: only OK when the lab supports exactly one platform and the name fits it.
+    # Nodes with an explicit `definition` (e.g. nxosv9000) always use that definition's literal names.
     sol = solution_of(lab, pack)
-    texts += list(sol.values())
-    lits = set().union(*(_literal_ifs(t) for t in texts)) if texts else set()
-    if lits:
+    per_dev: dict[str, list[str]] = {n.name: [n.config] for n in lab.nodes}
+    all_checks = lab.graded_checks + [c for st in lab.steps for c in st.checks if st.optional]
+    for c in all_checks:
+        per_dev.setdefault(c.device, []).extend([c.command, *c.match, *c.absent])
+    for dev, cfg in sol.items():
+        per_dev.setdefault(dev, []).append(cfg)
+    for st in lab.steps:
+        for v in st.verify:
+            per_dev.setdefault(v.device, []).append(v.command)
+    defs = {n.name: n.definition for n in lab.nodes}
+    plat_lits: set[str] = set()
+    for dev, texts in per_dev.items():
+        lits = set().union(*(_literal_ifs(t) for t in texts)) if texts else set()
+        nd = node_def(defs.get(dev))
+        if nd is None:
+            plat_lits |= lits
+            continue
+        ok = re.compile(rf"^({re.escape(nd.long_prefix)}|{re.escape(nd.short_prefix)})[{nd.first_port}-{nd.first_port + MAX_PORTS - 1}]$")
+        bad = sorted(l for l in lits if not ok.match(l))
+        if bad:
+            errors.append(f"{dev}: interface names {bad} do not exist on {nd.id} in this app "
+                          f"(valid: {nd.ifname(0)}-{nd.ifname(MAX_PORTS - 1)})")
+    if plat_lits:
         if len(lab.platforms) > 1:
-            errors.append(f"literal interface names {sorted(lits)} found; use %if0%..%if3% (long) / %if0s%..%if3s% (short) "
+            errors.append(f"literal interface names {sorted(plat_lits)} found; use %if0%..%if3% (long) / %if0s%..%if3s% (short) "
                           "placeholders so the lab works on both IOL and IOSv, or set platforms to a single platform")
         else:
             p = PLATFORMS[lab.platforms[0]]
             ok = re.compile(rf"^({p.long_prefix}|{p.short_prefix})0/[0-{MAX_PORTS - 1}]$")
-            bad = sorted(l for l in lits if not ok.match(l))
+            bad = sorted(l for l in plat_lits if not ok.match(l))
             if bad:
                 errors.append(f"interface names {bad} do not exist on platform {p.name} "
                               f"(valid: {p.long_prefix}0/0-0/{MAX_PORTS - 1}); prefer %ifN% placeholders")
@@ -227,13 +249,20 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
     if unknown:
         warnings.append(f"blueprint items {unknown} are not ENCOR v1.2 exam topics (e.g. 3.2.b); the progress dashboard "
                         "maps them by their domain number only")
-    if not lab.hints and not any(c.hint for c in lab.checks):
+    if not lab.is_walkthrough and not lab.hints and not any(c.hint for c in lab.graded_checks):
         warnings.append("no hints: add an ordered `hints:` list (vague first) for the Hint button")
     for dev in sol:
         if dev not in {n.name for n in lab.nodes}:
             errors.append(f"solution references unknown device {dev}")
+    if lab.is_walkthrough:
+        for st in lab.steps:
+            if st.config and not (st.checks or st.verify):
+                warnings.append(f"step {st.id} changes config but has no verify commands or checks")
     if errors:
         return Report(False, lab.id, lab.title, errors, warnings, results)
+    # walkthroughs: grade every step's checks (optional steps too) against all step configs
+    glab = lab if not lab.is_walkthrough else lab.model_copy(update={
+        "type": "challenge", "steps": [], "checks": [c for st in lab.steps for c in st.checks]})
     for plat_name in lab.platforms:
         plat = get_platform(plat_name)
         try:
@@ -246,8 +275,10 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
         for mode in ("config", "live"):
             if mode == "live" and not pack.fixtures.get("solved"):
                 continue
-            solved = grade(lab, SimRunner(lab, plat, True, solution=sol, fixtures=pack.fixtures), plat, mode=mode)
-            blank = grade(lab, SimRunner(lab, plat, False, solution=sol, fixtures=pack.fixtures), plat, mode=mode)
+            if not glab.checks_for(mode):
+                continue
+            solved = grade(glab, SimRunner(lab, plat, True, solution=sol, fixtures=pack.fixtures), plat, mode=mode)
+            blank = grade(glab, SimRunner(lab, plat, False, solution=sol, fixtures=pack.fixtures), plat, mode=mode)
             results.append({"platform": plat_name, "mode": mode, "solution_pct": solved.score_pct, "blank_pct": blank.score_pct})
             if not solved.passed:
                 for r in solved.results:
@@ -257,6 +288,8 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
                 errors.append(f"[{plat_name}/{mode}] the starting config already passes every check - nothing to solve")
             elif blank.score_pct > 0:
                 passing = [r.id for r in blank.results if r.passed]
+                if lab.is_walkthrough:
+                    continue      # e.g. a cabling check in the first step passes before any config
                 (errors if (strict and mode == "config") else warnings).append(
                     f"[{plat_name}/{mode}] checks already passing on the starting config: {passing}")
         if sol and lab.faults:

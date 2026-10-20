@@ -36,7 +36,15 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [License](#license)
 
 ## Features
-- **18 built-in labs** covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
+- **BGP EVPN VXLAN walkthrough (new in 1.9.0):** a guided, step-by-step build of a spine-and-leaf fabric on Nexus
+  9000v: OSPF underlay, iBGP EVPN with the spines as route reflectors, NVE/VTEPs, and VLANs 10 and 20 stretched across
+  both leaves, with an optional L3VNI/anycast-gateway step. Each step explains the idea, gives the exact config with copy
+  buttons, lists verification commands with the expected output, and has **Check this step** and **Apply this step
+  for me**. See [Walkthrough labs](#walkthrough-labs-bgp-evpn-vxlan).
+- **RAM estimate on every lab:** a tag shows the CML server RAM a lab needs (from its node types). Labs from 16 GB up
+  (configurable) get a red **RAM heavy · ~N GB** tag in the list, on the lab page, in the build confirmation, in
+  courses and in the library.
+- **19 built-in labs** (18 challenges plus the EVPN walkthrough) covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
   OSPFv2 multi-area/stub/summarization, EIGRP named mode with authentication and stub, eBGP/iBGP with next-hop-self,
   HSRPv2 with tracking, ACL/PAT/static NAT, VRF-lite, GRE over IPsec with OSPF, NTP/Syslog/SNMPv3/IP SLA,
   HSRP failover driven by IP SLA object tracking, policy-based routing, mutual OSPF/EIGRP redistribution with route tags,
@@ -46,7 +54,7 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   It only ever touches labs titled `ENCOR-…`.
 - **Two grading modes:** *live* (real adjacencies, routes, pings over the console server) and *config* (HTTPS only).
   *Auto* uses live when it can and falls back to config.
-- **Break my lab (fault practice):** every built-in lab ships with 3 predefined faults (54 in total). One click rebuilds
+- **Break my lab (fault practice):** every built-in challenge lab ships with 3 predefined faults (54 in total). One click rebuilds
   the working lab with a random fault and gives you a symptom-only trouble ticket, so you get unlimited troubleshooting practice.
 - **Exam mode:** a timed, one-shot attempt with a countdown, the solution withheld, and hints disabled or costing
   points. *Submit exam* (or the timer running out) grades once and shows a score report (raw score, hint penalty,
@@ -262,7 +270,8 @@ Manual alternative: `python3 -m venv .venv && .venv/bin/pip install -e . && .ven
 ## CML requirements
 - **CML 2.9.x**. The client library is pinned to `virl2_client>=2.9.0,<2.10` to match the controller. `doctor` warns on other versions.
 - **Images:** IOL (`iol-xe`) and IOL-L2 (`ioll2-xe`) by default, or IOSv / IOSvL2 (*Settings > Device images*).
-  Labs use 2-7 nodes. A node limit (default 20, the CML Personal license) is enforced before starting a lab.
+  Challenge labs use 2-7 nodes. The EVPN walkthrough also needs the **`nxosv9000`** node definition (Nexus 9300v 10.5(3),
+  on the CML 2.9 reference platform ISO) and about **52 GB of RAM** (see [RAM estimate](#ram-estimate-and-the-ram-heavy-tag)). A node limit (default 20, the CML Personal license) is enforced before starting a lab.
 - **From your PC:** HTTPS to the CML URL, for the API and config mode. Your own CA or Let's Encrypt certificate works with TLS verification on.
 - **For live checks:** SSH to the **CML console server**, by default the CML host on **port 22**.
   You can set a separate *Console server FQDN* and port, for example behind a TCP passthrough proxy (see below).
@@ -348,6 +357,62 @@ v1.6.0 release for older app versions or for sharing.
 > and the `... labels` output format are the least certain parts. If a live check fails on a
 > correctly solved lab, run it in *Config* grading mode and please report the device output.
 
+### Walkthrough labs (BGP EVPN VXLAN)
+A **walkthrough** is a guided build instead of a graded challenge. The built-in `18-evpn-vxlan` walkthrough
+(*Walkthrough: BGP EVPN VXLAN spine-and-leaf*) turns four empty Nexus 9000v switches into a VXLAN EVPN fabric.
+
+**Topology** (8 nodes): SPINE1 and SPINE2 (`nxosv9000`), LEAF1 and LEAF2 (`nxosv9000`), and four small IOS hosts
+(`iol-xe`, or `iosv` with *Settings > Device images*): H1 and H3 in VLAN 10, H2 and H4 in VLAN 20, two on each leaf.
+Each leaf connects to both spines on routed /31 links (leaf `Ethernet1/1` to SPINE1, `Ethernet1/2` to SPINE2, hosts on
+`Ethernet1/3`/`Ethernet1/4`).
+
+**Resources:** 4 × nxosv9000 at about 12 GB RAM and 2 vCPUs each (the CML 2.9 default; 10 GB is the minimum) plus
+4 × IOL at about 1 GB, so **about 52 GB of CML RAM and 12 vCPUs** (50 GB with IOSv hosts). NX-OS takes 10-15 minutes
+to boot, so the build waits up to 25 minutes. The switch consoles show `login:`; the app logs in with your device
+username/password from Settings (default `cisco`/`cisco`), which it also writes into the NX-OS day-0 config.
+
+**The steps** (move back and forth freely; the progress bar shows which steps passed):
+
+| # | Step | What you do | Verified with |
+|---|---|---|---|
+| 1 | The fabric | Concepts: spine-and-leaf, VXLAN, VNI, VTEP, EVPN route types 2/3/5; cabling check | `show cdp neighbors` |
+| 2 | Underlay links | Routed ports (`no switchport`), MTU 9216, /31s, loopback0 (router ID) and loopback1 (VTEP) | `show ip interface brief`, `ping` |
+| 3 | Underlay OSPF | `feature ospf`, point-to-point links in area 0, ECMP over both spines | `show ip ospf neighbors`, `show ip route 10.0.1.12` |
+| 4 | Features | `nv overlay evpn`, `feature bgp`; leaves also `feature nv overlay` and `feature vn-segment-vlan-based` | `show feature` |
+| 5 | BGP EVPN | iBGP AS 65000, `l2vpn evpn` only, spines as route reflectors, `send-community extended` | `show bgp l2vpn evpn summary` |
+| 6 | VLAN to VNI | VLAN 10 = L2VNI 10010, VLAN 20 = L2VNI 10020, access ports, `evpn` with `rd auto` / `route-target auto` | `show vxlan`, `show vlan brief` |
+| 7 | NVE (VTEP) | `interface nve1`, `host-reachability protocol bgp`, source loopback1, `ingress-replication protocol bgp` | `show nve vni`, `show nve peers`, type-3 routes |
+| 8 | Extend the VLANs | H1 to H3 and H2 to H4 pings at Layer 2 across the fabric | MAC behind `nve1(10.0.1.12)`, type-2 MAC routes, `show l2route evpn mac all` |
+| 9 | L3VNI (optional) | VRF TENANT1 with L3VNI 50001, anycast gateway 2020.0000.00aa on Vlan10/20, symmetric IRB | MAC+IP type-2 and type-5 routes, `show ip route vrf TENANT1`, inter-VLAN ping |
+
+Then a **summary** page lists what you built and the complete config of every device, with copy buttons.
+
+- **Check this step** runs that step's checks: live console checks (falling back to config mode as usual) plus
+  config checks on the running config. **Check every step** checks them all in one pass.
+- **Apply this step for me** types the step's config into each device over the CML console (after a confirm). It
+  sends `exit` whenever the indentation leaves a sub-mode, starts each top-level block from global configuration mode,
+  and stops at the first line a device rejects, showing that line. Typing it yourself teaches more; this is for catching up.
+- Walkthroughs have no *Break my lab*, no exam mode and no score. They show a **walkthrough** badge, count as *completed*
+  once every required step passed (the optional step 9 doesn't count), appear in their own section on the Progress page,
+  and stay out of mastery and streaks. The CLI has `encorlab step 18-evpn-vxlan [N] [--check|--apply]`.
+- The **Data center** course (*Library & courses*) puts VRF-lite first, then the walkthrough. A standalone
+  `evpn-vxlan-walkthrough.encorlab` pack is attached to the v1.9.0 release for sharing (on 1.9.0 the lab is already built in).
+
+> **Not verified on real devices yet.** The expected outputs and the recorded outputs the checks are tested against
+> were written from Cisco's NX-OS 10.x VXLAN BGP EVPN documentation, not captured from a running Nexus 9000v, and
+> *Apply this step for me* has only been tested against a simulated NX-OS console. If a check fails on a correctly
+> built fabric, run it in *Config* grading mode and please report the device output.
+
+### RAM estimate and the RAM heavy tag
+Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node
+definition: `iol-xe`/`ioll2-xe` 1 GB, `iosv` 0.5 GB, `iosvl2` 0.75 GB, `csr1000v` 3 GB, `cat8000v` 4 GB, `nxosv9000`
+12 GB, `cat9000v` 18 GB, `iosxrv9000` 20 GB (unknown types count as 2 GB). A lab author can override it with `ram_gb:`
+in `lab.yaml`. The tag is neutral (`RAM ~4 GB`) for most labs; at or above the threshold in *Settings > Lab options*
+(default **16 GB**) it turns red and reads **RAM heavy · ~52 GB**, so it is not conveyed by color alone. Hover it for
+the breakdown. It appears in the lab list, on the lab page, in the **Build** confirmation (which now always asks
+first), in courses (a course shows its heaviest lab) and in the online library, for built-in and imported labs alike.
+Your server's node or image settings can differ, so treat it as an estimate.
+
 ### Break my lab (fault practice)
 **Break my lab** rebuilds the lab in CML from its *working* configuration (starting config + reference solution) plus one
 random predefined fault, such as a wrong HSRP key, a missing `ip nat outside`, an LACP member forced to `mode on`, or
@@ -407,6 +472,7 @@ The **Progress** page summarizes your results history and maps every lab to the
 - **Per domain and per blueprint item:** mastery, labs solved, and buttons that open the labs.
 - **Weakest topics**, **checks you fail most**, a 30-day **activity** chart and your **streak** (days in a row with a Check).
 - **Time spent**, estimated from the lab timer value sent with each Check.
+- **Walkthroughs** are listed separately (steps passed, completed) and are not part of mastery, solved labs or streaks.
 
 How a score counts: the best attempt per lab, minus 5 points per hint used. It is capped at 50% if you revealed the answer
 first, and exam attempts use the exam result. Labs never checked count as 0. Everything is computed locally from the
@@ -491,8 +557,9 @@ Everything can be set on the **Settings** page; `.env` / environment variables p
 | ENCOR_GRADING_MODE | auto | `auto`, `live` or `config` |
 | ENCOR_PLATFORM | iol | `iol` (IOL / IOL-L2, light) or `iosv` (IOSv / IOSvL2) |
 | ENCOR_NODE_LIMIT | 20 | Refuse to start a lab if it would exceed this many running nodes |
-| ENCOR_BOOT_TIMEOUT | 900 | Seconds to wait for nodes to boot |
-| ENCOR_DEVICE_USERNAME / _PASSWORD / _ENABLE | cisco | Used only if a device console asks for a login or enable password |
+| ENCOR_BOOT_TIMEOUT | 900 | Seconds to wait for nodes to boot (labs with NX-OS nodes wait at least 1500) |
+| ENCOR_RAM_HEAVY_GB | 16 | Labs estimated at or above this many GB of CML RAM get the red *RAM heavy* tag |
+| ENCOR_DEVICE_USERNAME / _PASSWORD / _ENABLE | cisco | Used if a device console asks for a login or enable password, and as the NX-OS day-0 login |
 | ENCOR_USER_LABS_DIR / ENCOR_DATA_DIR | settings folder | Where imported labs / results history are stored |
 | ENCOR_AI_BASE_URL / ENCOR_AI_MODEL / ENCOR_AI_API_KEY | - | Optional AI generator (OpenAI-compatible) |
 | ENCOR_CONSOLE_BACKEND | ssh | `ssh` (paramiko, all OSes) or `pyats` (Linux/macOS only, needs `pip install -e .[pyats]`) |
@@ -591,6 +658,7 @@ encorlab/                 the application (Python package)
   schema.py, templates.py lab schema + check templates    packs.py      .encorlab import/export/validation
   courses.py, library.py  .encorcourse + online library    faults.py     "Break my lab" faults (iosmerge.py: config merge)
   blueprint.py            ENCOR v1.2 exam topics           progress.py   progress dashboard
+  walkthrough.py          walkthrough steps: check/apply   sizing.py     RAM estimate per lab (RAM heavy tag)
   exam.py, snapshots.py   exam mode, config snapshots      updates.py    update check + patch verify/install/rollback
   install.py              install type (deb / linux-tar / windows-zip / source) and the matching full-download asset
   autoupdate.py           background update checker: ETag + backoff, staging, Update now / Later / Skip, idle gating
@@ -598,7 +666,7 @@ encorlab/                 the application (Python package)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders
-  labs/<id>/              18 built-in labs (lab.yaml, solution.cfg, fixture_*.yaml)
+  labs/<id>/              19 built-in labs (lab.yaml, solution.cfg, fixture_*.yaml; 18-evpn-vxlan is a walkthrough)
   web/                    FastAPI app, templates/index.html, static/ (app.js, help.js, help.json, style.css)
   resources/              authoring guide + example lab (source of docs/)
 docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example lab, images/
@@ -626,7 +694,7 @@ become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv
 After changing the schema, templates, guide or example, run `python -m encorlab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **1.8.1**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
+Current version: **1.9.0**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/encore-lab-app/releases) for downloads.
 
 ## License

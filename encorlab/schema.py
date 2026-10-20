@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .templates import expand_check
 
-from .platforms import MAX_PORTS, PLATFORMS, placeholders
+from .platforms import DEFINITIONS, MAX_PORTS, PLATFORMS, placeholders
 
 _NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,30}$")
 
@@ -24,12 +24,22 @@ class Node(_Strict):
     x: int = Field(default=0, description="Canvas X position in CML")
     y: int = Field(default=0, description="Canvas Y position in CML")
     config: str = Field(description="Starting IOS config (no hostname line needed). Use %if0%..%if3% for data interfaces")
+    definition: str | None = Field(default=None, description=(
+        "Optional explicit CML node definition instead of the platform profile's router/switch, e.g. 'nxosv9000' "
+        "(NX-OS 9000v, ports 0-3 = Ethernet1/1-1/4). Write literal interface names in its config, not %ifN%"))
 
     @field_validator("name")
     @classmethod
     def _name(cls, v):
         if not _NAME.match(v):
             raise ValueError(f"invalid node name {v!r}")
+        return v
+
+    @field_validator("definition")
+    @classmethod
+    def _definition(cls, v):
+        if v is not None and v not in DEFINITIONS:
+            raise ValueError(f"unknown node definition {v!r}; supported: {', '.join(sorted(DEFINITIONS))}")
         return v
 
 
@@ -107,9 +117,46 @@ class Fault(_Strict):
         return v
 
 
+class Verify(_Strict):
+    """A verification command shown in a walkthrough step, with what good output looks like."""
+    device: str
+    command: str = Field(description="Read-only 'show ...' or 'ping ...' command to run on the device")
+    expect: str = Field(description="Markdown: what to look for in good output (a short excerpt is fine)")
+
+    @model_validator(mode="after")
+    def _shape(self):
+        if not self.command.strip().startswith(("show ", "ping ")):
+            raise ValueError(f"verify command {self.command!r}: only read-only 'show'/'ping' commands allowed")
+        if not self.expect.strip():
+            raise ValueError(f"verify {self.command!r}: expect is required")
+        return self
+
+
+class Step(_Strict):
+    """One step of a walkthrough lab: why, the exact config per device, how to verify it, and optional checks."""
+    id: str = Field(description="Short unique id, e.g. 'underlay-ospf'")
+    title: str
+    explain: str = Field(description="Markdown: what this step builds and why (concepts first, concise)")
+    config: dict[str, str] = Field(default={}, description="device -> exact config for this step (copy buttons in the UI)")
+    verify: list[Verify] = Field(default=[], description="Verification commands with the expected output")
+    checks: list[Check] = Field(default=[], description="Checks run by 'Check this step' (live and/or config)")
+    optional: bool = Field(default=False, description="Optional step: not needed to complete the walkthrough")
+    apply: bool = Field(default=True, description="Offer 'Apply this step for me' (push the config over the console)")
+
+    @field_validator("id")
+    @classmethod
+    def _sid(cls, v):
+        if not re.match(r"^[a-z0-9][a-z0-9-]{1,40}$", v):
+            raise ValueError("step id must be lowercase letters, digits, dashes")
+        return v
+
+
 class Lab(_Strict):
     """One ENCOR practice lab."""
     id: str = Field(description="Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name")
+    type: Literal["challenge", "walkthrough"] = Field(default="challenge", description=(
+        "challenge (default): a graded task. walkthrough: a guided build in ordered `steps` (not graded; no "
+        "faults or exam mode; completion is tracked separately)"))
     title: str
     blueprint: list[str] = Field(description="ENCOR 350-401 v1.2 blueprint items, e.g. ['3.2.b']")
     domain: str = Field(description="Blueprint domain, e.g. '3.0 Infrastructure - Layer 3'")
@@ -119,7 +166,12 @@ class Lab(_Strict):
     nodes: list[Node]
     links: list[Link]
     task: str = Field(description="Markdown task text shown to the student")
-    checks: list[Check] = Field(description="Needs at least one live and one config check")
+    checks: list[Check] = Field(default=[], description=(
+        "Challenge labs: needs at least one live and one config check. Walkthroughs: leave empty and put the "
+        "checks in the steps"))
+    steps: list[Step] = Field(default=[], description="Walkthrough labs only: the ordered steps")
+    ram_gb: float | None = Field(default=None, gt=0, le=512, description=(
+        "Optional: CML server RAM the lab needs in GB. Default: estimated from the node definitions"))
     solution: dict[str, str] | None = Field(default=None, description="Optional reference solution: device -> config lines")
     solution_summary: str = Field(default="", description=(
         "Markdown shown after the lab is solved (or on 'Reveal solution'): the root cause / what was missing, "
@@ -166,10 +218,10 @@ class Lab(_Strict):
                 used.add((ep.node, ep.port))
             if ln.a.node == ln.b.node:
                 errs.append("self-link not allowed")
-        ids = [c.id for c in self.checks]
+        ids = [c.id for c in self.checks] + [c.id for st in self.steps for c in st.checks]
         if len(set(ids)) != len(ids):
             errs.append("duplicate check ids")
-        for c in self.checks:
+        for c in self.checks + [c for st in self.steps for c in st.checks]:
             if c.device not in names:
                 errs.append(f"check {c.id} references unknown device {c.device}")
         for dev in (self.solution or {}):
@@ -196,13 +248,75 @@ class Lab(_Strict):
             for idx in placeholders(n.config):
                 if idx >= MAX_PORTS:
                     errs.append(f"{n.name}: placeholder port {idx} out of range")
-        if not self.checks_for("live"):
-            errs.append("lab has no live checks")
-        if not self.checks_for("config"):
-            errs.append("lab has no config checks")
+            if n.definition and placeholders(n.config):
+                errs.append(f"{n.name}: write literal {n.definition} interface names, not %ifN% placeholders")
+        if self.type == "walkthrough":
+            errs.extend(self._walkthrough_errors(names))
+        else:
+            if self.steps:
+                errs.append("steps are only allowed in walkthrough labs (type: walkthrough)")
+            if not self.checks_for("live"):
+                errs.append("lab has no live checks")
+            if not self.checks_for("config"):
+                errs.append("lab has no config checks")
         if errs:
             raise ValueError("; ".join(errs))
         return self
+
+    def _walkthrough_errors(self, names: list[str]) -> list[str]:
+        errs = []
+        if len(self.steps) < 2:
+            errs.append("a walkthrough needs at least 2 steps")
+        if self.checks:
+            errs.append("walkthroughs keep their checks in the steps; leave the lab-level checks empty")
+        if self.faults:
+            errs.append("walkthroughs have no faults (Break my lab is for challenge labs)")
+        if self.solution:
+            errs.append("walkthroughs take their solution from the step configs; remove `solution`")
+        sids = [st.id for st in self.steps]
+        if len(set(sids)) != len(sids):
+            errs.append("duplicate step ids")
+        for st in self.steps:
+            for dev in list(st.config) + [v.device for v in st.verify]:
+                if dev not in names:
+                    errs.append(f"step {st.id} references unknown device {dev}")
+            if any(not v.strip() for v in st.config.values()):
+                errs.append(f"step {st.id}: empty config for a device")
+            for dev, cfg in st.config.items():
+                if dev in names and self.node(dev).definition and placeholders(cfg):
+                    errs.append(f"step {st.id}: write literal interface names for {dev}, not %ifN%")
+        req = [st for st in self.steps if not st.optional]
+        if not any(c.mode == "live" for st in req for c in st.checks):
+            errs.append("a walkthrough needs at least one live check in a required step")
+        return errs
+
+    @property
+    def is_walkthrough(self) -> bool:
+        return self.type == "walkthrough"
+
+    @property
+    def graded_checks(self) -> list[Check]:
+        """Lab checks, or for a walkthrough the checks of its required steps (optional steps are checked only by
+        their own 'Check this step')."""
+        if self.is_walkthrough:
+            return [c for st in self.steps if not st.optional for c in st.checks]
+        return list(self.checks)
+
+    def step(self, step_id: str) -> Step:
+        for st in self.steps:
+            if st.id == step_id:
+                return st
+        raise KeyError(step_id)
+
+    def step_solution(self, include_optional: bool = True) -> dict[str, str]:
+        """Walkthrough: device -> all step configs in order (the finished build)."""
+        out: dict[str, str] = {}
+        for st in self.steps:
+            if st.optional and not include_optional:
+                continue
+            for dev, cfg in st.config.items():
+                out[dev] = out.get(dev, "") + cfg.rstrip() + "\n"
+        return out
 
     @property
     def node_count(self) -> int:
@@ -215,8 +329,8 @@ class Lab(_Strict):
         raise KeyError(name)
 
     def checks_for(self, mode: str) -> list[Check]:
-        return [c for c in self.checks if c.mode == mode]
+        return [c for c in self.graded_checks if c.mode == mode]
 
     @property
     def total_points(self) -> int:
-        return sum(c.points for c in self.checks)
+        return sum(c.points for c in self.graded_checks)

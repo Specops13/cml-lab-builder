@@ -1,12 +1,18 @@
 "use strict";
 /* ENCOR Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "1.8.1";  // must equal encorlab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "1.9.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 const DOMAINS = ["1.0 Architecture", "2.0 Virtualization", "3.0 Infrastructure - Layer 2", "3.0 Infrastructure - Layer 3",
   "3.0 Infrastructure - Wireless", "3.0 Infrastructure - IP Services", "4.0 Network Assurance", "5.0 Security", "6.0 Automation"];
 let labs = [], current = null, templates = [], draft = null, draftSource = null, statusTimer = null;
+/* RAM estimate tag: neutral for every lab, red + the words "RAM heavy" at/above the Settings threshold (text, not only color). */
+function ramTag(r) {
+  if (!r) return "";
+  return `<span data-help="lab.ram" class="tag ram${r.heavy ? " ram-heavy" : ""}" title="${esc(r.tooltip)}">${r.heavy ? "RAM heavy · " : "RAM "}${esc(r.label)}</span>`;
+}
+const walkTag = (l) => l.type === "walkthrough" ? '<span class="tag walk">walkthrough</span>' : "";
 
 /* ---------------------------------------------------------------- error banner */
 function banner(msg) {
@@ -163,8 +169,10 @@ function renderList() {
   if (crs) { const order = crs.labs.map((x) => x.id); items = items.filter((l) => order.includes(l.id)).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); }
   $("#lab-list").innerHTML = items.map((l) => `<li data-help="lab.item" data-id="${esc(l.id)}" class="${l.id === current ? "sel" : ""}">
     <b>${esc(l.title)}</b><br>
-    <span class="tag">${"★".repeat(l.difficulty)}</span><span class="tag">${l.nodes} nodes</span><span class="tag">${esc(l.blueprint.join(", "))}</span>
-    ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : "")}
+    ${walkTag(l)}<span class="tag">${"★".repeat(l.difficulty)}</span><span class="tag">${l.nodes} nodes</span>${ramTag(l.ram)}<span class="tag">${esc(l.blueprint.join(", "))}</span>
+    ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${l.walkthrough
+      ? (l.walkthrough.completed ? '<span class="tag ok">completed</span>' : (l.walkthrough.required_passed ? `<span class="tag">${l.walkthrough.required_passed}/${l.walkthrough.required} steps</span>` : ""))
+      : (l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : ""))}
     <div class="muted small">${esc(l.summary)}</div></li>`).join("") || `<li class="muted">No labs match.</li>`;
   $$("#lab-list li[data-id]").forEach((li) => li.addEventListener("click", () => selectLab(li.dataset.id)));
 }
@@ -211,14 +219,14 @@ async function openLibrary(fetchIndex) {
 function renderCourses() {
   const box = $("#lib-courses"); if (!box) return;
   box.innerHTML = courseList.length ? courseList.map((c) => `<div class="course card" data-help="lib.course">
-    <div class="toolbar"><b>${esc(c.title)}</b><span class="tag">${c.solved}/${c.total} solved</span><span class="sep"></span>
+    <div class="toolbar"><b>${esc(c.title)}</b><span class="tag">${c.solved}/${c.total} done</span>${ramTag(c.ram)}<span class="sep"></span>
       ${c.next ? `<button data-help="lib.continue" class="primary" data-open="${esc(c.next)}">Continue: ${esc(c.next)}</button>` : '<span class="tag ok">complete</span>'}
       <button data-help="lib.filter" data-filter="${esc(c.id)}">Show in list</button>
       <button data-help="lib.removeCourse" class="danger" data-rmcourse="${esc(c.id)}" data-bundled="${c.bundled.length}">Remove</button></div>
     ${bar(c.pct)}
     ${c.description ? `<div class="muted small">${esc(c.description)}</div>` : ""}
     <ol>${c.labs.map((l) => `<li>${l.available ? `<a data-help="lib.courseLab" href="#" data-open="${esc(l.id)}">${esc(l.title)}</a>` : `${esc(l.id)} <span class="tag warn">missing</span>`}
-      ${l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : "")}</li>`).join("")}</ol></div>`).join("")
+      ${l.type === "walkthrough" ? walkTag(l) : ""}${ramTag(l.ram)}${l.solved ? `<span class="tag ok">${l.type === "walkthrough" ? "completed" : "solved"}</span>` : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : "")}</li>`).join("")}</ol></div>`).join("")
     : `<div class="muted">No courses yet. Install one from the online library below, or import a .encorcourse file.</div>`;
   $$("#lib-courses [data-open]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); selectLab(b.dataset.open); }));
   $$("#lib-courses [data-filter]").forEach((b) => b.addEventListener("click", () => { $("#f-course").value = b.dataset.filter; renderList(); }));
@@ -242,7 +250,8 @@ async function loadLibrary() {
     const idx = await api(`/api/library?url=${encodeURIComponent(url)}`);
     $("#lib-items").innerHTML = idx.items.length ? `<table><tr><th>Item</th><th>Type</th><th>Topics</th><th>Size</th><th></th></tr>${idx.items.map((it) => `<tr>
       <td><b>${esc(it.title)}</b><div class="muted small">${esc(it.description)}</div>${it.kind === "course" ? `<div class="muted small">Labs: ${esc(it.labs.join(", "))}</div>` : ""}</td>
-      <td><span class="tag">${it.kind}</span>${it.nodes ? `<span class="tag">${it.nodes} nodes</span>` : ""}${it.difficulty ? `<span class="tag">${"★".repeat(it.difficulty)}</span>` : ""}</td>
+      <td><span class="tag">${it.kind}</span>${it.type === "walkthrough" ? walkTag(it) : ""}${it.nodes ? `<span class="tag">${it.nodes} nodes</span>` : ""}${it.difficulty ? `<span class="tag">${"★".repeat(it.difficulty)}</span>` : ""}${it.ram_gb ? ramTag({heavy: it.ram_heavy, label: `~${Math.round(it.ram_gb)} GB`,
+        tooltip: `About ${Math.round(it.ram_gb)} GB of CML server RAM${it.kind === "course" ? " for its heaviest lab" : ""}, estimated from the CML 2.9 node-definition defaults.${it.ram_heavy ? " Marked RAM heavy (threshold in Settings)." : ""}`}) : ""}</td>
       <td>${esc(it.blueprint.join(", "))}</td><td class="small">${(it.size / 1024).toFixed(1)} KB</td>
       <td>${it.builtin ? '<span class="tag">built in</span>' : `<button data-help="lib.install" data-file="${esc(it.file)}" data-installed="${it.installed ? 1 : ""}" class="${it.installed ? "" : "primary"}">${it.installed ? "Reinstall" : "Install"}</button>`}</td></tr>`).join("")}</table>
       <div class="muted small" data-help="lib.integrity">Every download is checked against the sha256 and size in the index, then validated like an imported file.</div>`
@@ -287,9 +296,11 @@ setInterval(renderTimer, 1000);
 async function selectLab(id) {
   current = id; renderList();
   const l = await api(`/api/labs/${id}`);
+  currentLab = l;
+  if (l.type === "walkthrough") return renderWalkthrough(l);
   $("#lab-detail").innerHTML = `
     <div class="toolbar"><h2 style="margin:0">${esc(l.title)}</h2><span class="sep"></span>
-      <span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>
+      <span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
       ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}</div>
     <div class="toolbar">
       <button data-help="lab.build" id="a-build" class="primary">Build</button>${l.exam ? '<button data-help="lab.examSubmit" id="a-check" class="primary">Submit exam</button>' : '<button data-help="lab.check" id="a-check">Check</button>'}<button data-help="lab.hintNext" id="a-hint">Hint</button>
@@ -301,6 +312,7 @@ async function selectLab(id) {
       ${l.exam ? "" : `<button data-help="lab.edit" id="a-edit">Edit / copy</button><button data-help="lab.export" id="a-export">Export pack</button>`}
       ${l.source === "user" ? '<button data-help="lab.delete" id="a-delete" class="danger">Delete lab</button>' : ""}
     </div>
+    <div id="build-confirm"></div>
     <div class="statusbar"><span data-help="lab.status" class="muted"><span id="status">Status: …</span></span><div class="progress"><div id="boot-bar"></div></div>
       <span data-help="lab.timer">⏱ <span id="timer" class="timer">00:00:00</span></span><button data-help="lab.timerToggle" id="t-toggle" class="hint-btn">Start</button><button data-help="lab.timerReset" id="t-reset" class="hint-btn">Reset timer</button></div>
     ${l.fault ? `<section class="fault-box" data-help="lab.faultBox"><h3>Trouble ticket <span class="tag">fault practice</span></h3>
@@ -334,7 +346,7 @@ async function selectLab(id) {
     <details id="hist-box"><summary data-help="lab.history">History</summary><div id="history"></div></details>
     ${l.exam ? "" : `<div class="toolbar"><a data-help="lab.report" class="btn" href="/report/labs/${encodeURIComponent(l.id)}" target="_blank" rel="noopener">Print report ↗</a>
       <a data-help="lab.reportOutputs" class="btn" href="/report/labs/${encodeURIComponent(l.id)}?outputs=true" target="_blank" rel="noopener">Report with command output ↗</a></div>`}`;
-  $("#a-build").onclick = () => run("build");
+  $("#a-build").onclick = () => confirmBuild(l);
   $("#a-check").onclick = () => (l.exam ? confirm("Submit the exam now? It is graded once and the exam ends.") && run("check") : run("check"));
   currentExam = l.exam || null; currentHintsTotal = l.hints_total || 0;
   currentHints = l.exam ? (l.exam.hints_shown || []) : (l.hints || []);
@@ -510,7 +522,9 @@ async function run(kind, path) {
       if (kind === "reset") hintsSet(lab, 0);
       if (kind === "snapshot" || kind === "restore") { if (lab === current) loadSnapshots(); if (kind === "restore") toast("Snapshot restored: the lab rebooted with the saved configs", "ok", 7000); }
       if (kind === "break") { hintsSet(lab, 0); timerSet(lab, {acc: 0, start: Date.now()}); toast("Trouble ticket ready. Find and fix the fault.", "ok", 7000); if (lab === current) await selectLab(lab); }
-      if (kind === "check" && j.result && lab === current) {
+      if ((kind === "step-check" || kind === "step-apply") && lab === current) await afterStepJob(kind, j.result);
+      if (kind === "check" && j.result && lab === current && j.result.walkthrough) { await afterStepJob("step-check", j.result); }
+      else if (kind === "check" && j.result && lab === current) {
         if (j.result.fault_fixed || j.result.exam) { hintsSet(lab, 0); await selectLab(lab); }
         if (j.result.exam) { timerPause(lab); toast(`Exam submitted: ${j.result.exam.final_pct}% (${j.result.exam.passed ? "PASS" : "below target"})`, j.result.exam.passed ? "ok" : "err", 8000); }
         showResults(j.result); if (j.result.passed) { timerPause(lab); toast(j.result.fault_fixed ? "Fault fixed!" : "Lab solved!", "ok"); } loadHistory(); loadLabs(); }
@@ -559,6 +573,134 @@ async function loadHistory() {
   if ($("#hist-clear")) $("#hist-clear").onclick = async () => { await api(`/api/history/${current}`, {method: "DELETE"}); loadHistory(); loadLabs(); };
 }
 
+/* ---------------------------------------------------------------- build confirmation (shows the RAM estimate) */
+let currentLab = null;
+function confirmBuild(l) {
+  const box = $("#build-confirm"); if (!box) return run("build");
+  const r = l.ram || {};
+  box.innerHTML = `<section class="${r.heavy ? "build-box heavy" : "build-box"}" data-help="lab.buildBox"><p><b>Build "${esc(l.title)}" in CML?</b> ${ramTag(r)}</p>
+    <p class="small">${l.nodes} nodes. ${esc(r.tooltip || "")}${r.vcpus ? ` About ${r.vcpus} vCPUs.` : ""}${r.heavy ? " Make sure your CML server has that much free memory before you start it." : ""}</p>
+    <div class="toolbar"><button data-help="lab.buildGo" id="bc-go" class="primary">Build</button><button data-help="lab.buildCancel" id="bc-cancel" class="hint-btn">Cancel</button></div></section>`;
+  $("#bc-go").onclick = () => { box.innerHTML = ""; run("build"); };
+  $("#bc-cancel").onclick = () => { box.innerHTML = ""; };
+}
+
+/* ---------------------------------------------------------------- walkthrough labs: guided, ordered steps */
+let walk = null;   // {lab, status, index}
+function renderWalkthrough(l) {
+  walk = {lab: l, status: l.walkthrough, index: Math.min(l.walkthrough.current, l.steps.length)};
+  $("#lab-detail").innerHTML = `
+    <div class="toolbar"><h2 style="margin:0">${esc(l.title)}</h2><span class="sep"></span>
+      ${walkTag(l)}<span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
+      ${l.source === "user" ? '<span class="tag user">imported</span>' : ""}</div>
+    <div class="toolbar">
+      <button data-help="lab.build" id="a-build" class="primary">Build</button>
+      <button data-help="w.checkAll" id="w-check-all">Check every step</button>
+      <button data-help="lab.reset" id="a-reset">Reset</button><button data-help="lab.destroy" id="a-destroy" class="danger">Destroy</button>
+      <button data-help="w.restart" id="w-restart" class="hint-btn">Restart walkthrough</button>
+      <span class="sep"></span>
+      <button data-help="lab.edit" id="a-edit">Edit / copy</button><button data-help="lab.export" id="a-export">Export pack</button>
+      ${l.source === "user" ? '<button data-help="lab.delete" id="a-delete" class="danger">Delete lab</button>' : ""}
+    </div>
+    <div id="build-confirm"></div>
+    <div class="statusbar"><span data-help="lab.status" class="muted"><span id="status">Status: …</span></span><div class="progress"><div id="boot-bar"></div></div></div>
+    <details class="walk-intro"${walk.index === 0 ? " open" : ""}><summary data-help="w.intro">About this walkthrough</summary><div class="task md">${md(l.task)}</div></details>
+    <div id="walk-progress" class="walk-progress"></div>
+    <section id="walk-step" class="walk-step"></section>
+    <h3 data-help="lab.activity">Activity</h3><pre id="log" class="log">-</pre>
+    <details id="cons-box" hidden><summary data-help="lab.consoles">Consoles</summary><div id="consoles"></div></details>`;
+  $("#a-build").onclick = () => confirmBuild(l);
+  $("#w-check-all").onclick = () => run("step-check", `/api/labs/${l.id}/walkthrough/check-all`);
+  $("#a-reset").onclick = () => confirm("Reset wipes all device configs back to the starting point (hostname and logins only). Your walkthrough progress is kept. Continue?") && run("reset");
+  $("#a-destroy").onclick = () => confirm("Delete this lab from CML?") && run("destroy");
+  $("#w-restart").onclick = async () => {
+    if (!confirm("Clear the step results and go back to step 1? (Device configs are not touched.)")) return;
+    walk.status = await api(`/api/labs/${l.id}/walkthrough/reset`, {method: "POST"}); walk.index = 0; renderWalkStep(); loadLabs();
+  };
+  $("#a-edit").onclick = () => openInBuilder(l.id);
+  $("#a-export").onclick = () => { location.href = `/api/labs/${encodeURIComponent(l.id)}/export`; };
+  if ($("#a-delete")) $("#a-delete").onclick = async () => {
+    if (!confirm(`Delete imported lab "${l.title}" from this app? (It is not removed from CML.)`)) return;
+    try { await api(`/api/user-labs/${l.id}`, {method: "DELETE"}); toast("Lab deleted", "ok"); current = null;
+      $("#lab-detail").innerHTML = '<div class="empty">Select a lab, or import one.</div>'; loadLabs(); } catch (e) { toast(e.message, "err"); }
+  };
+  renderWalkStep(); refreshStatus();
+}
+function walkStepState(i) {
+  const st = walk.status.steps[i] || {};
+  return st.passed === true ? "ok" : st.passed === false ? "bad" : "";
+}
+function renderWalkProgress() {
+  const l = walk.lab, s = walk.status, n = l.steps.length;
+  $("#walk-progress").innerHTML = `<div class="toolbar"><b data-help="w.progress">${walk.index >= n ? `Summary (after step ${n})` : `Step ${walk.index + 1} of ${n}`}</b>
+      <span class="muted small">${s.required_passed}/${s.required} required steps checked${s.completed ? " · <span class=\"pass\">walkthrough completed</span>" : ""}</span></div>
+    <div class="pbar wide" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(100 * walk.index / n)}"><div style="width:${Math.round(100 * Math.min(walk.index, n) / n)}%"></div></div>
+    <ol class="walk-steps">${l.steps.map((st, i) => `<li class="${i === walk.index ? "cur " : ""}${walkStepState(i)}"><button data-help="w.jump" class="hint-btn" data-step="${i}" title="${esc(st.title)}">${i + 1}${walkStepState(i) === "ok" ? " ✓" : walkStepState(i) === "bad" ? " ✗" : ""}${st.optional ? " (opt.)" : ""}</button></li>`).join("")}
+      <li class="${walk.index >= n ? "cur" : ""}"><button data-help="w.summary" class="hint-btn" data-step="${n}">Summary</button></li></ol>`;
+  $$("#walk-progress [data-step]").forEach((b) => b.onclick = () => walkGo(Number(b.dataset.step)));
+}
+async function walkGo(i) {
+  const n = walk.lab.steps.length;
+  walk.index = Math.max(0, Math.min(i, n)); renderWalkStep();
+  try { walk.status = await api(`/api/labs/${walk.lab.id}/walkthrough/step?index=${walk.index}`, {method: "POST"}); renderWalkProgress(); } catch (e) { /* position is a convenience */ }
+}
+function cfgBlock(dev, text, whole) {
+  const btn = whole ? `<button data-help="w.copyAll" class="hint-btn" data-copy="${esc(text)}">Copy all of ${esc(dev)}</button>`
+    : `<button data-help="w.copy" class="hint-btn" data-copy="${esc(text)}">Copy ${esc(dev)} config</button>`;
+  return `<div class="cfg"><div class="toolbar"><b>${esc(dev)}</b>${btn}</div><pre class="code">${esc(text)}</pre></div>`;
+}
+function renderWalkStep() {
+  renderWalkProgress();
+  const l = walk.lab, n = l.steps.length, i = walk.index, box = $("#walk-step");
+  const nav = `<div class="toolbar walk-nav"><button data-help="w.prev" id="w-prev" ${i === 0 ? "disabled" : ""}>← Previous</button><span class="sep"></span>
+    <button data-help="w.next" id="w-next" class="primary" ${i >= n ? "disabled" : ""}>${i === n - 1 ? "Summary →" : "Next →"}</button></div>`;
+  if (i >= n) {
+    const fs = l.final_summary || {devices: {}, text: ""};
+    box.innerHTML = `<h3 data-help="w.summaryView">Summary: the whole build</h3>
+      ${walk.status.completed ? '<p class="pass">Walkthrough completed: every required step has passed its checks.</p>' : `<p class="note">${walk.status.required - walk.status.required_passed} required step(s) not checked yet. Use <b>Check every step</b> to check them all at once.</p>`}
+      <div class="md">${md(fs.text)}</div>
+      <h4>Complete config per device</h4>
+      ${Object.entries(fs.devices).map(([dev, parts]) => cfgBlock(dev, parts.map((p) => `! --- ${p.title}${p.optional ? " (optional)" : ""}\n${p.config}`).join(""), true)).join("")}
+      ${nav}`;
+  } else {
+    const st = l.steps[i], r = walk.status.steps[i] || {};
+    box.innerHTML = `<h3>${i + 1}. ${esc(st.title)} ${st.optional ? '<span class="tag">optional</span>' : ""}
+        ${r.passed === true ? '<span class="tag ok">checked ✓</span>' : r.passed === false ? '<span class="tag bad">not passing yet</span>' : ""}${r.applied_at ? '<span class="tag">applied for you</span>' : ""}</h3>
+      <div class="md">${md(st.explain)}</div>
+      ${Object.keys(st.config).length ? `<h4 data-help="w.config">Configuration</h4>${Object.entries(st.config).map(([d, c]) => cfgBlock(d, c, false)).join("")}` : ""}
+      ${st.verify.length ? `<h4 data-help="w.verify">Verify</h4><table><tr><th>Device</th><th>Command</th><th>Good output looks like</th></tr>${st.verify.map((v) => `<tr>
+        <td>${esc(v.device)}</td><td><code class="cmd">${esc(v.command)}</code> <button data-help="w.copyCmd" class="hint-btn" data-copy="${esc(v.command)}">Copy</button></td><td class="md small">${md(v.expect)}</td></tr>`).join("")}</table>` : ""}
+      <div class="toolbar">${st.checks.length ? `<button data-help="w.check" id="w-check" class="primary">Check this step</button><span class="muted small">${st.checks.length} check(s): ${st.checks.filter((c) => c.mode === "live").length} live, ${st.checks.filter((c) => c.mode === "config").length} config</span>` : '<span class="muted small">Nothing to check in this step: read it and move on.</span>'}
+        ${st.apply ? '<button data-help="w.apply" id="w-apply" class="warn">Apply this step for me</button>' : ""}</div>
+      <div id="w-results"></div>
+      ${nav}`;
+    if ($("#w-check")) $("#w-check").onclick = () => run("step-check", `/api/labs/${l.id}/steps/${encodeURIComponent(st.id)}/check`);
+    if ($("#w-apply")) $("#w-apply").onclick = () => confirm(`Type the configuration of this step into ${Object.keys(st.config).join(", ")} over the CML console?\n\nThe lab must be built and booted. Typing it yourself teaches more; this is for catching up.`) &&
+      run("step-apply", `/api/labs/${l.id}/steps/${encodeURIComponent(st.id)}/apply`);
+  }
+  $$("#walk-step [data-copy]").forEach((b) => b.onclick = async () => toast(await copyText(b.dataset.copy) ? "Copied" : "Could not copy", "ok"));
+  $("#w-prev").onclick = () => walkGo(i - 1);
+  $("#w-next").onclick = () => walkGo(i + 1);
+}
+async function afterStepJob(kind, res) {
+  if (!walk || walk.lab.id !== current) return;
+  if (kind === "step-apply") {
+    toast(`Applied on ${(res && res.applied || []).join(", ")}. Give the protocols a moment, then click Check this step.`, "ok", 8000);
+    walk.status = await api(`/api/labs/${walk.lab.id}/walkthrough`); renderWalkStep(); return;
+  }
+  if (res && res.walkthrough) walk.status = res.walkthrough;
+  const was = walk.index; renderWalkStep();
+  if (res && $("#w-results") && (res.step || was < walk.lab.steps.length)) {
+    $("#w-results").innerHTML = `<p><b>${res.passed ? '<span class="pass">Step passed</span>' : '<span class="fail">Not there yet</span>'}</b> ${res.earned}/${res.total} · mode ${esc(res.mode)}</p>
+      ${(res.notes || []).map((x) => `<p class="note">${esc(x)}</p>`).join("")}
+      <table>${res.results.map((c) => `<tr><td class="${c.passed ? "pass" : "fail"}">${c.passed ? "PASS" : "FAIL"}</td><td>${esc(c.device)}</td>
+        <td>${esc(c.description)}<br><code class="small">${esc(c.command)}</code></td><td class="small">${c.passed ? "" : esc(c.hint)}
+        <details><summary data-help="lab.output">output</summary><pre class="log">${esc(c.output)}</pre></details></td></tr>`).join("")}</table>`;
+  }
+  if (res && res.walkthrough && res.walkthrough.completed && !res.step) toast("Every required step passes: walkthrough completed!", "ok", 8000);
+  loadLabs();
+}
+
 /* ---------------------------------------------------------------- progress dashboard */
 const fmtDur = (s) => `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, "0")}m`;
 const bar = (pct) => `<div class="pbar"><div style="width:${Math.max(0, Math.min(100, pct || 0))}%"></div></div>`;
@@ -576,6 +718,10 @@ async function loadProgress() {
       <div class="kpi" data-help="p.streak"><b>${st.current} day${st.current === 1 ? "" : "s"}</b><span>streak (longest ${st.longest})</span></div>
       <div class="kpi" data-help="p.time"><b>${fmtDur(o.time_spent_s)}</b><span>time spent</span></div>
       <div class="kpi" data-help="p.faults"><b>${o.faults_fixed}</b><span>faults fixed</span></div></div>
+    ${p.walkthroughs && p.walkthroughs.total ? `<h3 data-help="p.walkthroughs">Walkthroughs <span class="muted small">(${p.walkthroughs.completed}/${p.walkthroughs.total} completed, not part of mastery)</span></h3>
+      <table><tr><th>Walkthrough</th><th>Steps checked</th><th></th><th>Status</th><th></th></tr>${p.walkthroughs.labs.map((w) => `<tr><td>${esc(w.title)}</td>
+        <td>${w.required_passed}/${w.required}</td><td>${bar(w.pct)}</td><td>${w.completed ? '<span class="tag ok">completed</span>' : w.started ? '<span class="tag">in progress</span>' : '<span class="muted small">not started</span>'}</td>
+        <td>${labBtns([w.id])}</td></tr>`).join("")}</table>` : ""}
     <h3 data-help="p.domains">Exam domains <span class="muted small">(${esc(p.blueprint)})</span></h3>
     <table><tr><th>Domain</th><th>Weight</th><th>Mastery</th><th></th><th>Solved</th><th>Labs</th></tr>${p.domains.map((d) => `<tr>
       <td>${esc(d.id)} ${esc(d.name)}</td><td>${d.weight}%</td>${d.labs ? `<td>${d.mastery_pct}%</td><td>${bar(d.mastery_pct)}</td><td>${d.solved}/${d.labs}</td><td>${labBtns(d.lab_ids)}</td>`
@@ -628,8 +774,8 @@ function renderForm() {
   const d = draft; const names = d.nodes.map((n) => n.name);
   const nodeOpts = (sel) => names.map((n) => `<option ${n === sel ? "selected" : ""}>${esc(n)}</option>`).join("");
   const portOpts = (sel) => [0, 1, 2, 3].map((p) => `<option value="${p}" ${p === sel ? "selected" : ""}>port ${p} (%if${p}%)</option>`).join("");
-  d.solution ??= {};
-  $("#tab-form").innerHTML = `
+  if (d.type !== "walkthrough") d.solution ??= {};
+  $("#tab-form").innerHTML = `${d.type === "walkthrough" ? `<p class="note">This is a walkthrough lab (${(d.steps || []).length} steps). Edit the steps (explanation, config per device, verify commands, checks) in the YAML tab; the form covers the general fields, nodes and links.</p>` : ""}
   <fieldset><legend>General</legend><div class="grid">
     ${field("f.id", "Lab id", "id", d.id)}${field("f.title", "Title", "title", d.title)}
     <label>Domain<input data-help="f.domain" data-path="domain" list="domains" value="${esc(d.domain)}"><datalist id="domains">${DOMAINS.map((x) => `<option>${esc(x)}</option>`).join("")}</datalist></label>
@@ -805,7 +951,7 @@ async function loadSettings() {
   loadUpdateStatus().catch(() => {});
   const s = await api("/api/settings");
   const f = $("#settings-form");
-  for (const k of ["cml_url", "username", "console_host", "console_port", "grading_mode", "platform", "node_limit", "ai_base_url", "ai_model"]) f[k].value = s[k] ?? "";
+  for (const k of ["cml_url", "username", "console_host", "console_port", "grading_mode", "platform", "node_limit", "ram_heavy_gb", "ai_base_url", "ai_model"]) f[k].value = s[k] ?? "";
   f.verify_tls.value = s.verify_tls === false ? "false" : "true";
   f.show_help.checked = s.show_help !== false; if (window.Help) Help.setVisible(f.show_help.checked);
   f.check_updates.checked = s.check_updates === true;
@@ -820,7 +966,7 @@ $("#settings-form").addEventListener("submit", async (e) => {
   const f = e.target;
   const body = {cml_url: f.cml_url.value, username: f.username.value, password: f.password.value, verify_tls: f.verify_tls.value,
     console_host: f.console_host.value, console_port: Number(f.console_port.value) || 22, grading_mode: f.grading_mode.value,
-    platform: f.platform.value, node_limit: Number(f.node_limit.value) || 20, remember_password: f.remember_password.checked,
+    platform: f.platform.value, node_limit: Number(f.node_limit.value) || 20, ram_heavy_gb: Number(f.ram_heavy_gb.value) || 16, remember_password: f.remember_password.checked,
     ai_preset: f.ai_preset.value, ai_base_url: f.ai_base_url.value, ai_model: f.ai_model.value, ai_api_key: f.ai_api_key.value,
     remember_ai_key: f.remember_ai_key.checked, show_help: f.show_help.checked, check_updates: f.check_updates.checked};
   try {

@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
-from .platforms import get as get_platform
+from .platforms import get as get_platform, node_def
 from .render import full_config, lab_title, to_yaml
 from .schema import Lab
 
@@ -118,6 +118,27 @@ class CML:
                 f"starting {lab.node_count} nodes would exceed the node limit "
                 f"({running} already running, limit {self.s.node_limit}); stop another lab first")
 
+    def creds(self) -> tuple[str, str]:
+        return (self.s.device_username or "cisco", self.s.device_password or "cisco")
+
+    def boot_timeout(self, lab: Lab) -> int:
+        need = [d.boot_s for n in lab.nodes if (d := node_def(n.definition))]
+        return max([self.s.boot_timeout, *need])
+
+    def check_definitions(self, lab: Lab) -> None:
+        """Fail early with a clear message when the lab needs a node definition this CML server lacks."""
+        wanted = sorted({n.definition for n in lab.nodes if n.definition})
+        if not wanted:
+            return
+        try:
+            have = {d.get("id") for d in self.client.definitions.node_definitions()}
+        except Exception:
+            return  # older client/server: let the import report it
+        missing = [w for w in wanted if w not in have]
+        if missing:
+            raise CMLError(f"this lab needs the CML node definition(s) {', '.join(missing)}, which this server "
+                           "does not have; install the image from the CML reference platform ISO first")
+
     def build(self, lab: Lab, start: bool = True, rebuild: bool = False,
               progress: Callable[[str], None] = lambda m: None, solution: dict | None = None,
               title: str | None = None):
@@ -129,8 +150,10 @@ class CML:
             self._destroy(existing)
             existing = None
         if existing is None:
+            self.check_definitions(lab)
             progress(f"Importing topology ({plat.name} profile)")
-            cl = self.client.import_lab(to_yaml(lab, plat, self.s.lab_prefix, solution=solution, title=title), title=title)
+            cl = self.client.import_lab(to_yaml(lab, plat, self.s.lab_prefix, solution=solution, title=title,
+                                                creds=self.creds()), title=title)
         else:
             progress("Lab already exists in CML; reusing it (use rebuild to recreate)")
             cl = existing
@@ -138,11 +161,12 @@ class CML:
             self.check_capacity(lab, cl)
             progress("Starting nodes")
             cl.start(wait=False)
-            self.wait_booted(cl, progress)
+            self.wait_booted(cl, progress, self.boot_timeout(lab))
         return cl
 
-    def wait_booted(self, cl, progress: Callable[[str], None] = lambda m: None) -> None:
-        deadline = time.monotonic() + self.s.boot_timeout
+    def wait_booted(self, cl, progress: Callable[[str], None] = lambda m: None, timeout: int | None = None) -> None:
+        timeout = timeout or self.s.boot_timeout
+        deadline = time.monotonic() + timeout
         while True:
             if cl.has_converged():
                 states = {n.label: n.state for n in cl.nodes()}
@@ -153,7 +177,7 @@ class CML:
                 states = {n.label: n.state for n in cl.nodes()}
             progress("Waiting for boot: " + ", ".join(f"{k}={v}" for k, v in sorted(states.items())))
             if time.monotonic() > deadline:
-                raise CMLError(f"nodes did not boot within {self.s.boot_timeout}s: {states}")
+                raise CMLError(f"nodes did not boot within {timeout}s: {states}")
             self._sleep(10)
 
     def reset(self, lab: Lab, progress: Callable[[str], None] = lambda m: None, extra: dict | None = None,
@@ -175,11 +199,11 @@ class CML:
         names = {n.name for n in lab.nodes}
         for n in cl.nodes():
             if n.label in names:
-                n.configuration = configs[n.label] if configs and configs.get(n.label) else full_config(lab, n.label, plat, extra)
+                n.configuration = configs[n.label] if configs and configs.get(n.label) else full_config(lab, n.label, plat, extra, self.creds())
         self.check_capacity(lab, cl)
         progress("Starting nodes")
         cl.start(wait=False)
-        self.wait_booted(cl, progress)
+        self.wait_booted(cl, progress, self.boot_timeout(lab))
         return cl
 
     def destroy(self, lab: Lab, progress: Callable[[str], None] = lambda m: None, title: str | None = None) -> bool:

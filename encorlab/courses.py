@@ -146,8 +146,12 @@ def _load(path: Path) -> dict | None:
         return None
 
 
-def list_courses(best: dict[str, float | None] | None = None) -> list[dict]:
-    """Installed courses with per-lab availability and best score (best: {lab_id: best_pct})."""
+def list_courses(best: dict[str, float | None] | None = None, platform: str = "iol",
+                 heavy_gb: float = 16) -> list[dict]:
+    """Installed courses with per-lab availability and best score (best: {lab_id: best_pct}; a completed
+    walkthrough counts as 100), lab type and estimated RAM (the course's ram is its heaviest lab: labs run one
+    at a time)."""
+    from . import sizing
     best = best or {}
     known = catalog.entries()
     out = []
@@ -161,14 +165,21 @@ def list_courses(best: dict[str, float | None] | None = None) -> list[dict]:
             e = known.get(lid)
             b = best.get(lid)
             labs.append({"id": lid, "title": e.lab.title if e else lid, "available": e is not None,
-                         "best": b, "solved": b is not None and b >= 100})
+                         "best": b, "solved": b is not None and b >= 100,
+                         "type": e.lab.type if e else None,
+                         "ram": _ram_brief(sizing.estimate(e.lab, platform, heavy_gb)) if e else None})
         done = sum(1 for x in labs if x["solved"])
         nxt = next((x["id"] for x in labs if x["available"] and not x["solved"]), None)
         out.append({"id": c["id"], "title": c["title"], "description": c.get("description", ""),
                     "author": c.get("author", ""), "version": c.get("version", ""), "labs": labs,
                     "solved": done, "total": len(labs), "pct": round(100 * done / len(labs)), "next": nxt,
-                    "bundled": c.get("bundled", [])})
+                    "bundled": c.get("bundled", []),
+                    "ram": max((x["ram"] for x in labs if x["ram"]), key=lambda r: r["gb"], default=None)})
     return out
+
+
+def _ram_brief(r: dict) -> dict:
+    return {k: r[k] for k in ("gb", "label", "heavy", "tooltip", "source")}
 
 
 def delete(course_id: str, remove_labs: bool = False) -> list[str]:

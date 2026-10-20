@@ -12,7 +12,7 @@ import re
 from typing import Callable
 from urllib.parse import urljoin, urlparse
 
-from . import catalog, courses, packs
+from . import catalog, courses, packs, sizing
 
 DEFAULT_INDEX = "https://raw.githubusercontent.com/Specops13/encore-lab-app/main/labs/index.json"
 MAX_INDEX_BYTES = 1024 * 1024
@@ -86,12 +86,16 @@ def parse_index(raw: bytes) -> list[dict]:
                     "blueprint": [str(x) for x in it.get("blueprint", [])][:20],
                     "nodes": it.get("nodes") if isinstance(it.get("nodes"), int) else None,
                     "difficulty": it.get("difficulty") if isinstance(it.get("difficulty"), int) else None,
+                    "ram_gb": float(it["ram_gb"]) if isinstance(it.get("ram_gb"), (int, float)) and 0 < it["ram_gb"] <= 4096 else None,
+                    "type": it.get("type") if it.get("type") in ("challenge", "walkthrough") else None,
                     "labs": [str(x) for x in it.get("labs", [])][:courses.MAX_LABS]})
     return out
 
 
-def index(url: str = DEFAULT_INDEX, fetch: Fetcher = http_fetch) -> dict:
+def index(url: str = DEFAULT_INDEX, fetch: Fetcher = http_fetch, *, heavy_gb: float = 16) -> dict:
     items = parse_index(fetch(_check_url(url), MAX_INDEX_BYTES))
+    for it in items:
+        it["ram_heavy"] = it["ram_gb"] is not None and it["ram_gb"] >= heavy_gb
     labs = catalog.entries()
     installed_courses = {c["id"] for c in courses.list_courses()}
     for it in items:
@@ -162,10 +166,19 @@ def build_index(folder, base_items: list[dict] | None = None) -> dict:
         if f.name.endswith(courses.COURSE_EXT):
             c, bundled = courses.read_course(data)
             it.update(kind="course", id=c.id, title=c.title, description=c.description, labs=c.labs)
+            labs_by_id = {lid: e.lab for lid, e in catalog.entries().items()}
+            for bp in bundled.values():
+                bl, _ = packs.parse_lab_text(bp.lab_yaml)
+                labs_by_id[bl.id] = bl
+            rams = [sizing.estimate(labs_by_id[lid], labs_by_id[lid].platforms[0])["gb"]
+                    for lid in c.labs if lid in labs_by_id]
+            if rams:
+                it["ram_gb"] = max(rams)
         else:
             pk = packs.read_upload(f.name, data)
             lab, _ = packs.parse_lab_text(pk.lab_yaml)
             it.update(kind="lab", id=lab.id, title=lab.title, description=lab.summary, blueprint=lab.blueprint,
-                      nodes=len(lab.nodes), difficulty=lab.difficulty)
+                      nodes=len(lab.nodes), difficulty=lab.difficulty, type=lab.type,
+                      ram_gb=sizing.estimate(lab, lab.platforms[0])["gb"])
         items.append(it)
     return {"format": 1, "items": items}

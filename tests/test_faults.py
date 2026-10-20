@@ -45,7 +45,7 @@ def test_merge_isakmp_key_per_peer_and_secondary_ip():
 
 
 # ---------------------------------------------------------------- built-in faults
-BUILTIN = [lid for lid, e in catalog.entries().items() if e.source == "builtin"]
+BUILTIN = [lid for lid, e in catalog.entries().items() if e.source == "builtin" and not e.lab.is_walkthrough]  # walkthroughs have no faults
 
 
 @pytest.mark.parametrize("lab_id", BUILTIN)

@@ -63,7 +63,7 @@ def test_prompt_is_self_contained():
 
 def test_json_schema_validates_example_shape():
     s = prompt.json_schema()
-    assert s["type"] == "object" and {"id", "nodes", "checks", "task"} <= set(s["required"])
+    assert s["type"] == "object" and {"id", "nodes", "task"} <= set(s["required"])
     assert "Check" in json.dumps(s["$defs"])
 
 

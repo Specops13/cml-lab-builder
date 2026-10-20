@@ -39,6 +39,7 @@ class Settings:
     node_limit: int = 20
     lab_prefix: str = "ENCOR-"
     boot_timeout: int = 900
+    ram_heavy_gb: int = 16          # labs estimated at or above this many GB of CML RAM get a red "RAM heavy" tag
     device_username: str = "cisco"
     device_password: str = field(default="cisco", repr=False)
     device_enable: str = field(default="cisco", repr=False)
@@ -87,6 +88,8 @@ class Settings:
             errs.append("console_backend must be 'ssh' or 'pyats'")
         if not (1 <= int(self.node_limit) <= 1000):
             errs.append("node_limit must be between 1 and 1000")
+        if not (1 <= int(self.ram_heavy_gb) <= 1024):
+            errs.append("ram_heavy_gb must be between 1 and 1024")
         if self.cml_url and urlparse(self.cml_url).scheme not in ("https", "http"):
             errs.append("cml_url must start with https://")
         return errs
@@ -107,6 +110,7 @@ def from_env(env: dict | None = None) -> Settings:
     s.node_limit = int(e.get("ENCOR_NODE_LIMIT", s.node_limit))
     s.lab_prefix = e.get("ENCOR_LAB_PREFIX", s.lab_prefix)
     s.boot_timeout = int(e.get("ENCOR_BOOT_TIMEOUT", s.boot_timeout))
+    s.ram_heavy_gb = int(e.get("ENCOR_RAM_HEAVY_GB", s.ram_heavy_gb))
     s.device_username = e.get("ENCOR_DEVICE_USERNAME", s.device_username)
     s.device_password = e.get("ENCOR_DEVICE_PASSWORD", s.device_password)
     s.device_enable = e.get("ENCOR_DEVICE_ENABLE", s.device_enable)
@@ -127,7 +131,7 @@ def from_env(env: dict | None = None) -> Settings:
 # Non-secret settings saved from the web Settings page. Passwords are never written here.
 PERSISTED = ("cml_url", "username", "verify_tls", "console_host", "console_port", "grading_mode",
              "platform", "node_limit", "boot_timeout", "ai_preset", "ai_base_url", "ai_model", "show_help",
-             "check_updates")
+             "check_updates", "ram_heavy_gb")
 
 
 def settings_file(env=None) -> Path:
@@ -203,7 +207,7 @@ class SettingsStore:
                     raise ValueError(f"unknown setting {k}")
                 if k in SECRETS and v in (None, ""):
                     continue  # empty = keep existing secret
-                if k in ("console_port", "node_limit", "boot_timeout"):
+                if k in ("console_port", "node_limit", "boot_timeout", "ram_heavy_gb"):
                     v = int(v)
                 if k == "verify_tls" and isinstance(v, str):
                     v = _bool_or_path(v, True)

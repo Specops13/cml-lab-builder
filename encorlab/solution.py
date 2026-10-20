@@ -36,7 +36,7 @@ def hints(lab: Lab, plat: Platform) -> list[str]:
         src = lab.hints
     else:
         src, seen = [], set()
-        for c in lab.checks:
+        for c in lab.graded_checks:
             if c.hint and c.hint not in seen:
                 seen.add(c.hint)
                 src.append(c.hint)

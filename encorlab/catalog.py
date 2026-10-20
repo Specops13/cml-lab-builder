@@ -129,6 +129,8 @@ def format_solution_cfg(sol: dict[str, str]) -> str:
 
 def load_solution(lab_id: str) -> dict[str, str]:
     e = entry(lab_id)
+    if e.lab.is_walkthrough:
+        return e.lab.step_solution()
     f = e.path / "solution.cfg"
     if f.exists():
         return parse_solution_cfg(f.read_text(encoding="utf-8"))

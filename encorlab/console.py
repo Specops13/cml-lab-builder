@@ -18,6 +18,39 @@ log = logging.getLogger(__name__)
 PROMPT_RE = re.compile(r"(?:^|[\r\n])([A-Za-z0-9._-]+)(\(config[^)]*\))?([>#]) ?$")
 CONSOLES_RE = re.compile(r"consoles>\s*$")
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+# Errors IOS and NX-OS print in configuration mode
+CONFIG_ERROR_RE = re.compile(r"^\s*(% ?(Invalid|Incomplete|Ambiguous|Unknown|Unrecognized|Bad mask|Cannot)|ERROR:|Error:)",
+                             re.M)
+
+
+# NX-OS commands that enter a sub-mode even when nothing is configured under them (e.g. a bare
+# `address-family l2vpn evpn` under `router bgp`, followed by a `neighbor` at the same level)
+NXOS_MODE_RE = re.compile(r"^(router \S+|interface \S+|vlan \d[\d,-]*|vrf context \S+|vrf \S+|address-family .+|"
+                          r"neighbor \S+( remote-as \S+)?|evpn|vni \d+ l2|route-map .+|line \S+|member vni \d+.*|template .+)$")
+
+
+def config_script(text: str, os: str = "ios") -> list[str]:
+    """Turn an indented config block (IOS / NX-OS style) into the exact lines to type in configuration mode.
+
+    Comments and blanks are dropped. Within a block, an `exit` is sent whenever the indentation steps back out of a
+    sub-mode (on NX-OS also after a known mode command with nothing under it). Every new top-level block starts
+    from a clean global configuration mode (`end`, `configure terminal`), so a mode the device entered silently
+    can never swallow the next block."""
+    rows = [(len(l) - len(l.lstrip(" ")), l.strip()) for l in text.replace("\t", "  ").splitlines()]
+    rows = [(i, l) for i, l in rows if l and not l.startswith("!") and l.lower() not in ("end", "configure terminal", "conf t")]
+    out, stack = [], []
+    for k, (ind, line) in enumerate(rows):
+        if ind == 0 and stack:
+            out += ["end", "configure terminal"]
+            stack = []
+        while stack and stack[-1] >= ind:
+            stack.pop()
+            out.append("exit")
+        out.append(line)
+        deeper = k + 1 < len(rows) and rows[k + 1][0] > ind
+        if deeper or (os == "nxos" and NXOS_MODE_RE.match(line)):
+            stack.append(ind)
+    return out
 
 
 class ConsoleError(RuntimeError):
@@ -70,7 +103,7 @@ class DeviceSession:
     def login(self, attempts: int = 12) -> None:
         pats = [
             re.compile(r"\[yes/no\]:\s*$"),
-            re.compile(r"[Uu]sername:\s*$"),
+            re.compile(r"([Uu]sername|[Ll]ogin):\s*$"),
             re.compile(r"[Pp]assword:\s*$"),
             PROMPT_RE,
         ]
@@ -121,6 +154,21 @@ class DeviceSession:
     def run(self, command: str) -> str:
         return self._exec(command, timeout=90 if command.startswith("ping") else 60)
 
+    def configure(self, text: str, os: str = "ios") -> str:
+        """Type a config block in configuration mode. Stops at the first line the device rejects
+        (ConsoleError naming the line); always returns to the privileged prompt."""
+        log_out = []
+        self._exec("configure terminal")
+        try:
+            for line in config_script(text, os):
+                out = self._exec(line, timeout=120)
+                log_out.append(f"{line}\n{out}" if out.strip() else line)
+                if CONFIG_ERROR_RE.search(out):
+                    raise ConsoleError(f"{self.hostname} rejected {line!r}: {out.strip()[:300]}")
+        finally:
+            self._exec("end")
+        return "\n".join(log_out) + "\n"
+
 
 class SSHConsoleRunner:
     """Runner that opens one console session per device via the CML console server."""
@@ -166,6 +214,9 @@ class SSHConsoleRunner:
     def run(self, device: str, command: str) -> str:
         return self._session(device).run(command)
 
+    def configure(self, device: str, text: str, os: str = "ios") -> str:
+        return self._session(device).configure(text, os)
+
     def close(self) -> None:
         for c in self._clients:
             try:
@@ -189,6 +240,18 @@ class PyatsRunner:
 
     def run(self, device: str, command: str) -> str:
         return self.lab.pyats.run_command(device, command)
+
+    def configure(self, device: str, text: str, os: str = "ios") -> str:
+        # one configure session per top-level block (Unicon enters and leaves configuration mode itself)
+        chunks, cur = [], []
+        for line in config_script(text, os) + ["end"]:
+            if line == "end":
+                if cur:
+                    chunks.append(cur)
+                cur = []
+            elif line != "configure terminal":
+                cur.append(line)
+        return "".join(self.lab.pyats.run_config_command(device, "\n".join(c)) or "" for c in chunks)
 
     def close(self) -> None:
         try:

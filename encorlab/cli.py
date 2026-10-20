@@ -44,11 +44,17 @@ def version():
 @app.command("list")
 def list_labs():
     """List the lab catalog (built-in and imported)."""
-    plat = get_platform(config.from_env().platform)
+    from . import sizing
+    s = config.from_env()
+    plat = get_platform(s.platform)
     for lid, e in catalog.entries().items():
         lab = e.lab
         fl = f"  faults:{len(lab.faults)}" if lab.faults else ""
-        typer.echo(f"{lid:28} {e.source:7} {lab.node_count} nodes  d{lab.difficulty}  [{', '.join(lab.blueprint)}]  {render(lab.title, plat)}{fl}")
+        r = sizing.estimate(lab, s.platform, s.ram_heavy_gb)
+        ram = f"RAM heavy {r['label']}" if r["heavy"] else r["label"]
+        kind = "  [walkthrough]" if lab.is_walkthrough else ""
+        typer.echo(f"{lid:28} {e.source:7} {lab.node_count} nodes  d{lab.difficulty}  {ram:>9}  "
+                   f"[{', '.join(lab.blueprint)}]  {render(lab.title, plat)}{fl}{kind}")
 
 
 @app.command()
@@ -255,6 +261,44 @@ def check(lab_id: str, as_json: bool = typer.Option(False, "--json"),
         return
     _print_check(rep)
     raise typer.Exit(0 if rep["passed"] else 2)
+
+
+@app.command("step")
+def step_cmd(lab_id: str, step: str = typer.Argument(None, help="step id or number (1 = first); omit to list the steps"),
+             do_check: bool = typer.Option(False, "--check", help="run this step's checks"),
+             do_apply: bool = typer.Option(False, "--apply", help="type this step's config into the devices over the console"),
+             yes: bool = typer.Option(False, "--yes", "-y", help="do not ask before --apply")):
+    """Walkthrough labs: list the steps, show one step (config + verify commands), check it or apply it."""
+    from . import walkthrough
+    lab = catalog.get(lab_id)
+    if not lab.is_walkthrough:
+        typer.echo(f"{lab_id} is not a walkthrough lab", err=True)
+        raise typer.Exit(1)
+    s = _settings()
+    plat = get_platform(s.platform)
+    st_all = walkthrough.status(lab)
+    if step is None:
+        for i, (st, r) in enumerate(zip(lab.steps, st_all["steps"]), 1):
+            mark = "PASS" if r["passed"] else ("fail" if r["passed"] is False else "    ")
+            typer.echo(f"{i:2}. [{mark}] {st.id:16} {render(st.title, plat)}{'  (optional)' if st.optional else ''}")
+        typer.echo(f"Required steps passed: {st_all['required_passed']}/{st_all['required']}"
+                   + ("  - completed" if st_all["completed"] else ""))
+        return
+    st = lab.steps[int(step) - 1] if step.isdigit() and 1 <= int(step) <= len(lab.steps) else lab.step(step)
+    if do_check:
+        rep = walkthrough.check_step(s, lab_id, st.id, _p, lab=lab)
+        _print_check(rep)
+        raise typer.Exit(0 if rep["passed"] else 2)
+    if do_apply:
+        if not yes and not typer.confirm(f"Type the config of step '{st.title}' into {', '.join(st.config)}?"):
+            raise typer.Exit(1)
+        walkthrough.apply_step(s, lab_id, st.id, _p, lab=lab)
+        return
+    typer.echo(f"# {render(st.title, plat)}\n\n{render(st.explain, plat).rstrip()}\n")
+    for dev, cfg in st.config.items():
+        typer.echo(f"! device {dev}\n{render(cfg, plat).rstrip()}\n")
+    for v in st.verify:
+        typer.echo(f"{v.device}# {render(v.command, plat)}\n    expect: {render(v.expect, plat).strip()}")
 
 
 @app.command()
@@ -584,13 +628,21 @@ app.add_typer(library_app, name="library")
 
 
 def _best() -> dict:
-    return {lid: max((x.get("score_pct") or 0 for x in history.load(lid)), default=None) for lid in catalog.entries()}
+    from . import walkthrough
+    out = {}
+    for lid, e in catalog.entries().items():
+        if e.lab.is_walkthrough:
+            out[lid] = 100.0 if walkthrough.status(e.lab)["completed"] else None
+        else:
+            out[lid] = max((x.get("score_pct") or 0 for x in history.load(lid)), default=None)
+    return out
 
 
 @course_app.command("list")
 def course_list():
     """Installed courses with your progress."""
-    cs = courses.list_courses(_best())
+    st = config.from_env()
+    cs = courses.list_courses(_best(), platform=st.platform, heavy_gb=st.ram_heavy_gb)
     if not cs:
         typer.echo("no courses installed (import a .encorcourse file, or: encorlab library list)")
     for c in cs:

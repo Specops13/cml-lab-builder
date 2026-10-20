@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, packs, progress, report, service, snapshots, updates
+from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, packs, progress, report, service, sizing, snapshots, updates, walkthrough
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from ..platforms import get as get_platform, render
@@ -54,6 +54,7 @@ class SettingsIn(BaseModel):
     ai_api_key: str | None = None
     show_help: bool | None = None
     check_updates: bool | None = None
+    ram_heavy_gb: int | None = None
     remember_password: bool = False
     remember_ai_key: bool = False
 
@@ -80,7 +81,8 @@ class CmlDraftIn(BaseModel):
 
 JOB_LABELS = {"build": "a lab build", "check": "grading", "test-live": "a live test", "break": "fault injection",
               "restore": "a snapshot restore", "snapshot": "a snapshot", "reset": "a lab reset",
-              "destroy": "a lab teardown", "ai": "AI lab generation"}
+              "destroy": "a lab teardown", "ai": "AI lab generation", "step-check": "a walkthrough step check",
+              "step-apply": "applying a walkthrough step"}
 
 
 def create_app(store: config.SettingsStore | None = None, client_factory=None, runner_factory=None,
@@ -157,6 +159,30 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     def health():
         return {"ok": True, "version": __version__}
 
+    def _ram(l, s=None) -> dict:
+        s = s or store.get()
+        r = sizing.estimate(l, s.platform, s.ram_heavy_gb)
+        return {k: r[k] for k in ("gb", "estimate_gb", "label", "heavy", "tooltip", "source", "threshold_gb", "vcpus")}
+
+    def _wt_brief(l) -> dict | None:
+        if not l.is_walkthrough:
+            return None
+        st = walkthrough.status(l)
+        return {k: st[k] for k in ("current", "required", "required_passed", "pct", "completed")} | {
+            "steps": len(l.steps)}
+
+    def _plain(lab_id: str, what: str):
+        e = _entry(lab_id)
+        if e.lab.is_walkthrough:
+            raise HTTPException(400, f"{what} is not available for walkthrough labs (they are guided builds, not challenges)")
+        return e
+
+    def _walk(lab_id: str):
+        e = _entry(lab_id)
+        if not e.lab.is_walkthrough:
+            raise HTTPException(400, "this lab is not a walkthrough")
+        return e
+
     # ------------------------------------------------------------ catalog
     @app.get("/api/labs")
     def labs():
@@ -168,18 +194,21 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         except ValueError as e:
             errors["settings"] = f"{e}; showing IOL interface names"
             plat = get_platform("iol")
+        s = store.get()
         for lid, e in catalog.entries(errors=errors).items():
             try:
                 l = e.lab
                 h = history.load(lid)
+                wt = _wt_brief(l)
                 out.append({"id": l.id, "title": render(l.title, plat), "summary": render(l.summary, plat),
                             "blueprint": l.blueprint,
                             "domain": l.domain, "difficulty": l.difficulty, "nodes": l.node_count,
                             "platforms": l.platforms, "source": e.source,
                             "checks": {"live": len(l.checks_for("live")), "config": len(l.checks_for("config"))},
                             "faults": len(l.faults), "fault_active": bool(faults.active(lid)), "exam_active": bool(exam.active(lid)),
-                            "best": max((x.get("score_pct") or 0 for x in h), default=None),
-                            "solved": any(x.get("passed") for x in h)})
+                            "best": max((x.get("score_pct") or 0 for x in h), default=None) if not wt else None,
+                            "solved": bool(wt["completed"]) if wt else any(x.get("passed") for x in h),
+                            "type": l.type, "walkthrough": wt, "ram": _ram(l, s)})
             except Exception as ex:  # pragma: no cover - defensive
                 errors[str(e.path)] = f"{type(ex).__name__}: {ex}"
         return {"labs": out, "broken": errors}
@@ -194,7 +223,20 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         hints = fault["hints"] if fault and fault["hints"] else solution_mod.hints(l, plat)
         if ex:
             ex["hints_shown"] = hints[:ex["hints_used"]]
-        return {"exam": ex, "hints_total": len(hints), "default_exam_minutes": exam.default_minutes(l),
+        steps = None
+        if l.is_walkthrough:
+            steps = [{"id": st.id, "title": render(st.title, plat), "explain": render(st.explain, plat),
+                      "optional": st.optional, "apply": bool(st.apply and st.config),
+                      "config": {d: render(c, plat) for d, c in st.config.items()},
+                      "verify": [{"device": v.device, "command": render(v.command, plat), "expect": render(v.expect, plat)}
+                                 for v in st.verify],
+                      "checks": [{"id": c.id, "mode": c.mode, "device": c.device,
+                                  "description": render(c.description, plat)} for c in st.checks]}
+                     for st in l.steps]
+        return {"type": l.type, "steps": steps, "ram": _ram(l),
+                "walkthrough": walkthrough.status(l) if l.is_walkthrough else None,
+                "final_summary": walkthrough.summary(l, plat) if l.is_walkthrough else None,
+                "exam": ex, "hints_total": len(hints), "default_exam_minutes": exam.default_minutes(l),
                 "id": l.id, "title": render(l.title, plat), "summary": render(l.summary, plat),
                 "source": e.source, "task": render(l.task, plat),
                 "faults": len(l.faults), "fault": fault,
@@ -213,7 +255,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     @app.post("/api/labs/{lab_id}/exam/start")
     def exam_start(lab_id: str, minutes: int | None = None, hints: str = "penalty", penalty: int = exam.DEFAULT_PENALTY):
         _not_updating()
-        e = _entry(lab_id)
+        e = _plain(lab_id, "Exam mode")
         if exam.active(lab_id):
             raise HTTPException(409, "an exam is already running for this lab")
         try:
@@ -254,7 +296,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         _no_exam(lab_id)
         data = yaml.safe_load((e.path / "lab.yaml").read_text(encoding="utf-8"))
         sol = catalog.load_solution(lab_id)
-        if sol:
+        if sol and not e.lab.is_walkthrough:      # a walkthrough's solution is its step configs
             data["solution"] = sol
         return {"yaml": ai.to_yaml_text(data), "source": e.source}
 
@@ -295,14 +337,18 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     # ------------------------------------------------------------ courses + online library
     def _best() -> dict:
         out = {}
-        for lid in catalog.entries():
+        for lid, e in catalog.entries().items():
+            if e.lab.is_walkthrough:     # completion, not a score
+                out[lid] = 100.0 if walkthrough.status(e.lab)["completed"] else None
+                continue
             h = history.load(lid)
             out[lid] = max((x.get("score_pct") or 0 for x in h), default=None)
         return out
 
     @app.get("/api/courses")
     def course_list():
-        return {"courses": courses.list_courses(_best())}
+        s = store.get()
+        return {"courses": courses.list_courses(_best(), platform=s.platform, heavy_gb=s.ram_heavy_gb)}
 
     @app.delete("/api/courses/{course_id}")
     def course_delete(course_id: str, labs: bool = False):
@@ -314,7 +360,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     @app.get("/api/library")
     def library_index(url: str = library.DEFAULT_INDEX):
         try:
-            return library.index(url, fetch=fetch)
+            return library.index(url, fetch=fetch, heavy_gb=store.get().ram_heavy_gb)
         except (library.LibraryError, packs.LabError) as e:  # shown in the UI
             return _lib_err(e)
 
@@ -569,6 +615,9 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         if revealed:
             extra["revealed"] = True
 
+        if _entry(lab_id).lab.is_walkthrough:
+            return wt_check_all(lab_id)
+
         def fn(s, p):
             m = mode or s.grading_mode
             runner = runner_factory(s, lab_id) if (runner_factory and m != "config") else None
@@ -576,6 +625,59 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
             return service.do_check(s, lab_id, p, client_factory=client_factory, runner=runner,
                                     config_source=src, mode=m, probe=probe, hints_used=hints_used, extra=extra)
         return _start("check", lab_id, fn)
+
+    # ------------------------------------------------------------ walkthroughs
+    @app.get("/api/labs/{lab_id}/walkthrough")
+    def wt_status(lab_id: str):
+        return walkthrough.status(_walk(lab_id).lab)
+
+    @app.post("/api/labs/{lab_id}/walkthrough/step")
+    def wt_goto(lab_id: str, index: int):
+        """Remember the step the student is on (index == number of steps: the final summary)."""
+        return walkthrough.set_current(_walk(lab_id).lab, index)
+
+    @app.post("/api/labs/{lab_id}/walkthrough/reset")
+    def wt_reset(lab_id: str):
+        return walkthrough.reset(_walk(lab_id).lab)
+
+    def _wt_kw(s, lab_id):
+        runner = runner_factory(s, lab_id) if (runner_factory and s.grading_mode != "config") else None
+        src = config_factory(s, lab_id) if config_factory else None
+        return {"runner": runner, "config_source": src, "probe": probe, "client_factory": client_factory}
+
+    @app.post("/api/labs/{lab_id}/steps/{step_id}/check")
+    def wt_check(lab_id: str, step_id: str):
+        e = _walk(lab_id)
+        try:
+            st = e.lab.step(step_id)
+        except KeyError:
+            raise HTTPException(404, f"unknown step {step_id}")
+        if not st.checks:
+            raise HTTPException(400, "this step has nothing to check")
+        return _start("step-check", lab_id,
+                      lambda s, p: walkthrough.check_step(s, lab_id, step_id, p, lab=e.lab, **_wt_kw(s, lab_id)))
+
+    @app.post("/api/labs/{lab_id}/walkthrough/check-all")
+    def wt_check_all(lab_id: str):
+        e = _walk(lab_id)
+        return _start("step-check", lab_id,
+                      lambda s, p: walkthrough.check_all(s, lab_id, p, lab=e.lab, **_wt_kw(s, lab_id)))
+
+    @app.post("/api/labs/{lab_id}/steps/{step_id}/apply")
+    def wt_apply(lab_id: str, step_id: str):
+        """Type the step's config into the devices over the CML console (the UI asks for confirmation first)."""
+        e = _walk(lab_id)
+        try:
+            st = e.lab.step(step_id)
+        except KeyError:
+            raise HTTPException(404, f"unknown step {step_id}")
+        if not (st.apply and st.config):
+            raise HTTPException(400, "this step has no config to apply")
+
+        def fn(s, p):
+            runner = runner_factory(s, lab_id) if runner_factory else None
+            return walkthrough.apply_step(s, lab_id, step_id, p, runner=runner, client_factory=client_factory, lab=e.lab)
+        return _start("step-apply", lab_id, fn)
 
     @app.post("/api/labs/{lab_id}/test-live")
     def test_live(lab_id: str, mode: str = "auto"):
@@ -594,7 +696,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     @app.post("/api/labs/{lab_id}/break")
     def break_lab(lab_id: str, fault: str | None = None):
         """Break my lab: rebuild with the solution plus one random predefined fault."""
-        e = _entry(lab_id)
+        e = _plain(lab_id, "Break my lab")
         if not e.lab.faults:
             raise HTTPException(400, "this lab has no predefined faults")
         _no_exam(lab_id)

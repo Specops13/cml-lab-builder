@@ -56,6 +56,8 @@ def clear(lab_id: str) -> None:
 def start(lab: Lab, minutes: int | None = None, hints: str = "penalty", penalty: int = DEFAULT_PENALTY,
           now: float | None = None) -> dict:
     from . import faults
+    if lab.is_walkthrough:
+        raise ExamError("exam mode is not available for walkthrough labs")
     if hints not in HINT_MODES:
         raise ExamError("hints must be 'penalty' or 'off'")
     if faults.active(lab.id):

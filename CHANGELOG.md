@@ -2,6 +2,44 @@
 
 All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
+## [1.9.0] - 2026-10-19
+### Added
+- **Walkthrough labs** (`type: walkthrough`): a guided build in ordered steps instead of a graded challenge.
+  - Each step has a short explanation, the exact config per device (copy buttons), verification commands with what
+    good output looks like, and **Check this step** (live checks plus config checks).
+  - A progress bar with free back/forward movement and a final **summary** (what you built, the complete config per device).
+  - **Apply this step for me** types the step's config over the CML console. It sends `exit` when the indentation
+    leaves a sub-mode (and after bare NX-OS mode commands), starts every top-level block from global config mode, and
+    stops at the first rejected line. CLI: `encorlab step <lab> [N] [--check|--apply]`.
+  - Walkthroughs have no *Break my lab* or exam mode (the API refuses both). They are marked *walkthrough* in the list,
+    courses and library, count as *completed* (not scored) and have their own section on the Progress page, outside
+    mastery, solved-lab counts and streaks.
+- **Built-in lab `18-evpn-vxlan`: BGP EVPN VXLAN spine-and-leaf walkthrough** on Nexus 9000v (`nxosv9000`, NX-OS 10.5).
+  - 2 spines, 2 leaves and 4 IOS hosts (8 nodes).
+  - Steps: OSPF underlay over /31s, NX-OS features, iBGP `l2vpn evpn` with the spines as route reflectors,
+    VLAN 10/20 mapped to L2VNI 10010/10020, NVE with BGP ingress replication, then same-VLAN pings between the leaves
+    verified with type-2/type-3 routes, NVE peers and MAC learning over the tunnel. An optional last step adds the
+    L3VNI with symmetric IRB and the anycast gateway (type-5 routes).
+  - Needs about 52 GB of CML RAM and 12 vCPUs.
+- **New course "Data center: VXLAN EVPN fabrics"** (`data-center.encorcourse` in the online library).
+- **Node definitions:** a lab node can set `definition: nxosv9000`. Such nodes use literal `Ethernet1/1-1/4` names
+  (`mgmt0` stays unconnected) and get an NX-OS day-0 config with your device logins. The build checks that the server
+  has the definition and waits at least 25 minutes for NX-OS to boot. The console login also handles NX-OS `login:`.
+- **RAM estimate on every lab**, from the CML 2.9 node-definition defaults (iol-xe 1 GB, iosv 0.5 GB, nxosv9000 12 GB,
+  cat9000v 18 GB, …) or the lab's new optional `ram_gb:` field.
+  - Labs at or above a threshold (*Settings > Lab options*, default 16 GB, `ENCOR_RAM_HEAVY_GB`) get a red
+    **RAM heavy · ~N GB** tag, with text as well as color. Its tooltip explains the estimate.
+  - The tag shows in the lab list, on the lab page, in courses, in the online library (`ram_gb` and `type` in
+    `labs/index.json`) and in `encorlab list`.
+  - **Build** now opens a confirmation box with the RAM estimate first.
+- Lab authoring guide and AI prompt: walkthrough labs, node definitions, NX-OS regex and ping tips, `ram_gb` and RAM guidance.
+### Changed
+- The lab JSON schema: `checks` is optional (walkthroughs keep their checks in `steps`), and `type`, `steps`, `ram_gb`
+  and `nodes[].definition` are new.
+- `validate`/`pack` check literal interface names per device (NX-OS names on `definition` nodes, placeholders
+  elsewhere) and grade every walkthrough step offline.
+- The runtime is unchanged (RUNTIME_VERSION 1), so 1.7.x and 1.8.x update to 1.9.0 as a normal patch.
+
 ## [1.8.1] - 2026-10-19
 ### Added
 - **MIT License** (`LICENSE`, Copyright (c) 2026 Dylan Vaughan (Specops13)).

@@ -55,6 +55,8 @@ def do_break(settings, lab_id, progress, fault_id: str | None = None, client_fac
     """'Break my lab': rebuild the lab with the reference solution plus one random predefined fault."""
     from . import exam, faults
     lab = catalog.get(lab_id)
+    if lab.is_walkthrough:
+        raise faults.FaultError("Break my lab is not available for walkthrough labs")
     if exam.active(lab_id):
         raise faults.FaultError("an exam is running for this lab; submit or abort it first")
     sol = catalog.load_solution(lab_id)

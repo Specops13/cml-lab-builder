@@ -91,3 +91,18 @@ a.btn.small{padding:.2rem .5rem;font-size:.8rem}
 .update-prompt[hidden]{display:none}.update-prompt h3{margin:0 0 .3rem;font-size:1rem}.update-prompt p{margin:.25rem 0;font-size:.88rem}
 .update-prompt .toolbar{margin-top:.5rem}
 .update-full{background:var(--warn-bg);border-bottom:1px solid var(--warn-line);padding:.45rem 1.2rem;font-size:.9rem}.update-full[hidden]{display:none}.update-full button{float:right}
+
+/* RAM estimate tags (1.9.0): neutral for every lab; red with the words "RAM heavy" at/above the Settings threshold */
+.tag.ram{cursor:help;font-variant-numeric:tabular-nums}
+.tag.ram-heavy{background:#c62828;border-color:#c62828;color:#fff;font-weight:700}
+.build-box{border:1px solid var(--line);border-radius:8px;padding:.4rem .9rem;margin:.5rem 0;background:var(--card)}
+.build-box.heavy{border:2px solid #c62828}.build-box p{margin:.35rem 0}
+/* walkthrough labs */
+.tag.walk{border-color:var(--accent);background:var(--accent);color:var(--accent-fg)}.tag.bad{border-color:var(--bad);color:var(--bad)}
+.walk-progress{margin:.6rem 0}.pbar.wide{width:100%;height:10px}
+.walk-steps{display:flex;flex-wrap:wrap;gap:.3rem;list-style:none;margin:.5rem 0;padding:0}
+.walk-steps li button{min-width:2.4em}.walk-steps li.ok button{border-color:var(--ok);color:var(--ok)}.walk-steps li.bad button{border-color:var(--bad);color:var(--bad)}
+.walk-steps li.cur button{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:700}
+.walk-step{border:1px solid var(--line);border-radius:8px;padding:.3rem 1rem .6rem;margin:.6rem 0}
+.walk-step .cfg pre.code{background:var(--code-bg);color:var(--code-fg);padding:.5rem .7rem;border-radius:6px;overflow:auto;margin:.2rem 0 .6rem;font-size:.84rem}
+.walk-step .cfg .toolbar{margin:.4rem 0 0}.walk-nav{margin-top:1rem}

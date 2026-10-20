@@ -5,7 +5,9 @@ Inputs are the per-lab results histories (history.py). Rules (documented in the 
 * a revealed fault/solution counts as at most REVEALED_CAP
 * lab mastery = best attempt score; domain/item mastery = average lab mastery over the labs mapped to it
   (labs never checked count as 0); overall mastery is weighted by the exam domain weights
-* time spent per lab is estimated from the lab timer value sent with each Check"""
+* time spent per lab is estimated from the lab timer value sent with each Check
+* walkthrough labs are guided builds, not graded: they are listed separately (steps passed, completed) and never
+  count towards mastery, solved labs or streaks"""
 from __future__ import annotations
 
 import datetime as dt
@@ -58,15 +60,30 @@ def streaks(days: set[dt.date], today: dt.date) -> dict:
     return {"current": cur, "longest": longest, "active_days": len(days), "last_day": max(days).isoformat()}
 
 
-def compute(today: dt.date | None = None, entries: dict | None = None, histories: dict | None = None) -> dict:
+def compute(today: dt.date | None = None, entries: dict | None = None, histories: dict | None = None,
+            walkthroughs: dict | None = None) -> dict:
+    """walkthroughs: lab id -> walkthrough.status() (default: read from the data folder)."""
     today = today or dt.date.today()
     entries = entries if entries is not None else catalog.entries()
     histories = histories if histories is not None else {lid: history.load(lid) for lid in entries}
     labs, days, recent, failed = [], set(), [], Counter()
     check_desc: dict[tuple[str, str], str] = {}
+    walks = []
     for lid, e in entries.items():
+        if e.lab.is_walkthrough:
+            if walkthroughs is not None and lid in walkthroughs:
+                st = walkthroughs[lid]
+            else:
+                from . import walkthrough
+                st = walkthrough.status(e.lab)
+            walks.append({"id": lid, "title": e.lab.title, "blueprint": e.lab.blueprint, "source": e.source,
+                          "steps": len(e.lab.steps), "required": st["required"],
+                          "required_passed": st["required_passed"], "pct": st["pct"],
+                          "completed": bool(st["completed"]), "completed_at": st["completed"],
+                          "started": any(x.get("passed") is not None for x in st["steps"]) or st["current"] > 0})
+            continue
         h = histories.get(lid, [])
-        for c in e.lab.checks + [c for f in e.lab.faults for c in f.checks]:
+        for c in [c for st in e.lab.steps for c in st.checks] + e.lab.checks + [c for f in e.lab.faults for c in f.checks]:
             check_desc[(lid, c.id)] = c.description
         for x in h:
             d = _day(x.get("ts", ""))
@@ -115,6 +132,8 @@ def compute(today: dt.date | None = None, entries: dict | None = None, histories
                     "uncovered_domains": [d["id"] for d in domains if not d["labs"]]},
         "streak": streaks(days, today),
         "domains": domains, "items": items, "labs": labs, "weakest": weakest,
+        "walkthroughs": {"labs": walks, "total": len(walks), "completed": sum(1 for w in walks if w["completed"]),
+                         "started": sum(1 for w in walks if w["started"])},
         "failed_checks": [{"lab_id": lid, "check_id": cid, "description": check_desc.get((lid, cid), cid), "count": n}
                           for (lid, cid), n in failed.most_common(5)],
         "recent": recent[:10], "activity": activity,

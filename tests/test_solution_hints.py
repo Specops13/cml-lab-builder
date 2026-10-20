@@ -13,7 +13,7 @@ from test_web import make, wait
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "encorlab" / "web" / "static"
 IOL = platforms.get("iol")
-BUILTIN = sorted(d.name for d in catalog.lab_dirs())
+BUILTIN = sorted(d.name for d in catalog.lab_dirs() if not catalog.get(d.name).is_walkthrough)  # challenge labs only
 
 
 def _lab_dict(lab_id="eigrp-basic"):

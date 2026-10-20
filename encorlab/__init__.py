@@ -1,2 +1,2 @@
 """ENCOR lab builder and grader for Cisco Modeling Labs 2.9."""
-__version__ = "1.8.1"
+__version__ = "1.9.0"

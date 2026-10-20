@@ -251,6 +251,19 @@
           "description": "Starting IOS config (no hostname line needed). Use %if0%..%if3% for data interfaces",
           "title": "Config",
           "type": "string"
+        },
+        "definition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional explicit CML node definition instead of the platform profile's router/switch, e.g. 'nxosv9000' (NX-OS 9000v, ports 0-3 = Ethernet1/1-1/4). Write literal interface names in its config, not %ifN%",
+          "title": "Definition"
         }
       },
       "required": [
@@ -260,6 +273,99 @@
       ],
       "title": "Node",
       "type": "object"
+    },
+    "Step": {
+      "additionalProperties": false,
+      "description": "One step of a walkthrough lab: why, the exact config per device, how to verify it, and optional checks.",
+      "properties": {
+        "id": {
+          "description": "Short unique id, e.g. 'underlay-ospf'",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "explain": {
+          "description": "Markdown: what this step builds and why (concepts first, concise)",
+          "title": "Explain",
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "device -> exact config for this step (copy buttons in the UI)",
+          "title": "Config",
+          "type": "object"
+        },
+        "verify": {
+          "default": [],
+          "description": "Verification commands with the expected output",
+          "items": {
+            "$ref": "#/$defs/Verify"
+          },
+          "title": "Verify",
+          "type": "array"
+        },
+        "checks": {
+          "default": [],
+          "description": "Checks run by 'Check this step' (live and/or config)",
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "optional": {
+          "default": false,
+          "description": "Optional step: not needed to complete the walkthrough",
+          "title": "Optional",
+          "type": "boolean"
+        },
+        "apply": {
+          "default": true,
+          "description": "Offer 'Apply this step for me' (push the config over the console)",
+          "title": "Apply",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "explain"
+      ],
+      "title": "Step",
+      "type": "object"
+    },
+    "Verify": {
+      "additionalProperties": false,
+      "description": "A verification command shown in a walkthrough step, with what good output looks like.",
+      "properties": {
+        "device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "command": {
+          "description": "Read-only 'show ...' or 'ping ...' command to run on the device",
+          "title": "Command",
+          "type": "string"
+        },
+        "expect": {
+          "description": "Markdown: what to look for in good output (a short excerpt is fine)",
+          "title": "Expect",
+          "type": "string"
+        }
+      },
+      "required": [
+        "device",
+        "command",
+        "expect"
+      ],
+      "title": "Verify",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -268,6 +374,16 @@
     "id": {
       "description": "Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name",
       "title": "Id",
+      "type": "string"
+    },
+    "type": {
+      "default": "challenge",
+      "description": "challenge (default): a graded task. walkthrough: a guided build in ordered `steps` (not graded; no faults or exam mode; completion is tracked separately)",
+      "enum": [
+        "challenge",
+        "walkthrough"
+      ],
+      "title": "Type",
       "type": "string"
     },
     "title": {
@@ -335,12 +451,37 @@
       "type": "string"
     },
     "checks": {
-      "description": "Needs at least one live and one config check",
+      "default": [],
+      "description": "Challenge labs: needs at least one live and one config check. Walkthroughs: leave empty and put the checks in the steps",
       "items": {
         "$ref": "#/$defs/Check"
       },
       "title": "Checks",
       "type": "array"
+    },
+    "steps": {
+      "default": [],
+      "description": "Walkthrough labs only: the ordered steps",
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "ram_gb": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "maximum": 512,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional: CML server RAM the lab needs in GB. Default: estimated from the node definitions",
+      "title": "Ram Gb"
     },
     "solution": {
       "anyOf": [
@@ -402,8 +543,7 @@
     "summary",
     "nodes",
     "links",
-    "task",
-    "checks"
+    "task"
   ],
   "title": "ENCOR Lab Builder lab definition",
   "type": "object",

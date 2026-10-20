@@ -2,6 +2,20 @@
   "format": 1,
   "items": [
     {
+      "file": "data-center.encorcourse",
+      "sha256": "6dd83d78ae6f3d52c34f0c70e1b532033333a4f7cb824ae852c82559710d843a",
+      "size": 492,
+      "kind": "course",
+      "id": "data-center",
+      "title": "Data center: VXLAN EVPN fabrics",
+      "description": "Data center fabric basics on Nexus 9000v: a guided walkthrough that builds a spine-and-leaf VXLAN fabric with a BGP EVPN control plane and stretches VLANs between leaves (optional L3VNI and anycast gateway). RAM heavy: about 52 GB of CML RAM (4 x nxosv9000 at 12 GB). Uses built-in labs only (needs ENCOR Lab Builder 1.9.0 or newer), so the course just records the study order and your progress.",
+      "labs": [
+        "08-vrf-lite",
+        "18-evpn-vxlan"
+      ],
+      "ram_gb": 52.0
+    },
+    {
       "file": "encor-multicast-mpls.encorcourse",
       "sha256": "0198e5aa9ca1b70e482581cc9c381ccc248296db8c4a164f1d962756d16f1a70",
       "size": 466,
@@ -15,7 +29,8 @@
         "08-vrf-lite",
         "16-mpls-ldp",
         "17-mpls-l3vpn"
-      ]
+      ],
+      "ram_gb": 6.0
     },
     {
       "file": "encor-routing.encorcourse",
@@ -33,7 +48,8 @@
         "08-vrf-lite",
         "12-pbr",
         "13-redistribution"
-      ]
+      ],
+      "ram_gb": 4.0
     },
     {
       "file": "ospf-mastery.encorcourse",
@@ -47,7 +63,8 @@
         "03-ospf-multiarea",
         "ospf-multiarea-stub",
         "troubleshoot-ospf-7node"
-      ]
+      ],
+      "ram_gb": 7.0
     },
     {
       "file": "ospf-multiarea-stub.encorlab",
@@ -61,7 +78,9 @@
         "3.2.b"
       ],
       "nodes": 4,
-      "difficulty": 3
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 4.0
     },
     {
       "file": "troubleshoot-ospf-7node.encorlab",
@@ -75,7 +94,9 @@
         "3.2.b"
       ],
       "nodes": 7,
-      "difficulty": 3
+      "difficulty": 3,
+      "type": "challenge",
+      "ram_gb": 7.0
     }
   ]
 }

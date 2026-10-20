@@ -1,0 +1,55 @@
+# Synthesized from Cisco NX-OS 10.x documentation (not recorded on real hardware): freshly booted switches,
+# cabling present (CDP) but nothing configured.
+LEAF1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater,
+                      V - VoIP-Phone, D - Remotely-Managed-Device,
+                      s - Supports-STP-Dispute
+
+    Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+    SPINE1(9KV1A2B3C4D)
+                       Eth1/1         171    R S I s   N9K-C9300v    Eth1/1
+    SPINE2(9KV5E6F7A8B)
+                       Eth1/2         166    R S I s   N9K-C9300v    Eth1/1
+    H1                 Eth1/3         150    R B         Linux Unix    Ethernet0/0
+    H2                 Eth1/4         148    R B         Linux Unix    Ethernet0/0
+
+    Total entries displayed: 4
+  ping 10.1.11.0: |
+    PING 10.1.11.0 (10.1.11.0): 56 data bytes
+    ping: sendto 10.1.11.0 64 chars, No route to host
+    Request 0 timed out
+    ping: sendto 10.1.11.0 64 chars, No route to host
+    Request 1 timed out
+    ping: sendto 10.1.11.0 64 chars, No route to host
+    Request 2 timed out
+    ping: sendto 10.1.11.0 64 chars, No route to host
+    Request 3 timed out
+    ping: sendto 10.1.11.0 64 chars, No route to host
+    Request 4 timed out
+
+    --- 10.1.11.0 ping statistics ---
+    5 packets transmitted, 0 packets received, 100.00% packet loss
+  show feature: |
+    Feature Name          Instance  State
+    --------------------  --------  --------
+    bfd                   1         disabled
+    bgp                   1         disabled
+    nve                   1         disabled
+    ospf                  1         disabled
+    vnseg_vlan            1         disabled
+SPINE1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater,
+                      V - VoIP-Phone, D - Remotely-Managed-Device,
+                      s - Supports-STP-Dispute
+
+    Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+    LEAF1(9KV9C0D1E2F)
+                       Eth1/1         163    R S I s   N9K-C9300v    Eth1/1
+    LEAF2(9KV3A4B5C6D)
+                       Eth1/2         160    R S I s   N9K-C9300v    Eth1/1
+
+    Total entries displayed: 2

@@ -44,6 +44,12 @@ OUTPUT RULES
   Match running-config lines exactly as IOS prints them (see "Writing regexes").
 - Keep to 2-6 nodes; use only kind router/switch; platforms [iol, iosv] unless a feature needs one.
 - id: lowercase-with-dashes, unique and descriptive.
+- Default to a challenge lab (`type` omitted). Only when the request asks for a guided, step-by-step build, write
+  `type: walkthrough` with ordered `steps` (explain, config per device, verify with expected output, checks) and no
+  lab-level checks, solution or faults (see "Walkthrough labs" in the guide).
+- Mind CML server RAM: IOL nodes need about 1 GB each. Only use a `definition:` such as nxosv9000 (about 12 GB each,
+  literal Ethernet1/1-1/4 names) when the request needs NX-OS, and say in the task how much RAM the lab needs.
+  Set `ram_gb:` only if the estimate from the node types would be wrong. Labs from 16 GB up are tagged RAM heavy.
 """
 
 
