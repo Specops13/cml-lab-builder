@@ -223,5 +223,6 @@
   "mig.banner": "Labs your previous version bundled are installed from the library (they could not be copied from the old program files). Your history is never removed.",
   "mig.retry": "Download the missing labs from the lab library now.",
   "mig.dismiss": "Stop showing this banner. You can still install the labs from the library; your history stays.",
-  "s.library_url": "Address of the lab library index (labs/index.json). Leave empty for the project's GitHub repo. https only (http only for a library on this computer, e.g. http://127.0.0.1:8000/index.json)."
+  "s.library_url": "Address of the lab library index (labs/index.json); empty means the project's GitHub repo. Use https (http only for localhost, e.g. a local mirror).",
+  "lab.retry": "Try to reach the lab library again."
 }

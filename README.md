@@ -36,6 +36,13 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [License](#license)
 
 ## Features
+- **Small download, labs from the library (new in 2.0.0):** the app no longer ships with labs. On the first start the
+  Labs page offers **Install recommended starter set** (one click), **Browse library** and **Import a .encorlab file**.
+  Every lab (all 19 former built-in labs, including the EVPN walkthrough) is a pack in the online
+  [lab library](#lab-library-and-courses), sha256-checked on download. Courses install all of their labs in one click,
+  and labs show **Update available** when the library has a newer version. **Updating from 1.x keeps everything:** your
+  labs, results history, walkthrough progress, snapshots and faults stay linked
+  ([how](#updating-from-1x-to-200-your-labs-are-kept)).
 - **BGP EVPN VXLAN walkthrough (new in 1.9.0):** a guided, step-by-step build of a spine-and-leaf fabric on Nexus
   9000v: OSPF underlay, iBGP EVPN with the spines as route reflectors, NVE/VTEPs, and VLANs 10 and 20 stretched across
   both leaves, with an optional L3VNI/anycast-gateway step. Each step explains the idea, gives the exact config with copy
@@ -44,7 +51,7 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - **RAM estimate on every lab:** a tag shows the CML server RAM a lab needs (from its node types). Labs from 16 GB up
   (configurable) get a red **RAM heavy · ~N GB** tag in the list, on the lab page, in the build confirmation, in
   courses and in the library.
-- **19 built-in labs** (18 challenges plus the EVPN walkthrough) covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
+- **19 labs in the library** (18 challenges plus the EVPN walkthrough) covering ENCOR blueprint topics: EIGRP basic, VLAN/802.1Q/Rapid PVST+, EtherChannel (LACP/PAgP),
   OSPFv2 multi-area/stub/summarization, EIGRP named mode with authentication and stub, eBGP/iBGP with next-hop-self,
   HSRPv2 with tracking, ACL/PAT/static NAT, VRF-lite, GRE over IPsec with OSPF, NTP/Syslog/SNMPv3/IP SLA,
   HSRP failover driven by IP SLA object tracking, policy-based routing, mutual OSPF/EIGRP redistribution with route tags,
@@ -54,7 +61,7 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   It only ever touches labs titled `ENCOR-…`.
 - **Two grading modes:** *live* (real adjacencies, routes, pings over the console server) and *config* (HTTPS only).
   *Auto* uses live when it can and falls back to config.
-- **Break my lab (fault practice):** every built-in challenge lab ships with 3 predefined faults (54 in total). One click rebuilds
+- **Break my lab (fault practice):** every library challenge lab comes with 3 predefined faults (54 in total). One click rebuilds
   the working lab with a random fault and gives you a symptom-only trouble ticket, so you get unlimited troubleshooting practice.
 - **Exam mode:** a timed, one-shot attempt with a countdown, the solution withheld, and hints disabled or costing
   points. *Submit exam* (or the timer running out) grades once and shows a score report (raw score, hint penalty,
@@ -112,8 +119,12 @@ Download from **[Releases](https://github.com/Specops13/encore-lab-app/releases/
 - Starting it again while it runs just opens the browser on the running copy.
 - **Quit:** close the console window or press Ctrl+C.
 - **Your data stays outside the app folder,** in `%APPDATA%\encorlab` or `~/.config/encorlab`. That covers settings, imported labs, history and installed updates. To update, use *Settings > Updates > Install update* (see [Updating](#updating-small-patches-instead-of-a-full-download)), or delete the old app folder and unzip the new one.
-- The bundle includes `example-packs/` (drag them onto the Labs page), `docs/`, this README, `LICENSE.txt` and
-  `THIRD-PARTY-NOTICES.txt` (the .deb puts the last two in `/usr/share/doc/encorlab/`).
+- **No labs are included** (that keeps the download small). The first start shows *Install recommended starter set*,
+  *Browse library* and *Import a .encorlab file*; see [Lab library and courses](#lab-library-and-courses). Without
+  internet access you can still import `.encorlab` files you downloaded elsewhere (e.g. from the repo's
+  [`labs/`](labs/) folder).
+- The bundle includes `docs/`, this README, `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` (the .deb puts the last two in
+  `/usr/share/doc/encorlab/`).
 - The command line works too: `ENCORLab list`, `ENCORLab check <lab>`, `ENCORLab --port 9000`, `ENCORLab --no-browser`.
 - **Windows SmartScreen:** the exe is not code-signed, so the first start may show "Windows protected your PC". Click *More info* > *Run anyway*.
   You can also right-click the downloaded zip, choose *Properties* > *Unblock*, then extract it. Check the download against `SHA256SUMS.txt` from the release.
@@ -292,13 +303,15 @@ The first connection accepts the server's host key and logs a warning.
    - The password is kept in memory only. Tick "Remember password in OS keyring" to store it in Windows Credential Manager or the Linux Secret Service.
    - Non-secret settings are saved to `settings.json` in your data folder.
    - Set *Console server host* if SSH port 22 isn't reachable at the URL's host name.
-2. **Labs**: pick a lab and click **Build**. It imports the topology as `ENCOR-<lab>`, starts it and waits until all nodes are BOOTED.
-3. Open the device consoles: the lab's **Consoles** section has an *Open lab in CML* link and a copyable
+2. **Get labs** (first start only): click **Install recommended starter set**, or **Browse library** to pick labs and
+   courses (sizes and RAM estimates are shown), or import a `.encorlab` file.
+3. **Labs**: pick a lab and click **Build**. It imports the topology as `ENCOR-<lab>`, starts it and waits until all nodes are BOOTED.
+4. Open the device consoles: the lab's **Consoles** section has an *Open lab in CML* link and a copyable
    `ssh -t <user>@<console host> "open /ENCOR-<lab>/<node>/0"` command per node (Windows 11 has `ssh` built in).
    Solve the task, then click **Check**. You get pass/fail per check, with details and the raw output.
-4. Stuck? Click **Hint** for the next hint. At 100% the **Solution summary** appears. Below 100%, **Reveal solution** shows it after a confirm.
-5. **Reset** stops the lab, wipes it and restarts it with the original configs (it also clears revealed hints). **Destroy** stops, wipes and deletes the lab.
-6. Done with a lab? Click **Break my lab** for troubleshooting practice, or **Exam mode** for a timed attempt (see below).
+5. Stuck? Click **Hint** for the next hint. At 100% the **Solution summary** appears. Below 100%, **Reveal solution** shows it after a confirm.
+6. **Reset** stops the lab, wipes it and restarts it with the original configs (it also clears revealed hints). **Destroy** stops, wipes and deletes the lab.
+7. Done with a lab? Click **Break my lab** for troubleshooting practice, or **Exam mode** for a timed attempt (see below).
 
 A timer starts on Build and stops when the lab is solved, and each lab keeps a results history.
 Small **?** icons explain each field. Turn them off with *Settings > Show help icons*; all help text is in `encorlab/web/static/help.json`.
@@ -321,7 +334,9 @@ CLI equivalents (`ENCORLab <cmd>` for the download; `run.bat <cmd>` / `./run.sh 
 | `report [<lab>] [-o file.html] [--outputs] [--name "Your Name"]` | printable HTML report of a lab (or of your progress); print or save as PDF |
 | `history <lab>` | your past scores (with hints used) |
 | `progress [--json]` | progress dashboard: mastery per exam domain, streak, time spent, weakest topics |
-| `library list` / `library install <file or https URL> [--sha256 …]` | browse / install from the online lab library |
+| `library list` / `library install <file or https URL> [--sha256 …]` | browse (size, RAM, installed / update) / install from the online lab library (a course also installs its labs) |
+| `library install --starter \| --all \| --updates` | install the recommended starter set, every lab, or all available lab updates |
+| `library restore` | after an update from 1.x: install the labs your old version bundled that could not be copied from disk |
 | `course list` / `course build <dir> [-o file]` / `course delete <id> [--labs]` | courses: progress, build a `.encorcourse`, remove |
 | `import <file> [--replace]`, `export <lab> [-o f.encorlab] [--cml-yaml]`, `delete <lab> -y` | manage your labs |
 | `validate [paths…]`, `pack <folder-or-yaml> [-o x.encorlab]` | offline test (solution 100%, starting config 0%); strict validate + write a shareable pack |
@@ -358,7 +373,7 @@ v1.6.0 release for older app versions or for sharing.
 > correctly solved lab, run it in *Config* grading mode and please report the device output.
 
 ### Walkthrough labs (BGP EVPN VXLAN)
-A **walkthrough** is a guided build instead of a graded challenge. The built-in `18-evpn-vxlan` walkthrough
+A **walkthrough** is a guided build instead of a graded challenge. The `18-evpn-vxlan` walkthrough (in the lab library)
 (*Walkthrough: BGP EVPN VXLAN spine-and-leaf*) turns four empty Nexus 9000v switches into a VXLAN EVPN fabric.
 
 **Topology** (8 nodes): SPINE1 and SPINE2 (`nxosv9000`), LEAF1 and LEAF2 (`nxosv9000`), and four small IOS hosts
@@ -395,8 +410,9 @@ Then a **summary** page lists what you built and the complete config of every de
 - Walkthroughs have no *Break my lab*, no exam mode and no score. They show a **walkthrough** badge, count as *completed*
   once every required step passed (the optional step 9 doesn't count), appear in their own section on the Progress page,
   and stay out of mastery and streaks. The CLI has `encorlab step 18-evpn-vxlan [N] [--check|--apply]`.
-- The **Data center** course (*Library & courses*) puts VRF-lite first, then the walkthrough. A standalone
-  `evpn-vxlan-walkthrough.encorlab` pack is attached to the v1.9.0 release for sharing (on 1.9.0 the lab is already built in).
+- The **Data center** course (*Library & courses*) puts VRF-lite first, then the walkthrough; *Install all* installs both.
+  The v1.9.0 release also has it as `evpn-vxlan-walkthrough.encorlab`; on 2.0.0 use the library or import
+  `labs/18-evpn-vxlan.encorlab` from the repo.
 
 > **Not verified on real devices yet.** The expected outputs and the recorded outputs the checks are tested against
 > were written from Cisco's NX-OS 10.x VXLAN BGP EVPN documentation, not captured from a running Nexus 9000v, and
@@ -410,7 +426,7 @@ definition: `iol-xe`/`ioll2-xe` 1 GB, `iosv` 0.5 GB, `iosvl2` 0.75 GB, `csr1000v
 in `lab.yaml`. The tag is neutral (`RAM ~4 GB`) for most labs; at or above the threshold in *Settings > Lab options*
 (default **16 GB**) it turns red and reads **RAM heavy · ~52 GB**, so it is not conveyed by color alone. Hover it for
 the breakdown. It appears in the lab list, on the lab page, in the **Build** confirmation (which now always asks
-first), in courses (a course shows its heaviest lab) and in the online library, for built-in and imported labs alike.
+first), in courses (a course shows its heaviest lab) and in the online library, for library and imported labs alike.
 Your server's node or image settings can differ, so treat it as an estimate.
 
 ### Break my lab (fault practice)
@@ -496,9 +512,10 @@ The file is validated immediately. You get readable errors such as `checks[2] (r
 A valid lab appears in the list right away, marked *imported*. If a lab with that id exists, you're asked whether to replace it.
 CLI: `run.bat import file.encorlab`.
 
-Imported labs are stored apart from the built-ins, in `%APPDATA%\encorlab\labs\<id>\` (Windows) or
+All labs (from the library or imported) are stored in `%APPDATA%\encorlab\labs\<id>\` (Windows) or
 `~/.config/encorlab/labs/<id>/` (Linux; override with `ENCOR_USER_LABS_DIR`). Results history is kept in `history/` next to it.
-**Export pack** shares a lab and **Delete lab** removes an imported one (built-ins can't be deleted).
+**Export pack** shares a lab. **Delete lab** removes it from the app; you choose whether its results history goes too (kept
+history links up again when you install the lab again).
 
 ### The `.encorlab` format
 
@@ -510,26 +527,52 @@ Imported labs are stored apart from the built-ins, in `%APPDATA%\encorlab\labs\<
 
 **Lab builder** (menu *Lab builder*): a form with metadata, Markdown task, nodes (starting config + solution side by side),
 links, and checks chosen from templates (OSPF/EIGRP/BGP neighbor, route present, ping, interface up, VLAN, config lines/regex…).
-A YAML tab shows the same lab with live validation. *Open existing lab* edits an imported lab (built-ins open as a copy).
+A YAML tab shows the same lab with live validation. *Open existing lab* edits an installed lab.
 *Import from CML* starts from any IOL/IOSv lab in your CML. *Test lab (offline)* runs the strict validator.
 *Live test in CML* (for saved labs) builds a throw-away `ENCOR-TEST-…` copy with the solution applied, grades it and deletes it.
 
 ### Lab library and courses
-Click **📚 Library & courses** on the Labs page.
-- **Online library:** *Load library* reads [`labs/index.json`](labs/index.json) from this repository (the only time the app
-  contacts GitHub) and lists the published lab packs and courses. *Install* downloads the file over https, rejects it unless
-  its **sha256 and size match the index**, validates it like any import, then installs it. You can point the library at your
-  own `index.json` (https only), for example a fork or a team share.
+Since 2.0.0 every lab comes from here: the download contains none. Click **📚 Library & courses** on the Labs page (on a
+first start the Labs page offers the same buttons).
+- **First start:** *Install recommended starter set* installs six small core labs (EIGRP basic, VLANs/STP, EtherChannel,
+  OSPF multi-area, BGP, HSRP; a few GB of CML RAM each) in one click. The set is listed in `labsrc/library.yaml`.
+- **Online library:** *Load library* reads [`labs/index.json`](labs/index.json) from this repository and lists the published
+  lab packs and courses with their size, RAM estimate (red **RAM heavy** tag at your threshold), node count and
+  difficulty. *Install* downloads the file over https, rejects it unless its **sha256 and size match the index**,
+  validates it like any import, then installs it. The address is *Settings > Library URL* (`ENCOR_LIBRARY_URL`; empty =
+  this repo). Point it at your own `index.json` (https only, or http on localhost), for example a fork, a team share or
+  an offline mirror.
+- **Courses: Install all.** Installing a course from the library also installs every lab it lists that you don't have yet.
+  Importing a course file does the same while online; offline it tells you which labs to get first.
+- **Updates:** each lab has a `version:`. When the library has a newer version than your copy, the library shows
+  *Update to vN* (plus *Update all*), and the lab list and lab page show *update available*. Updating replaces the lab
+  files; your history, progress and snapshots are kept.
+- **Offline:** if the library can't be reached you get a short explanation with *try again*; installed labs, history,
+  grading and imports of local `.encorlab` files keep working.
 - **Install from a URL:** paste an https link to a `.encorlab` / `.encorcourse` file and, ideally, the sha256 the author
   published. A mismatch installs nothing. Downloads are limited to 20 MB.
 - **Courses** (`.encorcourse`): a zip with `course.yaml` (id, title, description, `labs:` in study order) plus optional
-  `labs/<id>/` pack folders. A course may also list built-in labs. Installation is all-or-nothing: every bundled lab is
-  validated first. Your courses show solved/total, a progress bar and *Continue* (the next unsolved lab). The *Course* filter
-  shows a course's labs in order. *Remove* deletes the course and, if you choose, the labs it imported (never built-ins,
-  never your history). Build one with `python -m encorlab course build my-course/ --labs-from examples/`.
-- **Publishing:** put lab folders in `examples/` and courses in `examples/courses/<id>/course.yaml`, then run
-  `python packaging/build_library.py`. It rebuilds `labs/` reproducibly (fixed zip timestamps) and regenerates
-  `index.json` with the checksums. The test suite fails if `labs/` is out of date.
+  `labs/<id>/` pack folders. A course may also list library labs without bundling them (they are installed from the
+  library with the course). Installation is all-or-nothing: every bundled lab is validated first. Your courses show solved/total, a progress bar and *Continue* (the next unsolved lab). The *Course* filter
+  shows a course's labs in order. *Remove* deletes the course and, if you choose, the labs that came inside the course file
+  (never your history). Build one with `python -m encorlab course build my-course/ --labs-from examples/`.
+- **Publishing:** lab sources are in `labsrc/<id>/` (the former built-in labs) and `examples/<id>/`; courses in
+  `examples/courses/<id>/course.yaml`. Run `python packaging/build_library.py`: it validates every lab strictly, rebuilds
+  `labs/` reproducibly (fixed zip timestamps) and regenerates `index.json` with checksums, versions, RAM estimates and the
+  starter set. It refuses a changed lab whose `version:` was not raised. The test suite fails if `labs/` is out of date.
+
+#### Updating from 1.x to 2.0.0: your labs are kept
+Version 1.x had the labs inside the program. On the first start of 2.0.0 the app checks whether this is an existing
+installation (settings, history, progress, snapshots, courses or imported labs exist) and, if so, keeps every lab 1.x
+bundled:
+- **Updated by patch (the normal in-app update):** the old program files are still on disk, so the 19 labs are copied
+  from there into your labs folder, unchanged and under the same ids. No download, works offline.
+- **Updated by a full download** (or a newer `.deb`): the old files are gone, so the labs are installed from the lab
+  library in the background. Until that has worked (e.g. while offline) a banner offers *Restore now* and *Dismiss*;
+  `encorlab library restore` does the same on the command line.
+- Your results history, walkthrough progress, reports, snapshots, active faults and exams are files keyed by lab id in
+  the data folder. The update never moves, rewrites or deletes them, so they link up with the kept labs automatically.
+  A lab folder you already have is never overwritten. The state is in `migrations/library-labs.json` in the data folder.
 
 ### AI prompt (generate labs with any AI chatbot)
 
@@ -559,6 +602,8 @@ Everything can be set on the **Settings** page; `.env` / environment variables p
 | ENCOR_NODE_LIMIT | 20 | Refuse to start a lab if it would exceed this many running nodes |
 | ENCOR_BOOT_TIMEOUT | 900 | Seconds to wait for nodes to boot (labs with NX-OS nodes wait at least 1500) |
 | ENCOR_RAM_HEAVY_GB | 16 | Labs estimated at or above this many GB of CML RAM get the red *RAM heavy* tag |
+| ENCOR_LIBRARY_URL | (the repo's `labs/index.json`) | Lab library index (same as *Settings > Library URL*); https, or http on localhost |
+| ENCOR_BUILTIN_LABS_DIR | (none) | Developers: use a folder of lab sources (e.g. `labsrc`) in place, read-only |
 | ENCOR_DEVICE_USERNAME / _PASSWORD / _ENABLE | cisco | Used if a device console asks for a login or enable password, and as the NX-OS day-0 login |
 | ENCOR_USER_LABS_DIR / ENCOR_DATA_DIR | settings folder | Where imported labs / results history are stored |
 | ENCOR_AI_BASE_URL / ENCOR_AI_MODEL / ENCOR_AI_API_KEY | - | Optional AI generator (OpenAI-compatible) |
@@ -568,14 +613,15 @@ Everything can be set on the **Settings** page; `.env` / environment variables p
 - Only touches labs titled `ENCOR-…`. Deleting anything else is refused.
 - Checks never change device configuration (only `show` and `ping` commands are allowed in labs).
 - Imported packs are size-limited (5 MB) and path-checked. A lab file only contains data (YAML/regex), never code.
-- Internet access: *Load library* / *Install* (raw.githubusercontent.com or your URL) when you click them. The packaged
+- Internet access: *Load library* / *Install* (raw.githubusercontent.com or your URL) when you click them, and once after
+  an update from 1.x if labs have to be restored from the library (see above). The packaged
   app also makes an anonymous update check against api.github.com every 6 hours, which you can turn off in *Settings >
   Updates*. When there is a new release, it downloads the patch and `SHA256SUMS.txt` from github.com. Nothing is
   installed until you click *Update now*.
 - Patches are verified (SHA256SUMS, per-file manifest hashes, safe paths, version, runtime) before they are unpacked into
   your data folder, and are rolled back automatically if they cannot start.
-- Library downloads are https-only (redirects included), size-limited and verified against the sha256 in the index before
-  they are validated and installed.
+- Library downloads are https-only (redirects included; plain http only for a library on localhost), size-limited and
+  verified against the sha256 in the index before they are validated and installed.
 - The UI listens on 127.0.0.1 only. Secrets are never returned by the API or written to logs.
 
 ## Troubleshooting and diagnostics
@@ -666,12 +712,13 @@ encorlab/                 the application (Python package)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders
-  labs/<id>/              19 built-in labs (lab.yaml, solution.cfg, fixture_*.yaml; 18-evpn-vxlan is a walkthrough)
+  migrate.py              keeps the labs 1.x bundled (copies them / restores them from the library)
   web/                    FastAPI app, templates/index.html, static/ (app.js, help.js, help.json, style.css)
   resources/              authoring guide + example lab (source of docs/)
 docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example lab, images/
 examples/                 example packs and courses/ (sources of labs/)
 labs/                     online library: built packs, courses and index.json (packaging/build_library.py)
+labsrc/<id>/              lab sources of the library (the 19 former built-in labs) + library.yaml (starter set)
 encorboot.py              boot loader for packaged builds: picks the app-code bundle, rollback, RUNTIME_VERSION
 encor_launcher.py         frozen entry point (runs encorboot, then encorlab.launcher)
 packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, fake_release.py, icon
@@ -689,7 +736,10 @@ run.bat, run.ps1, run.sh  from-source launchers (create .venv, install, start)
 .venv/bin/python -m pytest -q        # unit + simulated end-to-end tests (no CML needed)
 .venv/bin/python -m encorlab validate
 ```
-Built-in labs live in `encorlab/labs/<id>/` (same format as packs). In configs, checks and fixtures, `%if0%` / `%if0s%`
+Lab sources live in `labsrc/<id>/` (same format as packs); the package itself has no labs. The test suite uses them in place
+via `ENCOR_BUILTIN_LABS_DIR=labsrc` (set by `tests/conftest.py`); set it yourself to run a source checkout with every lab
+(`ENCOR_BUILTIN_LABS_DIR=labsrc python -m encorlab web`) or validate them with `python -m encorlab validate labsrc/*`.
+In configs, checks and fixtures, `%if0%` / `%if0s%`
 become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv.
 After changing the schema, templates, guide or example, run `python -m encorlab docs` (a test checks `docs/` is current).
 

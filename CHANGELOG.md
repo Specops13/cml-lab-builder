@@ -2,6 +2,55 @@
 
 All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
 
+## [2.0.0] - 2026-10-20
+The app now ships without labs; every lab comes from the online lab library. This is a behaviour change for new
+installs (a first start has no labs), hence 2.0.0. Existing users keep everything, and the runtime is unchanged, so
+1.7.x-1.9.x installs update in place with the small patch.
+### Changed
+- **No labs in the downloads.** The 19 former built-in labs (including the EVPN walkthrough) moved from
+  `encorlab/labs/` to `labsrc/` and are published as packs in the lab library (`labs/`, with sha256, size, version, RAM
+  estimate and a recommended starter set in `labs/index.json`). The Windows zip, Linux tar.gz, .deb and patch contain no
+  labs, and the example packs folder (`example-packs/`) is gone from the downloads too.
+  - Honest numbers: the labs were about 300 KB uncompressed and about 86 KB compressed. That is about 0.3% of the
+    ~26 MB Windows zip and ~32 MB Linux tar.gz, but about a third of the patch (269 KB in 1.9.0). The downloads are
+    dominated by the Python runtime and libraries.
+- Courses list library labs instead of relying on built-in ones. *Install all* (library) installs a course plus every lab
+  it lists that you don't have; importing a course file does the same when online.
+- *Delete lab* keeps the lab's results history by default (it links up again when you re-install the lab); the UI asks
+  whether to delete the history too (`DELETE /api/user-labs/<id>?clear_history=true`).
+- The library accepts plain http only for a library on localhost (for local mirrors and testing); https elsewhere.
+### Added
+- **First start without labs:** the Labs page explains where labs come from and offers **Install recommended starter
+  set** (six small core labs, one click), **Browse library & courses** and **Import a .encorlab file**. When the library
+  can't be reached it says so and offers *try again*; everything else keeps working offline.
+- **Library view:** sizes, RAM estimates (red *RAM heavy* tag), *starter* and *installed vN* tags, *Install starter set*,
+  per-course *Install all (N labs)*, and **Update available** / *Update to vN* / *Update all* when the library has a newer
+  lab version (`version:` in lab.yaml, compared numerically). The lab list and lab page show *update available* too.
+- **Settings > Library URL** (`library_url`, `ENCOR_LIBRARY_URL`); empty means this repository.
+- **Keeping the labs 1.x bundled** (`encorlab/migrate.py`): on the first start of 2.x an existing installation gets
+  every formerly bundled lab back under the same id.
+  - Updated by patch: copied from the old program files still on disk (the runtime's bundled 1.x app code or an
+    installed 1.x patch, newest copy wins). Works offline.
+  - Updated by full download: installed from the library in the background. Until then a banner offers *Restore now* /
+    *Dismiss* (CLI: `encorlab library restore`).
+  - History, reports, walkthrough progress, snapshots, faults and exams are never touched, and an existing lab folder is
+    never overwritten. Fresh installs are detected and skip all of this.
+- CLI: `library install --starter | --all | --updates`, `library restore`; `library list` shows size, RAM, installed /
+  update and the starter set; `list` on an empty install explains how to get labs.
+- API: `POST /api/library/install-set` (starter / ids / updates), `GET /api/migration`, `POST /api/migration/restore`,
+  `POST /api/migration/dismiss`; `/api/labs` adds `version`, `library`, `update_available` and `migration`.
+- `packaging/build_library.py` validates every lab strictly, writes versions and the starter set (`labsrc/library.yaml`)
+  and refuses a changed lab pack whose `version:` was not raised.
+- Tests: first run, starter set, course *Install all*, offline, updates, version ordering, delete-keeps-history, every
+  library pack installs and validates, and migration (patch, bundled runtime copy, full download, offline, broken
+  source lab, never overwriting, background restore, dismiss). The smoke test now starts with no labs and installs the
+  starter set and a course from a library served on 127.0.0.1. A new `packaging/migration_test.py` runs both update
+  paths against the real 1.9.0 and 2.0.0 builds.
+- Developers: `ENCOR_BUILTIN_LABS_DIR=labsrc` uses the lab sources in place (the test suite does this).
+### Docs
+- README (first start, library, updating from 1.x), lab authoring guide (`version:`, publishing in the library, courses
+  with library labs), AI prompt (`version:` guidance) and the JSON Schema (`version` description).
+
 ## [1.9.0] - 2026-10-19
 ### Added
 - **Walkthrough labs** (`type: walkthrough`): a guided build in ordered steps instead of a graded challenge.

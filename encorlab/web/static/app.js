@@ -203,7 +203,7 @@ function renderEmpty(note = "") {
 }
 function offlineNote(msg) {
   return `<div class="err" data-help="lab.offline">Could not reach the lab library: ${esc(msg)}</div>
-    <p class="muted small">Are you offline? Everything else keeps working. You can <a href="#" data-retry="1">try again</a>,
+    <p class="muted small">Are you offline? Everything else keeps working. You can <a data-help="lab.retry" href="#" data-retry="1">try again</a>,
     import a .encorlab file you downloaded, or point Settings &gt; Library URL at another copy of the library.</p>`;
 }
 function libErr(e) { const d = e.data || {}; return (d.errors && d.errors.length) ? d.errors.join("; ") : e.message; }
@@ -248,7 +248,7 @@ function renderMigration() {
 function libNote(id) {
   const l = labs.find((x) => x.id === id);
   return l && l.update_available ? `<div class="notice" data-help="lab.update">A newer version of this lab is in the library.
-    <button id="a-update" class="primary" data-id="${esc(id)}">Update lab</button> <span class="muted small">Your history and progress are kept;
+    <button data-help="lab.update" id="a-update" class="primary" data-id="${esc(id)}">Update lab</button> <span class="muted small">Your history and progress are kept;
     changes you made to the lab's files are replaced.</span></div>` : "";
 }
 document.addEventListener("click", async (e) => {
