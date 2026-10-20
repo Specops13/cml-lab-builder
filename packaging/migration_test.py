@@ -158,7 +158,7 @@ def main() -> int:
     shutil.rmtree(data / "app", ignore_errors=True)
     srv, url = serve_library()
     code, out = run(new + ["version"])
-    check(code == 0 and out.strip().endswith(patch_ver), f"new build is {patch_ver}")
+    check(code == 0 and out.splitlines()[0].strip() == patch_ver, f"new build is {patch_ver} (then a note about the labs to restore)")
     st = json.loads((data / "migrations" / "library-labs.json").read_text(encoding="utf-8"))
     check(st.get("state") == "pending" and len(st.get("pending", [])) == LEGACY, f"no old files: {len(st.get('pending', []))} labs pending")
     code, out = run(new + ["list"])

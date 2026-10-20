@@ -11,9 +11,10 @@ installs (a first start has no labs), hence 2.0.0. Existing users keep everythin
   `encorlab/labs/` to `labsrc/` and are published as packs in the lab library (`labs/`, with sha256, size, version, RAM
   estimate and a recommended starter set in `labs/index.json`). The Windows zip, Linux tar.gz, .deb and patch contain no
   labs, and the example packs folder (`example-packs/`) is gone from the downloads too.
-  - Honest numbers: the labs were about 300 KB uncompressed and about 86 KB compressed. That is about 0.3% of the
-    ~26 MB Windows zip and ~32 MB Linux tar.gz, but about a third of the patch (269 KB in 1.9.0). The downloads are
-    dominated by the Python runtime and libraries.
+  - Honest numbers (1.9.0 -> 2.0.0, bytes): Windows zip 26,577,567 -> 26,489,377 (-86 KB, -0.3%), Linux tar.gz
+    33,453,768 -> 33,398,858 (-54 KB, -0.2%), .deb 27,876,152 -> 27,824,844 (-50 KB, -0.2%), patch 276,109 -> 184,693
+    (-89 KB, -33%). The labs were only ~300 KB uncompressed; the downloads are dominated by the Python runtime and
+    libraries. The big win is a clean start: a new user picks what they want instead of facing 19 labs at once.
 - Courses list library labs instead of relying on built-in ones. *Install all* (library) installs a course plus every lab
   it lists that you don't have; importing a course file does the same when online.
 - *Delete lab* keeps the lab's results history by default (it links up again when you re-install the lab); the UI asks
@@ -48,7 +49,7 @@ installs (a first start has no labs), hence 2.0.0. Existing users keep everythin
   library pack installs and validates, and migration (patch, bundled runtime copy, full download, offline, broken
   source lab, never overwriting, background restore, dismiss). The smoke test now starts with no labs and installs the
   starter set and a course from a library served on 127.0.0.1. A new `packaging/migration_test.py` runs both update
-  paths against the real 1.9.0 and 2.0.0 builds.
+  paths against the real 1.9.0 and 2.0.0 builds (passed on Linux and on Windows under Wine).
 - Developers: `ENCOR_BUILTIN_LABS_DIR=labsrc` uses the lab sources in place (the test suite does this).
 ### Docs
 - README (first start, library, updating from 1.x), lab authoring guide (`version:`, publishing in the library, courses
