@@ -108,8 +108,24 @@ a.btn.small{padding:.2rem .5rem;font-size:.8rem}
 .walk-step .cfg .toolbar{margin:.4rem 0 0}.walk-nav{margin-top:1rem}
 
 /* first run (no labs) and labs kept from 1.x */
-.welcome { padding: 1.5em 1em; max-width: 52em; }
-.welcome h2 { margin-top: 0; }
+.welcome { padding: 1.5rem 1rem 1rem; max-width: 60rem; margin: 0 auto; }
+.welcome-hero { text-align: center; margin-bottom: 1.4rem; }
+.welcome-hero h2 { margin: 0 0 .4rem; font-size: 1.6rem; }
+.welcome .lead { color: var(--muted); font-size: 1.05rem; margin: 0; }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
+.choice { border: 1px solid var(--line); border-radius: 10px; padding: 1rem; display: flex; flex-direction: column; background: var(--card); }
+.choice.rec { border: 2px solid var(--accent); }
+.choice h3 { margin: .3rem 0 .4rem; }
+.choice p { margin: 0 0 .6rem; }
+.choice button { margin-top: auto; }
+.choice > .tag { align-self: flex-start; }
+.starter-list { list-style: none; padding: 0; margin: 0 0 .8rem; }
+.starter-list li { display: flex; justify-content: space-between; gap: .5rem; padding: .15rem 0; border-bottom: 1px dashed var(--line); }
+.starter-list .tag { white-space: nowrap; flex-shrink: 0; align-self: center; }
+.starter-list li.total { border: 0; justify-content: flex-end; padding-top: .3rem; }
+.welcome-foot { text-align: center; margin-top: 1.2rem; }
+#e-note:not(:empty) { margin-top: 1rem; }
+aside.catalog.no-labs .filters { display: none; }
 .mig-banner { background: #fff4e5; border: 1px solid #f0b357; color: #4a3200; border-radius: 6px; padding: .6em .9em;
   margin: 0 0 .8em; display: flex; gap: .6em; align-items: center; flex-wrap: wrap; }
 .mig-banner[hidden] { display: none; }

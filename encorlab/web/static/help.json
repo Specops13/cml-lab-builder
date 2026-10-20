@@ -209,7 +209,7 @@
   "w.copyCmd": "Copy the command.",
   "w.check": "Run this step's checks on the devices (live console, plus config checks) and record the result.",
   "w.apply": "Type this step's config into the devices over the CML console for you. Stops at the first line a device rejects.",
-  "lab.empty": "The app ships without labs to keep the download small. Install them from the online lab library, or import a .encorlab file.",
+  "lab.empty": "No labs yet. Install a few from the online lab library, follow a course, or import a lab file.",
   "lab.starter": "Downloads a handful of small core labs from the lab library in one click (each one is sha256-checked and validated).",
   "lab.browse": "Open the lab library: every lab and course with its size and RAM estimate. Courses can install all of their labs at once.",
   "lab.offline": "The library could not be reached. Nothing else is affected: installed labs, history and grading keep working offline.",
@@ -224,5 +224,6 @@
   "mig.retry": "Download the missing labs from the lab library now.",
   "mig.dismiss": "Stop showing this banner. You can still install the labs from the library; your history stays.",
   "s.library_url": "Address of the lab library index (labs/index.json); empty means the project's GitHub repo. Use https (http only for localhost, e.g. a local mirror).",
-  "lab.retry": "Try to reach the lab library again."
+  "lab.retry": "Try to reach the lab library again.",
+  "lab.setup": "Open Settings to enter your CML server address and login."
 }

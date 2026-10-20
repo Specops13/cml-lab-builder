@@ -20,9 +20,12 @@ installs (a first start has no labs), hence 2.0.0. Existing users keep everythin
   whether to delete the history too (`DELETE /api/user-labs/<id>?clear_history=true`).
 - The library accepts plain http only for a library on localhost (for local mirrors and testing); https elsewhere.
 ### Added
-- **First start without labs:** the Labs page explains where labs come from and offers **Install recommended starter
-  set** (six small core labs, one click), **Browse library & courses** and **Import a .encorlab file**. When the library
-  can't be reached it says so and offers *try again*; everything else keeps working offline.
+- **A clean welcome screen on the first start** (no labs yet): three choices side by side. **Start with the basics**
+  (recommended) lists the six starter labs with their RAM estimate and total download size, and installs them in one
+  click with **Install recommended starter set**. **Follow a course** opens *Browse library & courses*, and **Got a lab
+  file?** imports a .encorlab file. Empty filters are hidden, and a hint points to Settings while no CML server is set.
+  When the library can't be reached, a plain "can't be reached right now" note offers *Try again* (technical details below
+  it); everything else keeps working offline.
 - **Library view:** sizes, RAM estimates (red *RAM heavy* tag), *starter* and *installed vN* tags, *Install starter set*,
   per-course *Install all (N labs)*, and **Update available** / *Update to vN* / *Update all* when the library has a newer
   lab version (`version:` in lab.yaml, compared numerically). The lab list and lab page show *update available* too.

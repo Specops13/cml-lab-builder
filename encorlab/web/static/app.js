@@ -158,6 +158,7 @@ async function loadLabs() {
   labs = data.labs;
   migration = data.migration || null;
   renderMigration();
+  document.querySelector("aside.catalog").classList.toggle("no-labs", !labs.length);
   if (!labs.length && !current && !$("#library")) renderEmpty();
   const sel = $("#f-domain"), cur = sel.value;
   const doms = [...new Set(labs.map((l) => l.domain))].sort();
@@ -180,7 +181,7 @@ function renderList() {
     ${srcTag(l)}${updTag(l)}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${l.walkthrough
       ? (l.walkthrough.completed ? '<span class="tag ok">completed</span>' : (l.walkthrough.required_passed ? `<span class="tag">${l.walkthrough.required_passed}/${l.walkthrough.required} steps</span>` : ""))
       : (l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : ""))}
-    <div class="muted small">${esc(l.summary)}</div></li>`).join("") || `<li class="muted">${labs.length ? "No labs match." : "No labs installed yet."}</li>`;
+    <div class="muted small">${esc(l.summary)}</div></li>`).join("") || `<li class="muted">${labs.length ? "No labs match." : "Your labs will show up here."}</li>`;
   $$("#lab-list li[data-id]").forEach((li) => li.addEventListener("click", () => selectLab(li.dataset.id)));
 }
 ["#f-search", "#f-domain", "#f-diff", "#f-source", "#f-course"].forEach((s) => $(s).addEventListener("input", renderList));
@@ -188,23 +189,58 @@ function renderList() {
 /* ---------------------------------------------------------------- first run (no labs) + labs kept from 1.x */
 function renderEmpty(note = "") {
   $("#lab-detail").innerHTML = `<div class="welcome" data-help="lab.empty">
-    <h2>Welcome to ENCOR Lab Builder</h2>
-    <p>No labs are installed yet. To keep the download small, labs come from the online <b>lab library</b>
-      (every download is checked against its sha256 and validated before it is installed).</p>
-    <div class="toolbar"><button data-help="lab.starter" id="e-starter" class="primary big">Install recommended starter set</button>
-      <button data-help="lab.browse" id="e-browse">📚 Browse library &amp; courses</button>
-      <button data-help="import.button" id="e-import">⬆ Import a .encorlab file</button></div>
-    <p class="muted small">The starter set is a handful of small labs (a few GB of CML RAM each) covering VLANs and STP,
-      EtherChannel, EIGRP, OSPF, BGP and HSRP. Courses can install all of their labs in one click.</p>
-    <div id="e-note">${note}</div></div>`;
+    <div class="welcome-hero"><h2>Welcome to ENCOR Lab Builder</h2>
+      <p class="lead">Hands-on CCNP ENCOR labs for your CML server. Pick a way to get your first labs. It takes a few seconds.</p></div>
+    <div class="choices">
+      <div class="choice rec"><span class="tag ok">Recommended</span><h3>Start with the basics</h3>
+        <p>Six small core labs: VLANs and STP, EtherChannel, EIGRP, OSPF, BGP and HSRP.</p>
+        <ul id="e-starter-list" class="starter-list muted small"><li>Loading the list…</li></ul>
+        <button data-help="lab.starter" id="e-starter" class="primary big">Install recommended starter set</button></div>
+      <div class="choice"><h3>Follow a course</h3>
+        <p>Courses put labs in a sensible order. <b>Install all</b> gets every lab of a course in one click.</p>
+        <p class="muted small">You can also pick single labs; each shows its size and how much CML RAM it needs.</p>
+        <button data-help="lab.browse" id="e-browse" class="big">📚 Browse library &amp; courses</button></div>
+      <div class="choice"><h3>Got a lab file?</h3>
+        <p>Import a .encorlab or .encorcourse file someone shared with you, or drop it anywhere on this page.</p>
+        <button data-help="import.button" id="e-import" class="big">⬆ Import a .encorlab file</button></div>
+    </div>
+    <div id="e-note">${note}</div>
+    <p id="e-next" class="muted small welcome-foot"></p></div>`;
   $("#e-starter").onclick = () => installStarter($("#e-starter"));
   $("#e-browse").onclick = () => openLibrary(true);
   $("#e-import").onclick = () => $("#import-file").click();
+  fillWelcome();
+}
+/* best effort: the starter labs with size and RAM, and a hint when no CML server is set yet */
+async function fillWelcome() {
+  api("/api/settings").then((s) => {
+    const n = $("#e-next"); if (!n) return;
+    n.innerHTML = s.cml_url ? "Labs download from the online lab library, so the app itself stays small."
+      : `Next step: add your CML server under <a data-help="lab.setup" href="#settings">Settings</a> so you can deploy the labs.`;
+    const a = $("a", n); if (a) a.onclick = (e) => { e.preventDefault(); location.hash = "settings"; show("settings"); };
+  }).catch(() => {});
+  const ul = $("#e-starter-list");
+  try {
+    const idx = await api("/api/library");
+    const set = idx.items.filter((it) => it.kind === "lab" && it.starter);
+    if (!$("#e-starter-list")) return;
+    if (!set.length) { ul.remove(); return; }
+    const kb = set.reduce((t, it) => t + it.size, 0) / 1024;
+    ul.innerHTML = set.map((it) => `<li><span>${esc(it.title)}</span>${it.ram_gb ? `<span class="tag ram">RAM ~${Math.round(it.ram_gb)} GB</span>` : ""}</li>`).join("") +
+      `<li class="total">${set.length} labs · ${kb.toFixed(0)} KB download</li>`;
+    $("#e-starter").textContent = `Install recommended starter set (${set.length} labs)`;
+  } catch (e) {
+    if (!$("#e-starter-list")) return;
+    ul.remove();
+    const box = $("#e-note");
+    if (box) { box.innerHTML = offlineNote(libErr(e)); const a = $("[data-retry]", box); if (a) a.onclick = (ev) => { ev.preventDefault(); renderEmpty(); }; }
+  }
 }
 function offlineNote(msg) {
-  return `<div class="err" data-help="lab.offline">Could not reach the lab library: ${esc(msg)}</div>
-    <p class="muted small">Are you offline? Everything else keeps working. You can <a data-help="lab.retry" href="#" data-retry="1">try again</a>,
-    import a .encorlab file you downloaded, or point Settings &gt; Library URL at another copy of the library.</p>`;
+  return `<div class="notice" data-help="lab.offline"><b>The lab library can't be reached right now.</b> Are you offline?
+    Everything else keeps working. <a data-help="lab.retry" href="#" data-retry="1">Try again</a>, import a .encorlab file,
+    or point Settings &gt; Library URL at another copy of the library.</div>
+    <div class="muted small">Could not reach the lab library: ${esc(msg)}</div>`;
 }
 function libErr(e) { const d = e.data || {}; return (d.errors && d.errors.length) ? d.errors.join("; ") : e.message; }
 async function installStarter(btn) {

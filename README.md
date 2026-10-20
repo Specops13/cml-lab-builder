@@ -119,8 +119,9 @@ Download from **[Releases](https://github.com/Specops13/encore-lab-app/releases/
 - Starting it again while it runs just opens the browser on the running copy.
 - **Quit:** close the console window or press Ctrl+C.
 - **Your data stays outside the app folder,** in `%APPDATA%\encorlab` or `~/.config/encorlab`. That covers settings, imported labs, history and installed updates. To update, use *Settings > Updates > Install update* (see [Updating](#updating-small-patches-instead-of-a-full-download)), or delete the old app folder and unzip the new one.
-- **No labs are included** (that keeps the download small). The first start shows *Install recommended starter set*,
-  *Browse library* and *Import a .encorlab file*; see [Lab library and courses](#lab-library-and-courses). Without
+- **No labs are included** (that keeps the download small). The first start shows a short welcome screen with three
+  choices: the recommended starter set (six small core labs, listed with their RAM needs, one click), a course, or a
+  lab file you already have; see [Lab library and courses](#lab-library-and-courses). Without
   internet access you can still import `.encorlab` files you downloaded elsewhere (e.g. from the repo's
   [`labs/`](labs/) folder).
 - The bundle includes `docs/`, this README, `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` (the .deb puts the last two in
