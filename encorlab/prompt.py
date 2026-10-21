@@ -16,7 +16,7 @@ def json_schema() -> dict:
     s = Lab.model_json_schema()
     s["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     s["$id"] = "encorlab-lab.schema.json"
-    s["title"] = "ENCOR Lab Builder lab definition"
+    s["title"] = "CML Lab Builder lab definition"
     return s
 
 
@@ -57,7 +57,7 @@ OUTPUT RULES
 def build_prompt(description: str | None = None, fmt: str = "yaml") -> str:
     desc = (description or "").strip() or PLACEHOLDER
     return "\n".join([
-        "You are generating a Cisco CCNP ENCOR (350-401) practice lab for the 'ENCOR Lab Builder' app,",
+        "You are generating a Cisco CCNP ENCOR (350-401) practice lab for the 'CML Lab Builder' app,",
         "which builds the lab in Cisco Modeling Labs 2.9 and grades it automatically.",
         "",
         "## Lab request",
@@ -82,7 +82,7 @@ def build_prompt(description: str | None = None, fmt: str = "yaml") -> str:
 
 
 DOC_HEADER = """\
-# AI prompt for generating ENCOR Lab Builder labs
+# AI prompt for generating CML Lab Builder labs
 
 How to use it:
 

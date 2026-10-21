@@ -10,8 +10,11 @@ from pathlib import Path
 from dataclasses import dataclass, field, fields
 from urllib.parse import urlparse
 
-KEYRING_SERVICE = "encorlab-cml"
-SECRETS = ("password", "device_password", "device_enable", "ai_api_key")
+# The default library address up to 2.0.0 (old repo name, old file names). A saved copy of it means "the default".
+LEGACY_LIBRARY_URLS = ("https://raw.githubusercontent.com/Specops13/encore-lab-app/main/labs/index.json",)
+KEYRING_SERVICE = "cml-lab-builder"
+LEGACY_KEYRING_SERVICE = "encorlab-cml"   # before 2.1.0; still read, copied to the new name on the data move
+SECRETS = ("password", "device_password", "device_enable", "nxos_password", "ai_api_key")
 
 
 def _bool_or_path(value: str | None, default: bool | str = True) -> bool | str:
@@ -39,11 +42,13 @@ class Settings:
     node_limit: int = 20
     lab_prefix: str = "ENCOR-"
     boot_timeout: int = 900
-    library_url: str = ""           # lab library index (labs/index.json); empty = the project's GitHub repo
+    library_url: str = ""           # lab library index (library/index.json); empty = the project's GitHub repo
     ram_heavy_gb: int = 16          # labs estimated at or above this many GB of CML RAM get a red "RAM heavy" tag
     device_username: str = "cisco"
     device_password: str = field(default="cisco", repr=False)
     device_enable: str = field(default="cisco", repr=False)
+    nxos_username: str = ""         # NX-OS (nxosv9000) console login and day-0 user; empty = the device username
+    nxos_password: str = field(default="", repr=False)   # empty = the device password
     ai_preset: str = ""             # optional AI generator (secondary feature)
     ai_base_url: str = ""
     ai_model: str = ""
@@ -120,12 +125,14 @@ def from_env(env: dict | None = None) -> Settings:
     s.device_username = e.get("ENCOR_DEVICE_USERNAME", s.device_username)
     s.device_password = e.get("ENCOR_DEVICE_PASSWORD", s.device_password)
     s.device_enable = e.get("ENCOR_DEVICE_ENABLE", s.device_enable)
+    s.nxos_username = e.get("ENCOR_NXOS_USERNAME", s.nxos_username)
+    s.nxos_password = e.get("ENCOR_NXOS_PASSWORD", s.nxos_password)
     s.ai_base_url = e.get("ENCOR_AI_BASE_URL", s.ai_base_url)
     s.ai_model = e.get("ENCOR_AI_MODEL", s.ai_model)
     s.ai_api_key = e.get("ENCOR_AI_API_KEY", s.ai_api_key)
     for k, v in load_saved(e).items():  # values saved from the Settings page win over env
-        if k == "library_url" and not v:
-            continue                    # empty = "the default", so ENCOR_LIBRARY_URL still applies
+        if k == "library_url" and (not v or str(v).strip() in LEGACY_LIBRARY_URLS):
+            continue                    # empty (or the pre-2.1 default) = "the default", so ENCOR_LIBRARY_URL still applies
         if k in PERSISTED:
             setattr(s, k, v)
     if e.get("ENCOR_USE_KEYRING", "1") != "0":
@@ -139,17 +146,15 @@ def from_env(env: dict | None = None) -> Settings:
 # Non-secret settings saved from the web Settings page. Passwords are never written here.
 PERSISTED = ("cml_url", "username", "verify_tls", "console_host", "console_port", "grading_mode",
              "platform", "node_limit", "boot_timeout", "ai_preset", "ai_base_url", "ai_model", "show_help",
-             "check_updates", "ram_heavy_gb", "library_url")
+             "check_updates", "ram_heavy_gb", "library_url", "device_username", "nxos_username")
 
 
 def settings_file(env=None) -> Path:
-    e = os.environ if env is None else env
-    if e.get("ENCOR_SETTINGS_FILE"):
-        return Path(e["ENCOR_SETTINGS_FILE"])
-    if os.name == "nt" and e.get("APPDATA"):
-        return Path(e["APPDATA"]) / "encorlab" / "settings.json"
-    base = Path(e["XDG_CONFIG_HOME"]) if e.get("XDG_CONFIG_HOME") else Path.home() / ".config"
-    return base / "encorlab" / "settings.json"
+    """settings.json in the user data folder (see paths.py; the first call moves a pre-2.1 encorlab folder)."""
+    from . import paths
+    if paths.env_get("SETTINGS_FILE", env):
+        return Path(paths.env_get("SETTINGS_FILE", env))
+    return paths.data_dir(env) / "settings.json"
 
 
 # settings.json format. 2 (1.7.0): automatic update checks are on by default. Files written before (no "_format")
@@ -182,7 +187,7 @@ def save_settings(s: "Settings", env=None) -> Path:
 def keyring_get(username: str) -> str | None:
     try:
         import keyring
-        return keyring.get_password(KEYRING_SERVICE, username)
+        return keyring.get_password(KEYRING_SERVICE, username) or keyring.get_password(LEGACY_KEYRING_SERVICE, username)
     except Exception:
         return None
 

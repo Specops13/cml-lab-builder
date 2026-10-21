@@ -114,7 +114,9 @@ def grade(lab: Lab, runner, platform: Platform,
                 out = configs[c.device]
             ok, details = evaluate(c, out, platform)
         except Exception as e:  # device unreachable, timeout, ...
-            out, ok, details = "", False, [f"error running command: {type(e).__name__}: {e}"]
+            tail = getattr(e, "tail", "")       # ConsoleError: the reason here, the last console lines as the output
+            out, ok = (f"(last console output)\n{tail}" if tail.strip() else ""), False
+            details = [f"error running command: {type(e).__name__}: {getattr(e, 'reason', None) or e}"]
         results.append(CheckResult(
             id=c.id, description=render(c.description, platform), device=c.device, command=cmd,
             passed=ok, points=c.points, earned=c.points if ok else 0,

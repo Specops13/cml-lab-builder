@@ -22,10 +22,13 @@ from .schema import version_key
 
 ORIGIN_FILE = ".library.json"
 
-DEFAULT_INDEX = "https://raw.githubusercontent.com/Specops13/encore-lab-app/main/labs/index.json"
+DEFAULT_INDEX = "https://raw.githubusercontent.com/Specops13/cml-lab-builder/main/library/index.json"
+# labs/index.json (.encorlab / .encorcourse names) is kept for 2.0.x, which reads it under the old repo name
+# (GitHub redirects that); packaging/build_library.py writes both folders from the same lab sources.
+LEGACY_INDEX = "https://raw.githubusercontent.com/Specops13/encore-lab-app/main/labs/index.json"
 MAX_INDEX_BYTES = 1024 * 1024
 MAX_DOWNLOAD = courses.MAX_COURSE_BYTES
-_FILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(encorlab|encorcourse)$")
+_FILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(cmllab|cmlcourse|encorlab|encorcourse)$")
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 
 Fetcher = Callable[[str, int], bytes]
@@ -114,7 +117,7 @@ def parse_index(raw: bytes) -> list[dict]:
         if not (isinstance(it, dict) and _FILE_RE.match(str(it.get("file", "")))
                 and _SHA_RE.match(str(it.get("sha256", ""))) and isinstance(it.get("size"), int)):
             continue   # skip malformed entries rather than failing the whole library
-        kind = "course" if it["file"].endswith(courses.COURSE_EXT) else "lab"
+        kind = "course" if it["file"].endswith(courses.COURSE_EXTS) else "lab"
         out.append({"file": it["file"], "kind": kind, "id": str(it.get("id", "")), "title": str(it.get("title", it["file"])),
                     "description": str(it.get("description", "")), "sha256": it["sha256"], "size": it["size"],
                     "blueprint": [str(x) for x in it.get("blueprint", [])][:20],
@@ -277,8 +280,8 @@ def install_url(file_url: str, expected_sha256: str = "", fetch: Fetcher = http_
                 node_limit: int = 20, overwrite: bool = False) -> dict:
     _check_url(file_url)
     name = urlparse(file_url).path.rsplit("/", 1)[-1] or "download"
-    if not name.lower().endswith((packs.PACK_EXT, courses.COURSE_EXT, ".zip", ".yaml", ".yml")):
-        raise LibraryError("the URL must point to a .encorlab, .encorcourse, .zip or .yaml file")
+    if not name.lower().endswith((*packs.PACK_EXTS, *courses.COURSE_EXTS, ".zip", ".yaml", ".yml")):
+        raise LibraryError("the URL must point to a .cmllab, .cmlcourse (or .encorlab, .encorcourse), .zip or .yaml file")
     exp = expected_sha256.strip().lower()
     if exp and not _SHA_RE.match(exp):
         raise LibraryError("sha256 must be 64 hex characters")
@@ -303,7 +306,7 @@ def build_index(folder, base_items: list[dict] | None = None, lab_roots: list | 
             continue
         data = f.read_bytes()
         it = {"file": f.name, "sha256": sha256(data), "size": len(data)}
-        if f.name.endswith(courses.COURSE_EXT):
+        if f.name.endswith(courses.COURSE_EXTS):
             c, bundled = courses.read_course(data)
             it.update(kind="course", id=c.id, title=c.title, description=c.description, labs=c.labs)
             labs_by_id = {lid: e.lab for lid, e in catalog.entries().items()}
@@ -311,7 +314,7 @@ def build_index(folder, base_items: list[dict] | None = None, lab_roots: list | 
                 for d in catalog.lab_dirs(root):
                     labs_by_id.setdefault(d.name, catalog.load_lab_file(d / "lab.yaml"))
             for f2 in folder.iterdir():      # labs published next to the course
-                if f2.name.endswith(packs.PACK_EXT) and f2.stem not in labs_by_id:
+                if f2.name.endswith(packs.PACK_EXTS) and f2.stem not in labs_by_id:
                     labs_by_id[f2.stem] = packs.parse_lab_text(packs.read_upload(f2.name, f2.read_bytes()).lab_yaml)[0]
             for bp in bundled.values():
                 bl, _ = packs.parse_lab_text(bp.lab_yaml)

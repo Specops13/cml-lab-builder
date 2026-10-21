@@ -30,7 +30,7 @@ def wait(c, job_id):
 
 def test_index_and_static():
     c, _ = make()
-    assert "ENCOR Lab Builder" in c.get("/").text
+    assert "CML Lab Builder" in c.get("/").text
     assert c.get("/static/app.js").status_code == 200
     assert c.get("/api/health").json()["ok"]
 

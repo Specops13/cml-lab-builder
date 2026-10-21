@@ -1,4 +1,4 @@
-# ENCOR Lab Builder launcher for Windows 11 (PowerShell).
+# CML Lab Builder launcher for Windows 11 (PowerShell).
 #   .\run.ps1               -> start the web UI on http://127.0.0.1:8765
 #   .\run.ps1 list          -> run a CLI command
 # If scripts are blocked: powershell -ExecutionPolicy Bypass -File .\run.ps1

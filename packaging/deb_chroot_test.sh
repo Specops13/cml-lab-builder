@@ -1,11 +1,13 @@
 #!/bin/bash
 # End-to-end test of the .deb in a clean Debian chroot (run on the host with sudo available).
-#   packaging/deb_chroot_test.sh <debian-12-chroot> <encorlab_X_amd64.deb>
+#   packaging/deb_chroot_test.sh <debian-12-chroot> <encorlab_X_amd64.deb> [<older .deb> <encorlab-patch-X.zip>]
+# With an older package and the patch of X, it first tests the in-app patch + data move on the installed older
+# package (rename_test.py) and the apt upgrade from it.
 # Make the chroot once with:  sudo debootstrap --variant=minbase bookworm /path/deb12
 # Checks: apt install, desktop-file-validate, launch + single instance, smoke test with patch and
 # auto-update tests as a normal user (/opt untouched), deb upgrades vs. a user-dir patch, remove/purge.
 set -euo pipefail
-CHROOT=$(realpath "$1"); DEB=$(realpath "$2")
+CHROOT=$(realpath "$1"); DEB=$(realpath "$2"); OLDDEB=${3:+$(realpath "$3")}; PATCHZIP=${4:+$(realpath "$4")}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 WORK=$(mktemp -d /tmp/debtest-XXXX)
 VER=$(dpkg-deb -f "$DEB" Version)
@@ -35,6 +37,7 @@ print(build_patch.build_patch(src(pv), work / "patch", pv, None))
 PY
 mkdir -p "$WORK/debs"; cp "$DEB" "$WORK/debs/"
 cp "$WORK"/patch/*.zip "$WORK/debs/user-patch-$PV.zip"
+if [ -n "$OLDDEB" ] && [ -n "$PATCHZIP" ]; then cp "$OLDDEB" "$WORK/debs/old-$(basename "$OLDDEB")"; cp "$PATCHZIP" "$WORK/debs/patch-$VER.zip"; fi
 
 cleanup() { set +e; for m in src tmp/debtest dev/pts dev sys proc; do sudo umount -l "$CHROOT/$m" 2>/dev/null; done; rm -rf "$WORK"; }
 trap cleanup EXIT

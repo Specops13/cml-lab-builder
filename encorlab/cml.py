@@ -119,7 +119,9 @@ class CML:
                 f"({running} already running, limit {self.s.node_limit}); stop another lab first")
 
     def creds(self) -> tuple[str, str]:
-        return (self.s.device_username or "cisco", self.s.device_password or "cisco")
+        """The NX-OS day-0 login (admin and this user get the password); Settings > NX-OS login, else the device login."""
+        return (getattr(self.s, "nxos_username", "") or self.s.device_username or "cisco",
+                getattr(self.s, "nxos_password", "") or self.s.device_password or "cisco")
 
     def boot_timeout(self, lab: Lab) -> int:
         need = [d.boot_s for n in lab.nodes if (d := node_def(n.definition))]
@@ -235,7 +237,19 @@ class CML:
             raise CMLError("lab is not built")
         if self.s.console_backend == "pyats":
             return PyatsRunner(self.s, cl)
-        return SSHConsoleRunner(self.s, cl.title)
+        return SSHConsoleRunner(self.s, cl.title, node_os=node_os(lab), ready_timeout=node_ready_timeout(lab))
+
+
+def node_os(lab: Lab) -> dict:
+    """node name -> "nxos" / "ios" (how the console session logs in and sets up the terminal)."""
+    from .platforms import node_def
+    return {n.name: (node_def(n.definition).os if node_def(n.definition) else "ios") for n in lab.nodes}
+
+
+def node_ready_timeout(lab: Lab) -> dict:
+    """How long a node's console may take to come up (its boot time, at least 5 minutes)."""
+    from .platforms import node_def
+    return {n.name: max(300, node_def(n.definition).boot_s if node_def(n.definition) else 300) for n in lab.nodes}
 
 
 class CMLConfigSource:

@@ -167,12 +167,15 @@ def test_build_deb_layout_and_metadata(tmp_path):
     assert deb.name == "encorlab_1.8.0_amd64.deb"
     info = subprocess.run(["dpkg-deb", "-f", str(deb)], capture_output=True, text=True, check=True).stdout
     for want in ("Package: encorlab", "Version: 1.8.0", "Architecture: amd64", "Depends: libc6 (>= 2.28)",
-                 "Recommends: xdg-utils", "Maintainer: ", "Homepage: https://github.com/Specops13/encore-lab-app",
-                 "Description: build and grade CCNP ENCOR labs"):
+                 "Recommends: xdg-utils", "Maintainer: ", "Homepage: https://github.com/Specops13/cml-lab-builder",
+                 "Description: build and grade practice labs in Cisco Modeling Labs"):
         assert want in info, want
     files = deb_contents(deb)
     assert files["/opt/encorlab/ENCORLab"].startswith("-rwxr-xr-x") and files["/usr/bin/encorlab"].startswith("-rwxr-xr-x")
     assert files["/opt/encorlab/README.md"].startswith("-rw-r--r--")
+    listing = subprocess.run(["dpkg-deb", "-c", str(deb)], capture_output=True, text=True, check=True).stdout
+    assert files["/usr/bin/cmllab"].startswith("l") and "./usr/bin/cmllab -> encorlab\n" in listing   # 2.1.0 command name
+    assert "./usr/share/man/man1/cmllab.1.gz -> encorlab.1.gz\n" in listing
     assert "/opt/encorlab/install-desktop-entry.sh" not in files            # the tar.gz-only helper
     for p in ("/opt/encorlab/install-type", "/usr/share/applications/encorlab.desktop", "/usr/share/man/man1/encorlab.1.gz",
               "/usr/share/doc/encorlab/copyright", "/usr/share/doc/encorlab/changelog.gz",

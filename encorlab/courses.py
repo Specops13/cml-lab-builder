@@ -1,4 +1,4 @@
-"""Courses: a .encorcourse file bundles several labs into an ordered study track.
+"""Courses: a .cmlcourse file (.encorcourse before 2.1.0) bundles several labs into an ordered study track.
 
 Format (a zip):
     course.yaml          id, title, description, labs: [lab ids in study order]
@@ -18,7 +18,8 @@ from pydantic import BaseModel, Field, ValidationError
 
 from . import catalog, packs
 
-COURSE_EXT = ".encorcourse"
+COURSE_EXT = ".cmlcourse"
+COURSE_EXTS = (".cmlcourse", ".encorcourse")   # .encorcourse: the name before 2.1.0, still imported
 MAX_COURSE_BYTES = 20 * 1024 * 1024
 MAX_LABS = 50
 ID_RE = r"^[a-z0-9][a-z0-9-]{1,48}$"
@@ -39,7 +40,7 @@ def courses_dir() -> Path:
 
 
 def is_course(filename: str, data: bytes) -> bool:
-    if filename.lower().endswith(COURSE_EXT):
+    if filename.lower().endswith(COURSE_EXTS):
         return True
     if data[:2] != b"PK":
         return False
@@ -72,7 +73,7 @@ def read_course(data: bytes) -> tuple[Course, dict[str, packs.Pack]]:
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
-        raise packs.LabError(["not a valid .encorcourse/zip file"])
+        raise packs.LabError(["not a valid .cmlcourse/zip file"])
     infos = [i for i in zf.infolist() if not i.is_dir()]
     if sum(i.file_size for i in infos) > MAX_COURSE_BYTES:
         raise packs.LabError(["course contents are too large"])
@@ -93,7 +94,7 @@ def read_course(data: bytes) -> tuple[Course, dict[str, packs.Pack]]:
         with zipfile.ZipFile(buf, "w") as z:
             for n, b in files.items():
                 z.writestr(n, b)
-        bundled[folder] = packs.read_upload(f"{folder}.encorlab", buf.getvalue())
+        bundled[folder] = packs.read_upload(f"{folder}.cmllab", buf.getvalue())
     return course, bundled
 
 
@@ -232,7 +233,7 @@ def _zput(z: zipfile.ZipFile, name: str, data: bytes) -> None:
 
 
 def deterministic_pack(path: Path) -> bytes:
-    """Pack a lab folder into .encorlab bytes reproducibly."""
+    """Pack a lab folder into .cmllab bytes reproducibly."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         for n in packs.PACK_FILES:
@@ -242,7 +243,7 @@ def deterministic_pack(path: Path) -> bytes:
 
 
 def build(source: Path, search: list[Path] | None = None, known: set[str] | None = None) -> bytes:
-    """Build a .encorcourse from a folder: course.yaml + labs/<id>/ (optional). Labs listed in course.yaml that
+    """Build a .cmlcourse from a folder: course.yaml + labs/<id>/ (optional). Labs listed in course.yaml that
     are not built in, not in `known` (labs the library publishes as packs; the app installs them from the library
     with the course) and not under labs/ are taken from <search dir>/<id>/. Validates the result."""
     known = set(known or ()) | packs.builtin_ids()

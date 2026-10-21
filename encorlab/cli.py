@@ -1,4 +1,4 @@
-"""Command line interface: encorlab <command>  (or python -m encorlab <command>)."""
+"""Command line interface: cmllab <command>  (or python -m cmllab <command>)."""
 from __future__ import annotations
 
 import json
@@ -10,17 +10,23 @@ from . import __version__, catalog, config, courses, history, library, packs, se
 from .platforms import get as get_platform, render
 from .render import to_yaml
 
-app = typer.Typer(add_completion=False, help=f"ENCOR Lab Builder {__version__}: build CCNP ENCOR labs in CML 2.9 and grade them.")
+app = typer.Typer(add_completion=False, help=f"CML Lab Builder {__version__}: build labs in CML 2.9 and grade them (CCNP ENCOR and other tracks).")
 
 
 @app.callback()
 def _main():
-    """ENCOR Lab Builder command line."""
-    from . import migrate
+    """CML Lab Builder command line."""
+    from . import migrate, paths
+    mv = paths.ensure_moved()     # 2.1.0: the data folder encorlab -> cml-lab-builder (once, see paths.py)
+    if mv.get("state") == "moved" and not mv.get("cli_notified"):
+        typer.echo(f"note: your data moved to {mv['to']} (the old folder {mv['from']} was left in place)", err=True)
+        paths.acknowledge("cli_notified")
+    elif mv.get("state") == "failed":
+        typer.echo(f"warning: could not move your data folder: {mv.get('error')}", err=True)
     st = migrate.run_local()      # keep the labs 1.x bundled (once, see migrate.py)
     if st.get("state") == "pending" and st.get("pending"):
         typer.echo(f"note: {len(st.get('pending', []))} lab(s) from your previous version still need to be restored "
-                   "from the online library: encorlab library restore", err=True)
+                   "from the online library: cmllab library restore", err=True)
 
 
 def _settings():
@@ -60,9 +66,9 @@ def list_labs():
     es = catalog.entries()
     if not es:
         typer.echo("no labs installed yet. Labs come from the online library:\n"
-                   "  encorlab library install --starter     the recommended starter set\n"
-                   "  encorlab library list                  everything the library offers\n"
-                   "  encorlab import <file.encorlab>        a lab pack you downloaded")
+                   "  cmllab library install --starter     the recommended starter set\n"
+                   "  cmllab library list                  everything the library offers\n"
+                   "  cmllab import <file.cmllab>          a lab pack you downloaded")
     for lid, e in es.items():
         lab = e.lab
         fl = f"  faults:{len(lab.faults)}" if lab.faults else ""
@@ -80,7 +86,7 @@ def task(lab_id: str):
 
 
 @app.command()
-def validate(paths: list[Path] = typer.Argument(None, help="lab .yaml / .encorlab / folder; default: whole catalog"),
+def validate(paths: list[Path] = typer.Argument(None, help="lab .yaml / .cmllab / folder; default: whole catalog"),
              strict: bool = typer.Option(None, help="require a solution and a 0% blank score (default on for files)")):
     """Validate labs offline: schema, interface names, node limit, solution 100% / starting config 0%."""
     ok = True
@@ -104,8 +110,8 @@ def validate(paths: list[Path] = typer.Argument(None, help="lab .yaml / .encorla
 
 @app.command()
 def pack(source: Path = typer.Argument(..., help="lab folder (lab.yaml [+ solution.cfg, fixtures]) or a lab .yaml"),
-         out: Path = typer.Option(None, "-o", "--out", help="output file (default <id>.encorlab)")):
-    """Validate strictly and write a shareable .encorlab pack."""
+         out: Path = typer.Option(None, "-o", "--out", help="output file (default <id>.cmllab)")):
+    """Validate strictly and write a shareable .cmllab pack."""
     try:
         pk = packs.read_dir(source)
     except packs.LabError as e:
@@ -123,7 +129,7 @@ def pack(source: Path = typer.Argument(..., help="lab folder (lab.yaml [+ soluti
 
 @app.command("import")
 def import_lab(file: Path, replace: bool = typer.Option(False, help="overwrite an existing user lab with the same id")):
-    """Import a .encorlab pack, a .encorcourse course or a lab .yaml into your user labs folder."""
+    """Import a .cmllab pack, a .cmlcourse course (or the older .encorlab / .encorcourse) or a lab .yaml into your user labs folder."""
     data = file.read_bytes()
     if courses.is_course(file.name, data):
         try:
@@ -152,7 +158,7 @@ def import_lab(file: Path, replace: bool = typer.Option(False, help="overwrite a
 @app.command()
 def export(lab_id: str, out: Path = typer.Option(None, "-o", "--out"),
            cml_yaml: bool = typer.Option(False, "--cml-yaml", help="write the CML topology YAML instead of a pack")):
-    """Export a lab as a .encorlab pack (or as CML topology YAML)."""
+    """Export a lab as a .cmllab pack (or as CML topology YAML)."""
     if cml_yaml:
         s = _settings()
         y = to_yaml(catalog.get(lab_id), get_platform(s.platform), s.lab_prefix)
@@ -360,7 +366,7 @@ def test_live(lab_id: str, mode: str = typer.Option("auto"), keep: bool = typer.
 
 @app.command("progress")
 def show_progress(as_json: bool = typer.Option(False, "--json")):
-    """Progress dashboard: mastery per ENCOR domain, streak, time spent, weakest topics."""
+    """Progress dashboard: mastery per track and ENCOR domain, streak, time spent, weakest topics."""
     from . import progress
     p = progress.compute()
     if as_json:
@@ -397,7 +403,7 @@ def break_lab(lab_id: str, fault: str = typer.Option(None, help="a specific faul
     rep = service.do_break(_settings(), lab_id, _p, fault_id=fault)
     typer.echo("")
     typer.echo("TROUBLE TICKET: " + rep["ticket"])
-    typer.echo(f"Fix it, then run: encorlab check {lab_id}   (encorlab fault {lab_id} --reveal to give up)")
+    typer.echo(f"Fix it, then run: cmllab check {lab_id}   (cmllab fault {lab_id} --reveal to give up)")
 
 
 @app.command()
@@ -410,10 +416,10 @@ def fault(lab_id: str, reveal: bool = typer.Option(False, "--reveal", help="show
     st = faults.active(lab_id)
     if end:
         faults.clear(lab_id)
-        typer.echo("fault practice ended (use 'encorlab reset' to go back to the starting configs)")
+        typer.echo("fault practice ended (use 'cmllab reset' to go back to the starting configs)")
         return
     if not st:
-        typer.echo(f"No active fault. {len(lab.faults)} predefined faults; start with: encorlab break {lab_id}")
+        typer.echo(f"No active fault. {len(lab.faults)} predefined faults; start with: cmllab break {lab_id}")
         raise typer.Exit(1)
     if reveal:
         faults.mark_revealed(lab_id)
@@ -474,7 +480,7 @@ def update_install(file: str = typer.Option("", "--file", help="install a downlo
         typer.echo(f"ERROR: {e}")
         raise typer.Exit(1)
     if r["status"] == "installed":
-        typer.echo(f"Installed {r['version']} ({r['size'] / 1024:.0f} KB, sha256 verified). Restart ENCOR Lab Builder to use it.")
+        typer.echo(f"Installed {r['version']} ({r['size'] / 1024:.0f} KB, sha256 verified). Restart CML Lab Builder to use it.")
     elif r["status"] == "up_to_date":
         typer.echo(f"You have the latest version ({r['current']}).")
     else:
@@ -491,8 +497,8 @@ def update_rollback():
         typer.echo(f"ERROR: {e}")
         raise typer.Exit(1)
     n = r["next"]
-    typer.echo(f"Rolled back. Next start uses {n['version']} ({n['source']}). Restart ENCOR Lab Builder." if n
-               else "Rolled back. Restart ENCOR Lab Builder.")
+    typer.echo(f"Rolled back. Next start uses {n['version']} ({n['source']}). Restart CML Lab Builder." if n
+               else "Rolled back. Restart CML Lab Builder.")
 
 
 def _fmt(sec) -> str:
@@ -507,7 +513,7 @@ def exam_cmd(lab_id: str,
              hints: str = typer.Option("penalty", help="penalty (each hint costs points) or off"),
              penalty: int = typer.Option(10, help="points per hint in penalty mode"),
              abort: bool = typer.Option(False, "--abort", help="abandon the running exam (nothing is recorded)")):
-    """Exam mode: timed, one submission (encorlab check), hints off or penalized. Without options: show status."""
+    """Exam mode: timed, one submission (cmllab check), hints off or penalized. Without options: show status."""
     from . import exam
     lab = catalog.get(lab_id)
     if abort:
@@ -525,11 +531,11 @@ def exam_cmd(lab_id: str,
             raise typer.Exit(1)
         typer.echo(f"Exam started: {_fmt(st['duration_s'])} on the clock, hints {st['hints']}"
                    + (f" (-{st['penalty']} points each)" if st["hints"] == "penalty" else "") + f", pass target {st['pass_pct']}%.")
-        typer.echo(f"Build the lab if needed (encorlab build {lab_id}), solve it, then submit with: encorlab check {lab_id}")
+        typer.echo(f"Build the lab if needed (cmllab build {lab_id}), solve it, then submit with: cmllab check {lab_id}")
         return
     st = exam.status(lab_id)
     if not st:
-        typer.echo(f"No exam running. Start one with: encorlab exam {lab_id} --start [--minutes {exam.default_minutes(lab)}]")
+        typer.echo(f"No exam running. Start one with: cmllab exam {lab_id} --start [--minutes {exam.default_minutes(lab)}]")
         return
     typer.echo(f"Exam running since {st['started']}: {_fmt(st['remaining_s'])} left of {_fmt(st['duration_s'])}"
                + (" (TIME IS UP - submit now)" if st["expired"] else "") + f", hints {st['hints']}, used {st['hints_used']}.")
@@ -563,7 +569,7 @@ def snapshot_cmd(lab_id: str,
         else:
             items = snapshots.list_snapshots(lab_id)
             if not items:
-                typer.echo(f"no snapshots for {lab_id} (save one with: encorlab snapshot {lab_id} --save NAME)")
+                typer.echo(f"no snapshots for {lab_id} (save one with: cmllab snapshot {lab_id} --save NAME)")
             for x in items:
                 typer.echo(f"{x['name']:<28} {x['created']}  {x['platform'] or '-':<5} {len(x['nodes'])} devices  {x['note']}")
     except snapshots.SnapshotError as e:
@@ -590,7 +596,7 @@ def console_cmds(lab_id: str):
     s = _settings()
     st = service.do_status(s, lab_id)
     if not st.get("exists"):
-        typer.echo(f"{lab_id} is not built in CML yet (run: encorlab build {lab_id})")
+        typer.echo(f"{lab_id} is not built in CML yet (run: cmllab build {lab_id})")
         raise typer.Exit(1)
     if st.get("cml_lab_url"):
         typer.echo(f"CML web UI: {st['cml_lab_url']}")
@@ -629,7 +635,7 @@ def web(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = typer.Op
     if host not in ("127.0.0.1", "localhost", "::1"):
         typer.echo("WARNING: binding to a non-loopback address exposes the UI to your network")
     url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '::') else host}:{port}"
-    typer.echo(f"ENCOR Lab Builder {__version__} on {url}  (Ctrl+C to stop)")
+    typer.echo(f"CML Lab Builder {__version__} on {url}  (Ctrl+C to stop)")
     if open_browser:
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     uvicorn.run(create_app(), host=host, port=port, log_level="warning")
@@ -637,7 +643,7 @@ def web(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = typer.Op
 
 
 # ---------------------------------------------------------------- courses + online library
-course_app = typer.Typer(help="Courses: ordered bundles of labs (.encorcourse).", no_args_is_help=True)
+course_app = typer.Typer(help="Courses: ordered bundles of labs (.cmlcourse).", no_args_is_help=True)
 library_app = typer.Typer(help="Online lab library (packs and courses from the GitHub repo or a URL).", no_args_is_help=True)
 app.add_typer(course_app, name="course")
 app.add_typer(library_app, name="library")
@@ -660,7 +666,7 @@ def course_list():
     st = config.from_env()
     cs = courses.list_courses(_best(), platform=st.platform, heavy_gb=st.ram_heavy_gb)
     if not cs:
-        typer.echo("no courses installed (import a .encorcourse file, or: encorlab library list)")
+        typer.echo("no courses installed (import a .cmlcourse file, or: cmllab library list)")
     for c in cs:
         typer.echo(f"{c['id']}: {c['title']}  [{c['solved']}/{c['total']} solved]" + (f"  next: {c['next']}" if c["next"] else ""))
         for i, l in enumerate(c["labs"], 1):
@@ -672,7 +678,7 @@ def course_list():
 def course_build(source: Path = typer.Argument(..., help="folder with course.yaml (+ labs/<id>/ folders)"),
                  out: Path = typer.Option(None, "-o", "--out"),
                  search: list[Path] = typer.Option(None, "--labs-from", help="also take listed labs from <dir>/<id>/")):
-    """Build and validate a .encorcourse file."""
+    """Build and validate a .cmlcourse file."""
     try:
         data = courses.build(source, search=search or [])
     except packs.LabError as e:
@@ -716,7 +722,7 @@ def library_list(url: str = typer.Option("", help=_URL_HELP)):
         star = " *" if it.get("starter") else ""
         typer.echo(f"{it['file']:<36} {it['kind']:<6} {mark:<9} {ram:>16} {it['size'] / 1024:6.1f} KB  {it['title']}{star}")
     if idx.get("starter"):
-        typer.echo("* = recommended starter set (encorlab library install --starter)")
+        typer.echo("* = recommended starter set (cmllab library install --starter)")
 
 
 @library_app.command("install")

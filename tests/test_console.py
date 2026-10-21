@@ -148,7 +148,7 @@ def test_unreachable_console_server():
     def boom():
         raise OSError("timed out")
     r = SSHConsoleRunner(s, "ENCOR-x", client_factory=boom)
-    with pytest.raises(ConsoleError, match="cannot reach console server"):
+    with pytest.raises(ConsoleError, match="cannot reach (the )?console server"):
         r.run("R1", "show version")
 
 

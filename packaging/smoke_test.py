@@ -86,7 +86,8 @@ def make_patch(tmp: Path, version: str, broken: bool = False, min_runtime: int |
     return build_patch.build_patch(src, tmp / "out", version, min_runtime)
 
 
-def patch_tests(exe, version: str, data_dir: Path, port: int, check) -> None:
+def patch_tests(exe, version: str, data_dir: Path, port: int, check, boot_dir: Path | None = None) -> None:
+    boot_dir = boot_dir or data_dir
     import shutil
     import tempfile
     tmp = Path(tempfile.mkdtemp(prefix="encor-smoke-"))
@@ -95,7 +96,7 @@ def patch_tests(exe, version: str, data_dir: Path, port: int, check) -> None:
         check(good.stat().st_size < 2_000_000, f"test patch built ({good.stat().st_size // 1024} KB)")
         code, out = run(exe + ["update-install", "--file", str(good)])
         check(code == 0 and "Installed 99.0.0" in out, f"update-install --file -> {out.strip()[-80:]!r}")
-        check((data_dir / "app" / "99.0.0" / "encorlab" / "__init__.py").is_file(), "patch extracted to <data>/app/99.0.0")
+        check((boot_dir / "app" / "99.0.0" / "encorlab" / "__init__.py").is_file(), "patch extracted to <data>/app/99.0.0")
         code, out = run(exe + ["version"])
         check(code == 0 and out.strip().endswith("99.0.0"), f"next start runs the patch: version -> {out.strip()[-20:]!r}")
         code, out = run(exe + ["update-status"])
@@ -118,7 +119,7 @@ def patch_tests(exe, version: str, data_dir: Path, port: int, check) -> None:
                 time.sleep(0.5)
             check(health and health.get("version") == "99.0.0", f"patched web UI is up: {health}")
             time.sleep(1.5)
-            st = json.loads((data_dir / "app" / "state.json").read_text(encoding="utf-8"))
+            st = json.loads((boot_dir / "app" / "state.json").read_text(encoding="utf-8"))
             check(st.get("current") == "99.0.0" and not st.get("pending"), "patch marked good after the UI started")
         finally:
             try:
@@ -138,15 +139,15 @@ def patch_tests(exe, version: str, data_dir: Path, port: int, check) -> None:
         check(code == 0 and "Installed 99.0.1" in out, "a patch that fails to import still installs (it is valid)")
         code, out = run(exe + ["version"])
         check(code == 0 and out.strip().endswith(version), f"broken patch -> automatic fallback: version -> {out.strip()[-20:]!r}")
-        st = json.loads((data_dir / "app" / "state.json").read_text(encoding="utf-8"))
+        st = json.loads((boot_dir / "app" / "state.json").read_text(encoding="utf-8"))
         check((st.get("failed") or {}).get("version") == "99.0.1" and st.get("current") != "99.0.1",
               f"broken patch recorded as failed: {st.get('failed')}")
         newer = make_patch(tmp, "99.0.2", min_runtime=999)
         code, out = run(exe + ["update-install", "--file", str(newer)])
-        check(code == 0 and "Full download needed" in out and not (data_dir / "app" / "99.0.2").exists(),
+        check(code == 0 and "Full download needed" in out and not (boot_dir / "app" / "99.0.2").exists(),
               "a patch that needs a newer runtime is refused")
     finally:
-        shutil.rmtree(data_dir / "app", ignore_errors=True)
+        shutil.rmtree(boot_dir / "app", ignore_errors=True)
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -156,7 +157,8 @@ def post_json(url, timeout=15):
         return json.loads(r.read())
 
 
-def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre) -> None:
+def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre, boot_dir: Path | None = None) -> None:
+    boot_dir = boot_dir or data_dir
     """End to end against a fake release served on 127.0.0.1: background check -> staged (not installed) -> prompt
     -> Update now waits for a running exam -> installs -> restarts on the same port -> 'Updated to' state."""
     import shutil
@@ -185,7 +187,7 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre) -
             time.sleep(0.5)
         check(st and st.get("enabled") and (st.get("offer") or {}).get("version") == new,
               f"background check found and staged {new}: offer={st and st.get('offer')}")
-        check(not (data_dir / "app" / new).exists() and (data_dir / "updates" / "staged" / f"encorlab-patch-{new}.zip").is_file(),
+        check(not (boot_dir / "app" / new).exists() and (data_dir / "updates" / "staged" / f"encorlab-patch-{new}.zip").is_file(),
               "patch downloaded + verified into updates/staged, not installed")
         labs = json.loads(get(base + "/api/labs")[2])
         lab_id = sorted(x["id"] for x in labs["labs"] if not x.get("walkthrough"))[0]
@@ -195,7 +197,7 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre) -
               f"Update now waits for the running exam: {a.get('waiting_for')}")
         time.sleep(3)
         h = json.loads(get(base + "/api/health")[2])
-        check(h.get("version") == version and not (data_dir / "app" / new).exists(), "nothing installed while the exam runs")
+        check(h.get("version") == version and not (boot_dir / "app" / new).exists(), "nothing installed while the exam runs")
         post_json(f"{base}/api/labs/{lab_id}/exam/abort")
         health = None
         for _ in range(180):
@@ -210,7 +212,7 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre) -
         st = json.loads(get(base + "/api/update/auto")[2])
         check((st.get("just_updated") or {}).get("version") == new, f"page gets 'Updated to {new}': {st.get('just_updated')}")
         time.sleep(1.5)
-        boot = json.loads((data_dir / "app" / "state.json").read_text(encoding="utf-8"))
+        boot = json.loads((boot_dir / "app" / "state.json").read_text(encoding="utf-8"))
         check(boot.get("current") == new and not boot.get("pending"), "new version confirmed by the boot loader")
         etags = [r for r in fake.requests if r[0].endswith("/releases/latest")]
         check(bool(etags) and etags[0][1] is None, f"release API polled ({len(etags)} request(s))")
@@ -225,7 +227,7 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre) -
         fake.stop()
         code, out = run(exe + ["update-rollback"])
         check(code == 0 and "Rolled back" in out, "update-rollback after the auto update")
-        shutil.rmtree(data_dir / "app", ignore_errors=True)
+        shutil.rmtree(boot_dir / "app", ignore_errors=True)
         shutil.rmtree(data_dir / "updates", ignore_errors=True)
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -234,13 +236,22 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("exe")
     ap.add_argument("--version", required=True)
-    ap.add_argument("--data-dir", required=True, help="where settings/labs must land (%%APPDATA%%\\encorlab or ~/.config/encorlab)")
+    ap.add_argument("--data-dir", required=True, help="where settings/labs must land (%%APPDATA%%\\cml-lab-builder or ~/.config/cml-lab-builder; "
+                    "encorlab for builds before 2.1.0)")
+    ap.add_argument("--boot-dir", help="where the boot loader keeps app/ (default: the encorlab folder next to a "
+                    "cml-lab-builder data folder, else the data folder)")
     ap.add_argument("--pack", action="append", default=[])
     ap.add_argument("--runner", default="", help="e.g. 'wine'")
     ap.add_argument("--port", type=int, default=18765)
     ap.add_argument("--patch-test", action="store_true")
     ap.add_argument("--auto-update-test", action="store_true")
     a = ap.parse_args()
+    dd = Path(a.data_dir)
+    boot = Path(a.boot_dir) if a.boot_dir else (dd.with_name("encorlab") if dd.name == "cml-lab-builder" else dd)
+    global LIBRARY
+    new_names = tuple(int(x) for x in a.version.split(".")[:2]) >= (2, 1)
+    if new_names:                     # 2.1+: the library with .cmllab/.cmlcourse files (labs/ keeps the old names)
+        LIBRARY = ROOT / "library"
     pre = a.runner.split() if a.runner else []
     exe = pre + [a.exe]
     ok = True
@@ -250,15 +261,15 @@ def main() -> int:
         print(("PASS " if cond else "FAIL ") + msg, flush=True)
         ok = ok and bool(cond)
 
-    for k in [k for k in os.environ if k.startswith("ENCOR_")]:
+    for k in [k for k in os.environ if k.startswith(("ENCOR_", "CMLLAB_"))]:
         del os.environ[k]
     code, out = run(exe + ["version"])
     check(code == 0 and a.version in out, f"CLI 'version' -> {out.strip()[-40:]!r}")
     code, out = run(exe + ["list"])
     check(code == 0 and "no labs installed yet" in out and "eigrp-basic" not in out, "CLI 'list' on a first run: no labs, points to the library")
-    lib_srv, lib_url = serve_library()
+    lib_srv, lib_url = serve_library(LIBRARY)
     index = json.loads((LIBRARY / "index.json").read_text(encoding="utf-8"))
-    packs_given = a.pack or [str(LIBRARY / "troubleshoot-ospf-7node.encorlab")]
+    packs_given = a.pack or [str(LIBRARY / ("troubleshoot-ospf-7node.cmllab" if new_names else "troubleshoot-ospf-7node.encorlab"))]
 
     t0 = time.time()
     proc = subprocess.Popen(exe + ["--no-browser", "--port", str(a.port)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -284,7 +295,7 @@ def main() -> int:
         check(health and health.get("version") == a.version, f"server up in {time.time() - t0:.1f}s, health={health}")
         st, ct, html = get(base + "/")
         html = html.decode("utf-8")
-        check(st == 200 and "ENCOR Lab Builder" in html and f"app.js?v={a.version}" in html, "UI page served with versioned assets")
+        check(st == 200 and "CML Lab Builder" in html and f"app.js?v={a.version}" in html, "UI page served with versioned assets")
         st, ct, js = get(base + f"/static/app.js?v={a.version}")
         check(st == 200 and "javascript" in ct and len(js) > 10000, f"app.js served ({ct})")
         st, ct, _ = get(base + "/static/help.json")
@@ -304,7 +315,7 @@ def main() -> int:
         check(set(ids) == set(index["starter"]) and all(l["source"] == "user" for l in ids.values()),
               f"starter labs installed into the user labs folder: {sorted(ids)}")
         check(all((Path(a.data_dir) / "labs" / lid / ".library.json").is_file() for lid in ids), "library origin recorded")
-        course = next(i for i in index["items"] if i["file"] == "data-center.encorcourse")
+        course = next(i for i in index["items"] if i["file"] == ("data-center.cmlcourse" if new_names else "data-center.encorcourse"))
         r = post_body(base + "/api/library/install", {"file": course["file"]})
         check(r.get("kind") == "course" and set(course["labs"]) <= set(r.get("installed", [])),
               f"course Install all -> course + its labs from the library: {r.get('installed')}")
@@ -342,9 +353,9 @@ def main() -> int:
     check(code == 0 and "eigrp-basic" in out and "18-evpn-vxlan" in out, "CLI 'list' shows the installed labs")
     lib_srv.shutdown()
     if a.patch_test:
-        patch_tests(exe, a.version, Path(a.data_dir), a.port + 1, check)
+        patch_tests(exe, a.version, Path(a.data_dir), a.port + 1, check, boot)
     if a.auto_update_test:
-        auto_update_test(exe, a.version, Path(a.data_dir), a.port + 2, check, pre)
+        auto_update_test(exe, a.version, Path(a.data_dir), a.port + 2, check, pre, boot)
     print("SMOKE TEST " + ("PASSED" if ok else "FAILED"))
     return 0 if ok else 1
 

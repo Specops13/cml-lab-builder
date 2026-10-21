@@ -3,7 +3,7 @@
 <body><div class="page">
 <div class="toolbar noprint"><button title="Open the print dialog; choose 'Save as PDF' to get a PDF" onclick="window.print()">Print / Save as PDF</button></div>
 <div class="head"><div>
-  <div class="muted small">ENCOR Lab Builder {{ version }} - lab report</div>
+  <div class="muted small">CML Lab Builder {{ version }} - lab report</div>
   <h1>{{ lab.title }}</h1>
   <div class="small">{% for b, t in items %}<span class="tag">{{ b }} {{ t }}</span>{% endfor %}
     <span class="tag">difficulty {{ lab.difficulty }}/5</span><span class="tag">{{ lab.nodes|length }} devices</span>{% if source == "user" %}<span class="tag">imported</span>{% endif %}</div>

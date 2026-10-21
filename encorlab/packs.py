@@ -2,7 +2,7 @@
 
 A pack is either
   * a single lab .yaml (solution may be embedded under `solution:`), or
-  * a .encorlab file = zip with lab.yaml [+ solution.cfg, fixture_solved.yaml,
+  * a .cmllab file (.encorlab before 2.1.0) = zip with lab.yaml [+ solution.cfg, fixture_solved.yaml,
     fixture_blank.yaml, README.md] at the root (or inside one top folder).
 """
 from __future__ import annotations
@@ -25,7 +25,8 @@ from .schema import Lab
 
 MAX_PACK_BYTES = 5 * 1024 * 1024
 PACK_FILES = ("lab.yaml", "solution.cfg", "fixture_solved.yaml", "fixture_blank.yaml", "README.md")
-PACK_EXT = ".encorlab"
+PACK_EXT = ".cmllab"
+PACK_EXTS = (".cmllab", ".encorlab")    # .encorlab: the name before 2.1.0, still imported
 
 
 class LabError(ValueError):
@@ -118,12 +119,12 @@ def read_upload(filename: str, data: bytes) -> Pack:
             return Pack(lab_yaml=data.decode("utf-8-sig"))
         except UnicodeDecodeError:
             raise LabError(["file is not UTF-8 text"])
-    if not (name.endswith((PACK_EXT, ".zip")) or data[:2] == b"PK"):
-        raise LabError([f"unsupported file type: {filename} (use .encorlab, .zip or .yaml)"])
+    if not (name.endswith((*PACK_EXTS, ".zip")) or data[:2] == b"PK"):
+        raise LabError([f"unsupported file type: {filename} (use .cmllab, .encorlab, .zip or .yaml)"])
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
-        raise LabError(["not a valid .encorlab/zip file"])
+        raise LabError(["not a valid .cmllab/zip file"])
     files = {}
     warnings = []
     total = 0
@@ -167,7 +168,7 @@ def read_dir(path: Path) -> Pack:
         for n in PACK_FILES:
             if (path / n).is_file():
                 z.write(path / n, n)
-    return read_upload("dir.encorlab", buf.getvalue())
+    return read_upload("dir.cmllab", buf.getvalue())
 
 
 # ---------------------------------------------------------------- linting
@@ -245,7 +246,7 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
         warnings.append("no solution_summary: add a short Markdown summary (root cause, exact fix commands per device, "
                         "why it works); until then the app shows an auto-generated one built from the solution")
     from .blueprint import known as known_item
-    unknown = [b for b in lab.blueprint if not known_item(b)]
+    unknown = [b for b in lab.blueprint if not known_item(b)] if lab.track.strip().upper() == "ENCOR" else []
     if unknown:
         warnings.append(f"blueprint items {unknown} are not ENCOR v1.2 exam topics (e.g. 3.2.b); the progress dashboard "
                         "maps them by their domain number only")

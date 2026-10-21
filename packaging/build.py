@@ -89,9 +89,11 @@ def main() -> int:
     print(f"built {target} ({target.stat().st_size / 1e6:.1f} MB)")
 
     if a.smoke:
-        data = Path(os.environ["APPDATA"]) / "encorlab" if WIN else Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "encorlab"
+        # 2.1+: data in cml-lab-builder (app updates stay in encorlab/app, see encorlab/paths.py)
+        base = Path(os.environ["APPDATA"]) if WIN else Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+        data = base / "cml-lab-builder"
         sh(sys.executable, HERE / "smoke_test.py", exe, "--version", v, "--data-dir", data, "--patch-test", "--auto-update-test",
-           *[x for p in sorted((ROOT / "labs").glob("*.encorlab"))[-2:] for x in ("--pack", p)])
+           *[x for p in sorted((ROOT / "library").glob("*.cmllab"))[-2:] for x in ("--pack", p)])
     return 0
 
 

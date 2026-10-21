@@ -4,7 +4,7 @@
 
 Serves /repos/<repo>/releases/latest (GitHub's JSON shape, with an ETag and 304 answers to If-None-Match) and
 /download/<asset>; SHA256SUMS.txt is generated from the files. Point the app at it with
-ENCOR_UPDATE_URL=http://127.0.0.1:<port>/repos/Specops13/encore-lab-app/releases/latest."""
+ENCOR_UPDATE_URL=http://127.0.0.1:<port>/repos/Specops13/cml-lab-builder/releases/latest."""
 from __future__ import annotations
 
 import argparse
@@ -15,7 +15,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-REPO = "Specops13/encore-lab-app"
+REPO = "Specops13/cml-lab-builder"   # renamed from encore-lab-app in 2.1.0 (GitHub redirects the old name)
 
 
 class FakeRelease:
@@ -41,7 +41,7 @@ class FakeRelease:
     def release_json(self) -> bytes:
         a = self.assets()
         return json.dumps({
-            "tag_name": f"v{self.version}", "name": f"ENCOR Lab Builder {self.version}",
+            "tag_name": f"v{self.version}", "name": f"CML Lab Builder {self.version}",
             "html_url": f"https://github.com/{REPO}/releases/tag/v{self.version}",
             "published_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "body": "fake release",
             "assets": [{"name": n, "size": len(b), "browser_download_url": f"{self.base}/download/{n}"} for n, b in a.items()],

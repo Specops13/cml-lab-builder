@@ -124,25 +124,37 @@ def main() -> int:
         print(("PASS " if cond else "FAIL ") + msg, flush=True)
         ok = ok and bool(cond)
 
-    for k in [k for k in os.environ if k.startswith("ENCOR_")]:
+    for k in [k for k in os.environ if k.startswith(("ENCOR_", "CMLLAB_"))]:
         del os.environ[k]
     env = dict(os.environ, ENCOR_UPDATE_URL="http://127.0.0.1:9/none")      # never ask GitHub during the test
     patch_ver = re.search(r"patch-(\d+\.\d+\.\d+)\.zip$", a.patch).group(1)
+    # 2.1+ moves the data folder (encorlab -> cml-lab-builder) on its first start; app/ stays in the old folder
+    renamed = tuple(int(x) for x in patch_ver.split(".")[:2]) >= (2, 1) and data.name == "encorlab"
+    cur = data.with_name("cml-lab-builder") if renamed else data
+
+    def moved_ok(label):
+        if not renamed:
+            return
+        m = json.loads((cur / "migrations" / "data-folder.json").read_text(encoding="utf-8"))
+        check(m.get("state") == "moved" and (data / "MOVED.txt").is_file() and (data / "settings.json").is_file()
+              and not (cur / "app").exists(), f"{label}: data moved to {cur.name} ({m.get('files')} files), old folder kept with MOVED.txt")
 
     print("== A) update by patch")
     shutil.rmtree(data, ignore_errors=True)
+    shutil.rmtree(cur, ignore_errors=True)
     before = seed(old, data, check)
     code, out = run(old + ["update-install", "--file", a.patch])
     check(code == 0 and f"Installed {patch_ver}" in out, f"patch {patch_ver} installed into the 1.9 build: {out.strip()[-60:]!r}")
     code, out = run(old + ["version"])
-    check(code == 0 and out.strip().endswith(patch_ver), f"next start runs {patch_ver}")
+    check(code == 0 and out.splitlines()[0].strip() == patch_ver, f"next start runs {patch_ver}")
+    moved_ok("A")
     code, out = run(old + ["list"])
     rows = [l for l in out.splitlines() if re.match(r"^[a-z0-9][a-z0-9-]+\s+user\s", l)]
     check(code == 0 and len(rows) == LEGACY + 1, f"CLI list after the update: {len(rows)} labs")
-    st = json.loads((data / "migrations" / "library-labs.json").read_text(encoding="utf-8"))
+    st = json.loads((cur / "migrations" / "library-labs.json").read_text(encoding="utf-8"))
     check(st.get("state") == "done" and len(st.get("copied", [])) == LEGACY, f"migration: copied {len(st.get('copied', []))} labs from the old program files")
-    check(all((data / "labs" / lid / "lab.yaml").is_file() for lid in st.get("copied", [])), "copies are in the user labs folder")
-    check(digest(data) == before, "history, walkthrough progress, snapshots and faults unchanged")
+    check(all((cur / "labs" / lid / "lab.yaml").is_file() for lid in st.get("copied", [])), "copies are in the user labs folder")
+    check(digest(cur) == before, "history, walkthrough progress, snapshots and faults unchanged")
     proc, base, lines = start_gui(old, a.port, env)
     try:
         check(base is not None, f"web UI up on the patched build: {base}")
@@ -154,12 +166,14 @@ def main() -> int:
 
     print("== B) update by full download (old program files gone)")
     shutil.rmtree(data, ignore_errors=True)
+    shutil.rmtree(cur, ignore_errors=True)
     before = seed(old, data, check)
     shutil.rmtree(data / "app", ignore_errors=True)
     srv, url = serve_library()
     code, out = run(new + ["version"])
     check(code == 0 and out.splitlines()[0].strip() == patch_ver, f"new build is {patch_ver} (then a note about the labs to restore)")
-    st = json.loads((data / "migrations" / "library-labs.json").read_text(encoding="utf-8"))
+    moved_ok("B")
+    st = json.loads((cur / "migrations" / "library-labs.json").read_text(encoding="utf-8"))
     check(st.get("state") == "pending" and len(st.get("pending", [])) == LEGACY, f"no old files: {len(st.get('pending', []))} labs pending")
     code, out = run(new + ["list"])
     check(code == 0 and "library restore" in out, "CLI says how to restore")
@@ -178,8 +192,9 @@ def main() -> int:
     finally:
         stop(proc, pre)
         srv.shutdown()
-    check(digest(data) == before, "B: history, walkthrough progress, snapshots and faults unchanged")
+    check(digest(cur) == before, "B: history, walkthrough progress, snapshots and faults unchanged")
     shutil.rmtree(data, ignore_errors=True)
+    shutil.rmtree(cur, ignore_errors=True)
     print("MIGRATION TEST " + ("PASSED" if ok else "FAILED"))
     return 0 if ok else 1
 

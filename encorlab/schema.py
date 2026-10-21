@@ -161,14 +161,20 @@ class Step(_Strict):
 
 
 class Lab(_Strict):
-    """One ENCOR practice lab."""
+    """One practice lab (ENCOR is the default track)."""
     id: str = Field(description="Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name")
     type: Literal["challenge", "walkthrough"] = Field(default="challenge", description=(
         "challenge (default): a graded task. walkthrough: a guided build in ordered `steps` (not graded; no "
         "faults or exam mode; completion is tracked separately)"))
     title: str
-    blueprint: list[str] = Field(description="ENCOR 350-401 v1.2 blueprint items, e.g. ['3.2.b']")
-    domain: str = Field(description="Blueprint domain, e.g. '3.0 Infrastructure - Layer 3'")
+    track: str = Field(default="ENCOR", min_length=1, max_length=40, description=(
+        "Study track the lab belongs to, e.g. ENCOR (default), CCNA, ENARSI, Data center. The progress dashboard "
+        "groups by track; the ENCOR exam-domain view uses only ENCOR labs. Needs 2.1.0+: leave it out for ENCOR "
+        "labs that should also import into older versions"))
+    blueprint: list[str] = Field(description=(
+        "Topics. ENCOR labs: 350-401 v1.2 blueprint items, e.g. ['3.2.b']. Other tracks: that exam's topic ids or "
+        "short topic names, e.g. ['OSPF']"))
+    domain: str = Field(description="Domain or area, e.g. '3.0 Infrastructure - Layer 3' (ENCOR) or 'Routing'")
     difficulty: int = Field(ge=1, le=5, description="1 (easy) to 5 (hard)")
     platforms: list[Literal["iol", "iosv"]] = Field(default=["iol", "iosv"], description="Image profiles the lab supports")
     summary: str = Field(description="One-line summary for the catalog")

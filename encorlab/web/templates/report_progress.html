@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>ENCOR progress report</title>{% include "_report_style.html" %}</head>
+<html lang="en"><head><meta charset="utf-8"><title>CML Lab Builder progress report</title>{% include "_report_style.html" %}</head>
 <body><div class="page">
 <div class="toolbar noprint"><button title="Open the print dialog; choose 'Save as PDF' to get a PDF" onclick="window.print()">Print / Save as PDF</button></div>
 {% set o = p.overall %}
-<div class="head"><div><div class="muted small">ENCOR Lab Builder {{ version }} - progress report</div><h1>CCNP ENCOR (350-401) practice progress</h1>
+<div class="head"><div><div class="muted small">CML Lab Builder {{ version }} - progress report</div><h1>{% if p.tracks|length == 1 and p.tracks[0].encor %}CCNP ENCOR (350-401) practice progress{% else %}Lab practice progress{% endif %}</h1>
   <div class="small muted">{{ p.blueprint }}</div></div>
   <div class="small muted" style="text-align:right">{% if student %}<b>{{ student }}</b><br>{% endif %}Generated {{ generated }}</div></div>
 <div class="kpis">
@@ -14,11 +14,16 @@
   <div class="kpi"><span class="muted small">Time spent</span><b>{{ o.time_spent_s|dur }}</b></div>
   <div class="kpi"><span class="muted small">Streak (longest)</span><b>{{ p.streak.current }} ({{ p.streak.longest }}) days</b></div>
 </div>
-<h2>Exam domains</h2>
+{% if p.tracks|length > 1 or (p.tracks and not p.tracks[0].encor) %}<h2>Tracks</h2>
+<table><tr><th>Track</th><th>Labs</th><th>Solved</th><th>Mastery</th></tr>
+{% for t in p.tracks %}<tr><td>{{ t.id }}</td><td>{{ t.labs }}</td><td>{{ t.solved }}</td>
+  <td><span class="bar"><i style="width:{{ t.mastery_pct or 0 }}%"></i></span> {{ t.mastery_pct }}%</td></tr>{% endfor %}
+</table>{% endif %}
+{% if p.overall.encor_labs %}<h2>ENCOR exam domains</h2>
 <table><tr><th>Domain</th><th>Weight</th><th>Labs</th><th>Solved</th><th>Mastery</th></tr>
 {% for d in p.domains %}<tr><td>{{ d.id }} {{ d.name }}</td><td>{{ d.weight }}%</td><td>{{ d.labs }}</td><td>{{ d.solved }}</td>
   <td>{% if d.mastery_pct is none %}<span class="muted">no labs (theory)</span>{% else %}<span class="bar"><i style="width:{{ d.mastery_pct }}%"></i></span> {{ d.mastery_pct }}%{% endif %}</td></tr>{% endfor %}
-</table>
+</table>{% endif %}
 <h2>Weakest topics</h2>
 {% if p.weakest %}<table><tr><th>Topic</th><th>Mastery</th><th>Labs</th></tr>
 {% for i in p.weakest %}<tr><td>{{ i.id }} {{ i.title }}</td><td>{{ i.mastery_pct }}%</td><td class="small">{{ i.lab_ids|join(", ") }}</td></tr>{% endfor %}</table>
@@ -30,6 +35,6 @@
 {% if p.failed_checks %}<h2>Checks you fail most</h2>
 <table><tr><th>Lab</th><th>Check</th><th>Failed</th></tr>{% for f in p.failed_checks %}<tr><td>{{ f.lab_id }}</td><td>{{ f.description or f.check_id }}</td><td>{{ f.count }}x</td></tr>{% endfor %}</table>{% endif %}
 <p class="small muted">Mastery per lab = best attempt minus {{ p.rules.hint_penalty|int }} points per hint, capped at {{ p.rules.revealed_cap|int }}% if the
-  answer was revealed first; exam attempts count their exam score; unattempted labs count 0. Domain and overall mastery are weighted by the
-  official exam weights over the domains that have labs.</p>
+  answer was revealed first; exam attempts count their exam score; unattempted labs count 0. ENCOR mastery is weighted by the official exam
+  weights over the domains that have labs; with several tracks, overall mastery is the average over all labs.</p>
 </div></body></html>

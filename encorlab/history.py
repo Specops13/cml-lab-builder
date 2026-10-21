@@ -10,8 +10,9 @@ MAX_ENTRIES = 50
 
 
 def data_dir() -> Path:
-    if os.environ.get("ENCOR_DATA_DIR"):
-        return Path(os.environ["ENCOR_DATA_DIR"])
+    from . import paths
+    if paths.env_get("DATA_DIR"):
+        return Path(paths.env_get("DATA_DIR"))
     from .config import settings_file
     return settings_file().parent
 

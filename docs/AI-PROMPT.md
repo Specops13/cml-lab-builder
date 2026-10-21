@@ -1,4 +1,4 @@
-# AI prompt for generating ENCOR Lab Builder labs
+# AI prompt for generating CML Lab Builder labs
 
 How to use it:
 
@@ -17,7 +17,7 @@ Generated from the app (`python -m encorlab docs`). Do not edit by hand.
 
 ---
 
-You are generating a Cisco CCNP ENCOR (350-401) practice lab for the 'ENCOR Lab Builder' app,
+You are generating a Cisco CCNP ENCOR (350-401) practice lab for the 'CML Lab Builder' app,
 which builds the lab in Cisco Modeling Labs 2.9 and grades it automatically.
 
 ## Lab request
@@ -256,15 +256,15 @@ which builds the lab in Cisco Modeling Labs 2.9 and grades it automatically.
 ```
 
 ## Authoring guide
-# ENCOR Lab Builder - Lab Authoring Guide
+# CML Lab Builder - Lab Authoring Guide
 
 A lab is one YAML document (`lab.yaml`). You can share it as:
 - **a single `.yaml` file** with the reference solution embedded under `solution:` (simplest), or
-- **a `.encorlab` pack**: a zip containing `lab.yaml`, plus optional `solution.cfg`, `fixture_solved.yaml`,
+- **a `.cmllab` pack** (called `.encorlab` before 2.1.0; both import): a zip containing `lab.yaml`, plus optional `solution.cfg`, `fixture_solved.yaml`,
   `fixture_blank.yaml` and `README.md`, all at the zip root.
 
 To import: drag the file onto the catalog page, click **Import lab**, or run `encorlab import <file>`.
-To check a lab before sending it: `encorlab validate <file-or-folder>`. To build a pack: `encorlab pack <folder-or-yaml> -o name.encorlab`.
+To check a lab before sending it: `cmllab validate <file-or-folder>`. To build a pack: `cmllab pack <folder-or-yaml> -o name.cmllab`.
 The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocomplete in VS Code (YAML extension), add
 `# yaml-language-server: $schema=./encorlab-lab.schema.json` as the first line.
 
@@ -291,7 +291,8 @@ The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocompl
 | Field | Required | Notes |
 |---|---|---|
 | id, title | yes | |
-| blueprint | yes | ENCOR 350-401 v1.2 items, e.g. `["3.2.b"]` |
+| track | no | study track, default `ENCOR`; e.g. `CCNA`, `ENARSI`. Progress groups labs by track. Needs 2.1.0+, so leave it out for ENCOR labs |
+| blueprint | yes | ENCOR labs: 350-401 v1.2 items, e.g. `["3.2.b"]`; other tracks: that exam's topic ids or short names |
 | domain | yes | e.g. `"3.0 Infrastructure - Layer 3"` |
 | difficulty | yes | 1-5 |
 | platforms | no | default `[iol, iosv]`. Use both unless a feature needs one image |
@@ -521,7 +522,7 @@ R1:
 ```
 With both fixtures present, `validate` must show `live solution=100% blank=0%` as well as config.
 
-## Courses (`.encorcourse`)
+## Courses (`.cmlcourse`, formerly `.encorcourse`)
 A course is a zip that bundles labs into a study track:
 ```
 course.yaml              # required
@@ -539,13 +540,14 @@ Every listed lab must be bundled in the course file, already installed, or publi
 course from the library (or importing a course file while online) installs the listed labs it doesn't bundle from the
 library first (*Install all*). Each bundle folder must be named after its lab id, and every bundled lab must pass the
 normal validation, otherwise nothing is installed. Build and validate one with
-`python -m encorlab course build <folder> [--labs-from examples/] -o my.encorcourse`.
+`python -m encorlab course build <folder> [--labs-from examples/] -o my.cmlcourse`.
 
 ## Publishing in the lab library
 Since 2.0.0 the app ships without labs; every lab, including the former built-in labs, is a pack in the online library
-(`labs/` in the project repo). Lab sources live in `labsrc/<id>/` (and `examples/<id>/`), courses in `examples/courses/`.
+(`library/` in the project repo, with `.cmllab` / `.cmlcourse` files; `labs/` keeps the same packs as `.encorlab` /
+`.encorcourse` for 2.0 and older). Lab sources live in `labsrc/<id>/` (and `examples/<id>/`), courses in `examples/courses/`.
 `python packaging/build_library.py` packs them reproducibly, validates every lab strictly (solution 100%, starting config
-0%) and writes `labs/index.json` with each file's sha256, size, version, RAM estimate and the recommended starter set
+0%) and writes `library/index.json` (and `labs/index.json`) with each file's sha256, size, version, RAM estimate and the recommended starter set
 (`labsrc/library.yaml`). It refuses a changed pack whose `version:` was not raised. Anyone can host a library: serve a
 folder with `index.json` and the packs over https and set *Settings > Library URL* (http is accepted only for
 localhost).
@@ -564,7 +566,7 @@ domain: "3.0 Infrastructure - Layer 3"
 difficulty: 1
 platforms: [iol, iosv]
 summary: Two routers, one link. Enable EIGRP AS 100 and exchange loopbacks.
-author: ENCOR Lab Builder
+author: CML Lab Builder
 version: "1"
 nodes:
   - name: R1
@@ -1041,7 +1043,7 @@ hints:
   }
  },
  "additionalProperties": false,
- "description": "One ENCOR practice lab.",
+ "description": "One practice lab (ENCOR is the default track).",
  "properties": {
   "id": {
    "description": "Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name",
@@ -1062,8 +1064,16 @@ hints:
    "title": "Title",
    "type": "string"
   },
+  "track": {
+   "default": "ENCOR",
+   "description": "Study track the lab belongs to, e.g. ENCOR (default), CCNA, ENARSI, Data center. The progress dashboard groups by track; the ENCOR exam-domain view uses only ENCOR labs. Needs 2.1.0+: leave it out for ENCOR labs that should also import into older versions",
+   "maxLength": 40,
+   "minLength": 1,
+   "title": "Track",
+   "type": "string"
+  },
   "blueprint": {
-   "description": "ENCOR 350-401 v1.2 blueprint items, e.g. ['3.2.b']",
+   "description": "Topics. ENCOR labs: 350-401 v1.2 blueprint items, e.g. ['3.2.b']. Other tracks: that exam's topic ids or short topic names, e.g. ['OSPF']",
    "items": {
     "type": "string"
    },
@@ -1071,7 +1081,7 @@ hints:
    "type": "array"
   },
   "domain": {
-   "description": "Blueprint domain, e.g. '3.0 Infrastructure - Layer 3'",
+   "description": "Domain or area, e.g. '3.0 Infrastructure - Layer 3' (ENCOR) or 'Routing'",
    "title": "Domain",
    "type": "string"
   },
@@ -1218,7 +1228,7 @@ hints:
   "links",
   "task"
  ],
- "title": "ENCOR Lab Builder lab definition",
+ "title": "CML Lab Builder lab definition",
  "type": "object",
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "encorlab-lab.schema.json"

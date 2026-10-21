@@ -67,7 +67,8 @@ def _ver(s: str) -> tuple:
 def legacy_sources() -> list[Path]:
     """labs/ folders of older (1.x) app code still on disk, newest version first."""
     found: list[tuple[tuple, Path]] = []
-    app = data_dir() / "app"
+    from . import paths
+    app = paths.boot_dir() / "app"     # the boot loader keeps app updates in its own (pre-2.1) folder
     if app.is_dir():
         for d in app.iterdir():
             labs = d / "encorlab" / "labs"
@@ -131,7 +132,7 @@ def _copy(src: Path, lid: str) -> bool:
     tmp.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(src, tmp, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     from .library import DEFAULT_INDEX, ORIGIN_FILE
-    (tmp / ORIGIN_FILE).write_text(json.dumps({"index": DEFAULT_INDEX, "file": f"{lid}.encorlab", "version": lab.version,
+    (tmp / ORIGIN_FILE).write_text(json.dumps({"index": DEFAULT_INDEX, "file": f"{lid}.cmllab", "version": lab.version,
                                                "migrated_from": str(src)}, indent=1), encoding="utf-8")
     tmp.rename(dest)
     return True

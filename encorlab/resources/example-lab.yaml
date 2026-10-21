@@ -6,7 +6,7 @@ domain: "3.0 Infrastructure - Layer 3"
 difficulty: 1
 platforms: [iol, iosv]
 summary: Two routers, one link. Enable EIGRP AS 100 and exchange loopbacks.
-author: ENCOR Lab Builder
+author: CML Lab Builder
 version: "1"
 nodes:
   - name: R1

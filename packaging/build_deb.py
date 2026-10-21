@@ -31,7 +31,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 PACKAGE = "encorlab"
 MAINTAINER = "Specops13 <Specops13@users.noreply.github.com>"
-HOMEPAGE = "https://github.com/Specops13/encore-lab-app"
+HOMEPAGE = "https://github.com/Specops13/cml-lab-builder"
 DEPENDS = "libc6 (>= 2.28), libgcc-s1 | libgcc1, zlib1g"
 RECOMMENDS = "xdg-utils"
 EPOCH = int(os.environ.get("SOURCE_DATE_EPOCH") or 1792368000)   # fixed file times: reproducible packages
@@ -39,21 +39,22 @@ EPOCH = int(os.environ.get("SOURCE_DATE_EPOCH") or 1792368000)   # fixed file ti
 DESKTOP = """[Desktop Entry]
 Type=Application
 Version=1.4
-Name=ENCOR Lab Builder
-GenericName=CCNP ENCOR lab trainer
-Comment=Build and grade CCNP ENCOR labs in Cisco Modeling Labs
+Name=CML Lab Builder
+GenericName=Cisco lab trainer
+Comment=Build and grade CCNP ENCOR and other labs in Cisco Modeling Labs
 Exec=encorlab
 TryExec=encorlab
 Icon=encorlab
 Terminal=true
 Categories=Education;ComputerScience;
-Keywords=CCNP;ENCOR;Cisco;CML;lab;network;
+Keywords=CCNP;ENCOR;Cisco;CML;lab;network;encorlab;
 StartupNotify=false
 """
 
 WRAPPER = """#!/bin/sh
-# ENCOR Lab Builder (Debian package). Starts the web UI and opens the browser, or just opens the browser when it is
-# already running; with a command (e.g. `encorlab list`) it runs the CLI. User data: ~/.config/encorlab
+# CML Lab Builder (Debian package). Starts the web UI and opens the browser, or just opens the browser when it is
+# already running; with a command (e.g. `cmllab list`) it runs the CLI. User data: ~/.config/cml-lab-builder
+# (app updates: ~/.config/encorlab/app). /usr/bin/cmllab is a symlink to this file.
 exec /opt/encorlab/ENCORLab "$@"
 """
 
@@ -77,7 +78,7 @@ set -e
 case "$1" in
     remove|deconfigure)
         if command -v pgrep >/dev/null 2>&1 && pgrep -f /opt/encorlab/ENCORLab >/dev/null 2>&1; then
-            echo "encorlab: ENCOR Lab Builder is still running; close it to finish." >&2
+            echo "encorlab: CML Lab Builder is still running; close it to finish." >&2
         fi
         ;;
 esac
@@ -99,14 +100,14 @@ case "$1" in
         ;;
 esac
 if [ "$1" = "purge" ]; then
-    echo "encorlab: user data (settings, imported labs, history, app updates) in ~/.config/encorlab is kept." >&2
+    echo "encorlab: user data in ~/.config/cml-lab-builder (settings, labs, history) and ~/.config/encorlab (app updates, pre-2.1 data) is kept." >&2
 fi
 exit 0
 """
 
 MANPAGE = r""".TH ENCORLAB 1 "{date}" "encorlab {version}" "User Commands"
 .SH NAME
-encorlab \- ENCOR Lab Builder: build and grade CCNP ENCOR labs in Cisco Modeling Labs
+encorlab, cmllab \- CML Lab Builder: build and grade CCNP ENCOR and other labs in Cisco Modeling Labs
 .SH SYNOPSIS
 .B encorlab
 [\fB\-\-port\fR \fIN\fR] [\fB\-\-no\-browser\fR]
@@ -129,8 +130,12 @@ install the new .deb with \fBsudo apt install ./encorlab_\fIversion\fB_amd64.deb
 .I /opt/encorlab/
 the application
 .TP
-.I ~/.config/encorlab/
-settings, imported labs, history and installed updates; kept when the package is removed or purged
+.I ~/.config/cml-lab-builder/
+settings, imported labs, history (before 2.1.0 in ~/.config/encorlab; moved automatically on the first start);
+kept when the package is removed or purged
+.TP
+.I ~/.config/encorlab/app/
+installed app updates and their rollback copies; kept when the package is removed or purged
 .SH SEE ALSO
 {homepage}
 """
@@ -138,7 +143,7 @@ settings, imported labs, history and installed updates; kept when the package is
 DOC_FILES = ("LICENSE.txt", "THIRD-PARTY-NOTICES.txt")
 
 COPYRIGHT = """Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: ENCOR Lab Builder
+Upstream-Name: CML Lab Builder
 Upstream-Contact: {maintainer}
 Source: {homepage}
 
@@ -182,13 +187,13 @@ License: MIT
 
 CHANGELOG = """encorlab ({version}) stable; urgency=medium
 
-  * ENCOR Lab Builder {version}.
+  * CML Lab Builder {version}.
   * Release notes: {homepage}/releases
 
  -- {maintainer}  {date}
 """
 
-LINTIAN_OVERRIDES = """# ENCOR Lab Builder is a PyInstaller one-folder application: a self-contained frozen Python runtime with its own
+LINTIAN_OVERRIDES = """# CML Lab Builder is a PyInstaller one-folder application: a self-contained frozen Python runtime with its own
 # libraries, installed as a unit under /opt/encorlab (it is not built from Debian sources).
 encorlab: dir-or-file-in-opt
 # bundled wheels' and CPython's libraries ship exactly as built and smoke-tested (stripping changes the tested files)
@@ -281,6 +286,9 @@ def build(stage: Path, out: Path, version: str | None = None, app_src: Path | No
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(data)
             p.chmod(mode)
+        # 2.1.0: the new command name (the package, /opt path and program file keep the old name until runtime 2)
+        (root / "usr/bin/cmllab").symlink_to("encorlab")
+        (root / "usr/share/man/man1/cmllab.1.gz").symlink_to("encorlab.1.gz")
         # permissions: directories 0755, files 0644, the launcher binary 0755
         for p in root.rglob("*"):
             if p.is_symlink():
@@ -306,8 +314,9 @@ Recommends: {RECOMMENDS}
 Section: education
 Priority: optional
 Homepage: {HOMEPAGE}
-Description: build and grade CCNP ENCOR labs in Cisco Modeling Labs
- ENCOR Lab Builder builds CCNP ENCOR practice labs in Cisco Modeling
+Description: build and grade practice labs in Cisco Modeling Labs
+ CML Lab Builder (formerly ENCOR Lab Builder) builds practice labs
+ (CCNP ENCOR and other tracks) in Cisco Modeling
  Labs (CML) and grades them with read-only show commands over the
  console, or offline from the configs. It offers hints, solutions,
  fault-injection practice, an exam mode and progress tracking,
@@ -315,7 +324,8 @@ Description: build and grade CCNP ENCOR labs in Cisco Modeling Labs
  .
  The package contains the self-contained application (frozen Python
  runtime) in /opt/encorlab. After asking, the app updates itself with
- small verified app-code patches stored per user in ~/.config/encorlab.
+ small verified app-code patches stored per user in ~/.config/encorlab;
+ user data lives in ~/.config/cml-lab-builder. Commands: cmllab, encorlab.
  Removing or purging the package keeps that user data.
 """
         for name, text, mode in (("control", control, 0o644), ("md5sums", "\n".join(md5) + "\n", 0o644),

@@ -59,7 +59,7 @@ def test_cli_report(tmp_path):
     r = CliRunner().invoke(cli_app, ["report", LAB, "-o", str(out), "--name", "Dylan"])
     assert r.exit_code == 0 and "Dylan" in out.read_text() and catalog.get(LAB).title in out.read_text()
     r = CliRunner().invoke(cli_app, ["report", "-o", str(tmp_path / "p.html")])
-    assert r.exit_code == 0 and "Exam domains" in (tmp_path / "p.html").read_text()
+    assert r.exit_code == 0 and "ENCOR exam domains" in (tmp_path / "p.html").read_text()
 
 
 def test_markdown_filter_is_safe():

@@ -8,7 +8,7 @@
     ENCORLab <command> [...]     run a CLI command instead, e.g. `ENCORLab list`, `ENCORLab check eigrp-basic`
 
 If the app is already running on the preferred port, the launcher just opens the browser there.
-User data (settings.json, imported labs, history) stays in %APPDATA%\\encorlab or ~/.config/encorlab;
+User data (settings.json, imported labs, history) stays in %APPDATA%\\cml-lab-builder or ~/.config/cml-lab-builder;
 nothing is written next to the executable."""
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def frozen() -> bool:
 
 
 def _running_instance(port: int) -> str | None:
-    """Version string if ENCOR Lab Builder already answers on this port."""
+    """Version string if CML Lab Builder already answers on this port."""
     try:
         with urllib.request.urlopen(f"http://{HOST}:{port}/api/health", timeout=1.5) as r:
             data = json.loads(r.read().decode("utf-8"))
@@ -97,7 +97,7 @@ def request_restart() -> None:
 
 def _respawn(port: int) -> None:
     args = [sys.executable, "--restarted", "--port", str(port)]
-    print("Restarting ENCOR Lab Builder...", flush=True)
+    print("Restarting CML Lab Builder...", flush=True)
     if os.name == "nt":   # a new console window becomes the "quit" control; this one closes
         subprocess.Popen(args, creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0x10), close_fds=True)
         return
@@ -125,7 +125,7 @@ def serve(port: int = DEFAULT_PORT, browser: bool = True, ready: threading.Event
     other = _running_instance(port)
     if other:
         url = f"http://{HOST}:{port}/"
-        print(f"ENCOR Lab Builder {other} is already running at {url} - opening it.")
+        print(f"CML Lab Builder {other} is already running at {url} - opening it.")
         if browser:
             webbrowser.open(url)
         return 0
@@ -159,7 +159,7 @@ def serve(port: int = DEFAULT_PORT, browser: bool = True, ready: threading.Event
             webbrowser.open(url)
 
     print("=" * 64)
-    print(f" ENCOR Lab Builder {__version__}")
+    print(f" CML Lab Builder {__version__}")
     print(f" Web UI:    {url}" + ("" if real == port else f"   (port {port} was busy)"))
     print(f" Your data: {settings_file().parent}")
     print(" Keep this window open while you use the app.")
@@ -177,7 +177,7 @@ def serve(port: int = DEFAULT_PORT, browser: bool = True, ready: threading.Event
         _RESTART = False
         _respawn(real)
         return 0
-    print("ENCOR Lab Builder stopped.")
+    print("CML Lab Builder stopped.")
     return 0
 
 
@@ -191,13 +191,26 @@ def _fatal(exc: BaseException) -> int:
         where = f"\nDetails were saved to {log}"
     except Exception:
         where = ""
-    print("\nENCOR Lab Builder could not start:\n" + text + where, file=sys.stderr)
+    print("\nCML Lab Builder could not start:\n" + text + where, file=sys.stderr)
     if frozen() and os.name == "nt" and sys.stdin and sys.stdin.isatty():
         try:
             input("\nPress Enter to close this window...")
         except EOFError:
             pass
     return 1
+
+
+def _console_title() -> None:
+    """The console window shows the product name (Windows; a terminal title escape elsewhere when interactive)."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleTitleW("CML Lab Builder")
+        elif sys.stdout.isatty():
+            sys.stdout.write("\033]0;CML Lab Builder\007")
+            sys.stdout.flush()
+    except Exception:  # noqa: BLE001 - cosmetic
+        pass
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -210,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         except SystemExit as e:
             return int(e.code or 0) if not isinstance(e.code, str) else 1
         return 0
+    _console_title()
     try:
         return serve(opts["port"], opts["browser"], restarted=bool(opts.get("restarted")))
     except Exception as e:  # pragma: no cover - shown to the user in the console window

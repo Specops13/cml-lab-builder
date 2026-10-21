@@ -228,9 +228,23 @@ def test_build_library_refuses_a_changed_pack_without_a_version_bump(tmp_path):
         if it["file"] == "06-hsrp.encorlab":
             it["sha256"] = "0" * 64
     with pytest.raises(SystemExit, match="raise `version:`"):
-        build_library.build(tmp_path / "out", prev)
-    build_library.build(tmp_path / "ok", index_json())
+        build_library.build(tmp_path / "out", prev, ".encorlab", ".encorcourse")
+    build_library.build(tmp_path / "ok", index_json(), ".encorlab", ".encorcourse")
     assert (tmp_path / "ok" / "index.json").read_bytes() == (LIB / "index.json").read_bytes()
+
+
+def test_new_library_folder_has_the_same_labs_under_the_new_names(tmp_path):
+    """2.1.0: library/ (.cmllab/.cmlcourse, read by 2.1+) and labs/ (.encorlab/.encorcourse, read by 2.0 and older)."""
+    sys.path.insert(0, str(ROOT / "packaging"))
+    import build_library
+    new = json.loads((ROOT / "library" / "index.json").read_text(encoding="utf-8"))
+    old = index_json()
+    strip = lambda it: {k: v for k, v in it.items() if k not in ("file", "sha256", "size")}
+    assert [strip(i) for i in new["items"]] == [strip(i) for i in old["items"]]
+    assert all(i["file"].endswith((".cmllab", ".cmlcourse")) for i in new["items"])
+    assert all(i["file"].endswith((".encorlab", ".encorcourse")) for i in old["items"])
+    build_library.build(tmp_path / "lib", new)
+    assert (tmp_path / "lib" / "index.json").read_bytes() == (ROOT / "library" / "index.json").read_bytes()
 
 
 def test_delete_keeps_history_unless_asked(no_labs):

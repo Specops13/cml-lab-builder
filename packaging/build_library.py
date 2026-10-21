@@ -1,9 +1,11 @@
-"""Build the online lab library in labs/ (served from the GitHub repo):
-    labs/<lab-id>.encorlab        one per lab folder in labsrc/ (the former built-in labs) and examples/
-    labs/<course-id>.encorcourse  one per folder in examples/courses/ (labs from labsrc/ are referenced, not
-                                  bundled: the app installs them from the library together with the course)
-    labs/index.json               file, kind, id, title, version, sha256, size ... (checked by the app before
-                                  installing) and the recommended starter set (labsrc/library.yaml)
+"""Build the online lab library in library/ (served from the GitHub repo):
+    library/<lab-id>.cmllab        one per lab folder in labsrc/ (the former built-in labs) and examples/
+    library/<course-id>.cmlcourse  one per folder in examples/courses/ (labs from labsrc/ are referenced, not
+                                   bundled: the app installs them from the library together with the course)
+    library/index.json             file, kind, id, title, version, sha256, size ... (checked by the app before
+                                   installing) and the recommended starter set (labsrc/library.yaml)
+and the same files under the pre-2.1 names in labs/ (*.encorlab, *.encorcourse, index.json) for 2.0.x apps, which
+read labs/index.json and only accept those extensions. The pack bytes are identical in both folders.
 
 A lab whose pack changed must raise its `version:` (the app shows "Update available" for installed copies).
 
@@ -40,7 +42,8 @@ def starter() -> list[str]:
     return [str(x) for x in d.get("starter", [])]
 
 
-def build(out: Path, previous: dict | None = None) -> None:
+def build(out: Path, previous: dict | None = None, pack_ext: str = packs.PACK_EXT,
+          course_ext: str = courses.COURSE_EXT) -> None:
     out.mkdir(parents=True, exist_ok=True)
     ex = ROOT / "examples"
     ids = set()
@@ -49,12 +52,12 @@ def build(out: Path, previous: dict | None = None) -> None:
         rep = packs.lint(packs.read_upload(d.name + packs.PACK_EXT, data), strict=True)
         if not rep.ok:
             sys.exit(f"{d.name}: " + "; ".join(rep.errors))
-        (out / f"{rep.lab_id}{packs.PACK_EXT}").write_bytes(data)
+        (out / f"{rep.lab_id}{pack_ext}").write_bytes(data)
         ids.add(rep.lab_id)
     lib_ids = {d.name for d in LABSRC.iterdir() if (d / "lab.yaml").is_file()}
     for d in sorted(p for p in (ex / "courses").iterdir() if (p / "course.yaml").is_file()):
         c = courses.parse_course_yaml((d / "course.yaml").read_text(encoding="utf-8"))
-        (out / f"{c.id}{courses.COURSE_EXT}").write_bytes(courses.build(d, search=[ex], known=lib_ids))
+        (out / f"{c.id}{course_ext}").write_bytes(courses.build(d, search=[ex], known=lib_ids))
     idx = library.build_index(out, lab_roots=[LABSRC, ex])
     bad = [s for s in starter() if s not in ids]
     if bad:
@@ -76,19 +79,22 @@ def _previous(target: Path) -> dict:
         return {}
 
 
+TARGETS = ((ROOT / "library", packs.PACK_EXT, courses.COURSE_EXT), (ROOT / "labs", ".encorlab", ".encorcourse"))
+
+
 def main() -> None:
-    target = ROOT / "labs"
-    if "--check" in sys.argv:
-        with tempfile.TemporaryDirectory() as t:
-            build(Path(t), _previous(target))
-            new = {p.name: p.read_bytes() for p in Path(t).iterdir()}
-        old = {p.name: p.read_bytes() for p in target.iterdir()} if target.is_dir() else {}
-        if new != old:
-            sys.exit("labs/ is out of date: run python packaging/build_library.py")
-        print("labs/ is up to date")
-        return
-    build(target, _previous(target))
-    print(f"wrote {len(list(target.iterdir()))} files to {target}")
+    for target, pext, cext in TARGETS:
+        if "--check" in sys.argv:
+            with tempfile.TemporaryDirectory() as t:
+                build(Path(t), _previous(target), pext, cext)
+                new = {p.name: p.read_bytes() for p in Path(t).iterdir()}
+            old = {p.name: p.read_bytes() for p in target.iterdir()} if target.is_dir() else {}
+            if new != old:
+                sys.exit(f"{target.name}/ is out of date: run python packaging/build_library.py")
+            print(f"{target.name}/ is up to date")
+            continue
+        build(target, _previous(target), pext, cext)
+        print(f"wrote {len(list(target.iterdir()))} files to {target}")
 
 
 if __name__ == "__main__":

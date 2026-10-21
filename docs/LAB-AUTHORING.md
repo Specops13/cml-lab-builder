@@ -1,12 +1,12 @@
-# ENCOR Lab Builder - Lab Authoring Guide
+# CML Lab Builder - Lab Authoring Guide
 
 A lab is one YAML document (`lab.yaml`). You can share it as:
 - **a single `.yaml` file** with the reference solution embedded under `solution:` (simplest), or
-- **a `.encorlab` pack**: a zip containing `lab.yaml`, plus optional `solution.cfg`, `fixture_solved.yaml`,
+- **a `.cmllab` pack** (called `.encorlab` before 2.1.0; both import): a zip containing `lab.yaml`, plus optional `solution.cfg`, `fixture_solved.yaml`,
   `fixture_blank.yaml` and `README.md`, all at the zip root.
 
 To import: drag the file onto the catalog page, click **Import lab**, or run `encorlab import <file>`.
-To check a lab before sending it: `encorlab validate <file-or-folder>`. To build a pack: `encorlab pack <folder-or-yaml> -o name.encorlab`.
+To check a lab before sending it: `cmllab validate <file-or-folder>`. To build a pack: `cmllab pack <folder-or-yaml> -o name.cmllab`.
 The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocomplete in VS Code (YAML extension), add
 `# yaml-language-server: $schema=./encorlab-lab.schema.json` as the first line.
 
@@ -33,7 +33,8 @@ The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocompl
 | Field | Required | Notes |
 |---|---|---|
 | id, title | yes | |
-| blueprint | yes | ENCOR 350-401 v1.2 items, e.g. `["3.2.b"]` |
+| track | no | study track, default `ENCOR`; e.g. `CCNA`, `ENARSI`. Progress groups labs by track. Needs 2.1.0+, so leave it out for ENCOR labs |
+| blueprint | yes | ENCOR labs: 350-401 v1.2 items, e.g. `["3.2.b"]`; other tracks: that exam's topic ids or short names |
 | domain | yes | e.g. `"3.0 Infrastructure - Layer 3"` |
 | difficulty | yes | 1-5 |
 | platforms | no | default `[iol, iosv]`. Use both unless a feature needs one image |
@@ -263,7 +264,7 @@ R1:
 ```
 With both fixtures present, `validate` must show `live solution=100% blank=0%` as well as config.
 
-## Courses (`.encorcourse`)
+## Courses (`.cmlcourse`, formerly `.encorcourse`)
 A course is a zip that bundles labs into a study track:
 ```
 course.yaml              # required
@@ -281,13 +282,14 @@ Every listed lab must be bundled in the course file, already installed, or publi
 course from the library (or importing a course file while online) installs the listed labs it doesn't bundle from the
 library first (*Install all*). Each bundle folder must be named after its lab id, and every bundled lab must pass the
 normal validation, otherwise nothing is installed. Build and validate one with
-`python -m encorlab course build <folder> [--labs-from examples/] -o my.encorcourse`.
+`python -m encorlab course build <folder> [--labs-from examples/] -o my.cmlcourse`.
 
 ## Publishing in the lab library
 Since 2.0.0 the app ships without labs; every lab, including the former built-in labs, is a pack in the online library
-(`labs/` in the project repo). Lab sources live in `labsrc/<id>/` (and `examples/<id>/`), courses in `examples/courses/`.
+(`library/` in the project repo, with `.cmllab` / `.cmlcourse` files; `labs/` keeps the same packs as `.encorlab` /
+`.encorcourse` for 2.0 and older). Lab sources live in `labsrc/<id>/` (and `examples/<id>/`), courses in `examples/courses/`.
 `python packaging/build_library.py` packs them reproducibly, validates every lab strictly (solution 100%, starting config
-0%) and writes `labs/index.json` with each file's sha256, size, version, RAM estimate and the recommended starter set
+0%) and writes `library/index.json` (and `labs/index.json`) with each file's sha256, size, version, RAM estimate and the recommended starter set
 (`labsrc/library.yaml`). It refuses a changed pack whose `version:` was not raised. Anyone can host a library: serve a
 folder with `index.json` and the packs over https and set *Settings > Library URL* (http is accepted only for
 localhost).

@@ -2,16 +2,36 @@
 # Runs inside the chroot (see deb_chroot_test.sh). Packages are in /tmp/debtest, the repo at /src (read-only).
 set -uo pipefail
 export DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8
-FAILS=0; D=/tmp/debtest; U=tester; H=/home/$U; DATA=$H/.config/encorlab
+FAILS=0; D=/tmp/debtest; U=tester; H=/home/$U; DATA=$H/.config/cml-lab-builder; BOOT=$H/.config/encorlab   # 2.1+: data / app updates
 ok()   { echo "PASS $*"; }
 bad()  { echo "FAIL $*"; FAILS=$((FAILS+1)); }
 chk()  { local msg=$1; shift; local o; if o=$("$@" 2>&1); then ok "$msg"; else bad "$msg"; echo "$o" | sed 's/^/   /' | head; fi; }
 as()   { su "$U" -s /bin/bash -c "cd $H && $*"; }
-appver() { as "encorlab version" 2>/dev/null | tail -1 | awk '{print $NF}'; }
+appver() { as "encorlab version" 2>/dev/null | head -1 | awk '{print $NF}'; }
 
 dpkg -s encorlab >/dev/null 2>&1 && { apt-get purge -y encorlab >/dev/null; }
 id "$U" >/dev/null 2>&1 || useradd -m -s /bin/bash "$U"
 rm -rf "$H/.config"
+
+OLD=$(ls $D/old-*.deb 2>/dev/null | head -1)
+if [ -n "$OLD" ]; then
+    OV=$(dpkg-deb -f "$OLD" Version)
+    echo "== upgrade path from the $OV package: in-app patch on the installed deb, then apt upgrade"
+    apt-get update -qq
+    apt-get install -y "$OLD" > /tmp/apt-old.log 2>&1 && ok "apt install the $OV package" || { bad "install $OV"; tail /tmp/apt-old.log; }
+    apt-get install -y -qq python3 procps >/tmp/apt-tools.log 2>&1
+    as "python3 /src/packaging/rename_test.py --exe /usr/bin/encorlab --patch $D/patch-$VER.zip --base $H/.config --port 18830" > /tmp/rename.log 2>&1; rc=$?
+    grep -E "^(PASS|FAIL)" /tmp/rename.log | sed 's/^/   /'
+    [ $rc = 0 ] && ok "patch -> data move -> next patch -> rollback on the installed $OV deb ($(grep -c ^PASS /tmp/rename.log) checks)" || { bad "rename test rc=$rc"; tail -20 /tmp/rename.log; }
+    chk "dpkg --verify clean after the patch round trip" test -z "$(dpkg --verify encorlab)"
+    as "encorlab import /src/labs/ospf-multiarea-stub.encorlab" >/dev/null 2>&1
+    chk "$OV keeps its data in ~/.config/encorlab" test -f "$BOOT/labs/ospf-multiarea-stub/lab.yaml" -a ! -e "$DATA"
+    apt-get install -y "$D/encorlab_${VER}_amd64.deb" > /tmp/apt-upg.log 2>&1 && ok "apt install ./encorlab_${VER}_amd64.deb over $OV" || { bad "upgrade $OV -> $VER"; tail /tmp/apt-upg.log; }
+    v=$(appver); [ "$v" = "$VER" ] && ok "after the upgrade: $v" || bad "after the upgrade -> $v"
+    chk "data moved to ~/.config/cml-lab-builder on the first start" test -f "$DATA/labs/ospf-multiarea-stub/lab.yaml" -a -f "$DATA/migrations/data-folder.json" -a -f "$BOOT/MOVED.txt"
+    chk "cmllab command works" as "cmllab list | grep -q ospf-multiarea-stub"
+    apt-get purge -y encorlab >/dev/null 2>&1; rm -rf "$H/.config"
+fi
 
 echo "== install $D/encorlab_${VER}_amd64.deb"
 apt-get update -qq
@@ -19,6 +39,7 @@ apt-get install -y "$D/encorlab_${VER}_amd64.deb" > /tmp/apt-install.log 2>&1 &&
 grep -E "^(Setting up|Unpacking) " /tmp/apt-install.log | sed 's/^/   /' | head -20
 apt-get install -y -qq python3 desktop-file-utils procps >/tmp/apt-tools.log 2>&1 || { bad "test tools"; tail /tmp/apt-tools.log; }
 chk "/usr/bin/encorlab is executable" test -x /usr/bin/encorlab
+chk "/usr/bin/cmllab -> encorlab" test "$(readlink /usr/bin/cmllab)" = encorlab
 chk "/opt/encorlab/install-type says deb" grep -qx deb /opt/encorlab/install-type
 chk "desktop-file-validate" desktop-file-validate /usr/share/applications/encorlab.desktop
 chk "hicolor icons installed" test -f /usr/share/icons/hicolor/256x256/apps/encorlab.png -a -f /usr/share/icons/hicolor/48x48/apps/encorlab.png
@@ -48,7 +69,7 @@ pkill -f '^/opt/encorlab/ENCORLab'; sleep 1
 
 echo "== smoke test of the installed package as $U (patches + auto-update against a fake release)"
 find /opt/encorlab -printf '%p %s %m\n' | sort > /tmp/opt.before
-PACKS="--pack /src/labs/ospf-multiarea-stub.encorlab --pack /src/labs/troubleshoot-ospf-7node.encorlab"
+PACKS="--pack /src/library/ospf-multiarea-stub.cmllab --pack /src/library/troubleshoot-ospf-7node.cmllab"
 as "python3 /src/packaging/smoke_test.py /usr/bin/encorlab --version $VER --data-dir $DATA --patch-test --auto-update-test $PACKS" > /tmp/smoke.log 2>&1; rc=$?
 grep -E "^(PASS|FAIL)" /tmp/smoke.log | sed 's/^/   /'
 [ $rc = 0 ] && ok "smoke test passed ($(grep -c ^PASS /tmp/smoke.log) checks)" || { bad "smoke test rc=$rc"; tail -30 /tmp/smoke.log; }
@@ -57,7 +78,7 @@ chk "/opt/encorlab untouched by patch installs" cmp /tmp/opt.before /tmp/opt.aft
 chk "dpkg --verify clean after patching" test -z "$(dpkg --verify encorlab)"
 
 echo "== upgrades: user patch $PV vs newer debs"
-rm -rf "$DATA/app" "$DATA/updates"
+rm -rf "$BOOT/app" "$DATA/updates"
 as "encorlab update-install --file $D/user-patch-$PV.zip" | tail -1 | sed 's/^/   /'
 v=$(appver); [ "$v" = "$PV" ] && ok "user patch $PV runs over deb $VER" || bad "after patch -> $v"
 apt-get install -y "$D/encorlab_${UP1}_amd64.deb" > /tmp/apt-up1.log 2>&1 && ok "apt install ./encorlab_${UP1}_amd64.deb over $VER" || { bad "upgrade to $UP1"; tail /tmp/apt-up1.log; }
@@ -66,17 +87,17 @@ chk "dpkg --verify clean after upgrade" test -z "$(dpkg --verify encorlab)"
 v=$(appver); [ "$v" = "$PV" ] && ok "newer user patch $PV keeps winning over bundled $UP1" || bad "after $UP1 deb -> $v"
 apt-get install -y "$D/encorlab_${UP2}_amd64.deb" > /tmp/apt-up2.log 2>&1 && ok "apt install ./encorlab_${UP2}_amd64.deb over $UP1" || bad "upgrade to $UP2"
 v=$(appver); [ "$v" = "$UP2" ] && ok "newer bundled $UP2 beats the $PV patch" || bad "after $UP2 deb -> $v"
-chk "user data dir untouched by upgrades" test -d "$DATA/app/$PV" -a -d "$DATA/labs/ospf-multiarea-stub"
+chk "user data dir untouched by upgrades" test -d "$BOOT/app/$PV" -a -d "$DATA/labs/ospf-multiarea-stub"
 
 echo "== remove / purge"
 apt-get remove -y encorlab > /tmp/apt-rm.log 2>&1 && ok "apt remove encorlab" || bad "apt remove"
 chk "/opt/encorlab gone after remove" test ! -e /opt/encorlab
-chk "/usr/bin/encorlab gone after remove" test ! -e /usr/bin/encorlab
+chk "/usr/bin/encorlab gone after remove" test ! -e /usr/bin/encorlab -a ! -L /usr/bin/cmllab
 chk "menu entry gone after remove" test ! -e /usr/share/applications/encorlab.desktop
-chk "~/.config/encorlab kept after remove" test -d "$DATA/labs/ospf-multiarea-stub"
+chk "~/.config/cml-lab-builder kept after remove" test -d "$DATA/labs/ospf-multiarea-stub"
 apt-get purge -y encorlab > /tmp/apt-purge.log 2>&1 && ok "apt purge encorlab" || bad "apt purge"
 grep -i "kept" /tmp/apt-purge.log | sed 's/^/   /'
 chk "package fully gone from dpkg" test -z "$(dpkg -l encorlab 2>/dev/null | grep -E '^(ii|rc)')"
-chk "~/.config/encorlab kept after purge" test -d "$DATA/labs/ospf-multiarea-stub" -a -d "$DATA/app/$PV"
+chk "~/.config/cml-lab-builder and ~/.config/encorlab/app kept after purge" test -d "$DATA/labs/ospf-multiarea-stub" -a -d "$BOOT/app/$PV"
 
 echo; [ $FAILS = 0 ] && echo "DEB CHROOT TEST PASSED" || { echo "DEB CHROOT TEST FAILED ($FAILS)"; exit 1; }

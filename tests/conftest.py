@@ -26,3 +26,17 @@ def _isolated_user_dirs(tmp_path, monkeypatch):
     monkeypatch.setenv("ENCOR_SETTINGS_FILE", str(tmp_path / "settings.json"))
     monkeypatch.setenv("ENCOR_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("ENCOR_USE_KEYRING", "0")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_config_home(tmp_path_factory, monkeypatch):
+    """Never touch the real ~/.config (or %APPDATA%): every test gets its own config home, and the console
+    driver's waits are shortened for the scripted fake consoles."""
+    home = tmp_path_factory.mktemp("cfg")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(home))
+    monkeypatch.setenv("APPDATA", str(home))
+    from encorlab import console, paths
+    paths.reset_cache()
+    monkeypatch.setattr(console, "OPEN_WAIT", 0.3)
+    yield
+    paths.reset_cache()

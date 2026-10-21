@@ -1,6 +1,6 @@
 "use strict";
-/* ENCOR Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "2.0.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
+/* CML Lab Builder UI - vanilla JS, no build step. */
+const APP_JS_VERSION = "2.1.0";  // must equal encorlab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -189,7 +189,7 @@ function renderList() {
 /* ---------------------------------------------------------------- first run (no labs) + labs kept from 1.x */
 function renderEmpty(note = "") {
   $("#lab-detail").innerHTML = `<div class="welcome" data-help="lab.empty">
-    <div class="welcome-hero"><h2>Welcome to ENCOR Lab Builder</h2>
+    <div class="welcome-hero"><h2>Welcome to CML Lab Builder</h2>
       <p class="lead">Hands-on CCNP ENCOR labs for your CML server. Pick a way to get your first labs. It takes a few seconds.</p></div>
     <div class="choices">
       <div class="choice rec"><span class="tag ok">Recommended</span><h3>Start with the basics</h3>
@@ -304,7 +304,7 @@ async function deleteLab(id, title) {
 
 /* ---------------------------------------------------------------- courses + online library */
 let courseList = [];
-const LIB_DEFAULT = "https://raw.githubusercontent.com/Specops13/encore-lab-app/main/labs/index.json";
+const LIB_DEFAULT = "https://raw.githubusercontent.com/Specops13/cml-lab-builder/main/library/index.json";
 async function loadCourses() {
   try { courseList = (await api("/api/courses")).courses; } catch (e) { courseList = []; }
   const sel = $("#f-course"), cur = sel.value;
@@ -442,6 +442,32 @@ function renderTimer() {
 setInterval(renderTimer, 1000);
 
 /* ---------------------------------------------------------------- lab detail */
+// 2.1.0: "Test console" per node - opens the node's console step by step (SSH, open, prompt, login, command) and shows
+// what each stage saw plus the raw last console lines, so a failing Check/Apply can be explained.
+function consoleTestBox(l) {
+  const nodes = l.node_list || [];
+  if (!nodes.length) return "";
+  return `<details id="ctest-box"><summary data-help="lab.consoleTest">Test console</summary>
+    <p class="muted small">Opens one node's console the way Check and Apply do and reports every stage. The lab must be built and the node booted.</p>
+    <div class="toolbar">${nodes.map((n) => `<button data-help="lab.consoleTestNode" class="small" data-ctest="${esc(n.name)}">${esc(n.name)} <span class="muted">${esc(n.os)}</span></button>`).join("")}</div>
+    <div id="ctest-out"></div></details>`;
+}
+function bindConsoleTest(l) {
+  document.querySelectorAll("[data-ctest]").forEach((b) => { b.onclick = () => consoleTest(l.id, b.dataset.ctest); });
+}
+async function consoleTest(id, node) {
+  const out = $("#ctest-out"); if (!out) return;
+  document.querySelectorAll("[data-ctest]").forEach((b) => { b.disabled = true; });
+  out.innerHTML = `<p class="muted">Testing the console of ${esc(node)}… (an NX-OS node can take a minute)</p>`;
+  try {
+    const r = await api(`/api/labs/${id}/console-test?node=${encodeURIComponent(node)}`, {method: "POST"});
+    out.innerHTML = `<p><b>${esc(node)}</b> ${r.ok ? '<span class="tag ok">console OK</span>' : '<span class="tag bad">console problem</span>'}</p>
+      <table>${(r.stages || []).map((st) => `<tr><td>${st.ok ? "✔" : "✘"}</td><td>${esc(st.name)}</td><td class="small">${esc(st.detail || "")}</td></tr>`).join("")}</table>
+      <p class="muted small">Last console lines:</p><pre class="log">${esc(r.tail || "(nothing received)")}</pre>`;
+  } catch (e) { out.innerHTML = `<p><span class="tag bad">error</span> ${esc(e.message)}</p>`; }
+  document.querySelectorAll("[data-ctest]").forEach((b) => { b.disabled = false; });
+}
+
 async function selectLab(id) {
   current = id; renderList();
   const l = await api(`/api/labs/${id}`);
@@ -485,7 +511,7 @@ async function selectLab(id) {
     <details><summary data-help="lab.objectives">Objectives graded (${l.checks.length} checks: ${l.checks.filter((c) => c.mode === "live").length} live, ${l.checks.filter((c) => c.mode === "config").length} config) - spoilers</summary>
       <table>${l.checks.map((c) => `<tr><td><span class="tag">${c.mode}</span></td><td>${esc(c.device)}</td><td>${esc(c.description)}</td>
       <td>${c.hint ? `<button data-help="lab.hint" class="hint-btn" data-hint="${esc(c.hint)}">Show hint</button>` : ""}</td></tr>`).join("")}</table></details>
-    <details id="cons-box" hidden><summary data-help="lab.consoles">Consoles</summary><div id="consoles"></div></details>
+    <details id="cons-box" hidden><summary data-help="lab.consoles">Consoles</summary><div id="consoles"></div></details>${consoleTestBox(l)}
     ${l.exam ? "" : `<details id="snap-box"><summary data-help="lab.snapshots">Config snapshots</summary>
       <div class="toolbar"><input data-help="lab.snapName" id="snap-name" placeholder="name (blank = date/time)" style="width:16em" aria-label="Snapshot name">
       <input data-help="lab.snapNote" id="snap-note" placeholder="note (optional)" style="flex:1;min-width:12em" aria-label="Snapshot note">
@@ -526,7 +552,7 @@ async function selectLab(id) {
   if ($("#a-delete")) $("#a-delete").onclick = () => deleteLab(id, l.title);
   $("#t-toggle").onclick = () => (timerState(id).start ? timerPause(id) : timerStart(id));
   $("#t-reset").onclick = () => confirm("Reset the timer?") && timerSet(id, {acc: 0, start: null});
-  bindHints($("#lab-detail"));
+  bindHints($("#lab-detail")); bindConsoleTest(l);
   if ($("#snap-save")) $("#snap-save").onclick = () => {
     const q = new URLSearchParams({name: $("#snap-name").value.trim(), note: $("#snap-note").value.trim()});
     run("snapshot", `/api/labs/${id}/snapshots?${q}`).then(() => { $("#snap-name").value = ""; $("#snap-note").value = ""; });
@@ -659,7 +685,7 @@ async function run(kind, path) {
       q.set("elapsed_s", String(timerSecs(lab))); if (localStorage.getItem(revealedKey(lab))) q.set("revealed", "true"); }
     const {job_id} = await api(path || (`/api/labs/${lab}/${kind}` + (q.toString() ? `?${q}` : "")), {method: "POST"});
     const j = await pollJob(job_id, (j) => { if (lab === current) { $("#log").textContent = j.log.join("\n") || "…"; $("#log").scrollTop = 1e9; } });
-    if (j.state === "error") toast(`${kind} failed: ${j.error}`, "err", 12000);
+    if (j.state === "error") toast(`${kind} failed: ${j.error.split("\n")[0]}${j.error.includes("\n") ? " (the last console lines are in the Activity log)" : ""}`, "err", 12000);
     else {
       toast(`${kind} finished`, "ok");
       if (kind === "build") timerStart(lab);
@@ -686,8 +712,8 @@ function showResults(r) {
     <table><tr><th></th><th>Device</th><th>Check</th><th>Details</th></tr>${r.results.map((c) => `
     <tr><td class="${c.passed ? "pass" : "fail"}">${c.passed ? "PASS" : "FAIL"}</td><td>${esc(c.device)}</td>
     <td>${esc(c.description)}<br><code class="small">${esc(c.command)}</code></td>
-    <td class="small">${c.details.map(esc).join("<br>")}${c.hint ? `<br><button data-help="lab.hint" class="hint-btn" data-hint="${esc(c.hint)}">Show hint</button>` : ""}
-    <details><summary data-help="lab.output">output</summary><pre class="log">${esc(c.output)}</pre></details></td></tr>`).join("")}</table>
+    <td class="small">${c.details.map((d) => (d.includes("\n") ? `<pre class="log">${esc(d)}</pre>` : esc(d))).join("<br>")}${c.hint ? `<br><button data-help="lab.hint" class="hint-btn" data-hint="${esc(c.hint)}">Show hint</button>` : ""}
+    <details${c.output.startsWith("(last console output)") ? " open" : ""}><summary data-help="lab.output">output</summary><pre class="log">${esc(c.output)}</pre></details></td></tr>`).join("")}</table>
     ${r.fault_fixed ? faultPanel(r.fault_fixed, "Fault fixed") : ""}
     <div id="solution-box">${r.fault ? "" : r.passed && r.solution_summary ? solutionPanel({summary: r.solution_summary, auto_generated: r.solution_summary_auto, configs: {}})
       : '<button data-help="lab.revealSolution" id="a-reveal" class="hint-btn">Reveal solution</button>'}</div>`;
@@ -753,7 +779,7 @@ function renderWalkthrough(l) {
     <div id="walk-progress" class="walk-progress"></div>
     <section id="walk-step" class="walk-step"></section>
     <h3 data-help="lab.activity">Activity</h3><pre id="log" class="log">-</pre>
-    <details id="cons-box" hidden><summary data-help="lab.consoles">Consoles</summary><div id="consoles"></div></details>`;
+    <details id="cons-box" hidden><summary data-help="lab.consoles">Consoles</summary><div id="consoles"></div></details>${consoleTestBox(l)}`;
   $("#a-build").onclick = () => confirmBuild(l);
   $("#w-check-all").onclick = () => run("step-check", `/api/labs/${l.id}/walkthrough/check-all`);
   $("#a-reset").onclick = () => confirm("Reset wipes all device configs back to the starting point (hostname and logins only). Your walkthrough progress is kept. Continue?") && run("reset");
@@ -764,6 +790,7 @@ function renderWalkthrough(l) {
   };
   $("#a-edit").onclick = () => openInBuilder(l.id);
   $("#a-export").onclick = () => { location.href = `/api/labs/${encodeURIComponent(l.id)}/export`; };
+  bindConsoleTest(l);
   if ($("#a-delete")) $("#a-delete").onclick = () => deleteLab(l.id, l.title);
   renderWalkStep(); refreshStatus();
 }
@@ -863,20 +890,23 @@ async function loadProgress() {
       <table><tr><th>Walkthrough</th><th>Steps checked</th><th></th><th>Status</th><th></th></tr>${p.walkthroughs.labs.map((w) => `<tr><td>${esc(w.title)}</td>
         <td>${w.required_passed}/${w.required}</td><td>${bar(w.pct)}</td><td>${w.completed ? '<span class="tag ok">completed</span>' : w.started ? '<span class="tag">in progress</span>' : '<span class="muted small">not started</span>'}</td>
         <td>${labBtns([w.id])}</td></tr>`).join("")}</table>` : ""}
-    <h3 data-help="p.domains">Exam domains <span class="muted small">(${esc(p.blueprint)})</span></h3>
+    ${(p.tracks || []).length > 1 || ((p.tracks || [])[0] && !p.tracks[0].encor) ? `<h3 data-help="p.tracks">Tracks</h3>
+      <table><tr><th>Track</th><th>Mastery</th><th></th><th>Solved</th><th>Labs</th></tr>${p.tracks.map((t) => `<tr><td><b>${esc(t.id)}</b></td>
+        <td>${t.mastery_pct}%</td><td>${bar(t.mastery_pct)}</td><td>${t.solved}/${t.labs}</td><td>${labBtns(t.lab_ids)}</td></tr>`).join("")}</table>` : ""}
+    ${o.encor_labs ? `<h3 data-help="p.domains">ENCOR exam domains <span class="muted small">(${esc(p.blueprint)}; ENCOR mastery ${o.encor_mastery_pct}%)</span></h3>
     <table><tr><th>Domain</th><th>Weight</th><th>Mastery</th><th></th><th>Solved</th><th>Labs</th></tr>${p.domains.map((d) => `<tr>
       <td>${esc(d.id)} ${esc(d.name)}</td><td>${d.weight}%</td>${d.labs ? `<td>${d.mastery_pct}%</td><td>${bar(d.mastery_pct)}</td><td>${d.solved}/${d.labs}</td><td>${labBtns(d.lab_ids)}</td>`
-      : '<td colspan="4" class="muted small">No labs for this domain yet (mostly theory topics). Study it separately.</td>'}</tr>`).join("")}</table>
+      : '<td colspan="4" class="muted small">No labs for this domain yet (mostly theory topics). Study it separately.</td>'}</tr>`).join("")}</table>` : ""}
     <h3 data-help="p.weakest">Weakest topics</h3>
     <table>${p.weakest.map((i) => `<tr><td><b>${esc(i.id)}</b> ${esc(i.title)}</td><td>${i.mastery_pct}%</td><td>${bar(i.mastery_pct)}</td><td>${labBtns(i.lab_ids)}</td></tr>`).join("")}</table>
-    <details><summary data-help="p.items">All blueprint items covered by labs (${p.items.length})</summary>
+    <details><summary data-help="p.items">All topics covered by labs (${p.items.length})</summary>
       <table><tr><th>Item</th><th>Mastery</th><th></th><th>Solved</th><th>Labs</th></tr>${p.items.map((i) => `<tr><td><b>${esc(i.id)}</b> ${esc(i.title)}</td><td>${i.mastery_pct}%</td><td>${bar(i.mastery_pct)}</td><td>${i.solved}/${i.labs}</td><td>${labBtns(i.lab_ids)}</td></tr>`).join("")}</table></details>
     <h3 data-help="p.activity">Activity (last 30 days)</h3>
     <div class="activity">${p.activity.map((a) => `<span title="${esc(a.day)}: ${a.checks} check(s)" style="height:${4 + Math.round(36 * a.checks / maxAct)}px" class="${a.checks ? "on" : ""}"></span>`).join("")}</div>
     ${p.failed_checks.length ? `<h3 data-help="p.failed">Checks you fail most</h3><table>${p.failed_checks.map((f) => `<tr><td>${esc(f.description)}</td><td class="muted small">${esc(f.lab_id)} / ${esc(f.check_id)}</td><td>${f.count}×</td><td>${labBtns([f.lab_id])}</td></tr>`).join("")}</table>` : ""}
     <h3 data-help="p.recent">Recent checks</h3>${p.recent.length ? `<table><tr><th>When</th><th>Lab</th><th>Type</th><th>Score</th><th>Counted</th></tr>${p.recent.map((r) =>
       `<tr><td>${esc(r.ts)}</td><td>${esc(r.title)}</td><td>${esc(r.kind)}</td><td class="${r.passed ? "pass" : ""}">${r.score_pct}%</td><td>${r.adjusted_pct}%</td></tr>`).join("")}</table>` : '<p class="muted">No checks yet. Build a lab and click Check.</p>'}
-    <p class="muted small">Mastery = best score per lab, minus ${p.rules.hint_penalty} points per hint used (capped at ${p.rules.revealed_cap}% after revealing the answer), averaged per topic; labs never checked count as 0. Overall is weighted by the exam domain weights of the domains that have labs.</p>`;
+    <p class="muted small">Mastery = best score per lab, minus ${p.rules.hint_penalty} points per hint used (capped at ${p.rules.revealed_cap}% after revealing the answer), averaged per topic; labs never checked count as 0. ENCOR mastery is weighted by the exam domain weights of the domains that have labs; with several tracks, overall mastery is the average over all labs.</p>`;
   $$("#progress [data-open]").forEach((b) => b.onclick = () => openLab(b.dataset.open));
 }
 $("#p-refresh").onclick = loadProgress;
@@ -910,7 +940,7 @@ $$(".tab").forEach((t) => t.onclick = async () => {
 const field = (help, label, path, value, type = "text", extra = "") =>
   `<label>${label}<input data-help="${help}" data-path="${path}" type="${type}" value="${esc(value ?? "")}" ${extra}></label>`;
 function getPath(obj, path) { return path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj); }
-function setPath(obj, path, v) { const ks = path.split("."); const last = ks.pop(); const t = ks.reduce((o, k) => (o[k] ??= {}), obj); t[last] = v; }
+function setPath(obj, path, v) { const ks = path.split("."); const last = ks.pop(); const t = ks.reduce((o, k) => (o[k] ??= {}), obj); if (v === undefined) delete t[last]; else t[last] = v; }
 function renderForm() {
   const d = draft; const names = d.nodes.map((n) => n.name);
   const nodeOpts = (sel) => names.map((n) => `<option ${n === sel ? "selected" : ""}>${esc(n)}</option>`).join("");
@@ -919,6 +949,7 @@ function renderForm() {
   $("#tab-form").innerHTML = `${d.type === "walkthrough" ? `<p class="note">This is a walkthrough lab (${(d.steps || []).length} steps). Edit the steps (explanation, config per device, verify commands, checks) in the YAML tab; the form covers the general fields, nodes and links.</p>` : ""}
   <fieldset><legend>General</legend><div class="grid">
     ${field("f.id", "Lab id", "id", d.id)}${field("f.title", "Title", "title", d.title)}
+    <label>Track<input data-help="f.track" data-path="track" data-type="track" placeholder="ENCOR" value="${esc(d.track || "")}"></label>
     <label>Domain<input data-help="f.domain" data-path="domain" list="domains" value="${esc(d.domain)}"><datalist id="domains">${DOMAINS.map((x) => `<option>${esc(x)}</option>`).join("")}</datalist></label>
     <label>Blueprint items<input data-help="f.blueprint" data-path="blueprint" data-type="csv" value="${esc((d.blueprint || []).join(", "))}"></label>
     <label>Difficulty<select data-help="f.difficulty" data-path="difficulty" data-type="int">${[1, 2, 3, 4, 5].map((i) => `<option ${i === d.difficulty ? "selected" : ""}>${i}</option>`).join("")}</select></label>
@@ -991,6 +1022,7 @@ function onFormChange(e) {
   else if (type === "csv") v = v.split(",").map((x) => x.trim()).filter(Boolean);
   else if (type === "lines") v = v.split("\n").filter((x) => x.trim());
   else if (type === "plat") v = v.split(",");
+  else if (type === "track") v = (v.trim() && v.trim().toUpperCase() !== "ENCOR") ? v.trim() : undefined;  // ENCOR = default: leave the key out (older versions import it)
   if (el.dataset.rename !== undefined) { // node rename: carry links/checks/solution along
     const old = el.dataset.rename;
     draft.links.forEach((l) => { if (l.a.node === old) l.a.node = v; if (l.b.node === old) l.b.node = v; });
@@ -1092,7 +1124,9 @@ async function loadSettings() {
   loadUpdateStatus().catch(() => {});
   const s = await api("/api/settings");
   const f = $("#settings-form");
-  for (const k of ["cml_url", "username", "console_host", "console_port", "grading_mode", "platform", "node_limit", "ram_heavy_gb", "library_url", "ai_base_url", "ai_model"]) f[k].value = s[k] ?? "";
+  for (const k of ["cml_url", "username", "console_host", "console_port", "grading_mode", "platform", "node_limit", "ram_heavy_gb", "library_url", "device_username", "nxos_username", "ai_base_url", "ai_model"]) f[k].value = s[k] ?? "";
+  for (const k of ["device_password", "nxos_password"]) { f[k].value = ""; f[k].placeholder = s[k + "_set"] ? "(set - leave blank to keep; not saved to disk)" : (k === "nxos_password" ? "(same as the device login)" : ""); }
+  loadHostKey().catch(() => {});
   libraryUrl = s.library_url || "";
   f.verify_tls.value = s.verify_tls === false ? "false" : "true";
   f.show_help.checked = s.show_help !== false; if (window.Help) Help.setVisible(f.show_help.checked);
@@ -1102,6 +1136,19 @@ async function loadSettings() {
   presets = await api("/api/ai/presets");
   $("#ai-preset").innerHTML = `<option value="">(none)</option>` + Object.entries(presets).map(([k, p]) => `<option value="${k}" ${k === s.ai_preset ? "selected" : ""}>${esc(p.label)}</option>`).join("");
 }
+async function loadHostKey() {
+  const h = await api("/api/console/hostkey"), box = $("#hostkey");
+  if (!h.host) { box.textContent = "Console server SSH host key: set the CML URL first."; return; }
+  box.innerHTML = h.key
+    ? `Console server SSH host key for <b>${esc(h.key.host)}</b>: <code>${esc(h.key.type)} ${esc(h.key.sha256)}</code> <span class="muted">(MD5 ${esc(h.key.md5)}; trusted on first use)</span>
+       <button data-help="s.forgetHostKey" type="button" id="hostkey-forget" class="hint-btn">Forget host key</button>`
+    : `Console server SSH host key for <b>${esc(h.host)}</b>: not stored yet. It is saved on the first console connection (trust on first use).`;
+  const b = $("#hostkey-forget");
+  if (b) b.onclick = async () => {
+    if (!confirm("Forget the stored SSH host key? The next console connection trusts whatever key the server sends. Only do this after reinstalling or upgrading CML.")) return;
+    await api("/api/console/hostkey/forget", {method: "POST"}); toast("Host key forgotten", "ok"); loadHostKey();
+  };
+}
 $("#ai-preset").onchange = (e) => { const p = presets[e.target.value]; if (p) { const f = $("#settings-form"); f.ai_base_url.value = p.base_url; f.ai_model.value = p.model; } };
 $("#settings-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1109,6 +1156,7 @@ $("#settings-form").addEventListener("submit", async (e) => {
   const body = {cml_url: f.cml_url.value, username: f.username.value, password: f.password.value, verify_tls: f.verify_tls.value,
     console_host: f.console_host.value, console_port: Number(f.console_port.value) || 22, grading_mode: f.grading_mode.value,
     platform: f.platform.value, node_limit: Number(f.node_limit.value) || 20, ram_heavy_gb: Number(f.ram_heavy_gb.value) || 16, library_url: f.library_url.value.trim(), remember_password: f.remember_password.checked,
+    device_username: f.device_username.value.trim(), device_password: f.device_password.value, nxos_username: f.nxos_username.value.trim(), nxos_password: f.nxos_password.value,
     ai_preset: f.ai_preset.value, ai_base_url: f.ai_base_url.value, ai_model: f.ai_model.value, ai_api_key: f.ai_api_key.value,
     remember_ai_key: f.remember_ai_key.checked, show_help: f.show_help.checked, check_updates: f.check_updates.checked};
   try {
@@ -1193,13 +1241,13 @@ function renderUpdatePrompt(st) {
     msg = `Waiting for ${esc(busy.join(", ") || "the running work")} to finish; then the update installs and the app restarts. Nothing is interrupted.`;
     buttons = `<button data-help="u.cancel" type="button" data-upd="cancel">Cancel</button>`;
   } else if (a.state === "installing") { msg = "Installing the update…"; buttons = ""; }
-  else if (a.state === "restarting") { msg = "Restarting ENCOR Lab… this page reconnects by itself."; buttons = ""; }
+  else if (a.state === "restarting") { msg = "Restarting CML Lab Builder… this page reconnects by itself."; buttons = ""; }
   else if (a.state === "installed") { msg = `Installed. ${esc(a.error || "Close the app and start it again to finish.")}`; buttons = ""; }
   else {
     if (a.state === "error") msg = `The update could not be installed: ${esc(a.error || "unknown error")}. You can try again.`;
     if (busy.length) msg += ` Update now will wait until ${esc(busy.join(", "))} finishes.`;
   }
-  box.innerHTML = `<h3>ENCOR Lab ${v} is ready</h3><p>${msg}</p>
+  box.innerHTML = `<h3>CML Lab Builder ${v} is ready</h3><p>${msg}</p>
     <p class="small"><a data-help="u.notes" href="${esc(o.url)}" target="_blank" rel="noopener">Release notes ↗</a> ·
     <a data-help="u.notes" href="${esc(o.changelog)}" target="_blank" rel="noopener">Changelog ↗</a></p>
     <div class="toolbar">${buttons}</div>`;
@@ -1222,7 +1270,7 @@ function renderFullBanner(st) {
   if (b.dataset.version === f.version && !b.hidden) return;
   b.dataset.version = f.version;
   b.innerHTML = `<button data-help="u.fullDismiss" type="button" class="hint-btn">Dismiss</button>
-    ENCOR Lab ${esc(f.version)} is available but needs a <b>full download</b> (${esc(f.reason || "new runtime")}); it cannot be installed as a patch.
+    CML Lab Builder ${esc(f.version)} is available but needs a <b>full download</b> (${esc(f.reason || "new runtime")}); it cannot be installed as a patch.
     <a data-help="u.fullLink" href="${esc(f.url)}" target="_blank" rel="noopener">${f.asset ? "Download " + esc(f.asset) : "Download it from the release page"} ↗</a>${f.how ? ", then " + esc(f.how) : ""}.
     Your data and settings are kept.`;
   b.hidden = false;
@@ -1274,7 +1322,7 @@ $("#s-update-restart").onclick = async () => {
   const before = (await api("/api/update/status").catch(() => ({}))).next_start;
   try { await api("/api/update/restart", {method: "POST"}); }
   catch (e) { toast(`Restart failed: ${(e.data && e.data.error) || e.message}`, "err", 9000); return; }
-  banner("Restarting ENCOR Lab Builder… this page reloads when it is back.");
+  banner("Restarting CML Lab Builder… this page reloads when it is back.");
   const t0 = Date.now();
   await new Promise((res) => setTimeout(res, 1500));
   while (Date.now() - t0 < 90000) {
@@ -1299,11 +1347,18 @@ async function versionCheck() {
   const h = await api("/api/health");
   if (page && h.version && h.version !== page && !versionCheck.warned) {
     versionCheck.warned = true;
-    banner(`ENCOR Lab Builder was updated to v${h.version} while this page was open (page is v${page}). Reload the page (F5) to use it.`);
+    banner(`CML Lab Builder was updated to v${h.version} while this page was open (page is v${page}). Reload the page (F5) to use it.`);
   }
 }
 
 /* ---------------------------------------------------------------- boot */
+/* 2.1.0 moved the data folder (encorlab -> cml-lab-builder): say so once */
+async function dataFolderNote() {
+  const d = await api("/api/data-folder");
+  if (d.state !== "moved" || d.notified) return;
+  toast(`Your data moved to ${d.to}\n(from ${d.from}; the old folder was left in place, with a MOVED.txt note)`, "ok", 15000);
+  await api("/api/data-folder/ack", {method: "POST"});
+}
 (async () => {
   const step = async (name, fn) => { try { await fn(); } catch (e) { if (!e.shown) banner(`Startup step "${name}" failed: ${e.message}`); } };
   await step("version check", versionCheck);
@@ -1312,6 +1367,7 @@ async function versionCheck() {
   await step("check templates", async () => { templates = await api("/api/templates"); });
   await step("lab list", loadLabs);
   await step("courses", loadCourses);
+  step("data folder", dataFolderNote);
   pollUpdates();   // the update prompt (the server does the checking); never blocks startup
   const v = (location.hash || "#labs").slice(1);
   show(VIEWS.includes(v) ? v : "labs");

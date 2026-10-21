@@ -11,7 +11,7 @@ import re
 
 from . import __version__, library
 
-REPO = "Specops13/encore-lab-app"
+REPO = "Specops13/cml-lab-builder"   # renamed from encore-lab-app in 2.1.0 (GitHub redirects the old name)
 LATEST_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 RELEASES_PAGE = f"https://github.com/{REPO}/releases"
 _VER = re.compile(r"^v?(\d+)\.(\d+)(?:\.(\d+))?")

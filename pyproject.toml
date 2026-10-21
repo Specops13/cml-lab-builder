@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "encorlab"
-version = "2.0.0"
-description = "Build CCNP ENCOR (350-401) practice labs in Cisco Modeling Labs 2.9 and grade them"
+version = "2.1.0"
+description = "CML Lab Builder: build hands-on labs in Cisco Modeling Labs 2.9 and grade them (CCNP ENCOR track included)"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{name = "Dylan Vaughan (Specops13)"}]
@@ -29,7 +29,9 @@ dev = ["pytest>=8", "httpx>=0.27"]
 build = ["pyinstaller>=6.22,<7"]
 
 [project.scripts]
-encorlab = "encorlab.cli:app"
+cmllab = "encorlab.cli:app"                # 2.1.0: the CLI's new name
+cml-lab-builder = "encorlab.launcher:main"
+encorlab = "encorlab.cli:app"              # old names, kept as aliases
 encorlab-app = "encorlab.launcher:main"
 
 [tool.setuptools]

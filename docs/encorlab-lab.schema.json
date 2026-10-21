@@ -369,7 +369,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "One ENCOR practice lab.",
+  "description": "One practice lab (ENCOR is the default track).",
   "properties": {
     "id": {
       "description": "Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name",
@@ -390,8 +390,16 @@
       "title": "Title",
       "type": "string"
     },
+    "track": {
+      "default": "ENCOR",
+      "description": "Study track the lab belongs to, e.g. ENCOR (default), CCNA, ENARSI, Data center. The progress dashboard groups by track; the ENCOR exam-domain view uses only ENCOR labs. Needs 2.1.0+: leave it out for ENCOR labs that should also import into older versions",
+      "maxLength": 40,
+      "minLength": 1,
+      "title": "Track",
+      "type": "string"
+    },
     "blueprint": {
-      "description": "ENCOR 350-401 v1.2 blueprint items, e.g. ['3.2.b']",
+      "description": "Topics. ENCOR labs: 350-401 v1.2 blueprint items, e.g. ['3.2.b']. Other tracks: that exam's topic ids or short topic names, e.g. ['OSPF']",
       "items": {
         "type": "string"
       },
@@ -399,7 +407,7 @@
       "type": "array"
     },
     "domain": {
-      "description": "Blueprint domain, e.g. '3.0 Infrastructure - Layer 3'",
+      "description": "Domain or area, e.g. '3.0 Infrastructure - Layer 3' (ENCOR) or 'Routing'",
       "title": "Domain",
       "type": "string"
     },
@@ -546,7 +554,7 @@
     "links",
     "task"
   ],
-  "title": "ENCOR Lab Builder lab definition",
+  "title": "CML Lab Builder lab definition",
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "encorlab-lab.schema.json"

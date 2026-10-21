@@ -23,10 +23,10 @@ OVERRIDE = {
     "pyinstaller-hooks-contrib": "Apache-2.0 (the embedded run-time hooks)",
 }
 LICENSE_NAMES = ("LICENSE", "LICENCE", "COPYING", "NOTICE", "AUTHORS", "COPYRIGHT")
-HEADER = """THIRD-PARTY NOTICES for ENCOR Lab Builder {version} ({platform})
+HEADER = """THIRD-PARTY NOTICES for CML Lab Builder {version} ({platform})
 =================================================================================
 
-ENCOR Lab Builder itself is licensed under the MIT License (see LICENSE).
+CML Lab Builder itself is licensed under the MIT License (see LICENSE).
 This download also contains the Python runtime and the third-party Python packages listed below, each under its
 own license. They are included unmodified. Their source code is available from the project pages listed (and from
 PyPI). The full license texts follow the summary.
@@ -151,7 +151,7 @@ def render(rows: list[dict], version: str, platform: str) -> str:
     out.append("\nThe Python runtime embeds OpenSSL (Apache-2.0), libffi (MIT), zlib (Zlib), bzip2, xz/liblzma, expat,\n"
                "SQLite (public domain), mpdecimal and (on Linux) libedit/ncurses, as described in the Python license below.\n"
                "\nThe Bootloader exception of PyInstaller (see its COPYING.txt below) allows distributing the executable\n"
-               "stub with any program; the GPL does not extend to ENCOR Lab Builder or the other packages.\n")
+               "stub with any program; the GPL does not extend to CML Lab Builder or the other packages.\n")
     for r in rows:
         out.append("\n\n" + "=" * 100 + f"\n{r['name']} {r['version']}  ({r['license']})\n" + "=" * 100 + "\n")
         if not r["texts"]:

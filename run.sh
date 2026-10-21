@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ENCOR Lab Builder launcher for Debian/Ubuntu (and macOS).
+# CML Lab Builder launcher for Debian/Ubuntu (and macOS).
 #   ./run.sh              -> start the web UI on http://127.0.0.1:8765
 #   ./run.sh <command>    -> run a CLI command, e.g. ./run.sh list | ./run.sh check eigrp-basic
 # Supported Python: 3.10 - 3.13.

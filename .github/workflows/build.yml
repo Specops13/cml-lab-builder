@@ -102,9 +102,11 @@ jobs:
           useradd -m tester && cp -r . /home/tester/src && chown -R tester /home/tester/src
           V=$(dpkg-query -W -f='${Version}' encorlab)
           su tester -c "cd ~ && python3 src/packaging/smoke_test.py /usr/bin/encorlab --version $V \
-            --data-dir /home/tester/.config/encorlab --patch-test --auto-update-test"
-          test -z "$(dpkg --verify encorlab)"   # updates went to ~/.config/encorlab, /opt untouched
-          apt-get purge -y encorlab && test ! -e /opt/encorlab && test -d /home/tester/.config/encorlab
+            --data-dir /home/tester/.config/cml-lab-builder --patch-test --auto-update-test"
+          test -L /usr/bin/cmllab && su tester -c "cmllab version"
+          test -z "$(dpkg --verify encorlab)"   # updates went to ~/.config/encorlab/app, /opt untouched
+          apt-get purge -y encorlab && test ! -e /opt/encorlab && test ! -e /usr/bin/cmllab \
+            && test -d /home/tester/.config/encorlab && test -d /home/tester/.config/cml-lab-builder
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.publish && inputs.tag != ''
     needs: [bundle, patch, deb-test]

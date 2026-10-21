@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, migrate, packs, progress, report, service, sizing, snapshots, updates, walkthrough
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
+from .. import cml as _cml_mod
 from ..platforms import get as get_platform, render
 from ..prompt import build_prompt, json_schema
 from ..templates import catalog as template_catalog
@@ -64,6 +65,8 @@ class SettingsIn(BaseModel):
     check_updates: bool | None = None
     ram_heavy_gb: int | None = None
     library_url: str | None = None
+    nxos_username: str | None = None
+    nxos_password: str | None = None
     remember_password: bool = False
     remember_ai_key: bool = False
 
@@ -97,7 +100,7 @@ JOB_LABELS = {"build": "a lab build", "check": "grading", "test-live": "a live t
 def create_app(store: config.SettingsStore | None = None, client_factory=None, runner_factory=None,
                config_factory=None, probe=None, persist: bool = True, ai_transport=None,
                library_fetch=None, update_fetch=None, update_http=None, auto_update: bool = False,
-               restart=None, auto_restore: bool | None = None) -> FastAPI:
+               restart=None, auto_restore: bool | None = None, console_factory=None) -> FastAPI:
     """auto_update=True (the desktop launcher) starts the background update checker; update_http / restart are
     test hooks for it (see autoupdate.Updater). auto_restore (default: same as auto_update) installs labs an older
     version bundled from the library in the background when they could not be copied from disk (migrate.py)."""
@@ -123,7 +126,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     if (auto_update if auto_restore is None else auto_restore) and migrate.status()["state"] == "pending":
         threading.Thread(target=lambda: migrate.restore(_lib_url(), fetch, store.get().node_limit),
                          name="restore-labs", daemon=True).start()
-    app = FastAPI(title="ENCOR Lab Builder", version=__version__)
+    app = FastAPI(title="CML Lab Builder", version=__version__)
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
     @app.middleware("http")
@@ -234,6 +237,17 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                 errors[str(e.path)] = f"{type(ex).__name__}: {ex}"
         return {"labs": out, "broken": errors, "migration": migrate.status()}
 
+    # ------------------------------------------------------------ data folder (moved in 2.1.0, see paths.py)
+    @app.get("/api/data-folder")
+    def data_folder():
+        from .. import paths
+        return {**paths.status(), "path": str(history.data_dir()), "boot_dir": str(paths.boot_dir())}
+
+    @app.post("/api/data-folder/ack")
+    def data_folder_ack():
+        from .. import paths
+        return paths.acknowledge()
+
     # ------------------------------------------------------------ labs from 1.x (see migrate.py)
     @app.get("/api/migration")
     def migration_status():
@@ -275,12 +289,48 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                 "source": e.source, "task": render(l.task, plat),
                 "faults": len(l.faults), "fault": fault,
                 "blueprint": l.blueprint, "domain": l.domain, "difficulty": l.difficulty, "nodes": l.node_count,
-                "platforms": l.platforms, "author": l.author,
+                "platforms": l.platforms, "author": l.author, "track": l.track,
+                "node_list": [{"name": n.name, "definition": n.definition,
+                               "os": _cml_mod.node_os(l).get(n.name, "ios")} for n in l.nodes],
                 "has_solution": bool(catalog.load_solution(lab_id)),
                 "has_solution_summary": bool(l.solution_summary.strip()),
                 "hints": [] if ex else hints,          # withheld during an exam (served one by one, penalized)
                 "checks": [{"id": c.id, "mode": c.mode, "description": render(c.description, plat),
                             "device": c.device, "hint": "" if ex else render(c.hint, plat)} for c in l.checks]}
+
+    @app.post("/api/labs/{lab_id}/console-test")
+    def console_test(lab_id: str, node: str):
+        """Open one node's console step by step and report each stage with the raw console output."""
+        e = _entry(lab_id)
+        if node not in {n.name for n in e.lab.nodes}:
+            raise HTTPException(404, f"no node {node!r} in {lab_id}")
+        s = store.get()
+        errs = s.validate()
+        if errs:
+            raise HTTPException(400, "; ".join(errs))
+        from ..console import diagnose
+        try:
+            cl = service.make_cml(s, client_factory).find(e.lab)
+        except Exception as ex:  # noqa: BLE001
+            return {"ok": False, "stages": [{"name": "find the lab in CML", "ok": False, "detail": f"{type(ex).__name__}: {ex}"}], "tail": ""}
+        if cl is None:
+            return {"ok": False, "stages": [{"name": "find the lab in CML", "ok": False,
+                                             "detail": "the lab is not built in CML (click Build first)"}], "tail": ""}
+        return diagnose(s, cl.title, node, _cml_mod.node_os(e.lab).get(node, "ios"), client_factory=console_factory)
+
+    # SSH host key of the console server (trust on first use, see console.py)
+    @app.get("/api/console/hostkey")
+    def console_hostkey():
+        from ..console import stored_host_key
+        s = store.get()
+        host = s.effective_console_host
+        return {"host": host, "port": s.console_port, "key": stored_host_key(host, s.console_port) if host else None}
+
+    @app.post("/api/console/hostkey/forget")
+    def console_hostkey_forget():
+        from ..console import forget_host_key
+        s = store.get()
+        return {"forgotten": bool(s.effective_console_host) and forget_host_key(s.effective_console_host, s.console_port)}
 
     def _no_exam(lab_id: str):
         if exam.active(lab_id):

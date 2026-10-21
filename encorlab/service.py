@@ -32,6 +32,8 @@ def _grade_live(settings, lab, plat, progress, client_factory, runner, title=Non
     if own:
         progress(f"Opening device consoles via {settings.effective_console_host}:{settings.console_port}")
         runner = make_cml(settings, client_factory).runner(lab, title)
+    if hasattr(runner, "progress") and getattr(runner, "progress", None) is None:
+        runner.progress = progress        # "waiting for the console to be ready ..." status lines
     try:
         return grade(lab, runner, plat, progress=progress, mode="live")
     finally:

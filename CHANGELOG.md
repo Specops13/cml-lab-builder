@@ -1,6 +1,51 @@
 # Changelog
 
-All notable changes to ENCOR Lab Builder. Versions follow `MAJOR.MINOR.PATCH`.
+All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.0.0). Versions follow `MAJOR.MINOR.PATCH`.
+
+## [2.1.0] - 2026-10-20
+**ENCOR Lab Builder is now CML Lab Builder**, because not every lab is for ENCOR. Delivered as a normal in-app patch
+to 1.7-2.0 installs (the runtime is unchanged); your data moves to the new folder name by itself on the first start.
+### Changed
+- **New name everywhere you see it:** window and console title, web UI, help, reports, CLI help, menu entry (from the
+  2.1.0 .deb), docs and release notes. ENCOR stays where it is ENCOR content: lab tags, courses, the ENCOR exam domains.
+- **GitHub repo renamed** to `Specops13/cml-lab-builder` (old `encore-lab-app` links, the releases API, downloads and raw
+  library URLs redirect). The updater and library default to the new repo.
+- **Data folder renamed** to `%APPDATA%\cml-lab-builder` / `~/.config/cml-lab-builder`. On the first start everything in
+  the old `encorlab` folder is copied, checked by SHA-256 and put in place in one rename, the keyring password is
+  copied to the new name, `MOVED.txt` is left in the old folder (nothing is deleted) and a one-time note says *Your data
+  moved to ...*. Files the old version writes later (after a rollback) are copied over on the next start without
+  overwriting anything. If the copy fails, the old folder keeps being used. Installed app updates (`app/`) stay in the
+  old folder because the installed boot loader looks there; patch, restart and rollback work as before.
+- **File types:** labs export as `.cmllab` and courses as `.cmlcourse`. `.encorlab` / `.encorcourse` still import.
+  The library is published in `library/` with the new names; `labs/` keeps the same labs under the old names for 2.0
+  and older.
+- **Commands:** `cmllab` and `cml-lab-builder` (pip / source; `/usr/bin/cmllab` in the 2.1.0 .deb); `encorlab` stays.
+- **Environment:** every `ENCOR_…` variable can also be written `CMLLAB_…` (wins if both are set).
+- **Progress per track:** labs may set `track:` (default `ENCOR`). The Progress page and report show a Tracks table;
+  the ENCOR exam-domain view only counts ENCOR labs and only appears when you have some. Non-ENCOR labs no longer get
+  the "unknown blueprint item" warning. The Lab builder has a Track field.
+### Fixed
+- **NX-OS (nxosv9000) console sessions, e.g. the EVPN-VXLAN labs:** after logging in, commands timed out because NX-OS
+  sends a bare `\r` before its prompt (`\r\r\n` line ends) and the prompt pattern required a line start. Line ends,
+  ANSI/OSC escape codes and backspaces are now normalised before matching. Also fixed: the console server's own
+  `consoles>` prompt was taken for a device prompt; `terminal width 0` (invalid on NX-OS) is now `terminal width 511`;
+  `--More--` paging is answered; slow output is waited for while data keeps arriving; the POAP / secure password /
+  admin password / basic setup dialog is answered; after the console exec-timeout the app logs in again, trying the new
+  *NX-OS login* setting, the device login, then `admin` with the device password, `admin`/`cisco`, `admin`/`admin`.
+  A node that is not running gives that message instead of a timeout, and a console that keeps showing a prompt the
+  app does not recognise fails within a minute instead of waiting for the boot timeout.
+- **Console errors show the real reason** with the last 20 console lines (Results output, Activity log, Test console).
+- **SSH host key:** no more `UserWarning: Unknown ssh-rsa host key`. The key is stored on first use in
+  `<data>/known_hosts`; *Settings* shows its fingerprint with **Forget host key**; a changed key stops with a clear error.
+### Added
+- **Test console** in the lab view: per node, reports each stage (SSH to the console server, open the node, prompt
+  detected, login needed, command ran) with the raw last console lines (`POST /api/labs/<id>/console-test?node=`).
+- Settings: *NX-OS login* (username / password; the password is kept like the CML password), device login fields.
+- `GET /api/data-folder`, `POST /api/data-folder/ack`, `GET /api/console/hostkey`, `POST /api/console/hostkey/forget`.
+### Kept (renamed in a later full release)
+- The program file `ENCORLab` / `ENCORLab.exe`, the download asset names, the .deb package `encorlab` and `/opt/encorlab`,
+  the patch file name `encorlab-patch-<v>.zip`, the Python package `encorlab`, and the `ENCOR-<lab>` lab titles in CML
+  (renaming those would orphan labs you have already built). Old updaters (1.7-2.0) depend on these names.
 
 ## [2.0.0] - 2026-10-20
 The app now ships without labs; every lab comes from the online lab library. This is a behaviour change for new
