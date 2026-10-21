@@ -3,8 +3,8 @@ import copy
 import pytest
 import yaml
 
-from encorlab import catalog
-from encorlab.schema import Lab
+from cmllab import catalog
+from cmllab.schema import Lab
 
 LAB = catalog.get("eigrp-basic")
 

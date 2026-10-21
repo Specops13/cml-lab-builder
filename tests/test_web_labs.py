@@ -6,10 +6,10 @@ from pathlib import Path
 import httpx
 import yaml
 
-from encorlab import catalog, config, platforms, prompt
-from encorlab.render import to_yaml
-from encorlab.sim import SimRunner
-from encorlab.web.app import create_app
+from cmllab import catalog, config, platforms, prompt
+from cmllab.render import to_yaml
+from cmllab.sim import SimRunner
+from cmllab.web.app import create_app
 from fakes import FakeClient
 from test_web import wait
 from fastapi.testclient import TestClient
@@ -114,7 +114,7 @@ def test_test_live_uses_test_copy_and_cleans_up():
     j = wait(c, c.post("/api/labs/eigrp-basic/test-live").json()["job_id"])
     assert j["state"] == "done", j
     assert j["result"]["passed"]
-    assert fc.labs and all(l.removed for l in fc.labs) and fc.labs[0].title.startswith("ENCOR-TEST-")
+    assert fc.labs and all(l.removed for l in fc.labs) and fc.labs[0].title.startswith("CML-TEST-")
 
 
 def test_history_recorded_after_check():
@@ -131,7 +131,7 @@ def test_history_recorded_after_check():
 def test_cml_labs_and_draft():
     c, fc = make()
     lab = catalog.get("eigrp-basic")
-    fc.import_lab(to_yaml(lab, platforms.get("iol"), "ENCOR-"), title="My lab")
+    fc.import_lab(to_yaml(lab, platforms.get("iol"), "CML-"), title="My lab")
     labs = c.get("/api/cml/labs").json()
     assert labs[0]["title"] == "My lab"
     d = c.post("/api/cml/draft", json={"lab_id": labs[0]["id"]}).json()

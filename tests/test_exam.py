@@ -4,8 +4,8 @@ import time
 import pytest
 from typer.testing import CliRunner
 
-from encorlab import catalog, exam, faults, history, progress
-from encorlab.cli import app as cli_app
+from cmllab import catalog, exam, faults, history, progress
+from cmllab.cli import app as cli_app
 from test_web import make, wait
 
 LAB = "eigrp-basic"

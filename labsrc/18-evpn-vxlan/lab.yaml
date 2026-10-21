@@ -5,8 +5,8 @@ blueprint: ["2.3", "1.1.a"]
 domain: "2.0 Virtualization"
 difficulty: 5
 summary: Step-by-step build of a VXLAN EVPN fabric - OSPF underlay, iBGP EVPN with the spines as route reflectors, NVE/VTEPs with ingress replication, and VLANs 10 and 20 stretched across both leaves (optional L3VNI with an anycast gateway).
-author: ENCOR Lab Builder
-version: "1"
+author: CML Lab Builder
+version: "2"
 nodes:
   - name: SPINE1
     kind: switch

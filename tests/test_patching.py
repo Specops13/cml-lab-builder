@@ -11,22 +11,23 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import encorboot
-from encorlab import __version__, config, library, updates
-from encorlab.web.app import create_app
+import cmlboot
+from cmllab import __version__, config, library, updates
+from cmllab.web.app import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "packaging"))
 import build_patch  # noqa: E402
 
 PKG = "fakeapp"
+RT = cmlboot.RUNTIME_VERSION
 
 
 def mkbundle(d: Path, version: str, min_runtime: int = 1, broken: bool = False, pkg: str = PKG) -> Path:
     (d / pkg).mkdir(parents=True, exist_ok=True)
     (d / pkg / "__init__.py").write_text(f'__version__ = "{version}"\n' + ('raise RuntimeError("boom")\n' if broken else ""),
                                          encoding="utf-8")
-    (d / "manifest.json").write_text(json.dumps(encorboot.build_manifest(d, version, min_runtime, package=pkg)),
+    (d / "manifest.json").write_text(json.dumps(cmlboot.build_manifest(d, version, min_runtime, package=pkg)),
                                      encoding="utf-8")
     return d
 
@@ -34,25 +35,25 @@ def mkbundle(d: Path, version: str, min_runtime: int = 1, broken: bool = False, 
 @pytest.fixture
 def boot(tmp_path, monkeypatch):
     bundled = mkbundle(tmp_path / "bundled", "1.6.0")
-    monkeypatch.setattr(encorboot, "frozen", lambda: True)
-    monkeypatch.setattr(encorboot, "bundled_dir", lambda: bundled)
-    monkeypatch.setattr(encorboot, "ACTIVE", None)
+    monkeypatch.setattr(cmlboot, "frozen", lambda: True)
+    monkeypatch.setattr(cmlboot, "bundled_dir", lambda: bundled)
+    monkeypatch.setattr(cmlboot, "ACTIVE", None)
     before = list(sys.path)
     yield bundled
-    encorboot.purge(PKG)
+    cmlboot.purge(PKG)
     sys.path[:] = before
 
 
 def install_dir(version, **kw) -> Path:
-    return mkbundle(encorboot.app_root() / version, version, **kw)
+    return mkbundle(cmlboot.app_root() / version, version, **kw)
 
 
 def fresh_start(gui=True):
     """What a new process does: forget the loaded app code, then run the boot loader."""
-    encorboot.purge(PKG)
+    cmlboot.purge(PKG)
     sys.path[:] = [p for p in sys.path if "bundled" not in p and "/app/" not in p.replace("\\", "/")]
-    encorboot.ACTIVE = None
-    return encorboot.activate(gui=gui, package=PKG)
+    cmlboot.ACTIVE = None
+    return cmlboot.activate(gui=gui, package=PKG)
 
 
 # ---------------------------------------------------------------- boot loader
@@ -63,112 +64,112 @@ def test_bundled_copy_is_used_without_patches(boot):
 
 def test_installed_patch_is_used_then_confirmed(boot):
     install_dir("1.6.1")
-    encorboot.stage("1.6.1", PKG)
+    cmlboot.stage("1.6.1", PKG)
     c = fresh_start()
     assert (c.source, c.version) == ("installed", "1.6.1") and sys.modules[PKG].__version__ == "1.6.1"
-    st = encorboot.load_state()
-    assert st["pending"] and st["boot_attempts"] == 1 and encorboot.pending_active()
-    encorboot.mark_good()
-    st = encorboot.load_state()
-    assert not st["pending"] and st["boot_attempts"] == 0 and not encorboot.pending_active()
+    st = cmlboot.load_state()
+    assert st["pending"] and st["boot_attempts"] == 1 and cmlboot.pending_active()
+    cmlboot.mark_good()
+    st = cmlboot.load_state()
+    assert not st["pending"] and st["boot_attempts"] == 0 and not cmlboot.pending_active()
     assert fresh_start().version == "1.6.1"          # confirmed patches stay in use
 
 
 def test_patch_that_never_reached_the_ui_is_rolled_back(boot):
     install_dir("1.6.1")
-    encorboot.stage("1.6.1", PKG)
+    cmlboot.stage("1.6.1", PKG)
     assert fresh_start().version == "1.6.1"          # first GUI start: attempt 1, then the process dies
     c = fresh_start()                                # next start: still pending -> roll back
     assert (c.source, c.version) == ("bundled", "1.6.0")
-    st = encorboot.load_state()
+    st = cmlboot.load_state()
     assert st["failed"]["version"] == "1.6.1" and st["current"] is None and not st["pending"]
 
 
 def test_cli_starts_do_not_count_as_attempts(boot):
     install_dir("1.6.1")
-    encorboot.stage("1.6.1", PKG)
+    cmlboot.stage("1.6.1", PKG)
     for _ in range(3):
         assert fresh_start(gui=False).version == "1.6.1"
-    assert encorboot.load_state()["boot_attempts"] == 0
+    assert cmlboot.load_state()["boot_attempts"] == 0
 
 
 def test_patch_that_fails_to_import_falls_back(boot):
     install_dir("1.6.1", broken=True)
-    encorboot.stage("1.6.1", PKG)
+    cmlboot.stage("1.6.1", PKG)
     c = fresh_start(gui=False)
     assert (c.source, c.version) == ("bundled", "1.6.0") and sys.modules[PKG].__version__ == "1.6.0"
-    st = encorboot.load_state()
+    st = cmlboot.load_state()
     assert "import failed" in st["failed"]["reason"] and st["current"] is None
 
 
 def test_failed_start_rolls_back_to_previous_patch(boot):
     install_dir("1.6.1")
-    encorboot.stage("1.6.1", PKG)
+    cmlboot.stage("1.6.1", PKG)
     fresh_start()
-    encorboot.mark_good()
+    cmlboot.mark_good()
     install_dir("1.6.2")
-    encorboot.stage("1.6.2", PKG)                    # running 1.6.1 becomes the fallback
-    assert encorboot.load_state()["previous"] == "1.6.1"
+    cmlboot.stage("1.6.2", PKG)                    # running 1.6.1 becomes the fallback
+    assert cmlboot.load_state()["previous"] == "1.6.1"
     assert fresh_start().version == "1.6.2"
-    assert encorboot.fail_active("exited with code 1 before the web UI started", PKG) is True
+    assert cmlboot.fail_active("exited with code 1 before the web UI started", PKG) is True
     assert PKG not in sys.modules
-    c = encorboot.activate(gui=True, package=PKG)
+    c = cmlboot.activate(gui=True, package=PKG)
     assert (c.source, c.version) == ("installed", "1.6.1")
-    assert encorboot.load_state()["failed"]["version"] == "1.6.2"
+    assert cmlboot.load_state()["failed"]["version"] == "1.6.2"
 
 
 def test_bundled_copy_wins_when_newer(boot):
     install_dir("1.5.9")
-    st = encorboot.load_state()
+    st = cmlboot.load_state()
     st.update(current="1.5.9")
-    encorboot.save_state(st)
+    cmlboot.save_state(st)
     assert fresh_start().source == "bundled"         # e.g. after a full download of a newer release
 
 
 def test_loader_ignores_patches_for_a_newer_runtime(boot):
-    install_dir("1.7.0", min_runtime=encorboot.RUNTIME_VERSION + 1)
-    encorboot.save_state({"current": "1.7.0"})
-    assert encorboot.candidate_at(encorboot.app_root() / "1.7.0", "installed", PKG) is None
+    install_dir("1.7.0", min_runtime=cmlboot.RUNTIME_VERSION + 1)
+    cmlboot.save_state({"current": "1.7.0"})
+    assert cmlboot.candidate_at(cmlboot.app_root() / "1.7.0", "installed", PKG) is None
     assert fresh_start().version == "1.6.0"
     with pytest.raises(ValueError):
-        encorboot.stage("1.7.0", PKG)
+        cmlboot.stage("1.7.0", PKG)
 
 
 def test_manual_rollback_and_pruning(boot):
     for v in ("1.6.1", "1.6.2", "1.6.3"):
         install_dir(v)
-        encorboot.stage(v, PKG)
+        cmlboot.stage(v, PKG)
         fresh_start()
-        encorboot.mark_good()
-    st = encorboot.load_state()
+        cmlboot.mark_good()
+    st = cmlboot.load_state()
     assert (st["current"], st["previous"]) == ("1.6.3", "1.6.2")
-    assert sorted(d.name for d in encorboot.app_root().iterdir() if d.is_dir()) == ["1.6.2", "1.6.3"]
-    r = encorboot.rollback(PKG)
+    assert sorted(d.name for d in cmlboot.app_root().iterdir() if d.is_dir()) == ["1.6.2", "1.6.3"]
+    r = cmlboot.rollback(PKG)
     assert r["next"]["version"] == "1.6.2"
     assert fresh_start().version == "1.6.2"
-    encorboot.rollback(PKG)
+    cmlboot.rollback(PKG)
     assert fresh_start().version == "1.6.0"
     with pytest.raises(ValueError):
-        encorboot.rollback(PKG)
+        cmlboot.rollback(PKG)
 
 
 def test_is_gui():
-    assert encorboot.is_gui([]) and encorboot.is_gui(["--no-browser", "--port", "9000"]) and encorboot.is_gui(["--restarted"])
-    assert not encorboot.is_gui(["version"]) and not encorboot.is_gui(["--help"]) and not encorboot.is_gui(["--port=1", "list"])
+    assert cmlboot.is_gui([]) and cmlboot.is_gui(["--no-browser", "--port", "9000"]) and cmlboot.is_gui(["--restarted"])
+    assert not cmlboot.is_gui(["version"]) and not cmlboot.is_gui(["--help"]) and not cmlboot.is_gui(["--port=1", "list"])
 
 
 def test_data_dir_matches_the_app(monkeypatch):
-    from encorlab import history
-    assert encorboot.data_dir() == history.data_dir()
-    monkeypatch.delenv("ENCOR_DATA_DIR")
-    assert encorboot.data_dir() == history.data_dir() == config.settings_file().parent
+    from cmllab import history
+    assert cmlboot.data_dir() == history.data_dir()
+    monkeypatch.delenv("CMLLAB_DATA_DIR")
+    assert cmlboot.data_dir() == history.data_dir() == config.settings_file().parent
 
 
 # ---------------------------------------------------------------- patch build + verification
 def make_src(tmp: Path, version: str) -> Path:
     src = tmp / f"src-{version}"
-    shutil.copytree(ROOT / "encorlab", src / "encorlab", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    init = src / "encorlab" / "__init__.py"
+    shutil.copytree(ROOT / "cmllab", src / "cmllab", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    init = src / "cmllab" / "__init__.py"
     init.write_text(re.sub(r'__version__ = "[^"]+"', f'__version__ = "{version}"', init.read_text(encoding="utf-8")),
                     encoding="utf-8")
     return src
@@ -191,10 +192,10 @@ def test_patch_is_deterministic_and_complete(tmp_path):
     assert a == b and len(a) < 2_000_000
     names = zipfile.ZipFile(io.BytesIO(a)).namelist()
     assert names[0] == "manifest.json" and not any("__pycache__" in n or n.endswith(".pyc") for n in names)
-    assert {"encorlab/__init__.py", "encorlab/web/static/app.js", "encorlab/migrate.py"} <= set(names)
-    assert not any(n.startswith("encorlab/labs/") for n in names)    # labs come from the online library (2.0.0)
-    m = updates.verify_patch(a, __version__, encorboot.RUNTIME_VERSION)
-    assert m["app_version"] == __version__ and m["min_runtime"] == encorboot.RUNTIME_VERSION
+    assert {"cmllab/__init__.py", "cmllab/web/static/app.js", "cmllab/migrate.py"} <= set(names)
+    assert not any(n.startswith("cmllab/labs/") for n in names)    # labs come from the online library (2.0.0)
+    m = updates.verify_patch(a, __version__, cmlboot.RUNTIME_VERSION)
+    assert m["app_version"] == __version__ and m["min_runtime"] == cmlboot.RUNTIME_VERSION
     assert set(m["files"]) == set(names) - {"manifest.json"}
 
 
@@ -208,51 +209,51 @@ def patch_bytes(tmp_path):
 
 
 @pytest.mark.parametrize("edit,msg", [
-    (lambda e: e.__setitem__("encorlab/cli.py", e["encorlab/cli.py"] + b"\n# tampered"), "checksum mismatch"),
-    (lambda e: e.__setitem__("encorlab/extra.py", b"x = 1"), "do not match its manifest"),
-    (lambda e: e.__setitem__("../evil.py", b"x = 1"), "outside encorlab"),
-    (lambda e: e.__setitem__("encorlab/../../evil.py", b"x = 1"), "outside encorlab"),
+    (lambda e: e.__setitem__("cmllab/cli.py", e["cmllab/cli.py"] + b"\n# tampered"), "checksum mismatch"),
+    (lambda e: e.__setitem__("cmllab/extra.py", b"x = 1"), "do not match its manifest"),
+    (lambda e: e.__setitem__("../evil.py", b"x = 1"), "outside cmllab"),
+    (lambda e: e.__setitem__("cmllab/../../evil.py", b"x = 1"), "outside cmllab"),
     (lambda e: e.pop("manifest.json"), "no manifest"),
     (lambda e: e.__setitem__("manifest.json", b"{nope"), "not valid JSON"),
 ])
 def test_verify_rejects_bad_patches(patch_bytes, edit, msg):
     with pytest.raises(updates.UpdateError, match=msg):
-        updates.verify_patch(rezip(patch_bytes, edit), "9.9.9", 1)
+        updates.verify_patch(rezip(patch_bytes, edit), "9.9.9", RT)
 
 
 def test_verify_rejects_non_zip():
     with pytest.raises(updates.UpdateError):
-        updates.verify_patch(b"not a zip", "9.9.9", 1)
+        updates.verify_patch(b"not a zip", "9.9.9", RT)
 
 
 def test_verify_checks_version_and_runtime(patch_bytes, tmp_path):
-    assert updates.verify_patch(patch_bytes, "9.9.9", 1)["app_version"] == "9.9.9"
+    assert updates.verify_patch(patch_bytes, "9.9.9", RT)["app_version"] == "9.9.9"
     with pytest.raises(updates.UpdateError, match="expected 9.9.8"):
-        updates.verify_patch(patch_bytes, "9.9.8", 1)
-    newer = build_patch.build_patch(make_src(tmp_path, "9.9.7"), tmp_path / "n", min_runtime=2).read_bytes()
+        updates.verify_patch(patch_bytes, "9.9.8", RT)
+    newer = build_patch.build_patch(make_src(tmp_path, "9.9.7"), tmp_path / "n", min_runtime=RT + 1).read_bytes()
     with pytest.raises(updates.RuntimeTooOld) as e:
-        updates.verify_patch(newer, "9.9.7", 1)
-    assert (e.value.needed, e.value.have) == (2, 1)
+        updates.verify_patch(newer, "9.9.7", RT)
+    assert (e.value.needed, e.value.have) == (RT + 1, RT)
 
     def lie(e):   # manifest says 9.9.9 but the code declares another version
-        e["encorlab/__init__.py"] = e["encorlab/__init__.py"].replace(b'"9.9.9"', b'"1.0.0"')
+        e["cmllab/__init__.py"] = e["cmllab/__init__.py"].replace(b'"9.9.9"', b'"1.0.0"')
         m = json.loads(e["manifest.json"])
-        m["files"]["encorlab/__init__.py"] = hashlib.sha256(e["encorlab/__init__.py"]).hexdigest()
+        m["files"]["cmllab/__init__.py"] = hashlib.sha256(e["cmllab/__init__.py"]).hexdigest()
         e["manifest.json"] = json.dumps(m).encode()
     with pytest.raises(updates.UpdateError, match="does not declare version"):
-        updates.verify_patch(rezip(patch_bytes, lie), "9.9.9", 1)
+        updates.verify_patch(rezip(patch_bytes, lie), "9.9.9", RT)
 
 
 # ---------------------------------------------------------------- install flow against a fake GitHub release
 def fake_github(patch: bytes | None, sums_text: str | None, tag="v9.9.9"):
     base = f"https://github.com/{updates.REPO}/releases/download/{tag}/"
-    assets = [{"name": "ENCORLab-9.9.9-windows-x64.zip", "size": 40_000_000,
-               "browser_download_url": base + "ENCORLab-9.9.9-windows-x64.zip"}]
+    assets = [{"name": "CMLLabBuilder-9.9.9-windows-x64.zip", "size": 40_000_000,
+               "browser_download_url": base + "CMLLabBuilder-9.9.9-windows-x64.zip"}]
     files = {}
     if patch is not None:
-        assets.append({"name": "encorlab-patch-9.9.9.zip", "size": len(patch),
-                       "browser_download_url": base + "encorlab-patch-9.9.9.zip"})
-        files[base + "encorlab-patch-9.9.9.zip"] = patch
+        assets.append({"name": "cml-lab-builder-patch-9.9.9.zip", "size": len(patch),
+                       "browser_download_url": base + "cml-lab-builder-patch-9.9.9.zip"})
+        files[base + "cml-lab-builder-patch-9.9.9.zip"] = patch
     if sums_text is not None:
         assets.append({"name": "SHA256SUMS.txt", "size": len(sums_text), "browser_download_url": base + "SHA256SUMS.txt"})
         files[base + "SHA256SUMS.txt"] = sums_text.encode()
@@ -270,31 +271,31 @@ def fake_github(patch: bytes | None, sums_text: str | None, tag="v9.9.9"):
 @pytest.fixture
 def packaged(boot, monkeypatch):
     """Pretend we run in the packaged app on the bundled 1.6.0 code."""
-    (boot / "encorlab").mkdir()
-    (boot / "encorlab" / "__init__.py").write_text('__version__ = "1.6.0"\n', encoding="utf-8")
-    monkeypatch.setattr(encorboot, "ACTIVE", encorboot.Candidate("bundled", "1.6.0", boot))
+    (boot / "cmllab").mkdir()
+    (boot / "cmllab" / "__init__.py").write_text('__version__ = "1.6.0"\n', encoding="utf-8")
+    monkeypatch.setattr(cmlboot, "ACTIVE", cmlboot.Candidate("bundled", "1.6.0", boot))
     return boot
 
 
 def test_install_from_release(packaged, patch_bytes):
-    f = fake_github(patch_bytes, f"{library.sha256(patch_bytes)}  encorlab-patch-9.9.9.zip\nabc  other\n")
+    f = fake_github(patch_bytes, f"{library.sha256(patch_bytes)}  cml-lab-builder-patch-9.9.9.zip\nabc  other\n")
     r = updates.install("1.6.0", fetch=f)
     assert r["status"] == "installed" and r["version"] == "9.9.9" and r["restart_required"] and r["size"] == len(patch_bytes)
-    d = encorboot.app_root() / "9.9.9"
-    assert (d / "encorlab" / "__init__.py").is_file() and (d / "manifest.json").is_file()
-    st = encorboot.load_state()
+    d = cmlboot.app_root() / "9.9.9"
+    assert (d / "cmllab" / "__init__.py").is_file() and (d / "manifest.json").is_file()
+    st = cmlboot.load_state()
     assert st["current"] == "9.9.9" and st["pending"] and st["previous"] is None
-    assert encorboot.next_start().version == "9.9.9"
+    assert cmlboot.next_start().version == "9.9.9"
     s = updates.status()
     assert s["patchable"] and s["installed"] == "9.9.9" and s["restart_needed"] and s["can_rollback"]
-    assert f.calls[0] == updates.LATEST_URL and f.calls[-1].endswith("encorlab-patch-9.9.9.zip")
+    assert f.calls[0] == updates.LATEST_URL and f.calls[-1].endswith("cml-lab-builder-patch-9.9.9.zip")
 
 
 def test_install_refuses_checksum_mismatch(packaged, patch_bytes):
-    f = fake_github(patch_bytes, "0" * 64 + "  encorlab-patch-9.9.9.zip\n")
+    f = fake_github(patch_bytes, "0" * 64 + "  cml-lab-builder-patch-9.9.9.zip\n")
     with pytest.raises(updates.UpdateError, match="checksum mismatch"):
         updates.install("1.6.0", fetch=f)
-    assert not (encorboot.app_root() / "9.9.9").exists() and not encorboot.load_state().get("current")
+    assert not (cmlboot.app_root() / "9.9.9").exists() and not cmlboot.load_state().get("current")
 
 
 def test_install_needs_sums_entry(packaged, patch_bytes):
@@ -308,10 +309,10 @@ def test_install_without_patch_or_with_newer_runtime_means_full_download(package
     r = updates.install("1.6.0", fetch=fake_github(None, ""))
     assert r["status"] == "full_download" and "no app patch" in r["reason"]
     newer = build_patch.build_patch(make_src(tmp_path, "9.9.9"), tmp_path / "n",
-                                    min_runtime=encorboot.RUNTIME_VERSION + 1).read_bytes()
-    r = updates.install("1.6.0", fetch=fake_github(newer, f"{library.sha256(newer)}  encorlab-patch-9.9.9.zip\n"))
-    assert r["status"] == "full_download" and r["needed_runtime"] == encorboot.RUNTIME_VERSION + 1
-    assert not (encorboot.app_root() / "9.9.9").exists()
+                                    min_runtime=cmlboot.RUNTIME_VERSION + 1).read_bytes()
+    r = updates.install("1.6.0", fetch=fake_github(newer, f"{library.sha256(newer)}  cml-lab-builder-patch-9.9.9.zip\n"))
+    assert r["status"] == "full_download" and r["needed_runtime"] == cmlboot.RUNTIME_VERSION + 1
+    assert not (cmlboot.app_root() / "9.9.9").exists()
 
 
 def test_install_up_to_date(packaged, patch_bytes):
@@ -319,7 +320,7 @@ def test_install_up_to_date(packaged, patch_bytes):
 
 
 def test_install_file_and_rollback(packaged, tmp_path, patch_bytes):
-    p = tmp_path / "encorlab-patch-9.9.9.zip"
+    p = tmp_path / "cml-lab-builder-patch-9.9.9.zip"
     p.write_bytes(patch_bytes)
     with pytest.raises(updates.UpdateError, match="checksum mismatch"):
         updates.install_file(p, "0" * 64)
@@ -340,7 +341,7 @@ def test_not_patchable_from_source():
 def test_web_endpoints_from_source():
     c = TestClient(create_app(config.SettingsStore(config.Settings()), persist=False))
     st = c.get("/api/update/status").json()
-    assert st["version"] == __version__ and st["patchable"] is False and st["runtime"] == encorboot.RUNTIME_VERSION
+    assert st["version"] == __version__ and st["patchable"] is False and st["runtime"] == cmlboot.RUNTIME_VERSION
     r = c.post("/api/update/install")
     assert r.status_code == 400 and "not available" in r.json()["error"]
     assert c.post("/api/update/rollback").status_code == 400
@@ -349,7 +350,7 @@ def test_web_endpoints_from_source():
 
 
 def test_web_install_and_status_packaged(packaged, patch_bytes):
-    f = fake_github(patch_bytes, f"{library.sha256(patch_bytes)}  encorlab-patch-9.9.9.zip\n")
+    f = fake_github(patch_bytes, f"{library.sha256(patch_bytes)}  cml-lab-builder-patch-9.9.9.zip\n")
     c = TestClient(create_app(config.SettingsStore(config.Settings()), persist=False, update_fetch=f))
     r = c.post("/api/update/install").json()
     assert r["status"] == "installed" and r["version"] == "9.9.9"

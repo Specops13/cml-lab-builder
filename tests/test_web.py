@@ -2,9 +2,9 @@ import time
 
 from fastapi.testclient import TestClient
 
-from encorlab import catalog, config, platforms
-from encorlab.sim import SimRunner
-from encorlab.web.app import create_app
+from cmllab import catalog, config, platforms
+from cmllab.sim import SimRunner
+from cmllab.web.app import create_app
 from fakes import FakeClient
 
 
@@ -113,7 +113,7 @@ def test_settings_page_has_console_fields():
 
 
 def test_settings_persist_to_file(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENCOR_SETTINGS_FILE", str(tmp_path / "s.json"))
+    monkeypatch.setenv("CMLLAB_SETTINGS_FILE", str(tmp_path / "s.json"))
     app = create_app(config.SettingsStore(config.Settings()), persist=True)
     r = TestClient(app).post("/api/settings", json={"cml_url": "https://cml.x", "username": "d", "password": "pw",
                                                     "console_host": "ssh.x", "console_port": 22})

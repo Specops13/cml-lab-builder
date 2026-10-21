@@ -4,16 +4,16 @@ How to use it:
 
 - **Any AI chat (recommended):** copy everything below the line, replace the
   `{{DESCRIBE YOUR LAB HERE ...}}` placeholder with the lab you want, and paste it into the chat.
-  The app's *More > Copy prompt for any AI* menu and `python -m encorlab prompt "your request"` do the
+  The app's *More > Copy prompt for any AI* menu and `python -m cmllab prompt "your request"` do the
   same with the request already filled in.
 - **Assistants that can run code:** write the YAML to `lab.yaml` (or a folder with `lab.yaml`,
   `solution.cfg`, `fixture_solved.yaml` and `fixture_blank.yaml`), then run
-  `python -m encorlab validate <path>` until it prints `OK` (solution 100%, starting config 0%), and
-  `python -m encorlab pack <path> -o <id>.encorlab`. Send the `.encorlab` file (or the `.yaml`).
+  `python -m cmllab validate <path>` until it prints `OK` (solution 100%, starting config 0%), and
+  `python -m cmllab pack <path> -o <id>.cmllab`. Send the `.cmllab` file (or the `.yaml`).
 - **Importing:** drag the file onto the app's Labs page, click *Import lab*, or run
-  `python -m encorlab import <file>`.
+  `python -m cmllab import <file>`.
 
-Generated from the app (`python -m encorlab docs`). Do not edit by hand.
+Generated from the app (`python -m cmllab docs`). Do not edit by hand.
 
 ---
 
@@ -263,10 +263,10 @@ A lab is one YAML document (`lab.yaml`). You can share it as:
 - **a `.cmllab` pack** (called `.encorlab` before 2.1.0; both import): a zip containing `lab.yaml`, plus optional `solution.cfg`, `fixture_solved.yaml`,
   `fixture_blank.yaml` and `README.md`, all at the zip root.
 
-To import: drag the file onto the catalog page, click **Import lab**, or run `encorlab import <file>`.
+To import: drag the file onto the catalog page, click **Import lab**, or run `cmllab import <file>`.
 To check a lab before sending it: `cmllab validate <file-or-folder>`. To build a pack: `cmllab pack <folder-or-yaml> -o name.cmllab`.
-The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocomplete in VS Code (YAML extension), add
-`# yaml-language-server: $schema=./encorlab-lab.schema.json` as the first line.
+The JSON Schema is `cml-lab.schema.json` (`cmllab schema`). For autocomplete in VS Code (YAML extension), add
+`# yaml-language-server: $schema=./cml-lab.schema.json` as the first line.
 
 ## Hard rules (the validator enforces them)
 1. `id`: lowercase letters, digits and dashes, 2-41 characters (e.g. `ospf-multiarea-stub`). It must not reuse the id of a lab in the online library (e.g. `03-ospf-multiarea`) unless you are publishing a new version of that lab.
@@ -494,7 +494,7 @@ Write `template:` and `params:` instead of command/match. The description is gen
 - Escape dots in IP addresses (`10\.0\.12\.1`). In YAML, put regexes in single quotes.
 
 ## Offline testing
-`encorlab validate <file>` checks the schema, interface names, node limit and both platforms. It then applies the solution and
+`cmllab validate <file>` checks the schema, interface names, node limit and both platforms. It then applies the solution and
 grades the **config** checks (solution must be 100%, starting config 0%). Live checks are only fully tested when the pack
 contains `fixture_solved.yaml` / `fixture_blank.yaml` (recorded command output: `{DEVICE: {"show ...": "output"}}`).
 Otherwise only their syntax is checked, so prefer templates for live checks.
@@ -540,7 +540,7 @@ Every listed lab must be bundled in the course file, already installed, or publi
 course from the library (or importing a course file while online) installs the listed labs it doesn't bundle from the
 library first (*Install all*). Each bundle folder must be named after its lab id, and every bundled lab must pass the
 normal validation, otherwise nothing is installed. Build and validate one with
-`python -m encorlab course build <folder> [--labs-from examples/] -o my.cmlcourse`.
+`python -m cmllab course build <folder> [--labs-from examples/] -o my.cmlcourse`.
 
 ## Publishing in the lab library
 Since 2.0.0 the app ships without labs; every lab, including the former built-in labs, is a pack in the online library
@@ -558,7 +558,7 @@ See the example below (also shipped as `example-lab.yaml`).
 
 ## Example lab (valid; copy its structure)
 ```yaml
-# yaml-language-server: $schema=./encorlab-lab.schema.json
+# yaml-language-server: $schema=./cml-lab.schema.json
 id: example-eigrp-pair
 title: "Example: EIGRP between two routers"
 blueprint: ["3.2.a"]
@@ -1231,7 +1231,7 @@ hints:
  "title": "CML Lab Builder lab definition",
  "type": "object",
  "$schema": "https://json-schema.org/draft/2020-12/schema",
- "$id": "encorlab-lab.schema.json"
+ "$id": "cml-lab.schema.json"
 }
 ```
 

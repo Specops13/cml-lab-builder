@@ -1,7 +1,7 @@
 """Write THIRD-PARTY-NOTICES.txt for a PyInstaller build: every Python distribution whose files actually went into
 the bundle (from PyInstaller's PYZ/COLLECT tables), its version, license and full license texts, plus the Python
 runtime and the PyInstaller bootloader. Run it with the build's Python (build.py does):
-    python packaging/third_party_notices.py --work <pyinstaller workpath>/encorlab --out THIRD-PARTY-NOTICES.txt
+    python packaging/third_party_notices.py --work <pyinstaller workpath>/cmllab --out THIRD-PARTY-NOTICES.txt
 --json prints the inventory (name, version, license) instead, for checks."""
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import sys
 import sysconfig
 from pathlib import Path
 
-SKIP = {"encorlab"}                                  # this app (MIT, see LICENSE)
+SKIP = {"cml-lab-builder", "cml_lab_builder", "encorlab"}   # this app (MIT, see LICENSE)
 # PyInstaller: only the bootloader/loader (GPL-2.0-or-later WITH Bootloader-exception) and the run-time hooks
 # (Apache-2.0) are embedded in the executable; its GPL build tooling is not shipped.
 OVERRIDE = {

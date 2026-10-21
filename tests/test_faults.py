@@ -5,11 +5,11 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from encorlab import catalog, config, faults, history, packs, platforms, service
-from encorlab.iosmerge import merge
-from encorlab.schema import Lab
-from encorlab.sim import SimRunner
-from encorlab.web.app import create_app
+from cmllab import catalog, config, faults, history, packs, platforms, service
+from cmllab.iosmerge import merge
+from cmllab.schema import Lab
+from cmllab.sim import SimRunner
+from cmllab.web.app import create_app
 
 from fakes import FakeClient
 

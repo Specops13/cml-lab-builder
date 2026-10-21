@@ -7,17 +7,17 @@ import sys
 import zipfile
 from pathlib import Path
 
-from encorlab import PRODUCT, __version__, catalog, courses, library, packs, progress
+from cmllab import PRODUCT, __version__, catalog, courses, library, packs, progress
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_product_name_and_version():
-    assert PRODUCT == "CML Lab Builder" and __version__ == "2.1.0"
+    assert PRODUCT == "CML Lab Builder" and __version__ == "3.0.0"
 
 
 def test_extensions_new_and_legacy_import(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENCOR_USER_LABS_DIR", str(tmp_path / "labs"))
+    monkeypatch.setenv("CMLLAB_USER_LABS_DIR", str(tmp_path / "labs"))
     assert packs.PACK_EXT == ".cmllab" and ".encorlab" in packs.PACK_EXTS
     assert courses.COURSE_EXT == ".cmlcourse" and ".encorcourse" in courses.COURSE_EXTS
     data = (ROOT / "labs" / "troubleshoot-ospf-7node.encorlab").read_bytes()
@@ -31,8 +31,8 @@ def test_extensions_new_and_legacy_import(tmp_path, monkeypatch):
 def test_cli_export_uses_the_new_extension(tmp_path, monkeypatch):
     from typer.testing import CliRunner
 
-    from encorlab.cli import app
-    monkeypatch.setenv("ENCOR_USER_LABS_DIR", str(tmp_path / "labs"))
+    from cmllab.cli import app
+    monkeypatch.setenv("CMLLAB_USER_LABS_DIR", str(tmp_path / "labs"))
     r = CliRunner().invoke(app, ["import", str(ROOT / "library" / "troubleshoot-ospf-7node.cmllab")])
     assert r.exit_code == 0, r.output
     monkeypatch.chdir(tmp_path)
@@ -43,9 +43,9 @@ def test_cli_export_uses_the_new_extension(tmp_path, monkeypatch):
 
 
 def test_cmllab_env_prefix_is_accepted():
-    code = ("import os; os.environ.pop('ENCOR_GRADING_MODE', None); os.environ['CMLLAB_GRADING_MODE']='config';"
-            "import encorlab, encorlab.config as c; print(os.environ.get('ENCOR_GRADING_MODE'), c.from_env().grading_mode)")
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("ENCOR_GRADING", "CMLLAB_"))}
+    code = ("import os; os.environ.pop('CMLLAB_GRADING_MODE', None); os.environ['CMLLAB_GRADING_MODE']='config';"
+            "import cmllab, cmllab.config as c; print(os.environ.get('CMLLAB_GRADING_MODE'), c.from_env().grading_mode)")
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("CMLLAB_GRADING", "CMLLAB_"))}
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, cwd=ROOT).stdout.split()
     assert out == ["config", "config"]
 

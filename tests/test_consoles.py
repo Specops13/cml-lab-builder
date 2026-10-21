@@ -1,8 +1,8 @@
 """Console links: CML web URL + console server commands per node."""
 from typer.testing import CliRunner
 
-from encorlab import catalog, config, service
-from encorlab.cli import app as cli_app
+from cmllab import catalog, config, service
+from cmllab.cli import app as cli_app
 from fakes import FakeClient
 from test_web import make, wait
 
@@ -13,10 +13,10 @@ def test_status_includes_console_commands():
     assert wait(c, c.post("/api/labs/eigrp-basic/build").json()["job_id"])["state"] == "done"
     st = c.get("/api/labs/eigrp-basic/status").json()
     lab_id = st["lab_id"]
-    assert st["cml_lab_url"] == f"https://cml.x/lab/{lab_id}" and st["cml_title"] == "ENCOR-eigrp-basic"
+    assert st["cml_lab_url"] == f"https://cml.x/lab/{lab_id}" and st["cml_title"] == "CML-eigrp-basic"
     assert [x["node"] for x in st["consoles"]] == ["R1", "R2"]
     r1 = st["consoles"][0]
-    assert r1["ssh"] == 'ssh -t u@cml.x "open /ENCOR-eigrp-basic/R1/0"' and r1["state"] == "BOOTED"
+    assert r1["ssh"] == 'ssh -t u@cml.x "open /CML-eigrp-basic/R1/0"' and r1["state"] == "BOOTED"
     assert "pw" not in str(st)    # never leaks the password
 
 
@@ -41,4 +41,4 @@ def test_cli_console(monkeypatch):
     assert r.exit_code == 1 and "not built" in r.output
     service.make_cml(config.from_env()).build(catalog.get("eigrp-basic"))
     r = CliRunner().invoke(cli_app, ["console", "eigrp-basic"])
-    assert r.exit_code == 0 and "CML web UI: https://cml.x/lab/" in r.output and '"open /ENCOR-eigrp-basic/R2/0"' in r.output
+    assert r.exit_code == 0 and "CML web UI: https://cml.x/lab/" in r.output and '"open /CML-eigrp-basic/R2/0"' in r.output

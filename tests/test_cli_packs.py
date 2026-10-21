@@ -3,8 +3,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from encorlab import catalog, prompt
-from encorlab.cli import app
+from cmllab import catalog, prompt
+from cmllab.cli import app
 
 r = CliRunner()
 OSPF = Path(__file__).parent.parent / "examples" / "ospf-multiarea-stub"
@@ -44,4 +44,4 @@ def test_schema_prompt_docs(tmp_path):
     assert res.exit_code == 0 and "BGP lab" in res.output
     assert r.invoke(app, ["docs", "-o", str(tmp_path / "d")]).exit_code == 0
     assert (tmp_path / "d" / "AI-PROMPT.md").is_file()
-    assert "2.1.0" in r.invoke(app, ["version"]).output
+    assert "3.0.0" in r.invoke(app, ["version"]).output

@@ -6,12 +6,12 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from encorlab import catalog, cli, history, packs, platforms, solution
-from encorlab.schema import Lab
+from cmllab import catalog, cli, history, packs, platforms, solution
+from cmllab.schema import Lab
 from test_web import make, wait
 
 ROOT = Path(__file__).resolve().parents[1]
-STATIC = ROOT / "encorlab" / "web" / "static"
+STATIC = ROOT / "cmllab" / "web" / "static"
 IOL = platforms.get("iol")
 BUILTIN = sorted(d.name for d in catalog.lab_dirs() if not catalog.get(d.name).is_walkthrough)  # challenge labs only
 

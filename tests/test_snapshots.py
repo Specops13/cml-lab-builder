@@ -2,9 +2,9 @@
 import pytest
 from typer.testing import CliRunner
 
-from encorlab import catalog, config, exam, platforms, service, snapshots
-from encorlab.cli import app as cli_app
-from encorlab.sim import SimRunner
+from cmllab import catalog, config, exam, platforms, service, snapshots
+from cmllab.cli import app as cli_app
+from cmllab.sim import SimRunner
 from fakes import FakeClient
 from test_web import make, wait
 

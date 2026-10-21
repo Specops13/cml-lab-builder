@@ -1,3 +1,6 @@
 labs/*.encorlab binary
 labs/*.encorcourse binary
 labs/index.json -text
+library/*.cmllab binary
+library/*.cmlcourse binary
+library/index.json -text

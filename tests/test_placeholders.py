@@ -10,17 +10,17 @@ import yaml
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
-from encorlab import catalog, config, packs, platforms
-from encorlab.cli import app as cli_app
-from encorlab.grader import grade
-from encorlab.render import to_yaml
-from encorlab.sim import SimRunner
-from encorlab.web.app import create_app
+from cmllab import catalog, config, packs, platforms
+from cmllab.cli import app as cli_app
+from cmllab.grader import grade
+from cmllab.render import to_yaml
+from cmllab.sim import SimRunner
+from cmllab.web.app import create_app
 from fakes import FakeClient
 
 TOKEN = re.compile(r"%\w+%")
 OSPF = Path(__file__).parent.parent / "examples" / "ospf-multiarea-stub"
-APP_JS = Path(__file__).parent.parent / "encorlab" / "web" / "static" / "app.js"
+APP_JS = Path(__file__).parent.parent / "cmllab" / "web" / "static" / "app.js"
 
 
 def no_tokens(obj, where):
@@ -63,20 +63,20 @@ def test_grade_reports_rendered(with_pack):
 
 def test_cml_topology_rendered(with_pack):
     for e, plat in cases(with_pack):
-        no_tokens(to_yaml(e.lab, plat, "ENCOR-"), f"topology {e.lab.id} {plat.name}")
+        no_tokens(to_yaml(e.lab, plat, "CML-"), f"topology {e.lab.id} {plat.name}")
 
 
 def test_cli_task_and_list(with_pack):
     r = CliRunner()
     for e, plat in cases(with_pack):
-        out = r.invoke(cli_app, ["task", e.lab.id], env={"ENCOR_PLATFORM": plat.name}).output
+        out = r.invoke(cli_app, ["task", e.lab.id], env={"CMLLAB_PLATFORM": plat.name}).output
         no_tokens(out, f"cli task {e.lab.id} {plat.name}")
     no_tokens(r.invoke(cli_app, ["list"]).output, "cli list")
 
 
 def test_ospf_task_names_per_platform(with_pack):
     r = CliRunner()
-    iol = r.invoke(cli_app, ["task", "ospf-multiarea-stub"], env={"ENCOR_PLATFORM": "iol"}).output
+    iol = r.invoke(cli_app, ["task", "ospf-multiarea-stub"], env={"CMLLAB_PLATFORM": "iol"}).output
     assert "R1 Ethernet0/0 - R2 Ethernet0/0" in iol and "R2 Ethernet0/1 - R3 Ethernet0/0" in iol
 
 
@@ -84,7 +84,7 @@ def test_template_description_with_interface_rendered():
     lab_d = yaml.safe_load((OSPF / "lab.yaml").read_text(encoding="utf-8"))
     lab_d["checks"].append({"id": "r1-if", "template": "interface_up", "device": "R1", "params": {"interface": "%if0%"},
                             "hint": "Check %if0% on R1"})
-    from encorlab.schema import Lab
+    from cmllab.schema import Lab
     lab = Lab.model_validate(lab_d)
     plat = platforms.get("iol")
     rep = grade(lab, SimRunner(lab, plat, False, solution={}, fixtures={}), plat, mode="live").to_dict()

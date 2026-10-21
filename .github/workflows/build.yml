@@ -3,11 +3,13 @@
 #    assets uploaded to an existing release by hand are never overwritten).
 #  - Actions > build > Run workflow: same, and with "publish" ticked it creates/updates the GitHub Release for
 #    the given tag. Existing assets with the same name are NOT replaced (overwrite_files: false).
-#  - every run also builds encorlab-patch-<version>.zip (app code only, used by the in-app "Install update")
+#  - every run also builds cml-lab-builder-patch-<version>.zip (app code only, used by the in-app "Install update")
 #    and checks packaging/runtime.lock.json, so a runtime change cannot ship as a patch by accident.
-#  - the Linux job also wraps the smoke-tested Linux build into encorlab_<version>_amd64.deb (lintian +
+#  - the Linux job also wraps the smoke-tested Linux build into cml-lab-builder_<version>_amd64.deb (lintian +
 #    desktop-file-validate), and deb-test installs it in a clean Debian 12 container and smoke-tests it.
-name: build
+#  - the release also carries the transition files for ENCOR Lab Builder 1.7 - 2.1 (packaging/build_compat.py:
+#    old-name copies and a manifest-only encorlab-patch-<version>.zip that makes old apps offer the full download).
+name: CML Lab Builder build
 on:
   push:
     tags: ["v*"]
@@ -40,12 +42,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
-      - name: Build the app-code patch (encorlab-patch-<version>.zip, for in-app "Install update")
+      - name: Build the app-code patch (cml-lab-builder-patch-<version>.zip, for in-app "Install update")
         run: python packaging/build_patch.py --check-lock --out dist
       - uses: actions/upload-artifact@v4
         with:
-          name: encorlab-patch
-          path: dist/encorlab-patch-*.zip
+          name: cml-lab-builder-patch
+          path: dist/cml-lab-builder-patch-*.zip
           if-no-files-found: error
   bundle:
     needs: test
@@ -63,14 +65,14 @@ jobs:
       - name: Build + smoke test (Linux, glibc 2.28 baseline)
         if: runner.os == 'Linux'
         run: packaging/build_linux.sh --smoke
-      - name: Debian package from the same build (encorlab_<version>_amd64.deb)
+      - name: Debian package from the same build (cml-lab-builder_<version>_amd64.deb)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq lintian desktop-file-utils
           python3 packaging/build_deb.py --out dist
-          lintian --fail-on error dist/encorlab_*.deb
-          dpkg-deb -x dist/encorlab_*.deb /tmp/debroot
-          desktop-file-validate /tmp/debroot/usr/share/applications/encorlab.desktop
+          lintian --fail-on error dist/cml-lab-builder_*.deb
+          dpkg-deb -x dist/cml-lab-builder_*.deb /tmp/debroot
+          desktop-file-validate /tmp/debroot/usr/share/applications/cml-lab-builder.desktop
       - uses: actions/setup-python@v5
         if: runner.os == 'Windows'
         with: {python-version: "3.12"}
@@ -80,10 +82,10 @@ jobs:
         run: packaging\build_exe.bat --smoke
       - uses: actions/upload-artifact@v4
         with:
-          name: ENCORLab-${{ matrix.artifact }}
+          name: CMLLabBuilder-${{ matrix.artifact }}
           path: |
-            dist/ENCORLab-*
-            dist/encorlab_*.deb
+            dist/CMLLabBuilder-*
+            dist/cml-lab-builder_*.deb
           if-no-files-found: error
   deb-test:
     needs: bundle
@@ -92,35 +94,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with: {name: ENCORLab-linux, path: dist}
+        with: {name: CMLLabBuilder-linux, path: dist}
       - name: apt install the .deb on a clean Debian 12, then smoke-test it as a normal user
         run: |
           apt-get update -qq
-          apt-get install -y ./dist/encorlab_*.deb
+          apt-get install -y ./dist/cml-lab-builder_*.deb
           apt-get install -y -qq python3 desktop-file-utils
-          desktop-file-validate /usr/share/applications/encorlab.desktop
+          desktop-file-validate /usr/share/applications/cml-lab-builder.desktop
           useradd -m tester && cp -r . /home/tester/src && chown -R tester /home/tester/src
-          V=$(dpkg-query -W -f='${Version}' encorlab)
-          su tester -c "cd ~ && python3 src/packaging/smoke_test.py /usr/bin/encorlab --version $V \
+          V=$(dpkg-query -W -f='${Version}' cml-lab-builder)
+          su tester -c "cd ~ && python3 src/packaging/smoke_test.py /usr/bin/cml-lab-builder --version $V \
             --data-dir /home/tester/.config/cml-lab-builder --patch-test --auto-update-test"
           test -L /usr/bin/cmllab && su tester -c "cmllab version"
-          test -z "$(dpkg --verify encorlab)"   # updates went to ~/.config/encorlab/app, /opt untouched
-          apt-get purge -y encorlab && test ! -e /opt/encorlab && test ! -e /usr/bin/cmllab \
-            && test -d /home/tester/.config/encorlab && test -d /home/tester/.config/cml-lab-builder
+          test -z "$(dpkg --verify cml-lab-builder)"   # updates went to ~/.config/cml-lab-builder/app, /opt untouched
+          test -d /home/tester/.config/cml-lab-builder/app
+          apt-get purge -y cml-lab-builder && test ! -e /opt/cml-lab-builder && test ! -e /usr/bin/cmllab \
+            && test -d /home/tester/.config/cml-lab-builder
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.publish && inputs.tag != ''
     needs: [bundle, patch, deb-test]
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: {path: dist, merge-multiple: true}
+      # old-name copies + manifest-only encorlab-patch for ENCOR Lab Builder 1.7 - 2.1 (see packaging/build_compat.py)
+      - run: python3 packaging/build_compat.py --dist dist
       # the in-app updater verifies the patch against SHA256SUMS.txt of the same release
-      - run: cd dist && sha256sum ENCORLab-* encorlab_*.deb encorlab-patch-*.zip > SHA256SUMS.txt
+      - run: cd dist && sha256sum CMLLabBuilder-* cml-lab-builder_*.deb cml-lab-builder-patch-*.zip ENCORLab-* encorlab_*.deb encorlab-patch-*.zip > SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
           overwrite_files: false
           files: |
+            dist/CMLLabBuilder-*
+            dist/cml-lab-builder_*.deb
+            dist/cml-lab-builder-patch-*.zip
             dist/ENCORLab-*
             dist/encorlab_*.deb
             dist/encorlab-patch-*.zip

@@ -4,9 +4,9 @@ import httpx
 import pytest
 import yaml
 
-from encorlab import ai, catalog, history, packs, platforms, prompt
-from encorlab.cml_import import _slug, draft_from_topology
-from encorlab.render import to_yaml
+from cmllab import ai, catalog, history, packs, platforms, prompt
+from cmllab.cml_import import _slug, draft_from_topology
+from cmllab.render import to_yaml
 
 EXAMPLE = yaml.safe_load(prompt.example())
 
@@ -14,7 +14,7 @@ EXAMPLE = yaml.safe_load(prompt.example())
 # ---------------------------------------------------------------- CML import
 def test_draft_from_rendered_topology_roundtrip():
     lab = catalog.get("eigrp-basic")
-    topo = to_yaml(lab, platforms.get("iol"), "ENCOR-")
+    topo = to_yaml(lab, platforms.get("iol"), "CML-")
     draft, warnings = draft_from_topology(topo, "My EIGRP Lab")
     assert draft["id"] == "my-eigrp-lab" and draft["platforms"] == ["iol"]
     assert [n["name"] for n in draft["nodes"]] == [n.name for n in lab.nodes]

@@ -299,12 +299,12 @@
     },
     {
       "file": "18-evpn-vxlan.cmllab",
-      "sha256": "cfa3f857f1e4b4c17bb5abdaa14293f788d76d6bf089549f1cb5c95102c1c883",
-      "size": 14551,
+      "sha256": "6dcf39201e4bd249afaa16f0c11e4dd290dd50974b6af68bb4c584ed53c85669",
+      "size": 14546,
       "kind": "lab",
       "id": "18-evpn-vxlan",
       "title": "Walkthrough: BGP EVPN VXLAN spine-and-leaf (NX-OS 9000v)",
-      "version": "1",
+      "version": "2",
       "description": "Step-by-step build of a VXLAN EVPN fabric - OSPF underlay, iBGP EVPN with the spines as route reflectors, NVE/VTEPs with ingress replication, and VLANs 10 and 20 stretched across both leaves (optional L3VNI with an anycast gateway).",
       "blueprint": [
         "2.3",
@@ -317,8 +317,8 @@
     },
     {
       "file": "data-center.cmlcourse",
-      "sha256": "adee696347287c669cc01cac075160799b967c9e1fb6c977ae93e8f3b1144fe9",
-      "size": 476,
+      "sha256": "b4b6068514fe63db3dde3629651bfa52a5e2c485bfcc88230b6b761c8f492fe8",
+      "size": 477,
       "kind": "course",
       "id": "data-center",
       "title": "Data center: VXLAN EVPN fabrics",
@@ -348,8 +348,8 @@
     },
     {
       "file": "encor-multicast-mpls.cmlcourse",
-      "sha256": "ca2e4cd7c74946b7a2d2e58b6c5102a878b85969a233720d61947d164bb04a53",
-      "size": 448,
+      "sha256": "6e897da9227bda14d08b37bc7c6627bc1eb7913f0dbe5ee1190b92ef57dc91c5",
+      "size": 450,
       "kind": "course",
       "id": "encor-multicast-mpls",
       "title": "Multicast and MPLS track",
@@ -365,8 +365,8 @@
     },
     {
       "file": "encor-routing.cmlcourse",
-      "sha256": "3060f4dd03c352a66f2e2aa0fa6a1125c76869d280bff9dbc3f41eb88ecc47c8",
-      "size": 425,
+      "sha256": "65e095e7815296ca642520431f83c4121ddbe68eb23a4a792aece63813e17ca0",
+      "size": 427,
       "kind": "course",
       "id": "encor-routing",
       "title": "ENCOR Infrastructure: routing track",
@@ -384,8 +384,8 @@
     },
     {
       "file": "ospf-mastery.cmlcourse",
-      "sha256": "3ef5d14d385f6ccea1958c740d4a974a8f7602bb1ac8627f164cea269f2e0786",
-      "size": 14028,
+      "sha256": "7488afe8f55e2f7cb4fe04351cb85a1b40638cf781d4e48ffd7b0d2cd0496e0f",
+      "size": 14011,
       "kind": "course",
       "id": "ospf-mastery",
       "title": "OSPF Mastery: design, areas and troubleshooting",
@@ -399,12 +399,12 @@
     },
     {
       "file": "ospf-multiarea-stub.cmllab",
-      "sha256": "17f5eb2bd7ceb4c5811af17a357cf40b11c430b986dc2bc381547476bc6a0745",
-      "size": 4941,
+      "sha256": "b7cbccf21e601413752820eb2f567e3f689171d1e3654ad9b89f5b6e330a4672",
+      "size": 4930,
       "kind": "lab",
       "id": "ospf-multiarea-stub",
       "title": "OSPFv2 Multi-Area: ABR Summarization and a Totally Stubby Area",
-      "version": "1",
+      "version": "2",
       "description": "Four routers, two OSPF areas. Make area 1 totally stubby and summarize its loopbacks to a /22 on the ABR.",
       "blueprint": [
         "3.2.b"
@@ -416,12 +416,12 @@
     },
     {
       "file": "troubleshoot-ospf-7node.cmllab",
-      "sha256": "621ec436dc28fd948b7d9dc0b939098b2bbdab0509224e19923253ffd3af2319",
-      "size": 8211,
+      "sha256": "53b67bd3416e27210b4c15fcf86be37940c26deeb3709879cd07d66cec2c3bec",
+      "size": 8207,
       "kind": "lab",
       "id": "troubleshoot-ospf-7node",
       "title": "Troubleshooting: Branch-2 Cannot Reach the Data-Center Server",
-      "version": "1",
+      "version": "2",
       "description": "Seven-router multi-area OSPF enterprise, fully configured. Users at Branch-2 can't reach the DC server. Find and fix the one fault.",
       "blueprint": [
         "3.2.b"

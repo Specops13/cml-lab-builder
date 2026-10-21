@@ -2,8 +2,8 @@
 
     python packaging/build.py [--out dist] [--work build/<os>] [--smoke]
 
-Windows -> dist/ENCORLab-<version>-windows-x64.zip     Linux -> dist/ENCORLab-<version>-linux-x64.tar.gz
-Contents: ENCORLab(.exe) + _internal/ (PyInstaller one-folder runtime; the app code is in _internal/appcode/),
+Windows -> dist/CMLLabBuilder-<version>-windows-x64.zip     Linux -> dist/CMLLabBuilder-<version>-linux-x64.tar.gz
+Contents: CMLLabBuilder.exe (Windows) or cml-lab-builder (Linux) + _internal/ (PyInstaller one-folder runtime; the app code is in _internal/appcode/),
 README-FIRST.txt, README.md, LICENSE.txt, THIRD-PARTY-NOTICES.txt, docs/ (no labs: they come from the online library). The app-code patch is built separately by build_patch.py.
 --smoke runs packaging/smoke_test.py against the staged build (it imports the example packs into YOUR user
 data folder, so it is meant for CI machines)."""
@@ -25,7 +25,7 @@ WIN = sys.platform == "win32"
 
 
 def version() -> str:
-    return re.search(r'__version__ = "([^"]+)"', (ROOT / "encorlab" / "__init__.py").read_text(encoding="utf-8")).group(1)
+    return re.search(r'__version__ = "([^"]+)"', (ROOT / "cmllab" / "__init__.py").read_text(encoding="utf-8")).group(1)
 
 
 def sh(*cmd, **kw):
@@ -42,36 +42,36 @@ def main() -> int:
     a = ap.parse_args()
     v = version()
     plat = "windows" if WIN else "linux"
-    name = f"ENCORLab-{v}-{plat}-x64"
+    name = f"CMLLabBuilder-{v}-{plat}-x64"
     work, out = Path(a.work), Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
 
     sh(sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--log-level", "WARN",
-       "--workpath", work / "pyi", "--distpath", work / "dist", HERE / "encorlab.spec")
+       "--workpath", work / "pyi", "--distpath", work / "dist", HERE / "cmllab.spec")
 
     stage = work / "stage" / name
     shutil.rmtree(work / "stage", ignore_errors=True)
-    shutil.copytree(work / "dist" / "ENCORLab", stage)
+    shutil.copytree(work / "dist" / "CMLLabBuilder", stage)
     shutil.copytree(ROOT / "docs", stage / "docs")
     shutil.copy2(ROOT / "README.md", stage / "README.md")
     shutil.copy2(HERE / "README-BINARY.txt", stage / "README-FIRST.txt")
     # MIT license of the app + licenses of everything PyInstaller bundled (fails on an incompatible license)
     shutil.copy2(ROOT / "LICENSE", stage / "LICENSE.txt")
-    sh(sys.executable, HERE / "third_party_notices.py", "--work", work / "pyi" / "encorlab", "--version", v,
+    sh(sys.executable, HERE / "third_party_notices.py", "--work", work / "pyi" / "cmllab", "--version", v,
        "--out", stage / "THIRD-PARTY-NOTICES.txt")
     # no labs in the download (2.0.0): they are installed from the online library (labs/ in the repo)
     if not WIN:
-        shutil.copy2(HERE / "encorlab.png", stage / "_internal" / "encorlab.png")
+        shutil.copy2(HERE / "cml-lab-builder.png", stage / "_internal" / "cml-lab-builder.png")
         shutil.copy2(HERE / "install-desktop-entry.sh", stage / "install-desktop-entry.sh")
         os.chmod(stage / "install-desktop-entry.sh", 0o755)
 
     appcode = stage / "_internal" / "appcode"
-    if not (appcode / "encorlab" / "__init__.py").is_file() or not (appcode / "manifest.json").is_file():
+    if not (appcode / "cmllab" / "__init__.py").is_file() or not (appcode / "manifest.json").is_file():
         raise SystemExit(f"app code missing from the bundle: {appcode}")
     # byte-compile the bundled app code (hash-checked pycs: valid whatever the file times are after unzipping)
-    sh(sys.executable, "-m", "compileall", "-q", "--invalidation-mode", "checked-hash", appcode / "encorlab")
+    sh(sys.executable, "-m", "compileall", "-q", "--invalidation-mode", "checked-hash", appcode / "cmllab")
 
-    exe = stage / ("ENCORLab.exe" if WIN else "ENCORLab")
+    exe = stage / ("CMLLabBuilder.exe" if WIN else "cml-lab-builder")
     got = subprocess.run([str(exe), "version"], capture_output=True, text=True, timeout=120).stdout.strip()
     if got != v:
         raise SystemExit(f"frozen app reports version {got!r}, expected {v!r}")
@@ -89,7 +89,7 @@ def main() -> int:
     print(f"built {target} ({target.stat().st_size / 1e6:.1f} MB)")
 
     if a.smoke:
-        # 2.1+: data in cml-lab-builder (app updates stay in encorlab/app, see encorlab/paths.py)
+        # data and app updates (app/) in cml-lab-builder (3.0.0, runtime 2)
         base = Path(os.environ["APPDATA"]) if WIN else Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
         data = base / "cml-lab-builder"
         sh(sys.executable, HERE / "smoke_test.py", exe, "--version", v, "--data-dir", data, "--patch-test", "--auto-update-test",

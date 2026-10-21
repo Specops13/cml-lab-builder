@@ -1,0 +1,561 @@
+{
+  "$defs": {
+    "Check": {
+      "additionalProperties": false,
+      "description": "A grading check. Either give command/match/absent/min_success directly, or a\n`template` + `params` (see LAB-AUTHORING.md).",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "mode": {
+          "default": "live",
+          "description": "live = show/ping over the device console; config = regex on the running config fetched via the CML API",
+          "enum": [
+            "live",
+            "config"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "command": {
+          "default": "",
+          "description": "live only: read-only 'show ...' or 'ping ...' command",
+          "title": "Command",
+          "type": "string"
+        },
+        "match": {
+          "default": [],
+          "description": "Python regexes (multiline: ^ and $ match per line) that must ALL match",
+          "items": {
+            "type": "string"
+          },
+          "title": "Match",
+          "type": "array"
+        },
+        "absent": {
+          "default": [],
+          "description": "Python regexes that must NOT match",
+          "items": {
+            "type": "string"
+          },
+          "title": "Absent",
+          "type": "array"
+        },
+        "min_success": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "live ping checks: minimum 'Success rate is N percent'",
+          "title": "Min Success"
+        },
+        "points": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Points",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "description": "Shown to the student when the check fails",
+          "title": "Hint",
+          "type": "string"
+        },
+        "template": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional check template (see LAB-AUTHORING.md)",
+          "title": "Template"
+        },
+        "params": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Parameters for the template",
+          "title": "Params"
+        }
+      },
+      "required": [
+        "id",
+        "device"
+      ],
+      "title": "Check",
+      "type": "object"
+    },
+    "Endpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "node": {
+          "description": "Node name",
+          "title": "Node",
+          "type": "string"
+        },
+        "port": {
+          "description": "Data port index 0-3 (= %if0%..%if3%)",
+          "exclusiveMaximum": 4,
+          "minimum": 0,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "port"
+      ],
+      "title": "Endpoint",
+      "type": "object"
+    },
+    "Fault": {
+      "additionalProperties": false,
+      "description": "A predefined fault for \"Break my lab\": applied on top of a working (solved) lab so the student\ngets a realistic trouble ticket. `config` is IOS config applied after the solution (use `no ...`\nto remove lines). Optional `checks` are graded in addition to the lab checks while the fault is active.",
+      "properties": {
+        "id": {
+          "description": "Short unique id, e.g. 'r2-wrong-key'",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "description": "Short name of the fault (shown after it is fixed)",
+          "title": "Title",
+          "type": "string"
+        },
+        "ticket": {
+          "description": "Symptom-only trouble ticket shown to the student (never the cause)",
+          "title": "Ticket",
+          "type": "string"
+        },
+        "device": {
+          "description": "Device the fault is applied to",
+          "title": "Device",
+          "type": "string"
+        },
+        "config": {
+          "description": "IOS config applied after the solution, e.g. 'interface %if0%\\n shutdown'",
+          "title": "Config",
+          "type": "string"
+        },
+        "explanation": {
+          "description": "Markdown: root cause and the exact fix, shown after the fault is fixed or revealed",
+          "title": "Explanation",
+          "type": "string"
+        },
+        "hints": {
+          "default": [],
+          "description": "Progressive hints for this fault, vaguest first",
+          "items": {
+            "type": "string"
+          },
+          "title": "Hints",
+          "type": "array"
+        },
+        "checks": {
+          "default": [],
+          "description": "Extra checks graded while this fault is active",
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "title": "Checks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "ticket",
+        "device",
+        "config",
+        "explanation"
+      ],
+      "title": "Fault",
+      "type": "object"
+    },
+    "Link": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/Endpoint"
+        },
+        "b": {
+          "$ref": "#/$defs/Endpoint"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "Link",
+      "type": "object"
+    },
+    "Node": {
+      "additionalProperties": false,
+      "description": "A router or switch. `config` is the starting config (hostname is added automatically).",
+      "properties": {
+        "name": {
+          "description": "Node label/hostname: letter first, then letters/digits/_/-, max 31 chars (e.g. R1, SW1)",
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "description": "router -> iol-xe / iosv; switch -> ioll2-xe / iosvl2",
+          "enum": [
+            "router",
+            "switch"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "x": {
+          "default": 0,
+          "description": "Canvas X position in CML",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "default": 0,
+          "description": "Canvas Y position in CML",
+          "title": "Y",
+          "type": "integer"
+        },
+        "config": {
+          "description": "Starting IOS config (no hostname line needed). Use %if0%..%if3% for data interfaces",
+          "title": "Config",
+          "type": "string"
+        },
+        "definition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional explicit CML node definition instead of the platform profile's router/switch, e.g. 'nxosv9000' (NX-OS 9000v, ports 0-3 = Ethernet1/1-1/4). Write literal interface names in its config, not %ifN%",
+          "title": "Definition"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "config"
+      ],
+      "title": "Node",
+      "type": "object"
+    },
+    "Step": {
+      "additionalProperties": false,
+      "description": "One step of a walkthrough lab: why, the exact config per device, how to verify it, and optional checks.",
+      "properties": {
+        "id": {
+          "description": "Short unique id, e.g. 'underlay-ospf'",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "explain": {
+          "description": "Markdown: what this step builds and why (concepts first, concise)",
+          "title": "Explain",
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "device -> exact config for this step (copy buttons in the UI)",
+          "title": "Config",
+          "type": "object"
+        },
+        "verify": {
+          "default": [],
+          "description": "Verification commands with the expected output",
+          "items": {
+            "$ref": "#/$defs/Verify"
+          },
+          "title": "Verify",
+          "type": "array"
+        },
+        "checks": {
+          "default": [],
+          "description": "Checks run by 'Check this step' (live and/or config)",
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "optional": {
+          "default": false,
+          "description": "Optional step: not needed to complete the walkthrough",
+          "title": "Optional",
+          "type": "boolean"
+        },
+        "apply": {
+          "default": true,
+          "description": "Offer 'Apply this step for me' (push the config over the console)",
+          "title": "Apply",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "explain"
+      ],
+      "title": "Step",
+      "type": "object"
+    },
+    "Verify": {
+      "additionalProperties": false,
+      "description": "A verification command shown in a walkthrough step, with what good output looks like.",
+      "properties": {
+        "device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "command": {
+          "description": "Read-only 'show ...' or 'ping ...' command to run on the device",
+          "title": "Command",
+          "type": "string"
+        },
+        "expect": {
+          "description": "Markdown: what to look for in good output (a short excerpt is fine)",
+          "title": "Expect",
+          "type": "string"
+        }
+      },
+      "required": [
+        "device",
+        "command",
+        "expect"
+      ],
+      "title": "Verify",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One practice lab (ENCOR is the default track).",
+  "properties": {
+    "id": {
+      "description": "Lowercase id: letters, digits, dashes (2-41 chars). Also the folder name",
+      "title": "Id",
+      "type": "string"
+    },
+    "type": {
+      "default": "challenge",
+      "description": "challenge (default): a graded task. walkthrough: a guided build in ordered `steps` (not graded; no faults or exam mode; completion is tracked separately)",
+      "enum": [
+        "challenge",
+        "walkthrough"
+      ],
+      "title": "Type",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "track": {
+      "default": "ENCOR",
+      "description": "Study track the lab belongs to, e.g. ENCOR (default), CCNA, ENARSI, Data center. The progress dashboard groups by track; the ENCOR exam-domain view uses only ENCOR labs. Needs 2.1.0+: leave it out for ENCOR labs that should also import into older versions",
+      "maxLength": 40,
+      "minLength": 1,
+      "title": "Track",
+      "type": "string"
+    },
+    "blueprint": {
+      "description": "Topics. ENCOR labs: 350-401 v1.2 blueprint items, e.g. ['3.2.b']. Other tracks: that exam's topic ids or short topic names, e.g. ['OSPF']",
+      "items": {
+        "type": "string"
+      },
+      "title": "Blueprint",
+      "type": "array"
+    },
+    "domain": {
+      "description": "Domain or area, e.g. '3.0 Infrastructure - Layer 3' (ENCOR) or 'Routing'",
+      "title": "Domain",
+      "type": "string"
+    },
+    "difficulty": {
+      "description": "1 (easy) to 5 (hard)",
+      "maximum": 5,
+      "minimum": 1,
+      "title": "Difficulty",
+      "type": "integer"
+    },
+    "platforms": {
+      "default": [
+        "iol",
+        "iosv"
+      ],
+      "description": "Image profiles the lab supports",
+      "items": {
+        "enum": [
+          "iol",
+          "iosv"
+        ],
+        "type": "string"
+      },
+      "title": "Platforms",
+      "type": "array"
+    },
+    "summary": {
+      "description": "One-line summary for the catalog",
+      "title": "Summary",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/Node"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "links": {
+      "items": {
+        "$ref": "#/$defs/Link"
+      },
+      "title": "Links",
+      "type": "array"
+    },
+    "task": {
+      "description": "Markdown task text shown to the student",
+      "title": "Task",
+      "type": "string"
+    },
+    "checks": {
+      "default": [],
+      "description": "Challenge labs: needs at least one live and one config check. Walkthroughs: leave empty and put the checks in the steps",
+      "items": {
+        "$ref": "#/$defs/Check"
+      },
+      "title": "Checks",
+      "type": "array"
+    },
+    "steps": {
+      "default": [],
+      "description": "Walkthrough labs only: the ordered steps",
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "ram_gb": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "maximum": 512,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional: CML server RAM the lab needs in GB. Default: estimated from the node definitions",
+      "title": "Ram Gb"
+    },
+    "solution": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional reference solution: device -> config lines",
+      "title": "Solution"
+    },
+    "solution_summary": {
+      "default": "",
+      "description": "Markdown shown after the lab is solved (or on 'Reveal solution'): the root cause / what was missing, the exact fix commands per device, and briefly why it works. Required for new labs; if empty the app generates a fallback from `solution`",
+      "title": "Solution Summary",
+      "type": "string"
+    },
+    "hints": {
+      "default": [],
+      "description": "Ordered progressive hints (vague first, most specific last), revealed one at a time with the Hint button. Never paste the full answer into a hint. If empty, the per-check hints are used in check order",
+      "items": {
+        "type": "string"
+      },
+      "title": "Hints",
+      "type": "array"
+    },
+    "faults": {
+      "default": [],
+      "description": "Optional predefined faults for 'Break my lab' (random troubleshooting practice on the solved lab)",
+      "items": {
+        "$ref": "#/$defs/Fault"
+      },
+      "title": "Faults",
+      "type": "array"
+    },
+    "author": {
+      "default": "",
+      "title": "Author",
+      "type": "string"
+    },
+    "version": {
+      "default": "1",
+      "description": "Content version of the lab, e.g. '1', '2' or '1.1' (default '1'). Raise it whenever you change a published lab, so installed copies show 'Update available' in the library",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "blueprint",
+    "domain",
+    "difficulty",
+    "summary",
+    "nodes",
+    "links",
+    "task"
+  ],
+  "title": "CML Lab Builder lab definition",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cml-lab.schema.json"
+}

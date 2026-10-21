@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import encorboot
-from encorlab import __version__, autoupdate, catalog, config, exam, library, updates
-from encorlab.web.app import create_app
+import cmlboot
+from cmllab import __version__, autoupdate, catalog, config, exam, library, updates
+from cmllab.web.app import create_app
 from test_patching import build_patch, make_src, mkbundle
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,17 +24,17 @@ NEW = "9.9.9"
 def patches(tmp_path_factory):
     t = tmp_path_factory.mktemp("patches")
     good = build_patch.build_patch(make_src(t, NEW), t / "good").read_bytes()
-    newer_rt = build_patch.build_patch(make_src(t / "rt", NEW), t / "rt-out", min_runtime=encorboot.RUNTIME_VERSION + 1).read_bytes()
+    newer_rt = build_patch.build_patch(make_src(t / "rt", NEW), t / "rt-out", min_runtime=cmlboot.RUNTIME_VERSION + 1).read_bytes()
     return {"good": good, "newer_runtime": newer_rt}
 
 
 @pytest.fixture
 def packaged(tmp_path, monkeypatch):
     """Pretend to be the packaged app running its bundled copy of the current version."""
-    bundled = mkbundle(tmp_path / "bundled", __version__, pkg="encorlab")
-    monkeypatch.setattr(encorboot, "frozen", lambda: True)
-    monkeypatch.setattr(encorboot, "bundled_dir", lambda: bundled)
-    monkeypatch.setattr(encorboot, "ACTIVE", encorboot.Candidate("bundled", __version__, bundled))
+    bundled = mkbundle(tmp_path / "bundled", __version__, pkg="cmllab")
+    monkeypatch.setattr(cmlboot, "frozen", lambda: True)
+    monkeypatch.setattr(cmlboot, "bundled_dir", lambda: bundled)
+    monkeypatch.setattr(cmlboot, "ACTIVE", cmlboot.Candidate("bundled", __version__, bundled))
     monkeypatch.setattr(autoupdate, "WAIT_POLL", 0.02)
     return bundled
 
@@ -49,11 +49,11 @@ class GitHub:
         self.fail: Exception | None = None
 
     def release(self) -> bytes:
-        assets = [{"name": f"ENCORLab-{self.version}-windows-x64.zip", "size": 26_000_000,
-                   "browser_download_url": self.BASE + f"ENCORLab-{self.version}-windows-x64.zip"}]
+        assets = [{"name": f"CMLLabBuilder-{self.version}-windows-x64.zip", "size": 26_000_000,
+                   "browser_download_url": self.BASE + f"CMLLabBuilder-{self.version}-windows-x64.zip"}]
         if self.patch is not None:
-            assets += [{"name": f"encorlab-patch-{self.version}.zip", "size": len(self.patch),
-                        "browser_download_url": self.BASE + f"encorlab-patch-{self.version}.zip"},
+            assets += [{"name": f"cml-lab-builder-patch-{self.version}.zip", "size": len(self.patch),
+                        "browser_download_url": self.BASE + f"cml-lab-builder-patch-{self.version}.zip"},
                        {"name": "SHA256SUMS.txt", "size": 100, "browser_download_url": self.BASE + "SHA256SUMS.txt"}]
         return json.dumps({"tag_name": f"v{self.version}", "assets": assets,
                            "html_url": f"https://github.com/{updates.REPO}/releases/tag/v{self.version}"}).encode()
@@ -68,7 +68,7 @@ class GitHub:
             return (304, b"", {"etag": tag}) if etag == tag else (200, body, {"etag": tag})
         if url.endswith("SHA256SUMS.txt"):
             text = self.sums_override if self.sums_override is not None else \
-                f"{library.sha256(self.patch)}  encorlab-patch-{self.version}.zip\n"
+                f"{library.sha256(self.patch)}  cml-lab-builder-patch-{self.version}.zip\n"
             return 200, text.encode(), {}
         if url.endswith(".zip"):
             return 200, self.patch, {}
@@ -130,7 +130,7 @@ def test_scheduler_checks_when_due_and_uses_etag(packaged, patches):
 
 
 def test_background_thread_runs_first_check_after_delay(packaged, patches, monkeypatch):
-    monkeypatch.setenv("ENCOR_UPDATE_DELAY", "0.05")
+    monkeypatch.setenv("CMLLAB_UPDATE_DELAY", "0.05")
     gh = GitHub(patches["good"])
     u = autoupdate.Updater(settings=lambda: config.Settings(), fetch=gh)
     u.start()
@@ -146,8 +146,8 @@ def test_check_stages_but_does_not_install(packaged, patches):
     assert u.check()["status"] == "staged"
     st = autoupdate.load()["staged"]
     assert st["version"] == NEW and st["size"] == len(patches["good"])
-    assert (autoupdate.staged_dir() / f"encorlab-patch-{NEW}.zip").is_file()
-    assert not (encorboot.app_root() / NEW).exists() and not encorboot.load_state().get("current")
+    assert (autoupdate.staged_dir() / f"cml-lab-builder-patch-{NEW}.zip").is_file()
+    assert not (cmlboot.app_root() / NEW).exists() and not cmlboot.load_state().get("current")
     offer = u.state()["offer"]
     assert offer["version"] == NEW and offer["url"].endswith(f"/v{NEW}") and "CHANGELOG.md" in offer["changelog"]
 
@@ -161,7 +161,7 @@ def test_up_to_date_clears_old_offers(packaged, patches):
 
 def test_bad_download_is_quiet_and_backs_off(packaged, patches):
     clock = Clock()
-    u = make(GitHub(patches["good"], sums="0" * 64 + f"  encorlab-patch-{NEW}.zip\n"), clock=clock)
+    u = make(GitHub(patches["good"], sums="0" * 64 + f"  cml-lab-builder-patch-{NEW}.zip\n"), clock=clock)
     r = u.check()                                          # automatic: never raises
     assert r["status"] == "error" and "SHA256SUMS" in r["error"]
     st = u.state()
@@ -197,7 +197,7 @@ def test_backoff_grows_and_honours_rate_limits(packaged, patches):
 def test_runtime_gating_shows_full_download(packaged, patches):
     u = make(GitHub(patches["newer_runtime"]))
     r = u.check()
-    assert r["status"] == "full_download" and f"runtime {encorboot.RUNTIME_VERSION + 1}" in r["reason"]
+    assert r["status"] == "full_download" and f"runtime {cmlboot.RUNTIME_VERSION + 1}" in r["reason"]
     st = u.state()
     assert st["offer"] is None and st["full_download"]["version"] == NEW
     assert not list(autoupdate.staged_dir().glob("*.zip"))
@@ -244,7 +244,7 @@ def test_rolled_back_version_is_not_offered_again(packaged, patches):
     gh, clock = GitHub(patches["good"]), Clock()
     u = make(gh, clock=clock)
     u.check()
-    encorboot.save_state({"failed": {"version": NEW, "reason": "rolled back by the user"}})
+    cmlboot.save_state({"failed": {"version": NEW, "reason": "rolled back by the user"}})
     assert u.state()["offer"] is None and NEW in autoupdate.load()["rolled_back"]
     clock.t += autoupdate.INTERVAL + 1
     n = len(gh.downloads())
@@ -262,13 +262,13 @@ def test_update_now_waits_for_running_work_then_installs_and_restarts(packaged, 
     assert a["state"] == "waiting" and a["waiting_for"] == ["a lab build (01-ospf)"]
     time.sleep(0.2)
     st = u.state()
-    assert st["apply"]["state"] == "waiting" and restarts == [] and not (encorboot.app_root() / NEW).exists()
+    assert st["apply"]["state"] == "waiting" and restarts == [] and not (cmlboot.app_root() / NEW).exists()
     busy.clear()
     assert wait_for(lambda: restarts == [1])
     st = autoupdate.load()
     assert st["apply"]["state"] == "restarting" and st["applied"]["version"] == NEW and u.applying()
-    b = encorboot.load_state()
-    assert b["current"] == NEW and b["pending"] and encorboot.next_start().version == NEW
+    b = cmlboot.load_state()
+    assert b["current"] == NEW and b["pending"] and cmlboot.next_start().version == NEW
 
 
 def test_update_now_can_be_cancelled_while_waiting(packaged, patches):
@@ -290,7 +290,7 @@ def test_tampered_staged_file_is_not_installed(packaged, patches):
     restarts = []
     u = make(GitHub(patches["good"]), restarts=restarts)
     u.check()
-    (autoupdate.staged_dir() / f"encorlab-patch-{NEW}.zip").write_bytes(b"evil")
+    (autoupdate.staged_dir() / f"cml-lab-builder-patch-{NEW}.zip").write_bytes(b"evil")
     assert u.state()["offer"] is None
     with pytest.raises(updates.UpdateError):
         u.apply(NEW)
@@ -304,7 +304,7 @@ def test_after_restart_toast_and_failed_notice(packaged):
     u.ack()
     assert u.state()["just_updated"] is None
     autoupdate.save({"applied": {"version": NEW, "from": __version__}})
-    encorboot.save_state({"failed": {"version": NEW, "reason": "exited with code 1 before the web UI started"}})
+    cmlboot.save_state({"failed": {"version": NEW, "reason": "exited with code 1 before the web UI started"}})
     assert u.state()["failed_update"] == {"version": NEW}
     u.ack()
     assert u.state()["failed_update"] is None
@@ -381,17 +381,17 @@ def test_settings_toggle_wakes_the_updater(packaged, monkeypatch):
 def test_url_rules(monkeypatch):
     assert updates.allowed_url("https://api.github.com/x") and updates.allowed_url("http://127.0.0.1:9/x")
     assert not updates.allowed_url("http://example.com/x") and not updates.allowed_url("file:///etc/passwd")
-    monkeypatch.setenv("ENCOR_UPDATE_URL", "http://example.com/latest")
+    monkeypatch.setenv("CMLLAB_UPDATE_URL", "http://example.com/latest")
     assert updates.release_url() == updates.LATEST_URL
-    monkeypatch.setenv("ENCOR_UPDATE_URL", "http://127.0.0.1:8000/repos/x/releases/latest")
+    monkeypatch.setenv("CMLLAB_UPDATE_URL", "http://127.0.0.1:8000/repos/x/releases/latest")
     assert updates.release_url().startswith("http://127.0.0.1:8000/")
     assert updates.asset_prefixes() == ("https://github.com/", "http://127.0.0.1:8000/")
 
 
 def test_http_end_to_end_with_etag(packaged, patches, monkeypatch):
-    fake = FakeRelease(NEW, {f"encorlab-patch-{NEW}.zip": patches["good"]}).start()
+    fake = FakeRelease(NEW, {f"cml-lab-builder-patch-{NEW}.zip": patches["good"]}).start()
     try:
-        monkeypatch.setenv("ENCOR_UPDATE_URL", fake.url)
+        monkeypatch.setenv("CMLLAB_UPDATE_URL", fake.url)
         clock = Clock()
         u = autoupdate.Updater(settings=lambda: config.Settings(), now=clock)   # the real http_get
         assert u.check()["status"] == "staged"

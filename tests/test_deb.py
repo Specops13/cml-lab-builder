@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-import encorboot
-from encorlab import __version__, autoupdate, config, install, updates
+import cmlboot
+from cmllab import __version__, autoupdate, config, install, updates
 from test_autoupdate import GitHub, make, packaged, patches  # noqa: F401  (fixtures)
 from test_patching import mkbundle
 
@@ -18,8 +18,8 @@ sys.path.insert(0, str(ROOT / "packaging"))
 import build_deb  # noqa: E402
 
 ASSETS = [{"name": n, "url": f"https://github.com/x/releases/download/v2.0.0/{n}", "size": 1}
-          for n in ("ENCORLab-2.0.0-windows-x64.zip", "ENCORLab-2.0.0-linux-x64.tar.gz", "encorlab_2.0.0_amd64.deb",
-                    "encorlab-patch-2.0.0.zip", "SHA256SUMS.txt")]
+          for n in ("CMLLabBuilder-2.0.0-windows-x64.zip", "CMLLabBuilder-2.0.0-linux-x64.tar.gz", "cml-lab-builder_2.0.0_amd64.deb",
+                    "cml-lab-builder-patch-2.0.0.zip", "SHA256SUMS.txt")]
 
 
 # ---------------------------------------------------------------- install type + asset choice
@@ -33,14 +33,14 @@ def test_install_type_detection(tmp_path):
     assert install.install_type(tmp_path, "posix") == "linux-tar" and install.install_type(tmp_path, "nt") == "windows-zip"
 
 
-@pytest.mark.parametrize("kind,name", [("deb", "encorlab_2.0.0_amd64.deb"), ("linux-tar", "ENCORLab-2.0.0-linux-x64.tar.gz"),
-                                       ("windows-zip", "ENCORLab-2.0.0-windows-x64.zip")])
+@pytest.mark.parametrize("kind,name", [("deb", "cml-lab-builder_2.0.0_amd64.deb"), ("linux-tar", "CMLLabBuilder-2.0.0-linux-x64.tar.gz"),
+                                       ("windows-zip", "CMLLabBuilder-2.0.0-windows-x64.zip")])
 def test_full_download_picks_the_asset_for_the_install_type(kind, name):
     d = install.full_download(ASSETS, "2.0.0", kind)
     assert d["name"] == name and d["url"].endswith(name) and d["kind"] == kind
     assert install.full_download([a for a in ASSETS if a["name"] != name], "2.0.0", kind) is None
     assert install.full_download(ASSETS, "2.0.0", "source") is None
-    assert "sudo apt install ./encorlab_2.0.0_amd64.deb" in install.how_to_install("deb", "encorlab_2.0.0_amd64.deb")
+    assert "sudo apt install ./cml-lab-builder_2.0.0_amd64.deb" in install.how_to_install("deb", "cml-lab-builder_2.0.0_amd64.deb")
 
 
 def test_check_reports_the_download_for_this_install(monkeypatch):
@@ -49,7 +49,7 @@ def test_check_reports_the_download_for_this_install(monkeypatch):
                       "browser_download_url": f"https://github.com/{updates.REPO}/releases/download/v2.0.0/{a['name']}"}
                      for a in ASSETS]}).encode()
     r = updates.check("1.8.0", fetch=lambda u, n: rel)
-    assert r["install_type"] == "deb" and r["download"]["name"] == "encorlab_2.0.0_amd64.deb"
+    assert r["install_type"] == "deb" and r["download"]["name"] == "cml-lab-builder_2.0.0_amd64.deb"
 
 
 def test_deb_banner_points_to_the_new_deb(packaged, patches, monkeypatch):  # noqa: F811
@@ -58,17 +58,17 @@ def test_deb_banner_points_to_the_new_deb(packaged, patches, monkeypatch):  # no
     class DebRelease(GitHub):
         def release(self):
             d = json.loads(super().release())
-            d["assets"].append({"name": f"encorlab_{self.version}_amd64.deb", "size": 27_000_000,
-                                "browser_download_url": self.BASE + f"encorlab_{self.version}_amd64.deb"})
+            d["assets"].append({"name": f"cml-lab-builder_{self.version}_amd64.deb", "size": 27_000_000,
+                                "browser_download_url": self.BASE + f"cml-lab-builder_{self.version}_amd64.deb"})
             return json.dumps(d).encode()
     u = make(DebRelease(patches["newer_runtime"]))
     assert u.check()["status"] == "full_download"
     fd = u.state()["full_download"]
-    assert fd["install_type"] == "deb" and fd["asset"] == "encorlab_9.9.9_amd64.deb" and fd["url"].endswith("_amd64.deb")
-    assert "sudo apt install ./encorlab_9.9.9_amd64.deb" in fd["how"] and fd["page"].endswith("/v9.9.9")
+    assert fd["install_type"] == "deb" and fd["asset"] == "cml-lab-builder_9.9.9_amd64.deb" and fd["url"].endswith("_amd64.deb")
+    assert "sudo apt install ./cml-lab-builder_9.9.9_amd64.deb" in fd["how"] and fd["page"].endswith("/v9.9.9")
     monkeypatch.setattr(install, "install_type", lambda *a, **k: "windows-zip")
     u.check(manual=True)
-    assert u.state()["full_download"]["asset"] == "ENCORLab-9.9.9-windows-x64.zip"
+    assert u.state()["full_download"]["asset"] == "CMLLabBuilder-9.9.9-windows-x64.zip"
 
 
 def test_status_reports_install_type():
@@ -79,13 +79,13 @@ def test_status_reports_install_type():
 # ---------------------------------------------------------------- precedence across .deb upgrades
 @pytest.fixture
 def deb_boot(tmp_path, monkeypatch):
-    """/opt/encorlab/_internal/appcode is the bundled copy; `apt install ./newer.deb` replaces it in place."""
-    bundled = tmp_path / "opt" / "encorlab" / "_internal" / "appcode"
-    monkeypatch.setattr(encorboot, "frozen", lambda: True)
-    monkeypatch.setattr(encorboot, "bundled_dir", lambda: bundled)
+    """/opt/cml-lab-builder/_internal/appcode is the bundled copy; `apt install ./newer.deb` replaces it in place."""
+    bundled = tmp_path / "opt" / "cml-lab-builder" / "_internal" / "appcode"
+    monkeypatch.setattr(cmlboot, "frozen", lambda: True)
+    monkeypatch.setattr(cmlboot, "bundled_dir", lambda: bundled)
     before = list(sys.path)
     yield bundled
-    encorboot.purge("fakeapp")
+    cmlboot.purge("fakeapp")
     sys.path[:] = before
 
 
@@ -95,28 +95,28 @@ def apt_install(bundled: Path, version: str) -> None:
 
 
 def start():
-    encorboot.purge("fakeapp")
-    encorboot.ACTIVE = None
-    return encorboot.activate(gui=False, package="fakeapp")
+    cmlboot.purge("fakeapp")
+    cmlboot.ACTIVE = None
+    return cmlboot.activate(gui=False, package="fakeapp")
 
 
 def test_user_patch_wins_until_a_newer_deb_arrives(deb_boot):
     apt_install(deb_boot, "1.8.0")
     assert start().version == "1.8.0"
-    mkbundle(encorboot.app_root() / "1.8.5", "1.8.5")                 # patch installed by the user, no root
-    encorboot.stage("1.8.5", "fakeapp")
+    mkbundle(cmlboot.app_root() / "1.8.5", "1.8.5")                 # patch installed by the user, no root
+    cmlboot.stage("1.8.5", "fakeapp")
     assert (start().source, start().version) == ("installed", "1.8.5")
     apt_install(deb_boot, "1.8.1")                                    # older deb upgrade: the newer patch still wins
     assert (start().source, start().version) == ("installed", "1.8.5")
     apt_install(deb_boot, "1.9.0")                                    # newer deb: its bundled copy wins
     assert (start().source, start().version) == ("bundled", "1.9.0")
-    assert (encorboot.app_root() / "1.8.5").is_dir()                  # nothing in the user folder was touched
+    assert (cmlboot.app_root() / "1.8.5").is_dir()                  # nothing in the user folder was touched
 
 
 def test_deb_needing_newer_runtime_patch_is_ignored(deb_boot):
     apt_install(deb_boot, "1.8.0")
-    mkbundle(encorboot.app_root() / "1.9.9", "1.9.9", min_runtime=encorboot.RUNTIME_VERSION + 1)
-    encorboot.save_state({"current": "1.9.9"})
+    mkbundle(cmlboot.app_root() / "1.9.9", "1.9.9", min_runtime=cmlboot.RUNTIME_VERSION + 1)
+    cmlboot.save_state({"current": "1.9.9"})
     assert start().version == "1.8.0"
 
 
@@ -132,12 +132,12 @@ def test_staged_patch_older_than_new_bundled_is_dropped(packaged, patches, monke
 
 # ---------------------------------------------------------------- the package itself
 def fake_stage(tmp: Path, version: str = "1.8.0") -> Path:
-    s = tmp / f"ENCORLab-{version}-linux-x64"
+    s = tmp / f"CMLLabBuilder-{version}-linux-x64"
     (s / "_internal").mkdir(parents=True)
-    (s / "ENCORLab").write_text("#!/bin/sh\necho fake\n")
+    (s / "cml-lab-builder").write_text("#!/bin/sh\necho fake\n")
     (s / "README.md").write_text("readme\n")
     (s / "install-desktop-entry.sh").write_text("#!/bin/sh\n")
-    mkbundle(s / "_internal" / "appcode", version, pkg="encorlab")
+    mkbundle(s / "_internal" / "appcode", version, pkg="cmllab")
     return s
 
 
@@ -164,29 +164,36 @@ needs_dpkg = pytest.mark.skipif(not shutil.which("dpkg-deb"), reason="dpkg-deb n
 @needs_dpkg
 def test_build_deb_layout_and_metadata(tmp_path):
     deb = build_deb.build(fake_stage(tmp_path), tmp_path / "out")
-    assert deb.name == "encorlab_1.8.0_amd64.deb"
+    assert deb.name == "cml-lab-builder_1.8.0_amd64.deb"
     info = subprocess.run(["dpkg-deb", "-f", str(deb)], capture_output=True, text=True, check=True).stdout
-    for want in ("Package: encorlab", "Version: 1.8.0", "Architecture: amd64", "Depends: libc6 (>= 2.28)",
+    for want in ("Package: cml-lab-builder", "Version: 1.8.0", "Architecture: amd64", "Depends: libc6 (>= 2.28)",
                  "Recommends: xdg-utils", "Maintainer: ", "Homepage: https://github.com/Specops13/cml-lab-builder",
-                 "Description: build and grade practice labs in Cisco Modeling Labs"):
+                 "Description: build and grade practice labs in Cisco Modeling Labs",
+                 "Provides: encorlab (= 1.8.0)", "Conflicts: encorlab (<< 3.0.0~)", "Breaks: encorlab (<< 3.0.0~)",
+                 "Replaces: encorlab (<< 3.0.0~)"):
         assert want in info, want
     files = deb_contents(deb)
-    assert files["/opt/encorlab/ENCORLab"].startswith("-rwxr-xr-x") and files["/usr/bin/encorlab"].startswith("-rwxr-xr-x")
-    assert files["/opt/encorlab/README.md"].startswith("-rw-r--r--")
+    assert files["/opt/cml-lab-builder/cml-lab-builder"].startswith("-rwxr-xr-x")
+    assert files["/usr/bin/cml-lab-builder"].startswith("-rwxr-xr-x")
+    assert files["/opt/cml-lab-builder/README.md"].startswith("-rw-r--r--")
+    assert not any("/opt/encorlab" in f or "ENCORLab" in f for f in files)
     listing = subprocess.run(["dpkg-deb", "-c", str(deb)], capture_output=True, text=True, check=True).stdout
-    assert files["/usr/bin/cmllab"].startswith("l") and "./usr/bin/cmllab -> encorlab\n" in listing   # 2.1.0 command name
-    assert "./usr/share/man/man1/cmllab.1.gz -> encorlab.1.gz\n" in listing
-    assert "/opt/encorlab/install-desktop-entry.sh" not in files            # the tar.gz-only helper
-    for p in ("/opt/encorlab/install-type", "/usr/share/applications/encorlab.desktop", "/usr/share/man/man1/encorlab.1.gz",
-              "/usr/share/doc/encorlab/copyright", "/usr/share/doc/encorlab/changelog.gz",
-              "/usr/share/icons/hicolor/48x48/apps/encorlab.png", "/usr/share/icons/hicolor/256x256/apps/encorlab.png"):
+    for alias in ("cmllab", "encorlab"):                                    # short command + the old one (until 4.0)
+        assert files[f"/usr/bin/{alias}"].startswith("l") and f"./usr/bin/{alias} -> cml-lab-builder\n" in listing
+        assert f"./usr/share/man/man1/{alias}.1.gz -> cml-lab-builder.1.gz\n" in listing
+    assert "/opt/cml-lab-builder/install-desktop-entry.sh" not in files            # the tar.gz-only helper
+    for p in ("/opt/cml-lab-builder/install-type", "/usr/share/applications/cml-lab-builder.desktop",
+              "/usr/share/man/man1/cml-lab-builder.1.gz",
+              "/usr/share/doc/cml-lab-builder/copyright", "/usr/share/doc/cml-lab-builder/changelog.gz",
+              "/usr/share/icons/hicolor/48x48/apps/cml-lab-builder.png",
+              "/usr/share/icons/hicolor/256x256/apps/cml-lab-builder.png"):
         assert p in files, p
-    assert deb_file(deb, "/opt/encorlab/install-type").strip() == "deb"
-    assert "exec /opt/encorlab/ENCORLab" in deb_file(deb, "/usr/bin/encorlab")
-    desk = deb_file(deb, "/usr/share/applications/encorlab.desktop")
-    assert "Exec=encorlab\n" in desk and "Icon=encorlab\n" in desk and "Terminal=true" in desk
+    assert deb_file(deb, "/opt/cml-lab-builder/install-type").strip() == "deb"
+    assert "exec /opt/cml-lab-builder/cml-lab-builder" in deb_file(deb, "/usr/bin/cml-lab-builder")
+    desk = deb_file(deb, "/usr/share/applications/cml-lab-builder.desktop")
+    assert "Exec=cml-lab-builder\n" in desk and "Icon=cml-lab-builder\n" in desk and "Terminal=true" in desk
     if shutil.which("desktop-file-validate"):
-        f = tmp_path / "encorlab.desktop"
+        f = tmp_path / "cml-lab-builder.desktop"
         f.write_text(desk)
         r = subprocess.run(["desktop-file-validate", str(f)], capture_output=True, text=True)
         assert r.returncode == 0 and "error" not in r.stdout.lower(), r.stdout
@@ -213,17 +220,18 @@ def test_maintainer_scripts_never_touch_user_data(tmp_path):
 def test_build_deb_from_tar_and_with_other_app_code(tmp_path):
     import tarfile
     stage = fake_stage(tmp_path / "s")
-    tar = tmp_path / "ENCORLab-1.8.0-linux-x64.tar.gz"
+    tar = tmp_path / "CMLLabBuilder-1.8.0-linux-x64.tar.gz"
     with tarfile.open(tar, "w:gz") as t:
         t.add(stage, arcname=stage.name)
     unpacked = build_deb.unpack_tar(tar, tmp_path / "u")
     src = tmp_path / "src"
-    shutil.copytree(ROOT / "encorlab", src / "encorlab", ignore=shutil.ignore_patterns("__pycache__"))
-    init = src / "encorlab" / "__init__.py"
+    shutil.copytree(ROOT / "cmllab", src / "cmllab", ignore=shutil.ignore_patterns("__pycache__"))
+    init = src / "cmllab" / "__init__.py"
     init.write_text(init.read_text().replace(f'"{__version__}"', '"1.8.1"'))
     deb = build_deb.build(unpacked, tmp_path / "out", "1.8.1", app_src=src)
-    m = json.loads(deb_file(deb, "/opt/encorlab/_internal/appcode/manifest.json"))
-    assert deb.name == "encorlab_1.8.1_amd64.deb" and m["app_version"] == "1.8.1" and "encorlab/autoupdate.py" in m["files"]
+    m = json.loads(deb_file(deb, "/opt/cml-lab-builder/_internal/appcode/manifest.json"))
+    assert deb.name == "cml-lab-builder_1.8.1_amd64.deb" and m["app_version"] == "1.8.1" and "cmllab/autoupdate.py" in m["files"]
+    assert m["package"] == "cmllab" and m["min_runtime"] == cmlboot.RUNTIME_VERSION
 
 
 @needs_dpkg
@@ -235,11 +243,11 @@ def test_deb_license_files_and_dep5_copyright(tmp_path):
     (s / "_internal" / "click-8.5.0.dist-info" / "licenses" / "LICENSE.txt").write_text("BSD\n")
     deb = build_deb.build(s, tmp_path / "out")
     files = deb_contents(deb)
-    assert "/usr/share/doc/encorlab/LICENSE.txt" in files and "/usr/share/doc/encorlab/THIRD-PARTY-NOTICES.txt" in files
-    assert "/opt/encorlab/LICENSE.txt" not in files and "/opt/encorlab/THIRD-PARTY-NOTICES.txt" not in files
-    assert "/opt/encorlab/_internal/click-8.5.0.dist-info/licenses/LICENSE.txt" in files
-    assert "MIT License" in deb_file(deb, "/usr/share/doc/encorlab/LICENSE.txt")
-    cr = deb_file(deb, "/usr/share/doc/encorlab/copyright")
+    assert "/usr/share/doc/cml-lab-builder/LICENSE.txt" in files and "/usr/share/doc/cml-lab-builder/THIRD-PARTY-NOTICES.txt" in files
+    assert "/opt/cml-lab-builder/LICENSE.txt" not in files and "/opt/cml-lab-builder/THIRD-PARTY-NOTICES.txt" not in files
+    assert "/opt/cml-lab-builder/_internal/click-8.5.0.dist-info/licenses/LICENSE.txt" in files
+    assert "MIT License" in deb_file(deb, "/usr/share/doc/cml-lab-builder/LICENSE.txt")
+    cr = deb_file(deb, "/usr/share/doc/cml-lab-builder/copyright")
     assert cr.startswith("Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\n")
     assert "Copyright: 2026 Dylan Vaughan (Specops13)\nLicense: MIT\n" in cr and "\nLicense: MIT\n Permission is hereby" in cr
     assert "THIRD-PARTY-NOTICES.txt" in cr and "all rights" not in cr.lower()

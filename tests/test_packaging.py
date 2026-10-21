@@ -6,13 +6,13 @@ import threading
 import urllib.request
 from pathlib import Path
 
-from encorlab import __version__, launcher
+from cmllab import __version__, launcher
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_app_js_version_matches_package():
-    js = (ROOT / "encorlab" / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    js = (ROOT / "cmllab" / "web" / "static" / "app.js").read_text(encoding="utf-8")
     assert re.search(r'const APP_JS_VERSION = "([^"]+)"', js).group(1) == __version__
     assert "versionCheck" in js and "visibilitychange" in js
 
@@ -59,28 +59,29 @@ def test_cli_passthrough(capsys):
 
 def test_build_files_present_and_consistent():
     pk = ROOT / "packaging"
-    for f in ("encorlab.spec", "build.py", "build_exe.bat", "build_linux.sh", "smoke_test.py", "README-BINARY.txt",
-              "encorlab.ico", "encorlab.png", "install-desktop-entry.sh"):
+    for f in ("cmllab.spec", "build.py", "build_exe.bat", "build_linux.sh", "smoke_test.py", "README-BINARY.txt",
+              "cml-lab-builder.ico", "cml-lab-builder.png", "install-desktop-entry.sh", "build_compat.py"):
         assert (pk / f).is_file(), f
-    spec = (pk / "encorlab.spec").read_text(encoding="utf-8")
+    spec = (pk / "cmllab.spec").read_text(encoding="utf-8")
     # the app code is not frozen into the runtime: it ships as a replaceable bundle in _internal/appcode
     assert '"appcode"' in spec and "build_manifest" in spec and "exclude_binaries=True" in spec and "upx=False" in spec
     assert b"\r\n" in (pk / "build_exe.bat").read_bytes()               # cmd.exe wants CRLF
     wf = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
     assert "windows-latest" in wf and "ubuntu-22.04" in wf and "--smoke" in wf
     assert "overwrite_files: false" in wf and "github.event_name == 'workflow_dispatch'" in wf  # tag push never re-publishes
-    entry = (ROOT / "encor_launcher.py").read_text(encoding="utf-8")
-    assert "from encorlab.launcher import main" in entry and "encorboot.activate" in entry
-    assert "build_patch.py" in wf and "encorlab-patch-" in wf and "--check-lock" in wf
+    entry = (ROOT / "cmllab_launcher.py").read_text(encoding="utf-8")
+    assert "from cmllab.launcher import main" in entry and "cmlboot.activate" in entry
+    assert "build_patch.py" in wf and "cml-lab-builder-patch-" in wf and "--check-lock" in wf
     # the .deb is built from the smoke-tested Linux build, linted, tested on Debian 12 and released
     assert "build_deb.py" in wf and "lintian" in wf and "container: debian:12" in wf
-    assert "sha256sum ENCORLab-* encorlab_*.deb encorlab-patch-*.zip" in wf and wf.count("dist/encorlab_*.deb") >= 3
+    assert "sha256sum CMLLabBuilder-* cml-lab-builder_*.deb cml-lab-builder-patch-*.zip ENCORLab-* encorlab_*.deb encorlab-patch-*.zip" in wf
+    assert wf.count("dist/cml-lab-builder_*.deb") >= 3 and "build_compat.py --dist dist" in wf
 
 
 def test_frozen_paths_are_package_relative():
     """Data files are found next to the modules, which PyInstaller preserves (collect_data_files)."""
-    from encorlab import catalog, prompt
-    from encorlab.web import app
-    assert catalog.LABS_DIR == Path(os.environ["ENCOR_BUILTIN_LABS_DIR"])   # the suite uses labsrc/ in place
+    from cmllab import catalog, prompt
+    from cmllab.web import app
+    assert catalog.LABS_DIR == Path(os.environ["CMLLAB_BUILTIN_LABS_DIR"])   # the suite uses labsrc/ in place
     assert not (Path(catalog.__file__).parent / "labs").exists()           # 2.0.0: the package ships no labs
     assert prompt.RES.parent == Path(prompt.__file__).parent and app.HERE == Path(app.__file__).parent

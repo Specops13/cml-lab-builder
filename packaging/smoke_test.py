@@ -1,11 +1,11 @@
 """Smoke test for a packaged build (stdlib only; used locally, under Wine and in CI).
 
-    python packaging/smoke_test.py <path to ENCORLab or ENCORLab.exe> --version 1.6.0 \
-        --data-dir <expected user data folder> [--pack x.encorlab ...] [--runner wine] [--port 8791] [--patch-test]
+    python packaging/smoke_test.py <path to cml-lab-builder or CMLLabBuilder.exe> --version 3.0.0 \
+        --data-dir <expected user data folder> [--pack x.cmllab ...] [--runner wine] [--port 8791] [--patch-test]
 
 Checks: CLI runs (version, list); the launcher serves the UI on 127.0.0.1 with versioned (cache-busted)
 assets; a first run has no labs (2.0.0 ships none) and no migration to do; the lab library is served from this
-source tree's labs/ on 127.0.0.1 (ENCOR_LIBRARY_URL): the starter set and a course (with the labs it lists)
+source tree's labs/ on 127.0.0.1 (CMLLAB_LIBRARY_URL): the starter set and a course (with the labs it lists)
 install from it; packs import into the user data folder; the solution endpoint works; a second launch detects
 the running instance; the server stops cleanly.
 --patch-test also builds test patches from this source tree and checks, on the frozen build: installing a patch
@@ -77,8 +77,8 @@ def make_patch(tmp: Path, version: str, broken: bool = False, min_runtime: int |
     sys.path.insert(0, str(ROOT / "packaging"))
     import build_patch
     src = tmp / f"src-{version}"
-    shutil.copytree(ROOT / "encorlab", src / "encorlab", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    init = src / "encorlab" / "__init__.py"
+    shutil.copytree(ROOT / "cmllab", src / "cmllab", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    init = src / "cmllab" / "__init__.py"
     text = re.sub(r'__version__ = "[^"]+"', f'__version__ = "{version}"', init.read_text(encoding="utf-8"))
     if broken:
         text += '\nraise RuntimeError("smoke test: deliberately broken patch")\n'
@@ -90,13 +90,13 @@ def patch_tests(exe, version: str, data_dir: Path, port: int, check, boot_dir: P
     boot_dir = boot_dir or data_dir
     import shutil
     import tempfile
-    tmp = Path(tempfile.mkdtemp(prefix="encor-smoke-"))
+    tmp = Path(tempfile.mkdtemp(prefix="cmllab-smoke-"))
     try:
         good = make_patch(tmp, "99.0.0")
         check(good.stat().st_size < 2_000_000, f"test patch built ({good.stat().st_size // 1024} KB)")
         code, out = run(exe + ["update-install", "--file", str(good)])
         check(code == 0 and "Installed 99.0.0" in out, f"update-install --file -> {out.strip()[-80:]!r}")
-        check((boot_dir / "app" / "99.0.0" / "encorlab" / "__init__.py").is_file(), "patch extracted to <data>/app/99.0.0")
+        check((boot_dir / "app" / "99.0.0" / "cmllab" / "__init__.py").is_file(), "patch extracted to <data>/app/99.0.0")
         code, out = run(exe + ["version"])
         check(code == 0 and out.strip().endswith("99.0.0"), f"next start runs the patch: version -> {out.strip()[-20:]!r}")
         code, out = run(exe + ["update-status"])
@@ -165,10 +165,10 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre, b
     import tempfile
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from fake_release import FakeRelease
-    tmp = Path(tempfile.mkdtemp(prefix="encor-auto-"))
+    tmp = Path(tempfile.mkdtemp(prefix="cmllab-auto-"))
     new = "99.2.0"
-    fake = FakeRelease(new, {f"encorlab-patch-{new}.zip": make_patch(tmp, new).read_bytes()}).start()
-    env = dict(os.environ, ENCOR_UPDATE_URL=fake.url, ENCOR_UPDATE_DELAY="1")
+    fake = FakeRelease(new, {f"cml-lab-builder-patch-{new}.zip": make_patch(tmp, new).read_bytes()}).start()
+    env = dict(os.environ, CMLLAB_UPDATE_URL=fake.url, CMLLAB_UPDATE_DELAY="1")
     proc = subprocess.Popen(exe + ["--no-browser", "--port", str(port)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, encoding="utf-8", errors="replace", env=env,
                             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
@@ -187,7 +187,7 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre, b
             time.sleep(0.5)
         check(st and st.get("enabled") and (st.get("offer") or {}).get("version") == new,
               f"background check found and staged {new}: offer={st and st.get('offer')}")
-        check(not (boot_dir / "app" / new).exists() and (data_dir / "updates" / "staged" / f"encorlab-patch-{new}.zip").is_file(),
+        check(not (boot_dir / "app" / new).exists() and (data_dir / "updates" / "staged" / f"cml-lab-builder-patch-{new}.zip").is_file(),
               "patch downloaded + verified into updates/staged, not installed")
         labs = json.loads(get(base + "/api/labs")[2])
         lab_id = sorted(x["id"] for x in labs["labs"] if not x.get("walkthrough"))[0]
@@ -223,7 +223,7 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre, b
         except Exception:
             proc.kill()
         if os.name == "nt" or pre:   # Windows: the restarted app runs in a new console (not our child)
-            subprocess.run(pre + ["taskkill", "/F", "/IM", "ENCORLab.exe"], capture_output=True, timeout=60)
+            subprocess.run(pre + ["taskkill", "/F", "/IM", "CMLLabBuilder.exe"], capture_output=True, timeout=60)
         fake.stop()
         code, out = run(exe + ["update-rollback"])
         check(code == 0 and "Rolled back" in out, "update-rollback after the auto update")
@@ -236,10 +236,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("exe")
     ap.add_argument("--version", required=True)
-    ap.add_argument("--data-dir", required=True, help="where settings/labs must land (%%APPDATA%%\\cml-lab-builder or ~/.config/cml-lab-builder; "
-                    "encorlab for builds before 2.1.0)")
-    ap.add_argument("--boot-dir", help="where the boot loader keeps app/ (default: the encorlab folder next to a "
-                    "cml-lab-builder data folder, else the data folder)")
+    ap.add_argument("--data-dir", required=True, help="where settings/labs must land (%%APPDATA%%\\cml-lab-builder or ~/.config/cml-lab-builder)")
+    ap.add_argument("--boot-dir", help="where the boot loader keeps app/ (default: the data folder, 3.0.0+)")
     ap.add_argument("--pack", action="append", default=[])
     ap.add_argument("--runner", default="", help="e.g. 'wine'")
     ap.add_argument("--port", type=int, default=18765)
@@ -247,7 +245,7 @@ def main() -> int:
     ap.add_argument("--auto-update-test", action="store_true")
     a = ap.parse_args()
     dd = Path(a.data_dir)
-    boot = Path(a.boot_dir) if a.boot_dir else (dd.with_name("encorlab") if dd.name == "cml-lab-builder" else dd)
+    boot = Path(a.boot_dir) if a.boot_dir else dd
     global LIBRARY
     new_names = tuple(int(x) for x in a.version.split(".")[:2]) >= (2, 1)
     if new_names:                     # 2.1+: the library with .cmllab/.cmlcourse files (labs/ keeps the old names)
@@ -261,7 +259,7 @@ def main() -> int:
         print(("PASS " if cond else "FAIL ") + msg, flush=True)
         ok = ok and bool(cond)
 
-    for k in [k for k in os.environ if k.startswith(("ENCOR_", "CMLLAB_"))]:
+    for k in [k for k in os.environ if k.startswith(("CMLLAB_", "ENCOR_"))]:
         del os.environ[k]
     code, out = run(exe + ["version"])
     check(code == 0 and a.version in out, f"CLI 'version' -> {out.strip()[-40:]!r}")
@@ -273,7 +271,7 @@ def main() -> int:
 
     t0 = time.time()
     proc = subprocess.Popen(exe + ["--no-browser", "--port", str(a.port)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, encoding="utf-8", errors="replace", env=dict(os.environ, ENCOR_LIBRARY_URL=lib_url),
+                            text=True, encoding="utf-8", errors="replace", env=dict(os.environ, CMLLAB_LIBRARY_URL=lib_url),
                             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
     lines: list[str] = []
     threading.Thread(target=lambda: [lines.append(l) for l in proc.stdout], daemon=True).start()

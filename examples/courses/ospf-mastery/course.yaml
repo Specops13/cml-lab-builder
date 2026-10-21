@@ -3,8 +3,8 @@ title: "OSPF Mastery: design, areas and troubleshooting"
 description: >-
   Three labs in study order: multi-area OSPF basics, ABR summarization with a totally stubby area,
   then a 7-node troubleshooting ticket. Bundles the two community labs; the first one is built in.
-author: ENCOR Lab Builder
-version: "1.0"
+author: CML Lab Builder
+version: "1.1"
 labs:
   - 03-ospf-multiarea
   - ospf-multiarea-stub

@@ -5,10 +5,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from encorlab import config
-from encorlab.web.app import create_app
+from cmllab import config
+from cmllab.web.app import create_app
 
-WEB = Path(__file__).parent.parent / "encorlab" / "web"
+WEB = Path(__file__).parent.parent / "cmllab" / "web"
 HELP = json.loads((WEB / "static" / "help.json").read_text(encoding="utf-8"))
 SOURCES = {"index.html": (WEB / "templates" / "index.html").read_text(encoding="utf-8"),
            "app.js": (WEB / "static" / "app.js").read_text(encoding="utf-8")}
@@ -66,7 +66,7 @@ def test_page_loads_help_engine_and_toggle_setting():
 
 def test_show_help_persisted_in_settings_json(tmp_path, monkeypatch):
     f = tmp_path / "settings.json"
-    monkeypatch.setenv("ENCOR_SETTINGS_FILE", str(f))
+    monkeypatch.setenv("CMLLAB_SETTINGS_FILE", str(f))
     store = config.SettingsStore(config.Settings())
     config.save_settings(store.update(show_help=False))
     assert json.loads(f.read_text(encoding="utf-8"))["show_help"] is False

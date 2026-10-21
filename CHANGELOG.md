@@ -1,6 +1,58 @@
 # Changelog
 
-All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.0.0). Versions follow `MAJOR.MINOR.PATCH`.
+All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
+
+## [3.0.0] - 2026-10-21
+**The full rename: the program, downloads, package, data and CML labs are all CML Lab Builder now.** This is a full
+download (new runtime 2), not a patch. ENCOR Lab Builder 1.7 - 2.1 find it by themselves and show *a full download
+is needed* with a direct link; your data moves on the first start. See *Upgrading from ENCOR Lab Builder* in the README.
+### Changed
+- **Program:** `CMLLabBuilder.exe` on Windows, `cml-lab-builder` on Linux (was `ENCORLab(.exe)`), with the new name in
+  the Windows file properties and a renamed icon.
+- **Downloads:** `CMLLabBuilder-<v>-windows-x64.zip`, `CMLLabBuilder-<v>-linux-x64.tar.gz`,
+  `cml-lab-builder_<v>_amd64.deb`; app patches are `cml-lab-builder-patch-<v>.zip`. 3.x only looks for these names.
+- **Debian package `cml-lab-builder`:** installs to `/opt/cml-lab-builder` with `/usr/bin/cml-lab-builder` and
+  `/usr/bin/cmllab`, menu entry `cml-lab-builder.desktop`, icons, `man cml-lab-builder`, docs in
+  `/usr/share/doc/cml-lab-builder`. It declares `Replaces/Breaks/Conflicts: encorlab (<< 3.0.0~)` and
+  `Provides: encorlab`, so `sudo apt install ./cml-lab-builder_3.0.0_amd64.deb` swaps out the old `encorlab` package in
+  one step. `/usr/bin/encorlab` stays as an alias until 4.0.
+- **Python package `cmllab`** (was `encorlab`; distribution `cml-lab-builder`): `python -m cmllab`, commands `cmllab`
+  and `cml-lab-builder` (`encorlab` is a temporary alias). Boot loader `cmlboot.py`, entry point `cmllab_launcher.py`,
+  spec `packaging/cmllab.spec`, schema `docs/cml-lab.schema.json`.
+- **Runtime 2:** the boot loader keeps installed updates in the data folder, `cml-lab-builder/app` (was `encorlab/app`),
+  and loads the `cmllab` package. Patches for runtime 1 (ENCOR Lab Builder) are not used.
+- **Labs in CML are titled `CML-<lab>`** (test copies `CML-TEST-<lab>`, tag `cml-lab-builder`). Labs built by ENCOR Lab
+  Builder (`ENCOR-<lab>`) are still found: Check, Reset, consoles, snapshots and Destroy work on them (consoles use their
+  real title), and *Rebuild* replaces them with a `CML-` copy. Nothing else is ever deleted.
+- **Environment variables are `CMLLAB_*`.** `ENCOR_*` still work (copied to the new name at start; `CMLLAB_*` wins).
+- **Everything else:** user agent `cml-lab-builder/<v>`, log and thread names, CI workflow and artifact names, build
+  scripts, desktop entry of the tar.gz (`cml-lab-builder.desktop`), README-FIRST, UI texts (import `.cmllab` /
+  `.cmlcourse`; the file picker also accepts the old extensions, which it did not list in 2.1.0).
+- **The two example packs** (`ospf-multiarea-stub`, `troubleshoot-ospf-7node`) have the new name in their README and
+  author (version 2, so installed copies are offered the update).
+### Upgrading from ENCOR Lab Builder
+- **Old apps see 3.0.0:** the release carries a manifest-only `encorlab-patch-3.0.0.zip` (`min_runtime` 2, no files) and
+  byte-identical copies of the downloads under the old names (`ENCORLab-3.0.0-windows-x64.zip`,
+  `ENCORLab-3.0.0-linux-x64.tar.gz`, `encorlab_3.0.0_amd64.deb`). 1.7 - 2.1 verify the stub against SHA256SUMS, see
+  "needs runtime 2" and show the full-download banner linking the copy for their install type (the .deb banner's
+  `sudo apt install ./encorlab_3.0.0_amd64.deb` installs the new package). Nothing is installed by the old app.
+  `packaging/build_compat.py` builds these; CI's release job adds them to every 3.x release.
+- **Data on the first start:** from 2.1 (data already in `cml-lab-builder`) nothing is copied again and the old
+  folder's `MOVED.txt` now says the whole folder may be deleted; from 1.7 - 2.0 the automatic move of 2.1.0 runs (copy,
+  SHA-256 check, one rename, keyring entry, `MOVED.txt`); from 1.x the formerly built-in labs are restored from the
+  library with scores linked. A stale "download 3.0" banner state from the old app does not come back.
+### Tests
+- `packaging/upgrade3_test.py` runs the real 1.9.0, 2.0.0 and 2.1.0 builds (Linux, and Windows under Wine) against a
+  fake 3.0.0 release, then 3.0.0 on their data, then a 3.0.1 patch round trip; the Debian chroot test upgrades from the
+  real `encorlab_2.1.0_amd64.deb` with exactly the command the old banner shows. `tests/test_rename3.py` covers the boot
+  loader folder, env aliases, legacy lab titles, the transition files and the absence of old names in the program.
+  `migration_test.py` and `rename_test.py` (1.x -> 2.x and 2.0 -> 2.1 by patch) were removed: those patches cannot be
+  built from the 3.0 tree.
+### Kept on purpose
+- ENCOR as a track, course and exam-domain name, and in lab content. The `labs/` library folder with `.encorlab` /
+  `.encorcourse` names for 2.0 and older, import of those extensions, the `encorlab-cml` keyring entry (read), the
+  `encorlab` data folder (read once, never deleted), `ENCOR_*` env vars and `ENCOR-` lab titles (recognised), and the
+  `encorlab` command alias (until 4.0).
 
 ## [2.1.0] - 2026-10-20
 **ENCOR Lab Builder is now CML Lab Builder**, because not every lab is for ENCOR. Delivered as a normal in-app patch

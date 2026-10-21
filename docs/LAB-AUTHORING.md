@@ -5,10 +5,10 @@ A lab is one YAML document (`lab.yaml`). You can share it as:
 - **a `.cmllab` pack** (called `.encorlab` before 2.1.0; both import): a zip containing `lab.yaml`, plus optional `solution.cfg`, `fixture_solved.yaml`,
   `fixture_blank.yaml` and `README.md`, all at the zip root.
 
-To import: drag the file onto the catalog page, click **Import lab**, or run `encorlab import <file>`.
+To import: drag the file onto the catalog page, click **Import lab**, or run `cmllab import <file>`.
 To check a lab before sending it: `cmllab validate <file-or-folder>`. To build a pack: `cmllab pack <folder-or-yaml> -o name.cmllab`.
-The JSON Schema is `encorlab-lab.schema.json` (`encorlab schema`). For autocomplete in VS Code (YAML extension), add
-`# yaml-language-server: $schema=./encorlab-lab.schema.json` as the first line.
+The JSON Schema is `cml-lab.schema.json` (`cmllab schema`). For autocomplete in VS Code (YAML extension), add
+`# yaml-language-server: $schema=./cml-lab.schema.json` as the first line.
 
 ## Hard rules (the validator enforces them)
 1. `id`: lowercase letters, digits and dashes, 2-41 characters (e.g. `ospf-multiarea-stub`). It must not reuse the id of a lab in the online library (e.g. `03-ospf-multiarea`) unless you are publishing a new version of that lab.
@@ -236,7 +236,7 @@ Write `template:` and `params:` instead of command/match. The description is gen
 - Escape dots in IP addresses (`10\.0\.12\.1`). In YAML, put regexes in single quotes.
 
 ## Offline testing
-`encorlab validate <file>` checks the schema, interface names, node limit and both platforms. It then applies the solution and
+`cmllab validate <file>` checks the schema, interface names, node limit and both platforms. It then applies the solution and
 grades the **config** checks (solution must be 100%, starting config 0%). Live checks are only fully tested when the pack
 contains `fixture_solved.yaml` / `fixture_blank.yaml` (recorded command output: `{DEVICE: {"show ...": "output"}}`).
 Otherwise only their syntax is checked, so prefer templates for live checks.
@@ -282,7 +282,7 @@ Every listed lab must be bundled in the course file, already installed, or publi
 course from the library (or importing a course file while online) installs the listed labs it doesn't bundle from the
 library first (*Install all*). Each bundle folder must be named after its lab id, and every bundled lab must pass the
 normal validation, otherwise nothing is installed. Build and validate one with
-`python -m encorlab course build <folder> [--labs-from examples/] -o my.cmlcourse`.
+`python -m cmllab course build <folder> [--labs-from examples/] -o my.cmlcourse`.
 
 ## Publishing in the lab library
 Since 2.0.0 the app ships without labs; every lab, including the former built-in labs, is a pack in the online library

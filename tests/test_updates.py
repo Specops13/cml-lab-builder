@@ -5,13 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
-from encorlab import __version__, config, library, updates
-from encorlab.cli import app as cli_app
-from encorlab.web.app import create_app
+from cmllab import __version__, config, library, updates
+from cmllab.cli import app as cli_app
+from cmllab.web.app import create_app
 
 
 def rel(tag, **kw):
-    d = {"tag_name": tag, "name": f"ENCOR Lab Builder {tag}", "html_url": f"https://github.com/{updates.REPO}/releases/tag/{tag}",
+    d = {"tag_name": tag, "name": f"CML Lab Builder {tag}", "html_url": f"https://github.com/{updates.REPO}/releases/tag/{tag}",
          "published_at": "2026-10-18T10:00:00Z", "body": "notes",
          "assets": [{"name": "x.zip", "size": 10, "browser_download_url": "https://github.com/a/b/x.zip"},
                     {"name": "evil", "browser_download_url": "http://evil/x"}]}
@@ -66,7 +66,7 @@ def test_api_update_check_and_setting_default_on(tmp_path):
 
 def test_check_updates_is_persisted(tmp_path, monkeypatch):
     f = tmp_path / "s.json"
-    monkeypatch.setenv("ENCOR_SETTINGS_FILE", str(f))
+    monkeypatch.setenv("CMLLAB_SETTINGS_FILE", str(f))
     s = config.SettingsStore(config.Settings()).update(check_updates="false")
     config.save_settings(s)
     saved = json.loads(f.read_text())
@@ -76,7 +76,7 @@ def test_check_updates_is_persisted(tmp_path, monkeypatch):
 def test_old_settings_file_is_migrated_to_auto_updates_on(tmp_path, monkeypatch):
     """1.6 and older always wrote check_updates=false (it was the default), so it is not an explicit opt-out."""
     f = tmp_path / "s.json"
-    monkeypatch.setenv("ENCOR_SETTINGS_FILE", str(f))
+    monkeypatch.setenv("CMLLAB_SETTINGS_FILE", str(f))
     f.write_text(json.dumps({"cml_url": "https://cml.lab", "check_updates": False, "show_help": False}))
     s = config.from_env()
     assert s.check_updates is True and s.show_help is False and s.cml_url == "https://cml.lab"

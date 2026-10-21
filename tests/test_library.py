@@ -10,8 +10,8 @@ import httpx
 import pytest
 from typer.testing import CliRunner
 
-from encorlab import catalog, courses, history, library, packs
-from encorlab.cli import app as cli_app
+from cmllab import catalog, courses, history, library, packs
+from cmllab.cli import app as cli_app
 from test_web import make
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -214,8 +214,8 @@ def test_http_fetch_size_limit_and_https_redirects(monkeypatch):
 # ---------------------------------------------------------------- API + CLI
 def _client(fetch=None):
     from fastapi.testclient import TestClient
-    from encorlab import config
-    from encorlab.web.app import create_app
+    from cmllab import config
+    from cmllab.web.app import create_app
     app = create_app(config.SettingsStore(config.Settings()), persist=False, library_fetch=fetch or fake_fetch())
     return TestClient(app)
 

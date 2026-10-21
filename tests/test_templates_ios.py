@@ -1,9 +1,9 @@
 """Template regexes against realistic IOS output."""
 import pytest
 
-from encorlab import platforms
-from encorlab.grader import evaluate
-from encorlab.schema import Check
+from cmllab import platforms
+from cmllab.grader import evaluate
+from cmllab.schema import Check
 
 IOL = platforms.get("iol")
 IOSV = platforms.get("iosv")

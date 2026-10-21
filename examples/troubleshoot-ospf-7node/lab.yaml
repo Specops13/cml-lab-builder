@@ -5,8 +5,8 @@ domain: "3.0 Infrastructure - Layer 3"
 difficulty: 3
 platforms: [iol]
 summary: "Seven-router multi-area OSPF enterprise, fully configured. Users at Branch-2 can't reach the DC server. Find and fix the one fault."
-author: ENCOR Lab Builder
-version: "1"
+author: CML Lab Builder
+version: "2"
 nodes:
   - name: CORE1
     kind: router

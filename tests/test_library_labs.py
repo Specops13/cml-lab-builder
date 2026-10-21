@@ -14,8 +14,8 @@ import yaml
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
-from encorlab import catalog, config, courses, history, library, migrate, packs, snapshots, walkthrough
-from encorlab.cli import app as cli_app
+from cmllab import catalog, config, courses, history, library, migrate, packs, snapshots, walkthrough
+from cmllab.cli import app as cli_app
 
 ROOT = Path(__file__).resolve().parents[1]
 LIB = ROOT / "labs"
@@ -52,7 +52,7 @@ def fetcher(files=None, log=None, down=False):
 
 
 def client(fetch=None, **kw):
-    from encorlab.web.app import create_app
+    from cmllab.web.app import create_app
     app = create_app(config.SettingsStore(config.Settings(library_url=INDEX)), persist=False,
                      library_fetch=fetch or fetcher(), **kw)
     return TestClient(app)
@@ -64,7 +64,7 @@ def index_json() -> dict:
 
 # ---------------------------------------------------------------- what ships
 def test_package_ships_no_labs_and_library_has_every_former_builtin():
-    assert not (ROOT / "encorlab" / "labs").exists()
+    assert not (ROOT / "cmllab" / "labs").exists() and not (ROOT / "encorlab").exists()
     idx = index_json()
     ids = {i["id"] for i in idx["items"] if i["kind"] == "lab"}
     assert set(migrate.LEGACY_IDS) <= ids and set(migrate.LEGACY_IDS) == {d.name for d in catalog.lab_dirs(LABSRC)}
@@ -96,7 +96,7 @@ def test_http_only_for_loopback():
             library._check_url(bad)
     assert config.Settings(library_url="http://example.com/i.json").validate()
     assert not config.Settings(library_url="http://127.0.0.1:9/i.json").validate()
-    assert config.from_env({"ENCOR_LIBRARY_URL": INDEX, "ENCOR_USE_KEYRING": "0"}).library_url == INDEX
+    assert config.from_env({"CMLLAB_LIBRARY_URL": INDEX, "CMLLAB_USE_KEYRING": "0"}).library_url == INDEX
 
 
 # ---------------------------------------------------------------- first run
@@ -216,7 +216,7 @@ def test_update_available_and_update_keeps_history(no_labs):
 
 
 def test_version_ordering():
-    from encorlab.schema import version_key
+    from cmllab.schema import version_key
     assert version_key("2") > version_key("1.10") > version_key("1.9") > version_key("1") == version_key("1.0") > version_key("0.9")
 
 
@@ -264,7 +264,7 @@ def test_cli_starter_updates_and_list(no_labs, monkeypatch):
     monkeypatch.setattr(library, "http_fetch", fetcher())
     monkeypatch.setattr(library.install_many, "__kwdefaults__", {**library.install_many.__kwdefaults__, "fetch": fetcher()})
     monkeypatch.setattr(library.index, "__defaults__", (INDEX, fetcher()))
-    monkeypatch.setenv("ENCOR_LIBRARY_URL", INDEX)
+    monkeypatch.setenv("CMLLAB_LIBRARY_URL", INDEX)
     r = CliRunner().invoke(cli_app, ["library", "install", "--starter"])
     assert r.exit_code == 0 and "installed: " in r.output and "eigrp-basic" in r.output, r.output
     r = CliRunner().invoke(cli_app, ["library", "list"])
@@ -340,10 +340,10 @@ def test_patch_update_copies_bundled_labs_and_keeps_everything(no_labs):
 
 def test_bundled_runtime_copy_is_a_source(no_labs, tmp_path, monkeypatch):
     """A 1.x frozen install patched to 2.x: the labs are in the runtime's bundled app code (_internal/appcode)."""
-    import encorboot
+    import cmlboot
     appcode = tmp_path / "_internal" / "appcode"
     _old_app_code(appcode, "1.9.0")
-    monkeypatch.setattr(encorboot, "bundled_dir", lambda: appcode)
+    monkeypatch.setattr(cmlboot, "bundled_dir", lambda: appcode)
     history.add("05-bgp-ebgp-ibgp", {"score_pct": 50, "passed": False, "earned": 1, "total": 2, "results": []})
     st = migrate.run_local()
     assert st["state"] == "done" and len(st["copied"]) == len(migrate.LEGACY_IDS)
@@ -351,7 +351,7 @@ def test_bundled_runtime_copy_is_a_source(no_labs, tmp_path, monkeypatch):
     # a 2.x bundle is never a legacy source
     assert migrate.legacy_sources() == [appcode / "encorlab" / "labs"]
     _old_app_code(tmp_path / "new", "2.0.0", labs=["eigrp-basic"])
-    monkeypatch.setattr(encorboot, "bundled_dir", lambda: tmp_path / "new")
+    monkeypatch.setattr(cmlboot, "bundled_dir", lambda: tmp_path / "new")
     assert migrate.legacy_sources() == []
 
 
@@ -422,15 +422,15 @@ def test_cli_restore_and_start_note(no_labs, monkeypatch):
     r = CliRunner().invoke(cli_app, ["version"])
     assert "still need to be restored" in r.output and "library restore" in r.output
     monkeypatch.setattr(library, "http_fetch", fetcher())
-    monkeypatch.setenv("ENCOR_LIBRARY_URL", INDEX)
+    monkeypatch.setenv("CMLLAB_LIBRARY_URL", INDEX)
     r = CliRunner().invoke(cli_app, ["library", "restore"])
     assert r.exit_code == 0 and "nothing to restore" in r.output and "eigrp-basic" in r.output
 
 
 def test_ui_strings_for_first_run_and_updates():
-    js = (ROOT / "encorlab" / "web" / "static" / "app.js").read_text(encoding="utf-8")
-    for s in ("Install recommended starter set", "Browse library", "Import a .encorlab file", "Update all", "Install all",
+    js = (ROOT / "cmllab" / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    for s in ("Install recommended starter set", "Browse library", "Import a .cmllab file", "Update all", "Install all",
               "update available", "/api/migration/restore", "Could not reach the lab library", "clear_history"):
         assert s in js, s
-    html = (ROOT / "encorlab" / "web" / "templates" / "index.html").read_text(encoding="utf-8")
+    html = (ROOT / "cmllab" / "web" / "templates" / "index.html").read_text(encoding="utf-8")
     assert 'name="library_url"' in html and 'id="mig-banner"' in html

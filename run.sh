@@ -45,7 +45,7 @@ fi
 
 [ -f .env ] && set -a && . ./.env && set +a
 if [ $# -eq 0 ]; then
-  exec "$VENV/bin/python" -m encorlab web
+  exec "$VENV/bin/python" -m cmllab web
 else
-  exec "$VENV/bin/python" -m encorlab "$@"
+  exec "$VENV/bin/python" -m cmllab "$@"
 fi

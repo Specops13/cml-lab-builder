@@ -4,10 +4,10 @@ import threading
 
 import pytest
 
-from encorlab import catalog, config, grader, platforms, service
-from encorlab.cml import probe_console
-from encorlab.schema import Check, Lab
-from encorlab.sim import SimRunner
+from cmllab import catalog, config, grader, platforms, service
+from cmllab.cml import probe_console
+from cmllab.schema import Check, Lab
+from cmllab.sim import SimRunner
 
 LAB = catalog.get("eigrp-basic")
 P = platforms.get("iol")
@@ -158,7 +158,7 @@ def test_probe_no_host():
 
 
 def test_settings_persistence(tmp_path):
-    env = {"ENCOR_SETTINGS_FILE": str(tmp_path / "s.json"), "ENCOR_USE_KEYRING": "0",
+    env = {"CMLLAB_SETTINGS_FILE": str(tmp_path / "s.json"), "CMLLAB_USE_KEYRING": "0",
            "CML_CONSOLE_HOST": "env-host", "CML_CONSOLE_PORT": "2222"}
     st = config.from_env(env)
     assert st.console_host == "env-host" and st.console_port == 2222

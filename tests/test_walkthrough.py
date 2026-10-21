@@ -8,13 +8,13 @@ import yaml
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from encorlab import catalog, config, packs, platforms, progress, sizing, walkthrough
-from encorlab.console import ConsoleError, SSHConsoleRunner, config_script
-from encorlab.grader import grade
-from encorlab.render import to_topology
-from encorlab.schema import Lab
-from encorlab.sim import SimRunner
-from encorlab.web.app import create_app
+from cmllab import catalog, config, packs, platforms, progress, sizing, walkthrough
+from cmllab.console import ConsoleError, SSHConsoleRunner, config_script
+from cmllab.grader import grade
+from cmllab.render import to_topology
+from cmllab.schema import Lab
+from cmllab.sim import SimRunner
+from cmllab.web.app import create_app
 from fakes import FakeClient
 
 EVPN = "18-evpn-vxlan"
@@ -135,7 +135,7 @@ def test_lint_checks_nxos_interface_names():
 # ---------------------------------------------------------------- rendering for CML
 def test_nxos_topology_and_day0_config():
     lab, p = evpn(), platforms.get("iol")
-    topo = to_topology(lab, p, "ENCOR-", creds=("student", "s3cret"))
+    topo = to_topology(lab, p, "CML-", creds=("student", "s3cret"))
     nodes = {n["label"]: n for n in topo["nodes"]}
     leaf = nodes["LEAF1"]
     assert leaf["node_definition"] == "nxosv9000" and nodes["H1"]["node_definition"] == "iol-xe"
@@ -153,12 +153,12 @@ def test_nxos_topology_and_day0_config():
             assert iface in {i["id"] for i in by_id[ln[side]]["interfaces"]}
     lbl = [ln["label"] for ln in topo["links"]]
     assert "SPINE1-Ethernet1/1<->LEAF1-Ethernet1/1" in lbl and "LEAF1-Ethernet1/3<->H1-Ethernet0/0" in lbl
-    iosv = to_topology(lab, platforms.get("iosv"), "ENCOR-")
+    iosv = to_topology(lab, platforms.get("iosv"), "CML-")
     assert {n["label"]: n["node_definition"] for n in iosv["nodes"]}["H3"] == "iosv"
 
 
 def test_build_needs_the_node_definition_and_waits_longer():
-    from encorlab.cml import CML, CMLError
+    from cmllab.cml import CML, CMLError
     s = config.Settings(cml_url="https://cml.x", username="u", password="p")
     fc = FakeClient()                       # no nxosv9000 on this server
     with pytest.raises(CMLError, match="nxosv9000"):
@@ -264,7 +264,7 @@ def nx_runner(reject=()):
         chans.setdefault("all", []).append(c)
         return FakeSSH(c)
     s = config.Settings(cml_url="https://cml.x", username="u", password="p")
-    return SSHConsoleRunner(s, "ENCOR-18-evpn-vxlan", client_factory=factory), chans
+    return SSHConsoleRunner(s, "CML-18-evpn-vxlan", client_factory=factory), chans
 
 
 def test_apply_step_types_config_in_the_right_modes():
@@ -321,7 +321,7 @@ def test_ram_threshold_setting():
     assert st.update(ram_heavy_gb="60").ram_heavy_gb == 60
     with pytest.raises(ValueError):
         st.update(ram_heavy_gb=0)
-    assert config.from_env({"ENCOR_RAM_HEAVY_GB": "8"}).ram_heavy_gb == 8
+    assert config.from_env({"CMLLAB_RAM_HEAVY_GB": "8"}).ram_heavy_gb == 8
 
 
 # ---------------------------------------------------------------- web API
@@ -410,7 +410,7 @@ def test_api_build_evpn_lab_in_fake_cml():
 
 
 def test_courses_and_library_show_ram_and_type(tmp_path):
-    from encorlab import courses, library
+    from cmllab import courses, library
     from pathlib import Path
     root = Path(__file__).parent.parent
     data = courses.build(root / "examples" / "courses" / "data-center", search=[root / "examples"])
@@ -440,8 +440,8 @@ def test_progress_keeps_walkthroughs_out_of_mastery():
 
 def test_ui_has_walkthrough_and_ram_tags():
     from pathlib import Path
-    js = (Path(__file__).parent.parent / "encorlab" / "web" / "static" / "app.js").read_text(encoding="utf-8")
-    css = (Path(__file__).parent.parent / "encorlab" / "web" / "static" / "style.css").read_text(encoding="utf-8")
+    js = (Path(__file__).parent.parent / "cmllab" / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (Path(__file__).parent.parent / "cmllab" / "web" / "static" / "style.css").read_text(encoding="utf-8")
     assert 'RAM heavy · ' in js and "ram-heavy" in js and "title=\"${esc(r.tooltip)}\"" in js
     assert ".tag.ram-heavy{background:#c62828" in css
     for s in ("renderWalkthrough", "Check this step", "Apply this step for me", "Previous", "Check every step",

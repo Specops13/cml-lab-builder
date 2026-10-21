@@ -1,6 +1,6 @@
 from typer.testing import CliRunner
 
-from encorlab.cli import app
+from cmllab.cli import app
 
 r = CliRunner()
 
@@ -11,13 +11,13 @@ def test_list():
 
 
 def test_validate():
-    res = r.invoke(app, ["validate"], env={"ENCOR_USE_KEYRING": "0"})
+    res = r.invoke(app, ["validate"], env={"CMLLAB_USE_KEYRING": "0"})
     assert res.exit_code == 0, res.output
     assert "OK   [builtin] eigrp-basic" in res.output and "solution=100.0%" in res.output
 
 
 def test_task_and_export(tmp_path):
-    env = {"ENCOR_USE_KEYRING": "0", "ENCOR_PLATFORM": "iol"}
+    env = {"CMLLAB_USE_KEYRING": "0", "CMLLAB_PLATFORM": "iol"}
     res = r.invoke(app, ["task", "eigrp-basic"], env=env)
     assert "Ethernet0/0" in res.output
     out = tmp_path / "lab.yaml"
@@ -26,5 +26,5 @@ def test_task_and_export(tmp_path):
 
 
 def test_build_without_settings_fails_cleanly():
-    res = r.invoke(app, ["build", "eigrp-basic"], env={"ENCOR_USE_KEYRING": "0", "CML_URL": "", "CML_USERNAME": "", "CML_PASSWORD": ""})
+    res = r.invoke(app, ["build", "eigrp-basic"], env={"CMLLAB_USE_KEYRING": "0", "CML_URL": "", "CML_USERNAME": "", "CML_PASSWORD": ""})
     assert res.exit_code != 0 and "required" in str(res.exception)

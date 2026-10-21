@@ -7,12 +7,12 @@ import types
 
 import pytest
 
-from encorlab import config, paths
+from cmllab import config, paths
 
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    for k in ("ENCOR_DATA_DIR", "ENCOR_SETTINGS_FILE", "CMLLAB_DATA_DIR", "CMLLAB_SETTINGS_FILE"):
+    for k in ("CMLLAB_DATA_DIR", "CMLLAB_SETTINGS_FILE", "CMLLAB_DATA_DIR", "CMLLAB_SETTINGS_FILE"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     paths.reset_cache()
@@ -141,13 +141,13 @@ def test_pinned_folder_never_moves(home, monkeypatch):
     assert paths.ensure_moved() == {"state": "pinned"} and paths.data_dir() == home / "pinned"
     assert not (home / "cml-lab-builder").exists()
     monkeypatch.delenv("CMLLAB_DATA_DIR")
-    monkeypatch.setenv("ENCOR_SETTINGS_FILE", str(home / "s" / "settings.json"))
+    monkeypatch.setenv("CMLLAB_SETTINGS_FILE", str(home / "s" / "settings.json"))
     assert paths.data_dir() == home / "s"
 
 
 def test_env_prefixes(monkeypatch):
-    monkeypatch.delenv("ENCOR_X_TEST", raising=False)
-    monkeypatch.setenv("ENCOR_X_TEST", "old")
+    monkeypatch.delenv("CMLLAB_X_TEST", raising=False)
+    monkeypatch.setenv("CMLLAB_X_TEST", "old")
     assert paths.env_get("X_TEST") == "old"
     monkeypatch.setenv("CMLLAB_X_TEST", "new")
     assert paths.env_get("X_TEST") == "new"
@@ -157,7 +157,7 @@ def test_acknowledge_and_api(home):
     old_install(home)
     from fastapi.testclient import TestClient
 
-    from encorlab.web.app import create_app
+    from cmllab.web.app import create_app
     c = TestClient(create_app(persist=False))
     d = c.get("/api/data-folder").json()
     assert d["state"] == "moved" and d["notified"] is False and d["to"].endswith("cml-lab-builder")
@@ -169,7 +169,7 @@ def test_acknowledge_and_api(home):
 def test_cli_prints_the_note_once(home):
     from typer.testing import CliRunner
 
-    from encorlab.cli import app
+    from cmllab.cli import app
     old_install(home)
     r1 = CliRunner().invoke(app, ["list"])
     assert "data moved" in r1.output.lower() or "data moved" in (r1.stderr if hasattr(r1, "stderr") else "").lower()

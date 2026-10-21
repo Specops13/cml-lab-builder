@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from encorlab import catalog, packs, prompt
+from cmllab import catalog, packs, prompt
 
 EXAMPLE = prompt.example()
 OSPF_DIR = Path(__file__).parent.parent / "examples" / "ospf-multiarea-stub"

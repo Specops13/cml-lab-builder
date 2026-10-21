@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=./encorlab-lab.schema.json
+# yaml-language-server: $schema=./cml-lab.schema.json
 id: example-eigrp-pair
 title: "Example: EIGRP between two routers"
 blueprint: ["3.2.a"]

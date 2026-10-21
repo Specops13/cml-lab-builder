@@ -2,10 +2,12 @@
 
 **Build practice labs in Cisco Modeling Labs (CML) 2.9 and auto-grade your solutions: CCNP ENCOR (350-401) and other tracks.**
 
-> **Renamed in 2.1.0:** this app was called **ENCOR Lab Builder** (repo `Specops13/encore-lab-app`). Not every lab is
-> for ENCOR any more, so it is now **CML Lab Builder** (repo `Specops13/cml-lab-builder`; the old GitHub links
-> redirect). Existing installs update with the normal in-app patch, and your data moves to the new folder name by
-> itself (see [Where your data lives](#where-your-data-lives-210-rename)). The command is now `cmllab`, and `encorlab` still works.
+> **Formerly ENCOR Lab Builder.** Up to 2.1.0 this app was called **ENCOR Lab Builder** (repo `Specops13/encore-lab-app`,
+> program `ENCORLab.exe`, package `encorlab`). Not every lab is for ENCOR any more, so since 3.0.0 everything is named
+> **CML Lab Builder**: the program (`CMLLabBuilder.exe`, `cml-lab-builder`, `cmllab`), the downloads, the Debian
+> package, the data folder and the labs it creates in CML (`CML-<lab>`). 3.0.0 is a **full download**: your old app
+> tells you so and links the right file. Your data moves by itself. See
+> [Upgrading from ENCOR Lab Builder](#upgrading-from-encor-lab-builder-17--21).
 
 [![Latest release](https://img.shields.io/github/v/release/Specops13/cml-lab-builder)](https://github.com/Specops13/cml-lab-builder/releases/latest)
 ![Python 3.10-3.13](https://img.shields.io/badge/python-3.10--3.13-blue)
@@ -26,8 +28,10 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [Screenshots](#screenshots)
 - [Quick start (ready-to-run download)](#quick-start-ready-to-run-download)
 - [Install on Debian / Ubuntu (.deb)](#install-on-debian--ubuntu-deb)
-- [Where your data lives (2.1.0 rename)](#where-your-data-lives-210-rename)
+- [Upgrading from ENCOR Lab Builder (1.7 - 2.1)](#upgrading-from-encor-lab-builder-17--21)
+- [Where your data lives](#where-your-data-lives)
 - [Updating (small patches instead of a full download)](#updating-small-patches-instead-of-a-full-download)
+- [Uninstalling](#uninstalling)
 - [Running from source](#running-from-source)
 - [CML requirements](#cml-requirements)
 - [Using it](#using-it)
@@ -64,7 +68,7 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
   **IP multicast** (PIM sparse mode with a static RP, BSR RP election, IGMPv3 and SSM) and **MPLS** (LDP core, and an
   MPLS L3VPN with VRFs and MP-BGP VPNv4). See [Multicast and MPLS labs](#multicast-and-mpls-labs).
 - **One-click lifecycle in CML:** Build (import + start + wait for boot), Check, Reset (back to the starting configs), Destroy.
-  It only ever touches labs titled `ENCOR-…`.
+  It only ever touches labs titled `CML-…` (and `ENCOR-…` labs built by ENCOR Lab Builder before 3.0.0).
 - **Two grading modes:** *live* (real adjacencies, routes, pings over the console server) and *config* (HTTPS only).
   *Auto* uses live when it can and falls back to config.
 - **Break my lab (fault practice):** every library challenge lab comes with 3 predefined faults (54 in total). One click rebuilds
@@ -81,7 +85,7 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - **Test console (new in 2.1.0):** per node, open the console the way Check/Apply do and see each stage (SSH, open
   node, prompt, login, command) with the raw last console lines. A failing check shows the last 20 console lines too.
 - **Console links:** once a lab is built, open it in the CML Workbench with one click, or copy a ready-to-paste
-  console server command (`ssh -t user@cml "open /ENCOR-<lab>/R1/0"`) for any node.
+  console server command (`ssh -t user@cml "open /CML-<lab>/R1/0"`) for any node.
 - **Learning aids:** a **Hint** button with progressive hints ("Hint 2 of 3"), remembered per lab and cleared on Reset.
   A **Solution summary** (root cause, exact fix per device, why it works) appears automatically at 100%.
   Below 100% you can open it with **Reveal solution**, after a confirm.
@@ -119,121 +123,162 @@ Download from **[Releases](https://github.com/Specops13/cml-lab-builder/releases
 
 | Download | Start it |
 |---|---|
-| `ENCORLab-<version>-windows-x64.zip` (Windows 10/11 x64) | Unzip anywhere (e.g. `Documents\ENCORLab`) and double-click **ENCORLab.exe** |
-| `encorlab_<version>_amd64.deb` (Debian 10+, Ubuntu 20.04+, Mint, …) | `sudo apt install ./encorlab_<version>_amd64.deb`, then start **CML Lab Builder** from the app menu or run `encorlab` / `cmllab` (see [the .deb section](#install-on-debian--ubuntu-deb)) |
-| `ENCORLab-<version>-linux-x64.tar.gz` (glibc 2.28+: Debian 10+, Ubuntu 20.04+) | `tar xzf ENCORLab-*.tar.gz && ./ENCORLab-*/ENCORLab` (optional: `./install-desktop-entry.sh` adds a menu entry) |
+| `CMLLabBuilder-<version>-windows-x64.zip` (Windows 10/11 x64) | Unzip anywhere (e.g. `Documents\CMLLabBuilder`) and double-click **CMLLabBuilder.exe** |
+| `cml-lab-builder_<version>_amd64.deb` (Debian 10+, Ubuntu 20.04+, Mint, …) | `sudo apt install ./cml-lab-builder_<version>_amd64.deb`, then start **CML Lab Builder** from the app menu or run `cml-lab-builder` / `cmllab` (see [the .deb section](#install-on-debian--ubuntu-deb)) |
+| `CMLLabBuilder-<version>-linux-x64.tar.gz` (glibc 2.28+: Debian 10+, Ubuntu 20.04+) | `tar xzf CMLLabBuilder-*.tar.gz && ./CMLLabBuilder-*/cml-lab-builder` (optional: `./install-desktop-entry.sh` adds a menu entry) |
+
+The release also carries `ENCORLab-…` / `encorlab_…` files: byte-identical copies under the old names, so the
+update banner of an old ENCOR Lab Builder links straight to a working download. You don't need them otherwise.
 
 - A small console window opens and your default browser shows the app at http://127.0.0.1:8765. If the port is busy, the next free port is used and the window shows the real address.
 - Starting it again while it runs just opens the browser on the running copy.
 - **Quit:** close the console window or press Ctrl+C.
-- **Your data stays outside the app folder,** in `%APPDATA%\cml-lab-builder` or `~/.config/cml-lab-builder` (before 2.1.0: `encorlab`; installed updates still live in `encorlab\app`, see [Where your data lives](#where-your-data-lives-210-rename)). That covers settings, imported labs and history. To update, use *Settings > Updates > Install update* (see [Updating](#updating-small-patches-instead-of-a-full-download)), or delete the old app folder and unzip the new one.
+- **Your data stays outside the app folder,** in `%APPDATA%\cml-lab-builder` or `~/.config/cml-lab-builder` (see [Where your data lives](#where-your-data-lives)). That covers settings, imported labs, history and installed updates. To update, use the in-app prompt (see [Updating](#updating-small-patches-instead-of-a-full-download)), or delete the old app folder and unzip the new one.
 - **No labs are included** (that keeps the download small). The first start shows a short welcome screen with three
   choices: the recommended starter set (six small core labs, listed with their RAM needs, one click), a course, or a
   lab file you already have; see [Lab library and courses](#lab-library-and-courses). Without
   internet access you can still import `.cmllab` (or older `.encorlab`) files you downloaded elsewhere (e.g. from the repo's
   [`library/`](library/) folder).
 - The bundle includes `docs/`, this README, `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` (the .deb puts the last two in
-  `/usr/share/doc/encorlab/`).
-- The command line works too: `ENCORLab list`, `ENCORLab check <lab>`, `ENCORLab --port 9000`, `ENCORLab --no-browser`. (The program file keeps the name `ENCORLab` / `ENCORLab.exe` until a later full release; the window title says CML Lab Builder.)
+  `/usr/share/doc/cml-lab-builder/`).
+- The command line works too: `CMLLabBuilder.exe list` on Windows, `./cml-lab-builder check <lab>`, `--port 9000`, `--no-browser` on Linux.
 - **Windows SmartScreen:** the exe is not code-signed, so the first start may show "Windows protected your PC". Click *More info* > *Run anyway*.
   You can also right-click the downloaded zip, choose *Properties* > *Unblock*, then extract it. Check the download against `SHA256SUMS.txt` from the release.
 
 Then open **Settings**, enter your CML URL and credentials, pick a lab and click **Build**.
 
 ## Install on Debian / Ubuntu (.deb)
-Since 1.8.0 every release also has `encorlab_<version>_amd64.deb`. It contains exactly the same frozen build as the
-Linux tar.gz, and it behaves like the Windows exe: a menu entry, a single instance, and automatic updates that ask first.
+Every release has `cml-lab-builder_<version>_amd64.deb` (up to 2.1.0: `encorlab_<version>_amd64.deb`). It contains
+exactly the same frozen build as the Linux tar.gz, and it behaves like the Windows exe: a menu entry, a single
+instance, and automatic updates that ask first.
 
 **Install** (apt resolves the few dependencies: `libc6 (>= 2.28)`, `libgcc-s1`, `zlib1g`; `xdg-utils` is recommended so the browser opens):
 ```bash
-sudo apt install ./encorlab_1.8.0_amd64.deb
+sudo apt install ./cml-lab-builder_3.0.0_amd64.deb
 ```
 The `./` matters, because it tells apt this is a local file. The package installs:
-- the app in `/opt/encorlab/`, with the `encorlab` and (from the 2.1.0 package) `cmllab` commands in `/usr/bin`;
+- the app in `/opt/cml-lab-builder/`, with the commands `cml-lab-builder` and `cmllab` in `/usr/bin` (plus the old
+  name `encorlab` as an alias until 4.0);
 - a menu entry, **CML Lab Builder** (in *Education*), with icons in `/usr/share/icons/hicolor/`;
-- the man page `man encorlab`.
+- the man page `man cml-lab-builder` (also `man cmllab`).
 
-**Start it** from the app menu, or run `encorlab` in a terminal. As with the exe:
+If the old **encorlab** package (ENCOR Lab Builder) is installed, the same command replaces it: the new package
+declares `Replaces/Breaks/Conflicts: encorlab (<< 3.0.0~)` and `Provides: encorlab`, so apt removes `encorlab` and
+installs `cml-lab-builder` in one step. Your data is not touched by apt; the app moves it on its first start.
+
+**Start it** from the app menu, or run `cml-lab-builder` (or `cmllab`) in a terminal. As with the exe:
 - a terminal window opens with the server, and your browser shows http://127.0.0.1:8765;
 - starting it again while it runs only opens the browser on the running copy (no second server);
 - closing the terminal window, or pressing Ctrl+C, quits.
 
-The command line is the same as `ENCORLab`: `encorlab list`, `encorlab update-status`, `encorlab --no-browser`, …
+The command line: `cmllab list`, `cmllab update-status`, `cmllab --no-browser`, …
 
 **Updating:**
 - **Patches (normal case):** automatic updates work exactly as in the exe (see [Updating](#updating-small-patches-instead-of-a-full-download)).
   The app downloads, verifies and, after you click *Update now*, installs the patch into
-  `~/.config/encorlab/app/<version>` (this stays in the old folder name, see below). It never writes to `/opt`, so it needs no root and no password, and
-  `dpkg --verify encorlab` stays clean.
+  `~/.config/cml-lab-builder/app/<version>`. It never writes to `/opt`, so it needs no root and no password, and
+  `dpkg --verify cml-lab-builder` stays clean.
 - **New runtime:** when a release needs a new runtime, the banner says *a full download is needed* and links that
-  release's `.deb`. Install it the same way, `sudo apt install ./encorlab_<new>_amd64.deb`. It upgrades the old
+  release's `.deb`. Install it the same way, `sudo apt install ./cml-lab-builder_<new>_amd64.deb`. It upgrades the
   package in place, and your data and installed patches are kept.
 - **Which copy runs after an upgrade:** an installed patch that is newer than the package's built-in copy keeps running
-  (e.g. patch 1.8.5 over the 1.8.1 package). A package that is newer than your patch wins (e.g. the 1.9.0 package over
-  patch 1.8.5).
+  (e.g. patch 3.0.5 over the 3.0.1 package). A package that is newer than your patch wins (e.g. the 3.1.0 package over
+  patch 3.0.5).
 - **Running app:** if the app is running while you upgrade the package, restart it afterwards.
 - **No apt repository:** the `.deb` is not in an apt repository, so `apt upgrade` does not update it. The app's own
   updater does.
-
-**Uninstall:**
-```bash
-sudo apt remove encorlab      # removes /opt/encorlab, /usr/bin/encorlab and the menu entry
-sudo apt purge encorlab       # the same; the package has no system-wide config files
-```
-**Neither command deletes your data.** Settings, imported labs, history and exam results stay in
-`~/.config/cml-lab-builder`, installed patches (and the pre-2.1 copy of your data) in `~/.config/encorlab` (each user
-has their own). Purge does not touch them either. To delete them as well, run
-`rm -rf ~/.config/cml-lab-builder ~/.config/encorlab`.
-
-The package keeps its name `encorlab` (and `/opt/encorlab`) in 2.1.0, because 2.1.0 is delivered as a patch to the
-installed program; a later full release will rename it.
 
 **Where things live:**
 
 | What | Where |
 |---|---|
-| App (read-only, owned by the package) | `/opt/encorlab/` (`install-type` marks it as a deb install) |
-| Command, menu entry, icons | `/usr/bin/encorlab`, `/usr/share/applications/encorlab.desktop`, `/usr/share/icons/hicolor/*/apps/encorlab.png` |
-| Your settings, labs, history | `~/.config/cml-lab-builder/` (`$XDG_CONFIG_HOME/cml-lab-builder`; before 2.1.0 `~/.config/encorlab/`) |
+| App (read-only, owned by the package) | `/opt/cml-lab-builder/` (`install-type` marks it as a deb install) |
+| Commands, menu entry, icons | `/usr/bin/cml-lab-builder`, `/usr/bin/cmllab`, `/usr/share/applications/cml-lab-builder.desktop`, `/usr/share/icons/hicolor/*/apps/cml-lab-builder.png` |
+| Your settings, labs, history | `~/.config/cml-lab-builder/` (`$XDG_CONFIG_HOME/cml-lab-builder`) |
 | Staged downloads, update log | `~/.config/cml-lab-builder/updates/` |
-| Installed patches (boot loader) | `~/.config/encorlab/app/` |
+| Installed patches (boot loader) | `~/.config/cml-lab-builder/app/` |
 
 **From the tar.gz:** install the .deb, start it once and check that your labs are there, then delete the old unpacked
-folder. If you used `install-desktop-entry.sh`, also remove `~/.local/share/applications/encorlab.desktop`. Both use
-the same data folder.
+folder. If you used `install-desktop-entry.sh`, also remove `~/.local/share/applications/cml-lab-builder.desktop`
+(or `encorlab.desktop` from an ENCOR Lab Builder folder). Both use the same data folder.
 
-## Where your data lives (2.1.0 rename)
+## Upgrading from ENCOR Lab Builder (1.7 - 2.1)
+3.0.0 renames the program itself, so it cannot arrive as a small patch: it needs a **new runtime** (runtime 2). Your
+old app finds 3.0.0 by itself (the old GitHub links redirect to the renamed repo) and shows the banner **a full
+download is needed** with a link to the file for your install type. Nothing is installed by the old app.
+
+**Windows (the zip):**
+1. Click the link in the banner (or download `CMLLabBuilder-3.0.0-windows-x64.zip` from the release page; the banner's
+   `ENCORLab-3.0.0-windows-x64.zip` is the same file under the old name).
+2. Close ENCOR Lab Builder (close its console window).
+3. Unzip the download anywhere, for example to `Documents\CMLLabBuilder`, and double-click **CMLLabBuilder.exe**
+   (the old banner says `ENCORLab.exe`; the new program is called `CMLLabBuilder.exe`).
+4. The first start moves your data (see below) and shows *Your data moved to …* once. Check that your labs and
+   history are there, then delete the old `ENCORLab-…` folder and any shortcut to `ENCORLab.exe`.
+
+**Debian / Ubuntu (the .deb):**
+1. Download the file from the banner (`encorlab_3.0.0_amd64.deb`, a copy of `cml-lab-builder_3.0.0_amd64.deb`; either works).
+2. Close the app, then run what the banner says, `sudo apt install ./encorlab_3.0.0_amd64.deb`
+   (or `sudo apt install ./cml-lab-builder_3.0.0_amd64.deb`). apt replaces the `encorlab` package with
+   `cml-lab-builder`; `/opt/encorlab` goes away, the menu entry becomes **CML Lab Builder**.
+3. Start it from the menu or with `cml-lab-builder` / `cmllab` (`encorlab` still works until 4.0).
+
+**Linux (the tar.gz folder):** unpack `CMLLabBuilder-3.0.0-linux-x64.tar.gz`, run `./cml-lab-builder`, then delete the
+old `ENCORLab-…` folder (and re-run `./install-desktop-entry.sh` from the new folder if you used it).
+
+**From source:** `git pull`, then `./run.sh` / `run.bat` as before (`python -m cmllab`; `.venv` needs no change).
+
+**What happens to your data on the first 3.0 start:**
+- **From 2.1.x** (data already in `cml-lab-builder`): nothing is copied again. 3.0 keeps using `cml-lab-builder` and from
+  now on also keeps installed updates there (`app/`). The old `encorlab` folder only held updates for the old program;
+  its `MOVED.txt` is updated to say it can be deleted.
+- **From 1.7 - 2.0** (data still in `encorlab`): the same automatic move 2.1.0 does (copy, SHA-256 check, one rename,
+  keyring entry copied, `MOVED.txt` in the old folder), see [Where your data lives](#where-your-data-lives). From 1.x,
+  the labs that were built in are restored from the online library as in 2.0.0, with your scores linked by lab id.
+- **Installed updates of the old program** (`encorlab/app`) are not used: they contain the old code for the old
+  runtime. 3.0 starts with its own built-in code and the next updates go to `cml-lab-builder/app`.
+- **Labs already running in CML:** labs are now created as `CML-<lab>`. A lab you built with ENCOR Lab Builder
+  (`ENCOR-<lab>`) is still found: Check, Reset, consoles, snapshots and Destroy work on it. *Rebuild* replaces it with
+  a `CML-<lab>` copy.
+- **Environment variables:** `ENCOR_*` still work (copied to the `CMLLAB_*` name at start; `CMLLAB_*` wins).
+
+**Going back:** the old program and the old folder are untouched, so you can still start ENCOR Lab Builder 2.x
+(Windows/tar: its folder; .deb: `sudo apt install ./encorlab_2.1.0_amd64.deb`, which apt allows as a downgrade
+after removing `cml-lab-builder`). 2.1 uses the `cml-lab-builder` data folder, 2.0 and older the `encorlab` one as it was before the move; files a
+2.0-or-older version adds there later are picked up by the next 3.0 start.
+
+## Where your data lives
 | | Windows | Linux |
 |---|---|---|
 | Your data (settings, labs, history, snapshots, exams, reports, courses, update downloads) | `%APPDATA%\cml-lab-builder` | `~/.config/cml-lab-builder` |
-| Installed app updates and rollback copies (`app/`) | `%APPDATA%\encorlab\app` | `~/.config/encorlab/app` |
+| Installed app updates and rollback copies (`app/`) | `%APPDATA%\cml-lab-builder\app` | `~/.config/cml-lab-builder/app` |
+| ENCOR Lab Builder's old folder (kept, not used) | `%APPDATA%\encorlab` | `~/.config/encorlab` |
 
-**The move is automatic.** On the first start of 2.1.0 (usually right after the in-app update) the app:
+The CML password (if you let the app remember it) is in the OS keyring under `cml-lab-builder` (before 2.1.0:
+`encorlab-cml`, which is still read).
+
+**The move from `encorlab` is automatic** (2.1.0 and later, for data that is still in the old folder). On the first start the app:
 1. copies every file from the old folder (`encorlab`) to the new one, except `app/`;
 2. checks every copied file by SHA-256, then puts the new folder in place in one rename;
 3. copies the saved CML password in the OS keyring to the new name (the old entry stays);
 4. writes `MOVED.txt` into the old folder and records the move in `<new folder>/migrations/data-folder.json`;
 5. shows a one-time note: *Your data moved to &lt;new path&gt;* (the command line prints it once too).
 
-**Nothing is deleted.** The old folder stays as it was, so you can roll back to 2.0.0 and still have everything. If
-the old version writes new files there later (e.g. a lab you import after rolling back), the next 2.1+ start copies
-the files that are missing in the new folder; it never overwrites a file in the new folder. If the copy or the check
-fails, the app keeps using the old folder and tries again on the next start.
+**Nothing is deleted.** The old folder stays as it was, so an older version still finds its data there. If an old
+version writes new files there later (e.g. a lab you import after going back), the next start copies the files that
+are missing in the new folder; it never overwrites a file in the new folder. If the copy or the check fails, the app
+keeps using the old folder for this start and tries again on the next one. Once you are happy with 3.0, you can
+delete the whole old `encorlab` folder.
 
-**Why `app/` stays in the old folder:** the boot loader inside the installed program (the part that only changes with
-a full download) looks for app updates there. Leaving it lets 2.1.0 arrive as a normal patch, and installing,
-restarting into and rolling back later patches keeps working. A future full release will move it too.
-You may delete the old folder after you are happy with 2.1.0, **except its `app` folder**.
-
-**Pinned folders:** with `CMLLAB_DATA_DIR` / `ENCOR_DATA_DIR` (or `CMLLAB_SETTINGS_FILE` / `ENCOR_SETTINGS_FILE`)
-the app uses that folder for everything and nothing is moved.
+**Pinned folders:** with `CMLLAB_DATA_DIR` (or `CMLLAB_SETTINGS_FILE`; the old `ENCOR_…` names work too) the app
+uses that folder for everything, including `app/`, and nothing is moved.
 
 ## Updating (small patches instead of a full download)
 Since 1.6.0 the download is split in two parts:
 
 - **The runtime:** the exe, Python and the libraries in `_internal/`. It only changes with a full download.
-- **The app code:** the `encorlab` package. It ships in `_internal/appcode/` and can be replaced by a small patch
-  (`encorlab-patch-<version>.zip`, about 0.25 MB, attached to each release).
+- **The app code:** the `cmllab` package (`encorlab` up to 2.1.0). It ships in `_internal/appcode/` and can be replaced by a small patch
+  (`cml-lab-builder-patch-<version>.zip`, about 0.25 MB, attached to each release; `encorlab-patch-` up to 2.1.0).
 
 **How it works (1.7.0 and later)** on Windows 11 and Linux, all in the GUI. Every button has a `?` tooltip.
 1. **Background check.** About 45 seconds after the app starts, and then every 6 hours, it asks the GitHub Releases API
@@ -242,14 +287,14 @@ Since 1.6.0 the download is split in two parts:
 2. **Download and verify, without installing.** If the release is newer and has a patch for your runtime, the app
    downloads it in the background and verifies it:
    - the zip's SHA-256 must match the release's `SHA256SUMS.txt`;
-   - every file must match the SHA-256 in the patch's `manifest.json`, with no extra or missing files and no paths outside `encorlab/`;
+   - every file must match the SHA-256 in the patch's `manifest.json`, with no extra or missing files and no paths outside `cmllab/`;
    - the version must match the release, and the patch's `min_runtime` must not be newer than your runtime.
 
    The verified patch is kept in `<data>/updates/staged/`. Nothing is installed yet.
 3. **The prompt.** A small card at the bottom left says *CML Lab Builder x.y.z is ready*, with links to the release notes
    and the changelog:
-   - **Update now** installs the patch into your data folder (`%APPDATA%\encorlab\app\<version>` or
-     `~/.config/encorlab/app/<version>`, the old folder name; see above), restarts the app on the same port and reloads the page, which then shows
+   - **Update now** installs the patch into your data folder (`%APPDATA%\cml-lab-builder\app\<version>` or
+     `~/.config/cml-lab-builder/app/<version>`), restarts the app on the same port and reloads the page, which then shows
      *Updated to x.y.z*. If a lab build, grading run, live test, snapshot or restore, *Break my lab* fault injection
      or an exam is running, the card says so. Update now then waits until that work is finished and never interrupts
      it. New work cannot start during the few seconds of installing and restarting. *Cancel* stops the waiting.
@@ -280,22 +325,39 @@ want automatic checks, turn them off again; from then on your choice is kept.
 change to the launcher), its patch declares a higher `min_runtime`. In that case nothing is downloaded or installed as a patch. A dismissible
 banner at the top says **a full download is needed** and links the file for your install type: the `.zip` for the
 exe, the `.tar.gz` for the Linux folder, or the `.deb` with its `sudo apt install ./…` command for the Debian package.
-The app finds its install type from the `install-type` marker file that the .deb adds; `encorlab update-status`
+The app finds its install type from the `install-type` marker file that the .deb adds; `cmllab update-status`
 shows it. Your data is kept.
 
 **Coming from an older version:**
+- **From ENCOR Lab Builder 1.7 - 2.1:** 3.0.0 is a full download (new runtime); see
+  [Upgrading from ENCOR Lab Builder](#upgrading-from-encor-lab-builder-17--21).
 - **From 1.6.0:** 1.6.0 has no background updater. Install 1.7.0 once with *Settings > Updates > Check for updates
   now > Install update > Restart now*. From then on, updates are automatic (with the prompt).
 - **From 1.5.x or older:** download the full 1.7.0 release once.
 
-**Command line:** `ENCORLab update-status`, `ENCORLab update-install` (latest release),
-`ENCORLab update-install --file encorlab-patch-<v>.zip [--sha256 …]` (offline) and `ENCORLab update-rollback`.
+**Command line:** `cmllab update-status`, `cmllab update-install` (latest release),
+`cmllab update-install --file cml-lab-builder-patch-<v>.zip [--sha256 …]` (offline) and `cmllab update-rollback`
+(`CMLLabBuilder.exe …` / `./cml-lab-builder …` for the downloads).
 
 > **Security note:** the checksums come from the same GitHub release as the patch. This proves the download is complete
 > and unmodified in transit, but it is not a code signature: whoever can publish releases on this repo can publish a
 > patch. The app downloads and verifies patches by itself, but it installs one only after you click *Update now*
 > (or `update-install`). When you run from source (`run.sh` / `pip install -e .`), use `git pull` instead; automatic
 > checks and patches are disabled there (*Check for updates now* only reports).
+
+## Uninstalling
+- **Windows / tar.gz:** close the app and delete its folder (and a desktop entry you added:
+  `~/.local/share/applications/cml-lab-builder.desktop`).
+- **Debian package:**
+  ```bash
+  sudo apt remove cml-lab-builder    # removes /opt/cml-lab-builder, the commands and the menu entry
+  sudo apt purge cml-lab-builder     # the same; the package has no system-wide config files
+  ```
+- **Your data is never deleted** by any of these: settings, labs, history, exam results and installed updates stay in
+  `%APPDATA%\cml-lab-builder` or `~/.config/cml-lab-builder` (each user has their own), and an old
+  `%APPDATA%\encorlab` / `~/.config/encorlab` folder stays too. To remove everything, delete those folders
+  (`rm -rf ~/.config/cml-lab-builder ~/.config/encorlab`). The saved CML password is in the OS keyring under
+  `cml-lab-builder` (and `encorlab-cml`).
 
 ## Running from source
 Needs Python **3.10 to 3.13** (3.13 recommended). Python 3.14+ is not supported yet: some dependencies have no prebuilt wheels for it.
@@ -315,7 +377,7 @@ git clone https://github.com/Specops13/cml-lab-builder.git && cd cml-lab-builder
 cp .env.example .env       # optional
 ./run.sh                   # web UI on http://127.0.0.1:8765
 ```
-Manual alternative: `python3 -m venv .venv && .venv/bin/pip install -e . && .venv/bin/python -m encorlab web`.
+Manual alternative: `python3 -m venv .venv && .venv/bin/pip install -e . && .venv/bin/python -m cmllab web`.
 `run.bat <command>` / `./run.sh <command>` runs any CLI command (see [Using it](#using-it)).
 
 ## CML requirements
@@ -327,10 +389,10 @@ Manual alternative: `python3 -m venv .venv && .venv/bin/pip install -e . && .ven
 - **For live checks:** SSH to the **CML console server**, by default the CML host on **port 22**.
   You can set a separate *Console server FQDN* and port, for example behind a TCP passthrough proxy (see below).
   Without it, config mode still works over HTTPS only.
-- A CML user that can create labs. Labs are created as `ENCOR-<lab id>`.
+- A CML user that can create labs. Labs are created as `CML-<lab id>` (`ENCOR-<lab id>` before 3.0.0; those are still recognised).
 
 ### Console access and your reverse proxy
-Live checks open `ssh <cml-user>@<console host>:<port>` and run `open /ENCOR-<lab>/<node>/0` on the CML console server.
+Live checks open `ssh <cml-user>@<console host>:<port>` and run `open /CML-<lab>/<node>/0` on the CML console server.
 They then run only read-only `show` and `ping` commands. The console server is set separately from the CML URL:
 Settings field **"Console server FQDN (port 22 proxy)"** plus **port** (default 22), or `CML_CONSOLE_HOST` / `CML_CONSOLE_PORT` in `.env`.
 If you put a proxy in front of port 22, it **must be a TCP/stream passthrough** (nginx `stream { server { listen 22; proxy_pass <cml>:22; } }`, HAProxy `mode tcp`).
@@ -357,9 +419,9 @@ Use **Test console** in the lab view to see exactly where a console session stop
    - Set *Console server host* if SSH port 22 isn't reachable at the URL's host name.
 2. **Get labs** (first start only): click **Install recommended starter set**, or **Browse library** to pick labs and
    courses (sizes and RAM estimates are shown), or import a `.cmllab` file.
-3. **Labs**: pick a lab and click **Build**. It imports the topology as `ENCOR-<lab>`, starts it and waits until all nodes are BOOTED.
+3. **Labs**: pick a lab and click **Build**. It imports the topology as `CML-<lab>`, starts it and waits until all nodes are BOOTED.
 4. Open the device consoles: the lab's **Consoles** section has an *Open lab in CML* link and a copyable
-   `ssh -t <user>@<console host> "open /ENCOR-<lab>/<node>/0"` command per node (Windows 11 has `ssh` built in).
+   `ssh -t <user>@<console host> "open /CML-<lab>/<node>/0"` command per node (Windows 11 has `ssh` built in).
    *Test console* next to it checks each node's console from the app.
    Solve the task, then click **Check**. You get pass/fail per check, with details and the raw output.
 5. Stuck? Click **Hint** for the next hint. At 100% the **Solution summary** appears. Below 100%, **Reveal solution** shows it after a confirm.
@@ -367,10 +429,10 @@ Use **Test console** in the lab view to see exactly where a console session stop
 7. Done with a lab? Click **Break my lab** for troubleshooting practice, or **Exam mode** for a timed attempt (see below).
 
 A timer starts on Build and stops when the lab is solved, and each lab keeps a results history.
-Small **?** icons explain each field. Turn them off with *Settings > Show help icons*; all help text is in `encorlab/web/static/help.json`.
+Small **?** icons explain each field. Turn them off with *Settings > Show help icons*; all help text is in `cmllab/web/static/help.json`.
 ◐ toggles dark mode.
 
-CLI equivalents (`ENCORLab <cmd>` for the download, `cmllab <cmd>` (or `encorlab <cmd>`) for the .deb and `pip install`; `run.bat <cmd>` / `./run.sh <cmd>` / `python -m encorlab <cmd>` from source):
+CLI equivalents (`CMLLabBuilder.exe <cmd>` / `./cml-lab-builder <cmd>` for the downloads, `cmllab <cmd>` for the .deb and `pip install`; `run.bat <cmd>` / `./run.sh <cmd>` / `python -m cmllab <cmd>` from source):
 
 | Command | What it does |
 |---|---|
@@ -391,9 +453,9 @@ CLI equivalents (`ENCORLab <cmd>` for the download, `cmllab <cmd>` (or `encorlab
 | `library install --starter \| --all \| --updates` | install the recommended starter set, every lab, or all available lab updates |
 | `library restore` | after an update from 1.x: install the labs your old version bundled that could not be copied from disk |
 | `course list` / `course build <dir> [-o file]` / `course delete <id> [--labs]` | courses: progress, build a `.encorcourse`, remove |
-| `import <file> [--replace]`, `export <lab> [-o f.encorlab] [--cml-yaml]`, `delete <lab> -y` | manage your labs |
-| `validate [paths…]`, `pack <folder-or-yaml> [-o x.encorlab]` | offline test (solution 100%, starting config 0%); strict validate + write a shareable pack |
-| `test-live <lab> [--keep]` | builds `ENCOR-TEST-<lab>` with the solution applied, grades it, deletes it |
+| `import <file> [--replace]`, `export <lab> [-o f.cmllab] [--cml-yaml]`, `delete <lab> -y` | manage your labs |
+| `validate [paths…]`, `pack <folder-or-yaml> [-o x.cmllab]` | offline test (solution 100%, starting config 0%); strict validate + write a shareable pack |
+| `test-live <lab> [--keep]` | builds `CML-TEST-<lab>` with the solution applied, grades it, deletes it |
 | `schema [-o f]`, `prompt ["request"]`, `docs` | JSON Schema, AI prompt, regenerate `docs/` |
 | `save-password`, `web [--no-open]` | keyring, web UI |
 
@@ -462,7 +524,7 @@ Then a **summary** page lists what you built and the complete config of every de
   and stops at the first line a device rejects, showing that line. Typing it yourself teaches more; this is for catching up.
 - Walkthroughs have no *Break my lab*, no exam mode and no score. They show a **walkthrough** badge, count as *completed*
   once every required step passed (the optional step 9 doesn't count), appear in their own section on the Progress page,
-  and stay out of mastery and streaks. The CLI has `encorlab step 18-evpn-vxlan [N] [--check|--apply]`.
+  and stay out of mastery and streaks. The CLI has `cmllab step 18-evpn-vxlan [N] [--check|--apply]`.
 - The **Data center** course (*Library & courses*) puts VRF-lite first, then the walkthrough; *Install all* installs both.
   The v1.9.0 release also has it as `evpn-vxlan-walkthrough.encorlab`; on 2.0.0 use the library or import
   `labs/18-evpn-vxlan.encorlab` from the repo.
@@ -557,7 +619,7 @@ history files; nothing leaves your machine.
 | **Config** | HTTPS only: CML API `extract_configuration` on each running node, then regex checks on the running config | The configuration is right (`router eigrp 100`, network statements for 10.0.12.0 and the loopback). **It does not verify adjacencies, routes or reachability.** |
 | **Auto** (default) | Tests TCP/SSH reachability of the console server first. If it's unreachable, or every live check fails to connect, it falls back to config mode | The results show which mode ran, plus a note when it fell back |
 
-Choose the default on the Settings page (or `ENCOR_GRADING_MODE`). You can override it per Check with the mode selector, or with `check <lab> --mode live|config|auto` on the CLI.
+Choose the default on the Settings page (or `CMLLAB_GRADING_MODE`). You can override it per Check with the mode selector, or with `check <lab> --mode live|config|auto` on the CLI.
 Config extraction requires the nodes to be running. It overwrites the node's stored startup config in CML, so **Reset** re-applies the lab's original configs before rebooting.
 
 Every check is read-only: live checks may only run `show …` and `ping …`, and config checks are regexes on the running config.
@@ -576,7 +638,7 @@ history links up again when you install the lab again).
 ### The `.cmllab` format (formerly `.encorlab`)
 
 **Lab file formats** (full reference in [docs/LAB-AUTHORING.md](docs/LAB-AUTHORING.md), schema in
-[docs/encorlab-lab.schema.json](docs/encorlab-lab.schema.json)):
+[docs/cml-lab.schema.json](docs/cml-lab.schema.json)):
 - a single `lab.yaml` with the reference solution embedded under `solution:`, or
 - a `.cmllab` zip (2.0 and older: `.encorlab`, still imported; same content) with `lab.yaml`, optional `solution.cfg`, `fixture_solved.yaml` / `fixture_blank.yaml`
   (recorded show output so live checks can be tested offline) and `README.md`.
@@ -585,7 +647,7 @@ history links up again when you install the lab again).
 links, and checks chosen from templates (OSPF/EIGRP/BGP neighbor, route present, ping, interface up, VLAN, config lines/regex…).
 A YAML tab shows the same lab with live validation. *Open existing lab* edits an installed lab.
 *Import from CML* starts from any IOL/IOSv lab in your CML. *Test lab (offline)* runs the strict validator.
-*Live test in CML* (for saved labs) builds a throw-away `ENCOR-TEST-…` copy with the solution applied, grades it and deletes it.
+*Live test in CML* (for saved labs) builds a throw-away `CML-TEST-…` copy with the solution applied, grades it and deletes it.
 
 ### Lab library and courses
 Since 2.0.0 every lab comes from here: the download contains none. Click **📚 Library & courses** on the Labs page (on a
@@ -596,7 +658,7 @@ first start the Labs page offers the same buttons).
   [`labs/index.json`](labs/index.json), which is kept with the same labs under their old file names) and lists the published
   lab packs and courses with their size, RAM estimate (red **RAM heavy** tag at your threshold), node count and
   difficulty. *Install* downloads the file over https, rejects it unless its **sha256 and size match the index**,
-  validates it like any import, then installs it. The address is *Settings > Library URL* (`ENCOR_LIBRARY_URL`; empty =
+  validates it like any import, then installs it. The address is *Settings > Library URL* (`CMLLAB_LIBRARY_URL`; empty =
   this repo). Point it at your own `index.json` (https only, or http on localhost), for example a fork, a team share or
   an offline mirror.
 - **Courses: Install all.** Installing a course from the library also installs every lab it lists that you don't have yet.
@@ -612,7 +674,7 @@ first start the Labs page offers the same buttons).
   `labs/<id>/` pack folders. A course may also list library labs without bundling them (they are installed from the
   library with the course). Installation is all-or-nothing: every bundled lab is validated first. Your courses show solved/total, a progress bar and *Continue* (the next unsolved lab). The *Course* filter
   shows a course's labs in order. *Remove* deletes the course and, if you choose, the labs that came inside the course file
-  (never your history). Build one with `python -m encorlab course build my-course/ --labs-from examples/`.
+  (never your history). Build one with `python -m cmllab course build my-course/ --labs-from examples/`.
 - **Publishing:** lab sources are in `labsrc/<id>/` (the former built-in labs) and `examples/<id>/`; courses in
   `examples/courses/<id>/course.yaml`. Run `python packaging/build_library.py`: it validates every lab strictly, rebuilds
   `library/` (new extensions) and `labs/` (old ones, for 2.0 clients) reproducibly (fixed zip timestamps) and regenerates both `index.json` with checksums, versions, RAM estimates and the
@@ -626,14 +688,14 @@ bundled:
   from there into your labs folder, unchanged and under the same ids. No download, works offline.
 - **Updated by a full download** (or a newer `.deb`): the old files are gone, so the labs are installed from the lab
   library in the background. Until that has worked (e.g. while offline) a banner offers *Restore now* and *Dismiss*;
-  `encorlab library restore` does the same on the command line.
+  `cmllab library restore` does the same on the command line.
 - Your results history, walkthrough progress, reports, snapshots, active faults and exams are files keyed by lab id in
   the data folder. The update never moves, rewrites or deletes them, so they link up with the kept labs automatically.
   A lab folder you already have is never overwritten. The state is in `migrations/library-labs.json` in the data folder.
 
 ### AI prompt (generate labs with any AI chatbot)
 
-**AI-generated labs.** Use any AI chat: *More > Copy prompt for any AI* (or `python -m encorlab prompt "OSPF stub lab, 4 routers"`)
+**AI-generated labs.** Use any AI chat: *More > Copy prompt for any AI* (or `python -m cmllab prompt "OSPF stub lab, 4 routers"`)
 copies a self-contained prompt with the rules, templates, guide, schema and an example. Import the YAML the AI returns.
 The prompt template is in [docs/AI-PROMPT.md](docs/AI-PROMPT.md). An assistant that can run code should
 `validate` and `pack` the lab before sending it.
@@ -648,29 +710,29 @@ Example packs live in [`examples/`](examples/) and are attached to every [releas
 
 ## Configuration
 Everything can be set on the **Settings** page; `.env` / environment variables provide defaults (copy `.env.example`).
-Since 2.1.0 every `ENCOR_…` variable can also be written `CMLLAB_…` (`CMLLAB_GRADING_MODE`, `CMLLAB_DATA_DIR`, …); if
-both are set, `CMLLAB_…` wins. The `ENCOR_…` names keep working.
+The variables are `CMLLAB_…` since 3.0.0. The old `ENCOR_…` names (ENCOR Lab Builder) still work: they are
+copied to the `CMLLAB_…` name at start, and if both are set, `CMLLAB_…` wins.
 
 | Variable | Default | Meaning |
 |---|---|---|
 | CML_URL / CML_USERNAME / CML_PASSWORD | - | Controller and credentials (same as the CML web login) |
 | CML_VERIFY_SSL | true | `true`, `false`, or a path to a CA bundle |
 | CML_CONSOLE_HOST / CML_CONSOLE_PORT | URL host / 22 | Console server FQDN (port 22 proxy) and port, for live checks |
-| ENCOR_GRADING_MODE | auto | `auto`, `live` or `config` |
-| ENCOR_PLATFORM | iol | `iol` (IOL / IOL-L2, light) or `iosv` (IOSv / IOSvL2) |
-| ENCOR_NODE_LIMIT | 20 | Refuse to start a lab if it would exceed this many running nodes |
-| ENCOR_BOOT_TIMEOUT | 900 | Seconds to wait for nodes to boot (labs with NX-OS nodes wait at least 1500) |
-| ENCOR_RAM_HEAVY_GB | 16 | Labs estimated at or above this many GB of CML RAM get the red *RAM heavy* tag |
-| ENCOR_LIBRARY_URL | (the repo's `library/index.json`) | Lab library index (same as *Settings > Library URL*); https, or http on localhost |
-| ENCOR_BUILTIN_LABS_DIR | (none) | Developers: use a folder of lab sources (e.g. `labsrc`) in place, read-only |
-| ENCOR_DEVICE_USERNAME / _PASSWORD / _ENABLE | cisco | Used if a device console asks for a login or enable password, and as the NX-OS day-0 login |
-| ENCOR_NXOS_USERNAME / _PASSWORD | (empty) | NX-OS console login tried first (e.g. your day-0 `admin` password); empty = the device login, then `admin` |
-| ENCOR_USER_LABS_DIR / ENCOR_DATA_DIR | data folder | Where imported labs / all data are stored (setting DATA_DIR turns the automatic folder move off) |
-| ENCOR_AI_BASE_URL / ENCOR_AI_MODEL / ENCOR_AI_API_KEY | - | Optional AI generator (OpenAI-compatible) |
-| ENCOR_CONSOLE_BACKEND | ssh | `ssh` (paramiko, all OSes) or `pyats` (Linux/macOS only, needs `pip install -e .[pyats]`) |
+| CMLLAB_GRADING_MODE | auto | `auto`, `live` or `config` |
+| CMLLAB_PLATFORM | iol | `iol` (IOL / IOL-L2, light) or `iosv` (IOSv / IOSvL2) |
+| CMLLAB_NODE_LIMIT | 20 | Refuse to start a lab if it would exceed this many running nodes |
+| CMLLAB_BOOT_TIMEOUT | 900 | Seconds to wait for nodes to boot (labs with NX-OS nodes wait at least 1500) |
+| CMLLAB_RAM_HEAVY_GB | 16 | Labs estimated at or above this many GB of CML RAM get the red *RAM heavy* tag |
+| CMLLAB_LIBRARY_URL | (the repo's `library/index.json`) | Lab library index (same as *Settings > Library URL*); https, or http on localhost |
+| CMLLAB_BUILTIN_LABS_DIR | (none) | Developers: use a folder of lab sources (e.g. `labsrc`) in place, read-only |
+| CMLLAB_DEVICE_USERNAME / _PASSWORD / _ENABLE | cisco | Used if a device console asks for a login or enable password, and as the NX-OS day-0 login |
+| CMLLAB_NXOS_USERNAME / _PASSWORD | (empty) | NX-OS console login tried first (e.g. your day-0 `admin` password); empty = the device login, then `admin` |
+| CMLLAB_USER_LABS_DIR / CMLLAB_DATA_DIR | data folder | Where imported labs / all data are stored (setting DATA_DIR turns the automatic folder move off) |
+| CMLLAB_AI_BASE_URL / CMLLAB_AI_MODEL / CMLLAB_AI_API_KEY | - | Optional AI generator (OpenAI-compatible) |
+| CMLLAB_CONSOLE_BACKEND | ssh | `ssh` (paramiko, all OSes) or `pyats` (Linux/macOS only, needs `pip install -e .[pyats]`) |
 
 ### Security and safety
-- Only touches labs titled `ENCOR-…`. Deleting anything else is refused.
+- Only touches labs titled `CML-…` (or `ENCOR-…`, built by ENCOR Lab Builder). Deleting anything else is refused.
 - Checks never change device configuration (only `show` and `ping` commands are allowed in labs).
 - Imported packs are size-limited (5 MB) and path-checked. A lab file only contains data (YAML/regex), never code.
 - Internet access: *Load library* / *Install* (raw.githubusercontent.com or your URL) when you click them, and once after
@@ -685,12 +747,12 @@ both are set, `CMLLAB_…` wins. The `ENCOR_…` names keep working.
 - The UI listens on 127.0.0.1 only. Secrets are never returned by the API or written to logs.
 
 ## Troubleshooting and diagnostics
-- **SmartScreen / antivirus warning on ENCORLab.exe:** the build is unsigned. Use *More info* > *Run anyway*, and compare the zip with `SHA256SUMS.txt`.
+- **SmartScreen / antivirus warning on CMLLabBuilder.exe:** the build is unsigned. Use *More info* > *Run anyway*, and compare the zip with `SHA256SUMS.txt`.
   The one-folder build avoids most antivirus heuristics. If yours still quarantines it, add an exclusion for the folder or run from source.
-- **The console window says the port was busy:** use the address it shows, or start with `ENCORLab --port 9000`.
+- **The console window says the port was busy:** use the address it shows, or start with `CMLLabBuilder.exe --port 9000` (`./cml-lab-builder --port 9000`).
 - **The app doesn't start (downloaded build):** the error is shown in the window and saved to `launcher-error.log` in your data folder.
 - **Live checks can't connect:** see [Console access](#console-access-and-your-reverse-proxy). `doctor` tests the console server's TCP/SSH reachability. Config mode works over HTTPS only.
-- **"Not built" / nodes not booting:** check the node limit, that the IOL/IOSv images exist in CML (`doctor` lists missing node definitions), and the boot timeout (`ENCOR_BOOT_TIMEOUT`).
+- **"Not built" / nodes not booting:** check the node limit, that the IOL/IOSv images exist in CML (`doctor` lists missing node definitions), and the boot timeout (`CMLLAB_BOOT_TIMEOUT`).
 
 ### Common problems (running from source)
 - **Install fails on Windows with "Microsoft Visual C++ 14.0 or greater is required", or with PyYAML building from source.**
@@ -712,28 +774,35 @@ reporting a problem, along with `run.bat doctor` output and the version shown in
   The page also checks its own version against the server and asks you to reload if they don't match.
 
 ## Building the executables
-PyInstaller can't cross-compile, so each OS builds its own bundle. Both use the same `packaging/encorlab.spec` and
+PyInstaller can't cross-compile, so each OS builds its own bundle. Both use the same `packaging/cmllab.spec` and
 `packaging/build.py`. The build is one-folder (an exe plus `_internal/`), not one-file: it starts faster, never unpacks to `%TEMP%`, and triggers
 far fewer antivirus false positives.
 
 - **Windows (once, on your PC):** install Python 3.12 or 3.13 from python.org, then double-click `packaging\build_exe.bat`.
-  The result is `dist\ENCORLab-<version>-windows-x64.zip`. Use `set PYTHON=C:\path\python.exe` to pick a specific interpreter.
-- **Linux:** `packaging/build_linux.sh` produces `dist/ENCORLab-<version>-linux-x64.tar.gz`. With `uv` installed, it uses
+  The result is `dist\CMLLabBuilder-<version>-windows-x64.zip`. Use `set PYTHON=C:\path\python.exe` to pick a specific interpreter.
+- **Linux:** `packaging/build_linux.sh` produces `dist/CMLLabBuilder-<version>-linux-x64.tar.gz`. With `uv` installed, it uses
   python-build-standalone Python 3.12 and manylinux_2_28 wheels, so the binary runs on glibc 2.28+ even when built on a newer distro.
-- **Debian package:** `python3 packaging/build_deb.py --tar dist/ENCORLab-<version>-linux-x64.tar.gz` wraps the
-  smoke-tested Linux build into `dist/encorlab_<version>_amd64.deb` with `dpkg-deb --root-owner-group`. No root is
+- **Debian package:** `python3 packaging/build_deb.py --tar dist/CMLLabBuilder-<version>-linux-x64.tar.gz` wraps the
+  smoke-tested Linux build into `dist/cml-lab-builder_<version>_amd64.deb` with `dpkg-deb --root-owner-group`. No root is
   needed, and the result is reproducible (`SOURCE_DATE_EPOCH`). It does not rebuild or strip anything, so the runtime
-  and its fingerprint stay the same as in the tar.gz. Check it with `lintian --pedantic encorlab_*.deb`; the intended
+  and its fingerprint stay the same as in the tar.gz. Check it with `lintian --pedantic cml-lab-builder_*.deb`; the intended
   exceptions (a bundled app in `/opt`, embedded libraries, …) are listed in the package's lintian overrides.
   `packaging/deb_chroot_test.sh <debian-12-chroot> <deb>` runs the full end-to-end test in a clean chroot (made with
   `debootstrap --variant=minbase bookworm`): apt install, `desktop-file-validate`, a menu launch and a second launch,
   the smoke test with patches and auto-update as a normal user (`/opt` must stay unchanged), upgrades to newer test
-  packages over a user patch, and remove/purge (data kept). With `<older deb> <patch zip>` as extra arguments it
-  first installs the older package, runs `rename_test.py` on it and tests the apt upgrade.
-- **Rename / data-folder move (2.1.0):** `packaging/rename_test.py --old <1.7-2.0 build> --patch encorlab-patch-2.1.x.zip
-  --base <folder holding encorlab/> [--runner wine]` (or `--exe /usr/bin/encorlab` for the installed .deb) installs the
-  patch with the old updater, checks the automatic move file by file, the one-time note, then next patch, restart,
-  roll back twice (to the old built-in version) and the catch-up of files the old version writes afterwards.
+  packages over a user patch, and remove/purge (data kept). With an old `encorlab_<2.x>_amd64.deb` as a third
+  argument it first tests the upgrade from it: the old updater's banner, `apt install ./encorlab_<v>_amd64.deb` (the
+  old-name copy) replacing the `encorlab` package, the data move and a patch round trip (`upgrade3_test.py`).
+- **Upgrade from ENCOR Lab Builder (3.0.0):** `packaging/upgrade3_test.py --old <1.9/2.0/2.1 build> [--old …]
+  --new <3.x build> --base <folder holding encorlab/> [--runner wine]` runs each real old build against a fake 3.x
+  release on 127.0.0.1 (its banner must link the right old-name copy and say *needs runtime 2*, nothing installed),
+  seeds a user's data with it, starts the 3.x build on that data (move checked file by file, labs, scores, settings,
+  1.x labs restored from the library, old banner gone), and ends with a 3.x patch round trip (install from a fake
+  release, run, roll back).
+- **Transition files:** `python packaging/build_compat.py --dist dist` writes the old-name copies
+  (`ENCORLab-<v>-windows-x64.zip`, `ENCORLab-<v>-linux-x64.tar.gz`, `encorlab_<v>_amd64.deb`) and the manifest-only
+  `encorlab-patch-<v>.zip` (`min_runtime` 2, no files) that make ENCOR Lab Builder 1.7 - 2.1 show the full-download
+  banner with a direct link. Every 3.x release carries them (CI's release job runs it) until nobody runs 2.x any more.
 - **License notices:** `build.py` copies `LICENSE` into the bundle as `LICENSE.txt` and runs
   `packaging/third_party_notices.py`. That script reads PyInstaller's tables of what was really bundled (not just what
   is installed in the build venv), maps the files to their Python distributions and writes `THIRD-PARTY-NOTICES.txt`
@@ -741,19 +810,19 @@ far fewer antivirus false positives.
   unknown license, no license text, or a strong copyleft license (GPL/AGPL; the PyInstaller bootloader's exception and
   LGPL are allowed).
 - **GitHub Actions:** `.github/workflows/build.yml` builds and smoke-tests both bundles (windows-latest + ubuntu-22.04) on every `v*` tag.
-  The bundles are kept as workflow artifacts. To publish them, run it by hand (*Actions > build > Run workflow*), tick *publish* and enter the tag.
-  Existing release assets are never overwritten. CI also builds `encorlab-patch-<version>.zip` and the `.deb` (lintian +
-  `desktop-file-validate`). It installs the .deb in a clean `debian:12` container, smoke-tests it there, and adds all files to `SHA256SUMS.txt`.
-- **App-code patch:** `python packaging/build_patch.py --out dist` writes `encorlab-patch-<version>.zip`, a deterministic
+  The bundles are kept as workflow artifacts. To publish them, run it by hand (*Actions > CML Lab Builder build > Run workflow*), tick *publish* and enter the tag.
+  Existing release assets are never overwritten. CI also builds `cml-lab-builder-patch-<version>.zip` and the `.deb` (lintian +
+  `desktop-file-validate`). It installs the .deb in a clean `debian:12` container, smoke-tests it there, adds the transition files and lists all files in `SHA256SUMS.txt`.
+- **App-code patch:** `python packaging/build_patch.py --out dist` writes `cml-lab-builder-patch-<version>.zip`, a deterministic
   zip with `manifest.json` (version, `min_runtime`, SHA-256 per file). The runtime is fingerprinted in
-  `packaging/runtime.lock.json`: the dependencies, `encorboot.py`, `encor_launcher.py`, the spec and `build_linux.sh`.
+  `packaging/runtime.lock.json`: the dependencies, `cmlboot.py`, `cmllab_launcher.py`, the spec and `build_linux.sh`.
   `--check-lock` (run by CI and the tests) fails if any of them changed. In that case bump `RUNTIME_VERSION` in
-  `encorboot.py` and run `--update-lock`, so that older runtimes are told to do a full download.
-- **How the bundle is laid out:** the spec keeps `encorlab` out of the frozen archive and ships it as plain files in
-  `_internal/appcode/`, with a manifest. The frozen entry point (`encor_launcher.py`) runs the boot loader
-  (`encorboot.py`), which picks the newest valid copy (an installed patch or the built-in one), imports it, and handles
+  `cmlboot.py` and run `--update-lock`, so that older runtimes are told to do a full download.
+- **How the bundle is laid out:** the spec keeps `cmllab` out of the frozen archive and ships it as plain files in
+  `_internal/appcode/`, with a manifest. The frozen entry point (`cmllab_launcher.py`) runs the boot loader
+  (`cmlboot.py`), which picks the newest valid copy (an installed patch or the built-in one), imports it, and handles
   rollback. Most of the standard library is frozen in, so patches can use modules the current code does not import yet.
-- **Smoke test:** `python packaging/smoke_test.py <exe> --version <v> --data-dir <user data dir> --pack x.encorlab` checks the CLI, the launcher, the UI assets, the lab list and imports
+- **Smoke test:** `python packaging/smoke_test.py <exe> --version <v> --data-dir <user data dir> --pack x.cmllab` checks the CLI, the launcher, the UI assets, the lab list and imports
   (`build.py --smoke` runs it; it imports the example packs into the user data folder). With `--auto-update-test` it serves a fake release on 127.0.0.1 (`packaging/fake_release.py`) and checks the whole automatic flow: background check, staged but not installed, *Update now* waiting for a running exam, install, restart on the same port, and *Updated to*. With `--patch-test` it also builds test patches and checks, on the frozen build,
   install → the patched version runs and serves the UI → rollback, automatic fallback from a broken patch, and refusal of a patch that needs a newer runtime.
 
@@ -762,12 +831,12 @@ the page, or if the app was updated while the tab was open. Cache-busting (`?v=<
 
 ## Project layout
 ```
-encorlab/                 the application (Python package)
+cmllab/                   the application (Python package; `encorlab` up to 2.1.0)
   cli.py                  CLI (typer)                     launcher.py   desktop launcher (packaged builds)
   service.py              build/check/reset/destroy       grader.py     check engine (live + config modes)
   cml.py, cml_import.py   CML 2.9 API (virl2_client)      console.py    console server SSH (paramiko / pyATS)
-  schema.py, templates.py lab schema + check templates    packs.py      .encorlab import/export/validation
-  courses.py, library.py  .encorcourse + online library    faults.py     "Break my lab" faults (iosmerge.py: config merge)
+  schema.py, templates.py lab schema + check templates    packs.py      .cmllab import/export/validation
+  courses.py, library.py  .cmlcourse + online library      faults.py     "Break my lab" faults (iosmerge.py: config merge)
   blueprint.py            ENCOR v1.2 exam topics           progress.py   progress dashboard
   walkthrough.py          walkthrough steps: check/apply   sizing.py     RAM estimate per lab (RAM heavy tag)
   exam.py, snapshots.py   exam mode, config snapshots      updates.py    update check + patch verify/install/rollback
@@ -782,12 +851,14 @@ encorlab/                 the application (Python package)
   resources/              authoring guide + example lab (source of docs/)
 docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example lab, images/
 examples/                 example packs and courses/ (sources of labs/)
-labs/                     online library: built packs, courses and index.json (packaging/build_library.py)
+library/                  online library: built packs, courses and index.json (packaging/build_library.py)
+labs/                     the same library under the old names (.encorlab/.encorcourse) for 2.0 and older
 labsrc/<id>/              lab sources of the library (the 19 former built-in labs) + library.yaml (starter set)
-encorboot.py              boot loader for packaged builds: picks the app-code bundle, rollback, RUNTIME_VERSION
-encor_launcher.py         frozen entry point (runs encorboot, then encorlab.launcher)
-packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, fake_release.py, icon
-                          build_deb.py (.deb from the Linux build), icons/hicolor/, deb_chroot_test.sh (+ _inner.sh)
+cmlboot.py                boot loader for packaged builds: picks the app-code bundle, rollback, RUNTIME_VERSION
+cmllab_launcher.py        frozen entry point (runs cmlboot, then cmllab.launcher)
+packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, fake_release.py, icons
+                          build_deb.py (.deb from the Linux build), icons/hicolor/, deb_chroot_test.sh (+ _inner.sh),
+                          build_compat.py + upgrade3_test.py (upgrade from ENCOR Lab Builder 1.7 - 2.1)
                           third_party_notices.py (THIRD-PARTY-NOTICES.txt from the PyInstaller build)
 LICENSE                   MIT license
 tests/                    pytest suite (no CML needed)
@@ -799,17 +870,17 @@ run.bat, run.ps1, run.sh  from-source launchers (create .venv, install, start)
 ```bash
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/python -m pytest -q        # unit + simulated end-to-end tests (no CML needed)
-.venv/bin/python -m encorlab validate
+.venv/bin/python -m cmllab validate
 ```
 Lab sources live in `labsrc/<id>/` (same format as packs); the package itself has no labs. The test suite uses them in place
-via `ENCOR_BUILTIN_LABS_DIR=labsrc` (set by `tests/conftest.py`); set it yourself to run a source checkout with every lab
-(`ENCOR_BUILTIN_LABS_DIR=labsrc python -m encorlab web`) or validate them with `python -m encorlab validate labsrc/*`.
+via `CMLLAB_BUILTIN_LABS_DIR=labsrc` (set by `tests/conftest.py`); set it yourself to run a source checkout with every lab
+(`CMLLAB_BUILTIN_LABS_DIR=labsrc python -m cmllab web`) or validate them with `python -m cmllab validate labsrc/*`.
 In configs, checks and fixtures, `%if0%` / `%if0s%`
 become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv.
-After changing the schema, templates, guide or example, run `python -m encorlab docs` (a test checks `docs/` is current).
+After changing the schema, templates, guide or example, run `python -m cmllab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **2.1.0**. It is shown in the UI header, by `ENCORLab version` and by `/api/health`.
+Current version: **3.0.0**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License
@@ -819,7 +890,7 @@ stay with it. It comes without any warranty.
 
 The ready-to-run downloads also contain the Python runtime and third-party packages. Each keeps its own license,
 and all of them allow redistribution with an MIT app. `THIRD-PARTY-NOTICES.txt` in every download lists them with
-their full license texts. The .deb puts it in `/usr/share/doc/encorlab/`.
+their full license texts. The .deb puts it in `/usr/share/doc/cml-lab-builder/`.
 - **Most packages** are under MIT, BSD, Apache-2.0, ISC or PSF-2.0 (e.g. FastAPI, Starlette, uvicorn, pydantic,
   Jinja2, Typer and virl2_client, which is Apache-2.0).
 - **paramiko** (the console server SSH client) is under **LGPL-2.1**. It is included unmodified, its source is at

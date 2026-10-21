@@ -5,8 +5,8 @@ domain: "3.0 Infrastructure - Layer 3"
 difficulty: 3
 platforms: [iol]
 summary: Four routers, two OSPF areas. Make area 1 totally stubby and summarize its loopbacks to a /22 on the ABR.
-author: ENCOR Lab Builder
-version: "1"
+author: CML Lab Builder
+version: "2"
 nodes:
   - name: R1
     kind: router

@@ -3,8 +3,8 @@ import datetime as dt
 
 from typer.testing import CliRunner
 
-from encorlab import blueprint, catalog, history, packs, progress
-from encorlab.cli import app as cli_app
+from cmllab import blueprint, catalog, history, packs, progress
+from cmllab.cli import app as cli_app
 from test_web import make, wait
 
 D = dt.date(2026, 10, 18)

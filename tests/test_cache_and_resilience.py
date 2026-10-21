@@ -4,9 +4,9 @@ import mimetypes
 
 from fastapi.testclient import TestClient
 
-from encorlab import __version__, catalog, config
-from encorlab.web import app as webapp
-from encorlab.web.app import create_app
+from cmllab import __version__, catalog, config
+from cmllab.web import app as webapp
+from cmllab.web.app import create_app
 
 
 def client(settings=None):

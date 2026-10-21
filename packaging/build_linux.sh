@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the Linux x64 bundle: dist/ENCORLab-<version>-linux-x64.tar.gz      Usage: packaging/build_linux.sh [--smoke]
+# Build the Linux x64 bundle: dist/CMLLabBuilder-<version>-linux-x64.tar.gz      Usage: packaging/build_linux.sh [--smoke]
 # With uv (recommended) it uses python-build-standalone CPython 3.12 (glibc 2.17 baseline) and manylinux_2_28 wheels,
 # so the result runs on glibc 2.28+ (Debian 10+, Ubuntu 20.04+) even when built on a newer distro.
 # Without uv it falls back to python3 -m venv (the binary then needs the build host's glibc or newer).

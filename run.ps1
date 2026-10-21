@@ -76,5 +76,5 @@ if (Test-Path ".env") {
         [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim(), "Process")
     }
 }
-if ($args.Count -eq 0) { & $venvPy -m encorlab web } else { & $venvPy -m encorlab @args }
+if ($args.Count -eq 0) { & $venvPy -m cmllab web } else { & $venvPy -m cmllab @args }
 exit $LASTEXITCODE

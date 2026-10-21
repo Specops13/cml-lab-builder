@@ -1,7 +1,7 @@
 import pytest
 
-from encorlab import catalog
-from encorlab.cml import CML, CMLError
+from cmllab import catalog
+from cmllab.cml import CML, CMLError
 from fakes import FakeClient
 
 LAB = catalog.get("eigrp-basic")
@@ -28,7 +28,7 @@ def test_build_imports_starts_and_waits(settings):
     c = FakeClient(boot_polls=3)
     msgs = []
     lab = mk(settings, c).build(LAB, progress=msgs.append)
-    assert lab.title == "ENCOR-eigrp-basic" and lab.calls == ["start"]
+    assert lab.title == "CML-eigrp-basic" and lab.calls == ["start"]
     assert all(n.state == "BOOTED" for n in lab.nodes())
     assert any("Waiting for boot" in m for m in msgs) and msgs[-1] == "All nodes booted"
     assert "version: 0.2.2" in c.imported_yaml[0]
@@ -106,7 +106,7 @@ def test_duplicate_titles(settings):
     c = FakeClient()
     m = mk(settings, c)
     m.build(LAB, start=False)
-    c.import_lab(c.imported_yaml[0], title="ENCOR-eigrp-basic")
+    c.import_lab(c.imported_yaml[0], title="CML-eigrp-basic")
     with pytest.raises(CMLError, match="duplicates"):
         m.find(LAB)
 
@@ -128,12 +128,12 @@ def test_status(settings):
 
 
 def test_runner_selection(settings):
-    from encorlab.console import SSHConsoleRunner
+    from cmllab.console import SSHConsoleRunner
     c = FakeClient()
     m = mk(settings, c)
     m.build(LAB)
     r = m.runner(LAB)
-    assert isinstance(r, SSHConsoleRunner) and r.lab_title == "ENCOR-eigrp-basic"
+    assert isinstance(r, SSHConsoleRunner) and r.lab_title == "CML-eigrp-basic"
 
 
 def test_reset_restores_initial_configs_after_extraction(settings):
@@ -173,7 +173,7 @@ def test_config_source_requires_built(settings):
 
 
 def test_doctor_reports_console(settings, monkeypatch):
-    import encorlab.cml as cmlmod
+    import cmllab.cml as cmlmod
     monkeypatch.setattr(cmlmod, "probe_console", lambda h, p: {"ok": False, "detail": "refused"})
     info = mk(settings, FakeClient()).doctor()
     assert info["console_reachable"] is False and info["console_server"] == "cml.example.ts.net:22"

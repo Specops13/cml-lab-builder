@@ -1,10 +1,10 @@
 """Console driver tests against a scripted fake of the CML console server + IOS CLI."""
 import pytest
 
-from encorlab import catalog, grader, platforms
-from encorlab.config import Settings
-from encorlab.console import ConsoleError, SSHConsoleRunner
-from encorlab.sim import SimRunner
+from cmllab import catalog, grader, platforms
+from cmllab.config import Settings
+from cmllab.console import ConsoleError, SSHConsoleRunner
+from cmllab.sim import SimRunner
 
 
 class FakeIOSChannel:
@@ -116,7 +116,7 @@ def runner_with(**chan_kw):
         c = FakeIOSChannel(sim, **chan_kw)
         chans.append(c)
         return c
-    r = SSHConsoleRunner(s, "ENCOR-eigrp-basic", client_factory=lambda: FakeSSH(factory))
+    r = SSHConsoleRunner(s, "CML-eigrp-basic", client_factory=lambda: FakeSSH(factory))
     return r, chans
 
 
@@ -131,7 +131,7 @@ def test_end_to_end_grading_over_console(kw):
     r, chans = runner_with(**kw)
     rep = grader.grade(LAB, r, P)
     assert rep.passed, [x.details for x in rep.results if not x.passed]
-    assert {c.opened for c in chans} == {("ENCOR-eigrp-basic", "R1", "0"), ("ENCOR-eigrp-basic", "R2", "0")}
+    assert {c.opened for c in chans} == {("CML-eigrp-basic", "R1", "0"), ("CML-eigrp-basic", "R2", "0")}
     assert len(chans) == 2  # one session per device, reused across checks
     r.close()
 
@@ -147,7 +147,7 @@ def test_unreachable_console_server():
 
     def boom():
         raise OSError("timed out")
-    r = SSHConsoleRunner(s, "ENCOR-x", client_factory=boom)
+    r = SSHConsoleRunner(s, "CML-x", client_factory=boom)
     with pytest.raises(ConsoleError, match="cannot reach (the )?console server"):
         r.run("R1", "show version")
 

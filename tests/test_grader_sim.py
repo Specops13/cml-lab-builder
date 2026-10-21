@@ -1,7 +1,7 @@
 import pytest
 
-from encorlab import catalog, grader, platforms, sim
-from encorlab.schema import Check
+from cmllab import catalog, grader, platforms, sim
+from cmllab.schema import Check
 
 LABS = [e.lab for e in catalog.entries().values() if e.source == "builtin"]  # never the user folder
 CASES = [(l, p) for l in LABS for p in l.platforms]

@@ -1,5 +1,5 @@
 @echo off
-rem Build the Windows bundle once: dist\ENCORLab-<version>-windows-x64.zip
+rem Build the Windows bundle once: dist\CMLLabBuilder-<version>-windows-x64.zip
 rem Needs Python 3.12 or 3.13 from python.org. Double-click, or run from a Command Prompt:
 rem     packaging\build_exe.bat
 rem     set PYTHON=C:\Path\To\python.exe ^&^& packaging\build_exe.bat      (use a specific Python)
@@ -25,7 +25,7 @@ if exist "%VENV%" rmdir /s /q "%VENV%"
 "%VENV%\Scripts\python.exe" -m pip install -q --disable-pip-version-check . "pyinstaller>=6.22,<7" || goto :fail
 "%VENV%\Scripts\python.exe" packaging\build.py --work build\windows --out dist %* || goto :fail
 echo.
-echo Done. Unzip the file in the dist folder anywhere and double-click ENCORLab.exe
+echo Done. Unzip the file in the dist folder anywhere and double-click CMLLabBuilder.exe
 if "%~1"=="" pause
 exit /b 0
 :fail

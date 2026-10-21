@@ -21,8 +21,8 @@ sys.path.insert(0, str(ROOT))
 
 import yaml  # noqa: E402
 
-from encorlab import courses, library, packs  # noqa: E402
-from encorlab.schema import version_key  # noqa: E402
+from cmllab import courses, library, packs  # noqa: E402
+from cmllab.schema import version_key  # noqa: E402
 
 LABSRC = ROOT / "labsrc"
 

@@ -1,7 +1,7 @@
 import yaml
 
-from encorlab import catalog, platforms
-from encorlab.render import SCHEMA_VERSION, to_topology, to_yaml
+from cmllab import catalog, platforms
+from cmllab.render import SCHEMA_VERSION, to_topology, to_yaml
 
 LAB = catalog.get("eigrp-basic")
 
@@ -19,11 +19,11 @@ def test_placeholder_render():
 
 
 def test_topology_shape_matches_cml_schema():
-    y = to_yaml(LAB, platforms.get("iol"), "ENCOR-")
+    y = to_yaml(LAB, platforms.get("iol"), "CML-")
     t = yaml.safe_load(y)
     assert set(t) == {"lab", "nodes", "links"}
     assert t["lab"]["version"] == SCHEMA_VERSION == "0.2.2"
-    assert t["lab"]["title"] == "ENCOR-eigrp-basic"
+    assert t["lab"]["title"] == "CML-eigrp-basic"
     n0 = t["nodes"][0]
     assert n0["id"] == "n0" and n0["label"] == "R1" and n0["node_definition"] == "iol-xe"
     assert n0["interfaces"][0] == {"id": "i0", "label": "Loopback0", "type": "loopback"}
@@ -41,5 +41,5 @@ def test_iosv_render():
 
 
 def test_config_is_literal_block():
-    y = to_yaml(LAB, platforms.get("iol"), "ENCOR-")
+    y = to_yaml(LAB, platforms.get("iol"), "CML-")
     assert "configuration: |" in y

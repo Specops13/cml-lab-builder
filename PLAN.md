@@ -1,4 +1,4 @@
-# ENCOR Lab Builder & Grader for CML 2.x — Implementation Plan (Phase 1)
+# CML Lab Builder (then: ENCOR Lab Builder) & Grader for CML 2.x — Implementation Plan (Phase 1, historical)
 
 ## 0. Verified facts (sources: developer.cisco.com/docs/modeling-labs, pypi.org/project/virl2-client)
 - Client: `virl2_client` (PyPI), latest 2.10.1 (Sep 2026), Python >=3.10, deps httpx. Extra `[pyats]` adds pyATS (not Genie); full parsing needs `pip install "pyats[full]"`.
@@ -7,21 +7,21 @@
 - Expired paid licenses revert to Free-tier behavior (status bar "OK (FREE-TIER)").
 
 ## 1. Architecture
-Python package `encorlab`, CLI via Typer:
+Python package `cmllab`, CLI via Typer:
 ```
-encorlab doctor                 # connectivity, version, license tier/node limit, available node defs
-encorlab list                   # catalog with domain, node count, required images
-encorlab validate [lab]         # offline schema + semantic validation (no CML needed)
-encorlab build <lab> [--start]  # import topology, start, wait for boot
-encorlab task <lab>             # print task text
-encorlab check <lab> [--json]   # grade via console, per-check pass/fail + hints
-encorlab reset <lab>            # stop, wipe, re-import initial configs
-encorlab destroy <lab>          # stop, wipe, remove
+cmllab   doctor                 # connectivity, version, license tier/node limit, available node defs
+cmllab   list                   # catalog with domain, node count, required images
+cmllab   validate [lab]         # offline schema + semantic validation (no CML needed)
+cmllab   build <lab> [--start]  # import topology, start, wait for boot
+cmllab   task <lab>             # print task text
+cmllab   check <lab> [--json]   # grade via console, per-check pass/fail + hints
+cmllab   reset <lab>            # stop, wipe, re-import initial configs
+cmllab   destroy <lab>          # stop, wipe, remove
 ```
 Modules: `config.py`, `cml.py` (thin wrapper over virl2_client, the only module touching the API), `catalog/` (YAML labs), `schema.py` (pydantic), `builder.py`, `connect.py` (console sessions), `grader.py` + `checks/` (check types), `report.py` (rich tables/JSON). Web UI (FastAPI) deferred to a later phase; it would reuse the same core.
 
 ## 2. Configuration
-Env vars (optionally `.env`): `CML_URL`, `CML_USERNAME`, `CML_PASSWORD`, `CML_VERIFY_SSL` (true/false/path-to-CA; default true, warn when false), `ENCOR_LAB_PREFIX` (default `ENCOR-`), `ENCOR_NODE_LIMIT` (override autodetected limit), `ENCOR_PLATFORM` (`iol` default | `iosv` | `cat8000v`). Credentials never written to disk or logs. Device creds for console login are defined per lab (default cisco/cisco), also overridable.
+Env vars (optionally `.env`): `CML_URL`, `CML_USERNAME`, `CML_PASSWORD`, `CML_VERIFY_SSL` (true/false/path-to-CA; default true, warn when false), `CMLLAB_LAB_PREFIX` (default `CML-`), `CMLLAB_NODE_LIMIT` (override autodetected limit), `CMLLAB_PLATFORM` (`iol` default | `iosv` | `cat8000v`). Credentials never written to disk or logs. Device creds for console login are defined per lab (default cisco/cisco), also overridable.
 
 ## 3. Lab definition format (one YAML per lab)
 ```yaml
@@ -76,7 +76,7 @@ Check types: `regex` (raw text, always available), `parsed` (Genie parser when `
 
 ## 7. Testing
 - Unit: pydantic schema, rendering to CML YAML (golden files), interface/platform mapping, node-limit math, check evaluators against captured show-output fixtures, all with mocked `ClientLibrary` (no network).
-- `encorlab validate --all` in CI: every lab parses, links reference real interfaces, ≤ limit, checks reference existing devices.
+- `cmllab validate --all` in CI: every lab parses, links reference real interfaces, ≤ limit, checks reference existing devices.
 - Integration (opt-in, `CML_URL` set): build -> apply solution.cfg -> check must score 100%; build untouched -> check must fail expected checks; destroy.
 
 ## 8. Open questions for Dylan
@@ -100,8 +100,8 @@ Check types: `regex` (raw text, always available), `parsed` (Genie parser when `
 ## 10. Phase 3 (v1.2.0): user labs, builder, AI
 - The 10 staged labs are enabled. Each has live and config checks, and all of them pass offline (solution 100%, starting config 0%, both platforms).
 - User labs go in `<settings folder>/labs/<id>/`, separate from the built-ins. Ids clashing with a built-in are rejected.
-- Pack = zip (`.encorlab`) with lab.yaml (+ solution.cfg, fixtures, README), or a single YAML with an embedded `solution:`. Limits: 5 MB, safe paths.
+- Pack = zip (`.cmllab`) with lab.yaml (+ solution.cfg, fixtures, README), or a single YAML with an embedded `solution:`. Limits: 5 MB, safe paths.
 - Strict lint (pack/import/AI): a solution is required, config checks must score 100% with the solution and 0% on the starting config, and live checks must do the same when fixtures exist.
 - Builder edits reuse the source lab's fixtures while they still match. Otherwise the fixtures are dropped with a warning.
 - The AI generator is optional and OpenAI-compatible, with no default provider. Its key is kept in memory or the keyring only. It retries up to 2 times, feeding the lint errors back.
-- docs/ is generated by `encorlab docs`. A test keeps it in sync.
+- docs/ is generated by `cmllab docs`. A test keeps it in sync.

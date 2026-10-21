@@ -5,8 +5,8 @@ import time
 
 import pytest
 
-from encorlab import config, console
-from encorlab.console import ConsoleError, SSHConsoleRunner, diagnose
+from cmllab import config, console
+from cmllab.console import ConsoleError, SSHConsoleRunner, diagnose
 
 ESC = "\x1b"
 
@@ -154,7 +154,7 @@ def runner(chan, **kw):
     s = config.Settings(cml_url="https://cml.x", username="u", password="p")
     for k, v in kw.pop("settings", {}).items():
         setattr(s, k, v)
-    return SSHConsoleRunner(s, "ENCOR-18-evpn-vxlan", client_factory=lambda: FakeSSH(chan),
+    return SSHConsoleRunner(s, "CML-18-evpn-vxlan", client_factory=lambda: FakeSSH(chan),
                             node_os={"LEAF1": "nxos", "R1": "ios"}, ready_timeout={"LEAF1": 20, "R1": 20}, **kw)
 
 
@@ -168,7 +168,7 @@ def test_nxos_login_prompt_quirks_and_command():
     r = runner(ch)
     out = r.run("LEAF1", "show clock")
     assert out.strip() == "14:02:01.123 UTC Tue Oct 20 2026"       # no escapes, no \r, no prompt
-    assert ch.sent[0] == "open /ENCOR-18-evpn-vxlan/LEAF1/0"
+    assert ch.sent[0] == "open /CML-18-evpn-vxlan/LEAF1/0"
     assert "cisco" in ch.sent and "terminal length 0" in ch.sent and "terminal width 511" in ch.sent
     assert "terminal width 0" not in ch.sent                        # NX-OS rejects width 0
     assert r._sessions["LEAF1"].hostname == "LEAF1"
@@ -247,14 +247,14 @@ def test_no_banner_after_open_still_works():
 def test_diagnose_reports_every_stage():
     s = config.Settings(cml_url="https://cml.x", username="u", password="p")
     ch = FakeNX()
-    d = diagnose(s, "ENCOR-18-evpn-vxlan", "LEAF1", "nxos", client_factory=lambda: FakeSSH(ch), ready_timeout=20)
+    d = diagnose(s, "CML-18-evpn-vxlan", "LEAF1", "nxos", client_factory=lambda: FakeSSH(ch), ready_timeout=20)
     assert d["ok"], d
     names = [x["name"] for x in d["stages"]]
-    assert names[0].startswith("SSH") and any(n.startswith("open /ENCOR-18-evpn-vxlan/LEAF1/0") for n in names)
+    assert names[0].startswith("SSH") and any(n.startswith("open /CML-18-evpn-vxlan/LEAF1/0") for n in names)
     login = next(x for x in d["stages"] if x["name"].startswith("log in"))
     assert "LEAF1#" in login["detail"] and "login prompt" in login["detail"]
     assert "UTC" in d["stages"][-1]["detail"] and "LEAF1" in d["tail"]
-    bad = diagnose(s, "ENCOR-18-evpn-vxlan", "LEAF1", "nxos", client_factory=lambda: FakeSSH(FakeNX(not_running=True)))
+    bad = diagnose(s, "CML-18-evpn-vxlan", "LEAF1", "nxos", client_factory=lambda: FakeSSH(FakeNX(not_running=True)))
     assert not bad["ok"] and bad["stages"][-1]["ok"] is False and "not running" in bad["stages"][-1]["detail"]
 
 
@@ -267,7 +267,7 @@ def test_ansi_osc_and_backspaces_are_stripped():
 # ---------------------------------------------------------------- SSH host key (trust on first use)
 def test_host_key_trust_on_first_use_store_show_forget(tmp_path, monkeypatch):
     import paramiko
-    monkeypatch.setenv("ENCOR_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CMLLAB_DATA_DIR", str(tmp_path))
     key = paramiko.RSAKey.generate(1024)
 
     class Cli:
@@ -291,7 +291,7 @@ def test_changed_host_key_is_a_clear_error_and_no_warning(tmp_path, monkeypatch)
     import warnings
 
     import paramiko
-    monkeypatch.setenv("ENCOR_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CMLLAB_DATA_DIR", str(tmp_path))
     old, new = paramiko.RSAKey.generate(1024), paramiko.RSAKey.generate(1024)
 
     def connect(self, host, **kw):
@@ -300,7 +300,7 @@ def test_changed_host_key_is_a_clear_error_and_no_warning(tmp_path, monkeypatch)
         self._policy.missing_host_key(self, host, new)
     monkeypatch.setattr(paramiko.SSHClient, "connect", connect)
     s = config.Settings(cml_url="https://192.168.11.96", username="u", password="p")
-    r = SSHConsoleRunner(s, "ENCOR-x")
+    r = SSHConsoleRunner(s, "CML-x")
     with warnings.catch_warnings():
         warnings.simplefilter("error")                               # a UserWarning would fail the test
         r._new_client()                                              # first use: stored, no warning
@@ -313,17 +313,17 @@ def test_changed_host_key_is_a_clear_error_and_no_warning(tmp_path, monkeypatch)
 def test_api_console_test_and_hostkey(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
-    from encorlab.web.app import create_app
-    monkeypatch.setenv("ENCOR_DATA_DIR", str(tmp_path))
+    from cmllab.web.app import create_app
+    monkeypatch.setenv("CMLLAB_DATA_DIR", str(tmp_path))
     store = config.SettingsStore(config.Settings(cml_url="https://cml.x", username="u", password="p"))
 
     class Lab:
-        title = "ENCOR-18-evpn-vxlan"
+        title = "CML-18-evpn-vxlan"
 
     class Cml:
         def find(self, lab, title=None):
             return Lab()
-    from encorlab import service
+    from cmllab import service
     monkeypatch.setattr(service, "make_cml", lambda s, cf=None: Cml())
     ch = FakeNX()
     app = create_app(store=store, persist=False, console_factory=lambda: FakeSSH(ch))

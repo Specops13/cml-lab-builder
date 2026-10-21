@@ -3,8 +3,8 @@ title: "Multicast and MPLS track"
 description: >-
   IP multicast, then MPLS: PIM sparse mode with a static RP, BSR with IGMPv3 and SSM, VRF-lite as a warm-up for
   VRFs, LDP in a provider core, and finally an MPLS L3VPN with MP-BGP VPNv4. Its labs come from the lab library (installed with the course; built in before ENCOR Lab Builder 2.0.0).
-author: ENCOR Lab Builder
-version: "1.0"
+author: CML Lab Builder
+version: "1.1"
 labs:
   - 14-multicast-pim-sm
   - 15-multicast-bsr-ssm

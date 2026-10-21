@@ -1,10 +1,10 @@
 """A fake GitHub release on 127.0.0.1, for tests and the smoke test of the automatic updater.
 
-    python packaging/fake_release.py --version 9.9.9 --file dist/encorlab-patch-9.9.9.zip [--port 0]
+    python packaging/fake_release.py --version 9.9.9 --file dist/cml-lab-builder-patch-9.9.9.zip [--port 0]
 
 Serves /repos/<repo>/releases/latest (GitHub's JSON shape, with an ETag and 304 answers to If-None-Match) and
 /download/<asset>; SHA256SUMS.txt is generated from the files. Point the app at it with
-ENCOR_UPDATE_URL=http://127.0.0.1:<port>/repos/Specops13/cml-lab-builder/releases/latest."""
+CMLLAB_UPDATE_URL=http://127.0.0.1:<port>/repos/Specops13/cml-lab-builder/releases/latest."""
 from __future__ import annotations
 
 import argparse
@@ -94,7 +94,7 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=0)
     a = ap.parse_args()
     f = FakeRelease(a.version, {Path(p).name: Path(p).read_bytes() for p in a.file}, a.port).start()
-    print(f"ENCOR_UPDATE_URL={f.url}", flush=True)
+    print(f"CMLLAB_UPDATE_URL={f.url}", flush=True)
     try:
         while True:
             time.sleep(3600)
