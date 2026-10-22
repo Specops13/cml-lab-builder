@@ -2,6 +2,15 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [Unreleased] - lab library update
+No app changes. Install from *Library & courses* (*Browse library*).
+### Added
+- **New library lab `19-evpn-mpls`: Walkthrough: BGP EVPN over MPLS (IOS-XE, IOL).** 8 `iol-xe` nodes (about 8 GB
+  RAM): OSPF + LDP core, iBGP `l2vpn evpn` through a route reflector, VLAN-based EVIs 10/20 with bridge domains and
+  service instances stretching two VLANs across three sites, route type 2/3 and MAC verification, same-VLAN pings,
+  and an optional EVPN-VPWS step. Published as `library/19-evpn-mpls.cmllab` (and `labs/19-evpn-mpls.encorlab` for
+  2.x). Expected outputs come from Cisco documentation and are not yet verified on CML.
+
 ## [3.0.0] - 2026-10-21
 **The full rename: the program, downloads, package, data and CML labs are all CML Lab Builder now.** This is a full
 download (new runtime 2), not a patch. ENCOR Lab Builder 1.7 - 2.1 find it by themselves and show *a full download

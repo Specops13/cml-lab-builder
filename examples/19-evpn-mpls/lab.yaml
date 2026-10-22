@@ -1,0 +1,817 @@
+id: 19-evpn-mpls
+type: walkthrough
+title: "Walkthrough: BGP EVPN over MPLS (IOS-XE, IOL)"
+blueprint: ["2.2", "2.3"]
+domain: "2.0 Virtualization"
+difficulty: 5
+platforms: [iol]
+summary: Step-by-step build of an EVPN over MPLS service provider core - OSPF and LDP in the core, iBGP l2vpn evpn through a route reflector, VLAN-based EVIs with bridge domains stretching VLANs 10 and 20 across three sites, route type 2/3 verification (optional EVPN-VPWS point-to-point service).
+author: CML Lab Builder
+version: "1"
+nodes:
+  - name: P1
+    kind: router
+    x: 0
+    y: 0
+    config: |
+      ! Core P router. Day-0: hostname only. You build the rest in the walkthrough steps.
+  - name: RR
+    kind: router
+    x: 0
+    y: -230
+    config: |
+      ! BGP route reflector. Day-0: hostname only. You build the rest in the walkthrough steps.
+  - name: PE1
+    kind: router
+    x: -320
+    y: -80
+    config: |
+      ! Provider edge for site 1. Day-0: hostname only. You build the rest in the walkthrough steps.
+  - name: PE2
+    kind: router
+    x: 320
+    y: -80
+    config: |
+      ! Provider edge for site 2. Day-0: hostname only. You build the rest in the walkthrough steps.
+  - name: PE3
+    kind: router
+    x: 0
+    y: 220
+    config: |
+      ! Provider edge for site 3. Day-0: hostname only. You build the rest in the walkthrough steps.
+  - name: CE1
+    kind: router
+    x: -600
+    y: -80
+    config: |
+      ! Site 1 customer device (an IOS router used as a VLAN 10/20 host) - already configured, do not change
+      interface %if0%
+       description trunk to PE1 (VLANs 10, 20)
+       mac-address 0010.0000.0001
+       no ip address
+       no shutdown
+      interface %if0%.10
+       encapsulation dot1Q 10
+       ip address 192.168.10.1 255.255.255.0
+      interface %if0%.20
+       encapsulation dot1Q 20
+       ip address 192.168.20.1 255.255.255.0
+      interface %if1%
+       description E-Line to PE1 port 2 (optional VPWS step)
+       mac-address 0010.0000.0101
+       no ip address
+       no shutdown
+      interface %if1%.100
+       encapsulation dot1Q 100
+       ip address 192.168.100.1 255.255.255.0
+  - name: CE2
+    kind: router
+    x: 600
+    y: -80
+    config: |
+      ! Site 2 customer device - already configured, do not change
+      interface %if0%
+       description trunk to PE2 (VLANs 10, 20)
+       mac-address 0010.0000.0002
+       no ip address
+       no shutdown
+      interface %if0%.10
+       encapsulation dot1Q 10
+       ip address 192.168.10.2 255.255.255.0
+      interface %if0%.20
+       encapsulation dot1Q 20
+       ip address 192.168.20.2 255.255.255.0
+  - name: CE3
+    kind: router
+    x: 0
+    y: 450
+    config: |
+      ! Site 3 customer device - already configured, do not change
+      interface %if0%
+       description trunk to PE3 (VLANs 10, 20)
+       mac-address 0010.0000.0003
+       no ip address
+       no shutdown
+      interface %if0%.10
+       encapsulation dot1Q 10
+       ip address 192.168.10.3 255.255.255.0
+      interface %if0%.20
+       encapsulation dot1Q 20
+       ip address 192.168.20.3 255.255.255.0
+      interface %if1%
+       description E-Line to PE3 port 2 (optional VPWS step)
+       mac-address 0010.0000.0103
+       no ip address
+       no shutdown
+      interface %if1%.100
+       encapsulation dot1Q 100
+       ip address 192.168.100.3 255.255.255.0
+links:
+  - {a: {node: P1, port: 0}, b: {node: PE1, port: 0}}
+  - {a: {node: P1, port: 1}, b: {node: PE2, port: 0}}
+  - {a: {node: P1, port: 2}, b: {node: PE3, port: 0}}
+  - {a: {node: P1, port: 3}, b: {node: RR, port: 0}}
+  - {a: {node: PE1, port: 1}, b: {node: CE1, port: 0}}
+  - {a: {node: PE2, port: 1}, b: {node: CE2, port: 0}}
+  - {a: {node: PE3, port: 1}, b: {node: CE3, port: 0}}
+  - {a: {node: PE1, port: 2}, b: {node: CE1, port: 1}}
+  - {a: {node: PE3, port: 2}, b: {node: CE3, port: 1}}
+task: |
+  A guided build, not a graded challenge. You turn five empty IOS-XE routers into a small MPLS service
+  provider core and sell a customer an **EVPN over MPLS** Layer 2 service: **VLAN 10** and **VLAN 20** are
+  stretched across three sites, so the customer devices in the same VLAN talk at Layer 2 through the core.
+
+  **The pieces**
+
+  - **Core (underlay)**: OSPF area 0 so every loopback is reachable, and **LDP** so every PE has an MPLS
+    label-switched path (LSP) to every other PE. P1 is a pure label switch: it never learns customer MACs and
+    never runs BGP.
+  - **Control plane**: iBGP AS 65000 with the `l2vpn evpn` address family. **RR** is a route reflector; the
+    three PEs only peer with RR.
+  - **Service**: one VLAN-based **EVPN instance (EVI)** per VLAN (EVI 10 = VLAN 10, EVI 20 = VLAN 20), tied
+    to a **bridge domain** on each PE that also holds the customer-facing **service instance** (EFP).
+  - **Optional**: an EVPN-VPWS point-to-point "E-Line" between CE1 and CE3 (VLAN 100).
+
+  | Device | Loopback0 | Ports |
+  |---|---|---|
+  | P1 | 10.0.0.10 | Ethernet0/0 PE1, Ethernet0/1 PE2, Ethernet0/2 PE3, Ethernet0/3 RR |
+  | RR | 10.0.0.100 | Ethernet0/0 P1 |
+  | PE1 | 10.0.0.1 | Ethernet0/0 P1, Ethernet0/1 CE1 (trunk 10/20), Ethernet0/2 CE1 (VPWS) |
+  | PE2 | 10.0.0.2 | Ethernet0/0 P1, Ethernet0/1 CE2 (trunk 10/20) |
+  | PE3 | 10.0.0.3 | Ethernet0/0 P1, Ethernet0/1 CE3 (trunk 10/20), Ethernet0/2 CE3 (VPWS) |
+
+  Core links are /30s with P1 taking .2: PE1-P1 10.10.1.0/30, PE2-P1 10.10.2.0/30, PE3-P1 10.10.3.0/30,
+  RR-P1 10.10.100.0/30. The CEs are already configured with 802.1Q subinterfaces: CEn has 192.168.10.n
+  (VLAN 10) and 192.168.20.n (VLAN 20), and its trunk port uses MAC 0010.0000.000n so you can spot it in
+  the EVPN tables.
+
+  **Resources**: 8 x IOL-XE routers (about 1 GB RAM each), so about 8 GB of CML RAM; they boot in about a
+  minute. EVPN over MPLS needs an IOS-XE image with the L2VPN EVPN feature (recent CML IOL-XE images have
+  the commands); the control plane is the same as on an ASR 1000 / ASR 900.
+
+  Work through the steps in order. Each step explains the idea, gives the exact config (copy it into the
+  console, or use **Apply this step for me**), and lists the commands to verify it. **Check this step**
+  runs those checks for you.
+steps:
+  - id: topology
+    title: "The service: EVPN over MPLS and what it replaces"
+    explain: |
+      A service provider wants to give a customer one Layer 2 network across several sites. The classic
+      answer is **VPLS**: a full mesh of pseudowires, MAC learning in the data plane by flooding, no
+      all-active multihoming. **EVPN** (RFC 7432) keeps the MPLS core but moves MAC learning into **BGP**:
+
+      - **type 3 (IMET, Inclusive Multicast Ethernet Tag)**: "I am a PE in EVI 10, send me BUM traffic with
+        this label" - builds the flood list (ingress replication).
+      - **type 2 (MAC/IP advertisement)**: "MAC 0010.0000.0003 lives behind PE 10.0.0.3, use this label".
+      - **type 1 (Ethernet auto-discovery)** and **type 4 (Ethernet segment)**: multihoming and EVPN-VPWS
+        (the optional last step uses type 1).
+
+      The data plane is plain MPLS: a frame for a remote MAC gets the **EVPN service label** the remote PE
+      advertised in its type 2 route, then the **LDP transport label** towards that PE's loopback. P1 only
+      swaps the transport label. EVPN can also run over VXLAN (see the *BGP EVPN VXLAN* walkthrough) or over
+      segment routing (SR-MPLS) instead of LDP - the BGP part is identical.
+
+      This first step only checks the cabling. The core routers start with just a hostname.
+    verify:
+      - device: P1
+        command: show cdp neighbors
+        expect: PE1 on `Eth 0/0`, PE2 on `Eth 0/1`, PE3 on `Eth 0/2`, RR on `Eth 0/3`.
+      - device: PE1
+        command: show cdp neighbors
+        expect: P1 on `Eth 0/0`, CE1 on `Eth 0/1` and `Eth 0/2`.
+    checks:
+      - id: topo-p1-cdp
+        description: P1 sees all three PEs and the route reflector over CDP
+        device: P1
+        command: show cdp neighbors
+        match: ['^PE1\S*\s+Eth ?0/0\b', '^PE2\S*\s+Eth ?0/1\b', '^PE3\S*\s+Eth ?0/2\b', '^RR\S*\s+Eth ?0/3\b']
+        hint: Wait until every node has booted; CDP needs about a minute after boot. Check the links in CML.
+      - id: topo-pe1-cdp
+        description: PE1 sees P1 and CE1 over CDP
+        device: PE1
+        command: show cdp neighbors
+        match: ['^P1\S*\s+Eth ?0/0\b', '^CE1\S*\s+Eth ?0/1\b']
+        hint: Check the PE1-P1 and PE1-CE1 links in CML.
+  - id: core-igp
+    title: "Core 1: addressing and OSPF so every loopback is reachable"
+    explain: |
+      BGP next hops in EVPN are the PE **loopbacks**, and every LSP ends at a loopback, so the core needs an
+      IGP that carries all /32 loopbacks. **OSPF area 0** with **point-to-point** links (no DR/BDR election)
+      is enough here; IS-IS is just as common in SP cores.
+
+      Interfaces join OSPF with `ip ospf 1 area 0` instead of `network` statements, and the loopback is
+      the OSPF router ID. RR gets OSPF too: it must reach every PE loopback to peer with it, but it sits off
+      to the side and never forwards customer traffic.
+    config:
+      P1: |
+        interface Loopback0
+         ip address 10.0.0.10 255.255.255.255
+         ip ospf 1 area 0
+        interface %if0%
+         description to PE1
+         ip address 10.10.1.2 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if1%
+         description to PE2
+         ip address 10.10.2.2 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if2%
+         description to PE3
+         ip address 10.10.3.2 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if3%
+         description to RR
+         ip address 10.10.100.2 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        router ospf 1
+         router-id 10.0.0.10
+      RR: |
+        interface Loopback0
+         ip address 10.0.0.100 255.255.255.255
+         ip ospf 1 area 0
+        interface %if0%
+         description to P1
+         ip address 10.10.100.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        router ospf 1
+         router-id 10.0.0.100
+      PE1: |
+        interface Loopback0
+         ip address 10.0.0.1 255.255.255.255
+         ip ospf 1 area 0
+        interface %if0%
+         description to P1
+         ip address 10.10.1.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        router ospf 1
+         router-id 10.0.0.1
+      PE2: |
+        interface Loopback0
+         ip address 10.0.0.2 255.255.255.255
+         ip ospf 1 area 0
+        interface %if0%
+         description to P1
+         ip address 10.10.2.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        router ospf 1
+         router-id 10.0.0.2
+      PE3: |
+        interface Loopback0
+         ip address 10.0.0.3 255.255.255.255
+         ip ospf 1 area 0
+        interface %if0%
+         description to P1
+         ip address 10.10.3.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        router ospf 1
+         router-id 10.0.0.3
+    verify:
+      - device: P1
+        command: show ip ospf neighbor
+        expect: Four neighbors (10.0.0.1, 10.0.0.2, 10.0.0.3, 10.0.0.100), all `FULL/  -` (point-to-point, no DR).
+      - device: PE1
+        command: show ip route ospf
+        expect: "`O 10.0.0.2/32`, `10.0.0.3/32`, `10.0.0.10/32` and `10.0.0.100/32`, all via 10.10.1.2."
+      - device: PE1
+        command: ping 10.0.0.3 source Loopback0
+        expect: "`Success rate is 100 percent (5/5)` (the first packet may be lost to ARP)."
+    checks:
+      - id: igp-p1-neighbors
+        description: P1 has a FULL point-to-point OSPF adjacency with PE1, PE2, PE3 and RR
+        device: P1
+        command: show ip ospf neighbor
+        match: ['^10\.0\.0\.1\s+\d+\s+FULL', '^10\.0\.0\.2\s+\d+\s+FULL', '^10\.0\.0\.3\s+\d+\s+FULL', '^10\.0\.0\.100\s+\d+\s+FULL']
+        hint: Both ends of each link need the /30, `ip ospf 1 area 0`, the same network type and `no shutdown`.
+      - id: igp-pe1-routes
+        description: PE1 has OSPF routes to the other PE loopbacks and to RR
+        device: PE1
+        command: show ip route ospf
+        match: ['10\.0\.0\.2/32', '10\.0\.0\.3/32', '10\.0\.0\.100/32']
+        hint: Each Loopback0 needs `ip ospf 1 area 0` so it is advertised.
+      - id: igp-pe1-ping-pe3
+        description: PE1 pings PE3's loopback from its own loopback
+        device: PE1
+        command: ping 10.0.0.3 source Loopback0
+        min_success: 60
+        hint: Check `show ip route 10.0.0.3` on PE1 and P1.
+      - id: igp-pe1-cfg
+        description: PE1 has Loopback0 and a point-to-point OSPF core link
+        device: PE1
+        mode: config
+        match: ['^interface Loopback0\n(?:[ \t]+.*\n)*?[ \t]+ip address 10\.0\.0\.1 255\.255\.255\.255', '^interface %if0%\n(?:[ \t]+.*\n)*?[ \t]+ip ospf network point-to-point']
+        hint: Paste the PE1 block of this step.
+  - id: core-ldp
+    title: "Core 2: MPLS with LDP - label-switched paths between the PEs"
+    explain: |
+      EVPN traffic crosses the core with **two labels**: the inner EVPN service label (from BGP, next steps)
+      and an outer **transport label** that gets the packet to the egress PE. **LDP** hands out the transport
+      labels: every router binds a label to every IGP prefix and tells its neighbors, so PE1 learns which label
+      to push to reach 10.0.0.3/32 through P1.
+
+      `mpls ldp router-id Loopback0 force` makes the LDP ID the loopback (it must be reachable - it is, via
+      OSPF), and `mpls ip` on a core link starts LDP discovery there. P1 is the **penultimate hop** for each
+      PE loopback, so it pops the transport label (`Pop Label`) and the egress PE only sees the service label.
+
+      RR gets no MPLS: it is only a BGP speaker, and the BGP next hop of every EVPN route stays the
+      originating PE (route reflectors do not change it), so traffic never goes through RR.
+
+      Large cores often use **segment routing** (SR-MPLS: labels carried in OSPF/IS-IS, no LDP) instead -
+      EVPN works the same on top of either.
+    config:
+      P1: |
+        mpls ldp router-id Loopback0 force
+        interface %if0%
+         mpls ip
+        interface %if1%
+         mpls ip
+        interface %if2%
+         mpls ip
+      PE1: |
+        mpls ldp router-id Loopback0 force
+        interface %if0%
+         mpls ip
+      PE2: |
+        mpls ldp router-id Loopback0 force
+        interface %if0%
+         mpls ip
+      PE3: |
+        mpls ldp router-id Loopback0 force
+        interface %if0%
+         mpls ip
+    verify:
+      - device: P1
+        command: show mpls ldp neighbor
+        expect: "Three peers `10.0.0.1:0`, `10.0.0.2:0` and `10.0.0.3:0`, each `State: Oper`."
+      - device: PE1
+        command: show mpls forwarding-table 10.0.0.3 32
+        expect: A numeric outgoing label for `10.0.0.3/32` via `Et0/0` and next hop 10.10.1.2.
+      - device: PE1
+        command: ping mpls ipv4 10.0.0.3/32 repeat 5
+        expect: "An LSP ping: `!!!!!` and `Success rate is 100 percent (5/5)`."
+    checks:
+      - id: ldp-p1-neighbors
+        description: P1 has an operational LDP session with every PE
+        device: P1
+        command: show mpls ldp neighbor
+        match: ['Peer LDP Ident: 10\.0\.0\.1:0', 'Peer LDP Ident: 10\.0\.0\.2:0', 'Peer LDP Ident: 10\.0\.0\.3:0', 'State: Oper']
+        hint: Every core link to a PE needs `mpls ip` on both ends; the LDP router ID (Loopback0) must be in OSPF.
+      - id: ldp-pe1-label-pe3
+        description: PE1 has a transport label for PE3's loopback
+        device: PE1
+        command: show mpls forwarding-table 10.0.0.3 32
+        match: ['^\d+\s+\d+\s+10\.0\.0\.3/32\s']
+        hint: '`No Label` means P1 has not sent a binding: check the LDP session between PE1 and P1.'
+      - id: ldp-pe1-lsp-ping
+        description: An MPLS LSP ping from PE1 to PE3's loopback succeeds
+        device: PE1
+        command: ping mpls ipv4 10.0.0.3/32 repeat 5
+        min_success: 60
+        hint: Check `show mpls ldp bindings 10.0.0.3 32` on PE1 and P1.
+      - id: ldp-pe1-cfg
+        description: PE1 runs LDP on its core link with Loopback0 as router ID
+        device: PE1
+        mode: config
+        match: ['^mpls ldp router-id Loopback0 force', '^interface %if0%\n(?:[ \t]+.*\n)*?[ \t]+mpls ip\b']
+        hint: Paste the PE1 block of this step.
+  - id: bgp-evpn
+    title: "Control plane: iBGP l2vpn evpn through a route reflector"
+    explain: |
+      EVPN routes travel in BGP's **L2VPN EVPN** address family (AFI 25, SAFI 70). All PEs are in AS 65000,
+      and iBGP routes are not passed on from one iBGP peer to another, so without help you would need a full
+      mesh of sessions. A **route reflector** fixes that: each PE peers only with RR, and RR reflects the
+      routes of each client to the others (keeping the original next hop).
+
+      - Peer **loopback to loopback** (`update-source Loopback0`), so a session never depends on one link.
+      - `no bgp default ipv4-unicast` stops IOS from also opening an IPv4 unicast session - only EVPN is needed.
+      - `send-community both`: EVPN depends on **extended communities** (route targets, the MAC mobility
+        sequence, the encapsulation type).
+      - On RR, `route-reflector-client` inside `address-family l2vpn evpn`. RR keeps every EVPN route even
+        without local EVIs (route-target filtering is off on a route reflector).
+    config:
+      RR: |
+        router bgp 65000
+         bgp router-id 10.0.0.100
+         bgp log-neighbor-changes
+         no bgp default ipv4-unicast
+         neighbor 10.0.0.1 remote-as 65000
+         neighbor 10.0.0.1 update-source Loopback0
+         neighbor 10.0.0.2 remote-as 65000
+         neighbor 10.0.0.2 update-source Loopback0
+         neighbor 10.0.0.3 remote-as 65000
+         neighbor 10.0.0.3 update-source Loopback0
+         address-family l2vpn evpn
+          neighbor 10.0.0.1 activate
+          neighbor 10.0.0.1 send-community both
+          neighbor 10.0.0.1 route-reflector-client
+          neighbor 10.0.0.2 activate
+          neighbor 10.0.0.2 send-community both
+          neighbor 10.0.0.2 route-reflector-client
+          neighbor 10.0.0.3 activate
+          neighbor 10.0.0.3 send-community both
+          neighbor 10.0.0.3 route-reflector-client
+         exit-address-family
+      PE1: |
+        router bgp 65000
+         bgp router-id 10.0.0.1
+         bgp log-neighbor-changes
+         no bgp default ipv4-unicast
+         neighbor 10.0.0.100 remote-as 65000
+         neighbor 10.0.0.100 update-source Loopback0
+         address-family l2vpn evpn
+          neighbor 10.0.0.100 activate
+          neighbor 10.0.0.100 send-community both
+         exit-address-family
+      PE2: |
+        router bgp 65000
+         bgp router-id 10.0.0.2
+         bgp log-neighbor-changes
+         no bgp default ipv4-unicast
+         neighbor 10.0.0.100 remote-as 65000
+         neighbor 10.0.0.100 update-source Loopback0
+         address-family l2vpn evpn
+          neighbor 10.0.0.100 activate
+          neighbor 10.0.0.100 send-community both
+         exit-address-family
+      PE3: |
+        router bgp 65000
+         bgp router-id 10.0.0.3
+         bgp log-neighbor-changes
+         no bgp default ipv4-unicast
+         neighbor 10.0.0.100 remote-as 65000
+         neighbor 10.0.0.100 update-source Loopback0
+         address-family l2vpn evpn
+          neighbor 10.0.0.100 activate
+          neighbor 10.0.0.100 send-community both
+         exit-address-family
+    verify:
+      - device: RR
+        command: show bgp l2vpn evpn summary
+        expect: |
+          Three neighbors 10.0.0.1-3 in AS 65000 with a number (prefixes received, 0 for now) in the last
+          column instead of `Idle` or `Active`.
+      - device: PE1
+        command: show bgp l2vpn evpn summary
+        expect: Neighbor 10.0.0.100, AS 65000, a number in the State/PfxRcd column.
+    checks:
+      - id: bgp-rr-summary
+        description: RR has established l2vpn evpn sessions with PE1, PE2 and PE3
+        device: RR
+        command: show bgp l2vpn evpn summary
+        match: ['^10\.0\.0\.1\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.0\.2\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.0\.3\s+4\s+65000\s.*\s\d+\s*$']
+        hint: '`Idle`/`Active` means no session: check update-source Loopback0 on both sides and that the loopbacks ping each other.'
+      - id: bgp-pe1-summary
+        description: PE1 has an established l2vpn evpn session with RR
+        device: PE1
+        command: show bgp l2vpn evpn summary
+        match: ['^10\.0\.0\.100\s+4\s+65000\s.*\s\d+\s*$']
+        hint: The neighbor must be activated under `address-family l2vpn evpn`.
+      - id: bgp-rr-cfg
+        description: RR reflects l2vpn evpn routes to its clients with extended communities
+        device: RR
+        mode: config
+        match: ['^router bgp 65000\n(?:[ \t]+.*\n|[ \t]*!\n)*?[ \t]+address-family l2vpn evpn', '^[ \t]+neighbor 10\.0\.0\.1 route-reflector-client', '^[ \t]+neighbor 10\.0\.0\.3 send-community (both|extended)']
+        hint: Paste the RR block of this step.
+  - id: evi
+    title: "Service 1: EVPN globally and one EVPN instance per VLAN"
+    explain: |
+      `l2vpn evpn` holds the global EVPN settings:
+      - `replication-type ingress`: BUM traffic (broadcast, unknown unicast, multicast) is copied by the
+        ingress PE to every remote PE in the flood list built from **type 3** routes - no multicast in the core.
+      - `router-id Loopback0`: used for the automatic route distinguisher and as the originator in the
+        type 3 routes.
+
+      An **EVPN instance (EVI)** is the customer's virtual switch across the provider network. With
+      `vlan-based` each EVI carries exactly one VLAN (one bridge domain); `vlan-bundle` and `vlan-aware`
+      (with `ethernet-tag`) put several VLANs into one EVI.
+
+      With no further commands the EVI gets an automatic **RD** (router-id:EVI, e.g. 10.0.0.1:10, unique per
+      PE) and an automatic **route target** (AS:EVI, 65000:10, the same on every PE - that is what makes
+      the PEs import each other's routes). You could set them by hand with `rd`, `route-target` and
+      `no auto-route-target`. The encapsulation is MPLS by default.
+
+      The EVI only comes up once a bridge domain uses it (next step), so this step is checked on the config.
+    config:
+      PE1: |
+        l2vpn evpn
+         replication-type ingress
+         router-id Loopback0
+        l2vpn evpn instance 10 vlan-based
+        l2vpn evpn instance 20 vlan-based
+      PE2: |
+        l2vpn evpn
+         replication-type ingress
+         router-id Loopback0
+        l2vpn evpn instance 10 vlan-based
+        l2vpn evpn instance 20 vlan-based
+      PE3: |
+        l2vpn evpn
+         replication-type ingress
+         router-id Loopback0
+        l2vpn evpn instance 10 vlan-based
+        l2vpn evpn instance 20 vlan-based
+    verify:
+      - device: PE1
+        command: show running-config | section l2vpn
+        expect: The `l2vpn evpn` block with ingress replication and `l2vpn evpn instance 10 vlan-based` / `20`.
+      - device: PE1
+        command: show l2vpn evpn evi
+        expect: EVI 10 and EVI 20 listed (not yet `Established` - no bridge domain uses them).
+    checks:
+      - id: evi-pe1-cfg
+        description: PE1 has the global EVPN settings and VLAN-based EVIs 10 and 20
+        device: PE1
+        mode: config
+        match: ['^l2vpn evpn\s*\n(?:[ \t]+.*\n)*?[ \t]+replication-type ingress', '^l2vpn evpn\s*\n(?:[ \t]+.*\n)*?[ \t]+router-id Loopback0', '^l2vpn evpn instance 10 vlan-based', '^l2vpn evpn instance 20 vlan-based']
+        hint: Paste the PE1 block of this step.
+      - id: evi-pe2-cfg
+        description: PE2 has VLAN-based EVIs 10 and 20
+        device: PE2
+        mode: config
+        match: ['^l2vpn evpn\s*\n(?:[ \t]+.*\n)*?[ \t]+replication-type ingress', '^l2vpn evpn instance 10 vlan-based', '^l2vpn evpn instance 20 vlan-based']
+        hint: Paste the PE2 block of this step.
+      - id: evi-pe3-cfg
+        description: PE3 has VLAN-based EVIs 10 and 20
+        device: PE3
+        mode: config
+        match: ['^l2vpn evpn\s*\n(?:[ \t]+.*\n)*?[ \t]+replication-type ingress', '^l2vpn evpn instance 10 vlan-based', '^l2vpn evpn instance 20 vlan-based']
+        hint: Paste the PE3 block of this step.
+  - id: bridge-domains
+    title: "Service 2: service instances and bridge domains - extend VLANs 10 and 20"
+    explain: |
+      On IOS-XE a PE's customer port is not a switchport. Instead the port carries **service instances**
+      (Ethernet flow points, EFPs): `service instance 10 ethernet` + `encapsulation dot1q 10` catches the
+      frames the CE sends tagged with VLAN 10. The port itself has no IP address.
+
+      A **bridge domain** is the local Layer 2 switch for one VLAN. It gets two members:
+      - the service instance (`member Ethernet0/1 service-instance 10`) - the local attachment circuit,
+      - the EVI (`member evpn-instance 10`) - the "virtual port" towards every remote PE in EVI 10.
+
+      As soon as the EVI has a bridge domain it comes up: the PE allocates a **per-BD (unicast) label** and a
+      **BUM label** and advertises a **type 3 (IMET)** route for EVI 10. Each PE imports the IMET routes of the
+      other PEs (route target 65000:10) and builds its ingress replication list from them.
+
+      The VLAN tag stays on the frame across the core (the same VLAN ID is used at every site); with
+      different VLAN IDs per site you would add `rewrite ingress tag pop 1 symmetric`.
+    config:
+      PE1: |
+        interface %if1%
+         description trunk to CE1 (VLANs 10, 20)
+         no ip address
+         no shutdown
+         service instance 10 ethernet
+          encapsulation dot1q 10
+         service instance 20 ethernet
+          encapsulation dot1q 20
+        bridge-domain 10
+         member %if1% service-instance 10
+         member evpn-instance 10
+        bridge-domain 20
+         member %if1% service-instance 20
+         member evpn-instance 20
+      PE2: |
+        interface %if1%
+         description trunk to CE2 (VLANs 10, 20)
+         no ip address
+         no shutdown
+         service instance 10 ethernet
+          encapsulation dot1q 10
+         service instance 20 ethernet
+          encapsulation dot1q 20
+        bridge-domain 10
+         member %if1% service-instance 10
+         member evpn-instance 10
+        bridge-domain 20
+         member %if1% service-instance 20
+         member evpn-instance 20
+      PE3: |
+        interface %if1%
+         description trunk to CE3 (VLANs 10, 20)
+         no ip address
+         no shutdown
+         service instance 10 ethernet
+          encapsulation dot1q 10
+         service instance 20 ethernet
+          encapsulation dot1q 20
+        bridge-domain 10
+         member %if1% service-instance 10
+         member evpn-instance 10
+        bridge-domain 20
+         member %if1% service-instance 20
+         member evpn-instance 20
+    verify:
+      - device: PE1
+        command: show l2vpn evpn evi detail
+        expect: |
+          EVI 10 and EVI 20 `(VLAN Based)`, `State: Established`, `Encapsulation: mpls`, an auto RD
+          (10.0.0.1:10) and route target 65000:10, and a `Per-BD Label` and `BUM Label` for each bridge domain.
+      - device: PE1
+        command: show bgp l2vpn evpn route-type 3
+        expect: |
+          IMET routes (prefixes starting with `[3]`) for EVIs 10 and 20 from PE1 itself and from
+          10.0.0.2 and 10.0.0.3 (reflected by RR, so the next hop is still the originating PE).
+      - device: PE1
+        command: show l2vpn evpn imet
+        expect: Remote originators 10.0.0.2 and 10.0.0.3 for EVI 10 and 20 - the ingress replication list.
+    checks:
+      - id: bd-pe1-evi-up
+        description: PE1's EVIs 10 and 20 are established with MPLS encapsulation
+        device: PE1
+        command: show l2vpn evpn evi detail
+        match: ['EVPN instance:\s+10\b', 'EVPN instance:\s+20\b', 'State:\s+Established', 'Encapsulation:\s+mpls']
+        hint: An EVI only comes up once a bridge domain has `member evpn-instance <evi>`.
+      - id: bd-pe1-imet
+        description: PE1 has type 3 (IMET) routes from PE2 and PE3
+        device: PE1
+        command: show bgp l2vpn evpn route-type 3
+        match: ['\[3\]\[10\.0\.0\.2:10\]', '\[3\]\[10\.0\.0\.3:10\]', '\[3\]\[10\.0\.0\.3:20\]']
+        hint: No remote type 3 routes means the BGP sessions, the route targets or the remote EVIs are missing.
+      - id: bd-pe1-bd10
+        description: PE1's bridge domain 10 is up
+        device: PE1
+        command: show bridge-domain 10
+        match: ['^Bridge-domain 10\b', 'State:\s+UP']
+        hint: The bridge domain needs the service instance and the EVI as members, and Ethernet0/1 must be up.
+      - id: bd-pe1-cfg
+        description: PE1 has service instances 10/20 and bridge domains 10/20 with the EVIs as members
+        device: PE1
+        mode: config
+        match: ['^interface %if1%\n(?:[ \t]+.*\n)*?[ \t]+service instance 10 ethernet\n[ \t]+encapsulation dot1q 10\b', '^bridge-domain 10\s*\n(?:[ \t]+.*\n)*?[ \t]+member %if1% service-instance 10\b', '^bridge-domain 10\s*\n(?:[ \t]+.*\n)*?[ \t]+member evpn-instance 10\b', '^bridge-domain 20\s*\n(?:[ \t]+.*\n)*?[ \t]+member evpn-instance 20\b']
+        hint: Paste the PE1 block of this step.
+      - id: bd-pe3-cfg
+        description: PE3 has bridge domains 10/20 with the EVIs as members
+        device: PE3
+        mode: config
+        match: ['^bridge-domain 10\s*\n(?:[ \t]+.*\n)*?[ \t]+member evpn-instance 10\b', '^bridge-domain 20\s*\n(?:[ \t]+.*\n)*?[ \t]+member evpn-instance 20\b']
+        hint: Paste the PE3 block of this step.
+  - id: verify-l2
+    title: "Verify: MAC learning, type 2 routes and same-VLAN ping across sites"
+    explain: |
+      Nothing to configure - generate traffic and follow it through the control plane.
+
+      1. CE1 pings 192.168.10.3. Its ARP broadcast enters PE1 on service instance 10. PE1 **learns CE1's MAC
+         locally** (data plane) and floods the broadcast to PE2 and PE3 with each one's BUM label (from their
+         type 3 routes).
+      2. PE1 advertises CE1's MAC in a **type 2 route** (RD 10.0.0.1:10, MAC 0010.0000.0001, label = PE1's
+         per-BD label). RR reflects it, and PE2/PE3 install the MAC as reachable via 10.0.0.1. CE3's reply
+         goes the same way the other direction.
+      3. From now on unicast frames are not flooded: PE1 pushes PE3's EVPN label plus the LDP label for
+         10.0.0.3 and P1 just label-switches.
+
+      In `show bridge-domain` a locally learned MAC points to the service instance, a remote one to the EVPN
+      instance; `show l2vpn evpn mac` lists the next hop (local port or remote PE loopback).
+    verify:
+      - device: CE1
+        command: ping 192.168.10.3
+        expect: "`Success rate is 80 percent (4/5)` or better (the first packet is lost to ARP)."
+      - device: CE1
+        command: ping 192.168.20.2
+        expect: The same for VLAN 20 towards site 2.
+      - device: PE1
+        command: show l2vpn evpn mac
+        expect: |
+          0010.0000.0001 with the local next hop (Et0/1 service instance), 0010.0000.0002 via 10.0.0.2 and
+          0010.0000.0003 via 10.0.0.3, in EVI/BD 10 and 20.
+      - device: PE1
+        command: show bgp l2vpn evpn route-type 2
+        expect: |
+          Type 2 routes (`[2]...[48][<MAC>]...`) for the three CE MACs, the remote ones with next hops 10.0.0.2
+          and 10.0.0.3.
+      - device: PE1
+        command: show bridge-domain 10
+        expect: The local CE1 MAC on `Ethernet0/1 service instance 10` and the remote MACs on `EVPN Instance 10`.
+      - device: PE1
+        command: show mpls forwarding-table
+        expect: Local labels for `evpn(uc:bd 10)` / `evpn(mc:bd 10)` (and 20) next to the LDP labels.
+    checks:
+      - id: l2-ce1-ce3-vlan10
+        description: CE1 pings CE3 in VLAN 10 across the EVPN/MPLS core
+        device: CE1
+        command: ping 192.168.10.3
+        min_success: 60
+        hint: Check the type 3 routes first (BUM/ARP must reach the remote PE), then the bridge domain members.
+      - id: l2-ce1-ce2-vlan20
+        description: CE1 pings CE2 in VLAN 20 across the core
+        device: CE1
+        command: ping 192.168.20.2
+        min_success: 60
+        hint: Check EVI 20 and bridge domain 20 on PE1 and PE2.
+      - id: l2-pe1-evpn-mac
+        description: PE1 knows CE3's MAC via PE3 and CE1's MAC locally
+        device: PE1
+        command: show l2vpn evpn mac
+        match: ['(?i)^0010\.0000\.0003\s.*\b10\.0\.0\.3\b', '(?i)^0010\.0000\.0001\s']
+        hint: A remote MAC appears only after traffic from it (run the pings) and needs the type 2 route from PE3.
+      - id: l2-pe1-type2
+        description: PE1 has type 2 (MAC) routes for CE2 and CE3
+        device: PE1
+        command: show bgp l2vpn evpn route-type 2
+        match: ['(?i)\[2\]\[10\.0\.0\.3:10\]\[0\]\[48\]\[0010\.?0000\.?0003\]', '(?i)\[2\]\[10\.0\.0\.2:20\]\[0\]\[48\]\[0010\.?0000\.?0002\]']
+        hint: Run the pings first; a PE only advertises MACs it has learned.
+  - id: vpws
+    title: "Optional: EVPN-VPWS - a point-to-point E-Line between CE1 and CE3"
+    optional: true
+    explain: |
+      Not every customer wants a bridged LAN. **EVPN-VPWS** (RFC 8214) builds a point-to-point pseudowire
+      with the same BGP EVPN machinery but **no MAC learning**: whatever enters the attachment circuit on PE1
+      leaves on PE3 and vice versa.
+
+      - The EVI is `point-to-point` instead of `vlan-based`, and it has a `vpws context`.
+      - Each end has a local **source** ID and the remote end's **target** ID: PE1 is source 1 / target 3,
+        PE3 is source 3 / target 1.
+      - The PEs advertise **type 1 (Ethernet A-D per EVI)** routes carrying the VPWS ID and the label; no
+        type 2 or type 3 routes are used.
+
+      CE1 and CE3 use their second port with a VLAN 100 subinterface (192.168.100.1 and .3), already set up.
+    config:
+      PE1: |
+        interface %if2%
+         description E-Line to CE1
+         no ip address
+         no shutdown
+         service instance 100 ethernet
+          encapsulation dot1q 100
+        l2vpn evpn instance 100 point-to-point
+         vpws context CE1-CE3
+          service target 3 source 1
+          member %if2% service-instance 100
+          no shutdown
+      PE3: |
+        interface %if2%
+         description E-Line to CE3
+         no ip address
+         no shutdown
+         service instance 100 ethernet
+          encapsulation dot1q 100
+        l2vpn evpn instance 100 point-to-point
+         vpws context CE1-CE3
+          service target 1 source 3
+          member %if2% service-instance 100
+          no shutdown
+    verify:
+      - device: PE1
+        command: show l2vpn evpn evi 100 detail
+        expect: EVI 100 `(Point to Point)` with the VPWS context CE1-CE3, state `Established`.
+      - device: PE1
+        command: show bgp l2vpn evpn route-type 1
+        expect: Type 1 routes (`[1]...`) for EVI 100 from PE1 and PE3 (next hop 10.0.0.3).
+      - device: CE1
+        command: ping 192.168.100.3
+        expect: "`Success rate is 80 percent` or better."
+    checks:
+      - id: vpws-ce1-ce3-ping
+        description: CE1 pings CE3 over the EVPN-VPWS E-Line
+        device: CE1
+        command: ping 192.168.100.3
+        min_success: 60
+        hint: Source and target must mirror each other on PE1 and PE3, and both service instances must be up.
+      - id: vpws-pe1-type1
+        description: PE1 has a type 1 (EAD per EVI) route for EVI 100 from PE3
+        device: PE1
+        command: show bgp l2vpn evpn route-type 1
+        match: ['\[1\]\[10\.0\.0\.3:100\]']
+        hint: Check the EVPN instance 100 config on PE3 and the BGP session with RR.
+      - id: vpws-pe1-cfg
+        description: PE1 has the point-to-point EVI with source 1 and target 3
+        device: PE1
+        mode: config
+        match: ['^l2vpn evpn instance 100 point-to-point', '^[ \t]+vpws context CE1-CE3', '^[ \t]+service target 3 source 1', '^[ \t]+member %if2% service-instance 100']
+        hint: Paste the PE1 block of this step.
+solution_summary: |
+  **What you built:** an MPLS core carrying a multipoint Layer 2 EVPN service for three customer sites.
+
+  - **Core**: OSPF area 0 (point-to-point links, Loopback0 /32s 10.0.0.1-3, .10, .100) and LDP
+    (`mpls ldp router-id Loopback0 force`, `mpls ip` on the PE-P links). Every PE has an LSP to every
+    other PE; P1 only switches labels and runs no BGP.
+  - **Control plane**: iBGP AS 65000, address family `l2vpn evpn` only (`no bgp default ipv4-unicast`),
+    loopback peering with `send-community both`. RR reflects the routes to PE1-PE3
+    (`route-reflector-client`) and keeps the original next hop, so it never forwards customer traffic.
+  - **Service**: `l2vpn evpn` with ingress replication and `router-id Loopback0`; VLAN-based EVIs 10 and 20
+    with auto RD (10.0.0.n:EVI) and auto RT (65000:EVI). On each PE, Ethernet0/1 carries
+    `service instance 10/20 ethernet` (`encapsulation dot1q 10/20`), and `bridge-domain 10/20` joins that
+    service instance with `member evpn-instance 10/20`.
+  - **Route types seen**: type 3 (IMET - one per PE and EVI, builds the BUM flood list with each PE's BUM
+    label) and type 2 (MAC - one per learned CE MAC, with the per-BD label); the optional VPWS step adds
+    type 1 (EAD per EVI) for EVI 100 (source 1 / target 3 on PE1, the mirror on PE3).
+  - **Result**: CE1, CE2 and CE3 share VLAN 10 and VLAN 20 across the provider core and ping each other at
+    Layer 2; packets cross the core with two labels (EVPN service label + LDP transport label).
+
+  **Where to go next**: all-active multihoming (a CE dual-homed to two PEs with an Ethernet segment / ESI,
+  type 1 and type 4 routes), integrated routing and bridging (IRB with a distributed anycast gateway and
+  type 2 MAC+IP routes), segment routing (SR-MPLS) instead of LDP, or the *BGP EVPN VXLAN* walkthrough
+  for the same control plane over an IP fabric.

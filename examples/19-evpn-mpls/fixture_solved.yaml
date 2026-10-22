@@ -1,0 +1,305 @@
+# Synthesized from the Cisco IOS XE MPLS / L2VPN configuration guides (EVPN single-homing over MPLS,
+# EVPN-VPWS single homed) and IOS command references - not recorded on real hardware.
+# State: every step done, including the optional EVPN-VPWS step, after the CE pings.
+P1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    PE1              Eth 0/0           165              R B   Linux Uni Eth 0/0
+    PE2              Eth 0/1           163              R B   Linux Uni Eth 0/0
+    PE3              Eth 0/2           171              R B   Linux Uni Eth 0/0
+    RR               Eth 0/3           158              R B   Linux Uni Eth 0/0
+
+    Total cdp entries displayed : 4
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    10.0.0.1          0   FULL/  -        00:00:35    10.10.1.1       %if0%
+    10.0.0.2          0   FULL/  -        00:00:38    10.10.2.1       %if1%
+    10.0.0.3          0   FULL/  -        00:00:31    10.10.3.1       %if2%
+    10.0.0.100        0   FULL/  -        00:00:36    10.10.100.1     %if3%
+  show mpls ldp neighbor: |
+        Peer LDP Ident: 10.0.0.1:0; Local LDP Ident 10.0.0.10:0
+            TCP connection: 10.0.0.1.646 - 10.0.0.10.40123
+            State: Oper; Msgs sent/rcvd: 31/30; Downstream
+            Up time: 00:12:04
+            LDP discovery sources:
+              %if0%, Src IP addr: 10.10.1.1
+            Addresses bound to peer LDP Ident:
+              10.10.1.1       10.0.0.1
+        Peer LDP Ident: 10.0.0.2:0; Local LDP Ident 10.0.0.10:0
+            TCP connection: 10.0.0.2.646 - 10.0.0.10.27811
+            State: Oper; Msgs sent/rcvd: 30/30; Downstream
+            Up time: 00:12:01
+            LDP discovery sources:
+              %if1%, Src IP addr: 10.10.2.1
+            Addresses bound to peer LDP Ident:
+              10.10.2.1       10.0.0.2
+        Peer LDP Ident: 10.0.0.3:0; Local LDP Ident 10.0.0.10:0
+            TCP connection: 10.0.0.3.646 - 10.0.0.10.51920
+            State: Oper; Msgs sent/rcvd: 30/31; Downstream
+            Up time: 00:11:58
+            LDP discovery sources:
+              %if2%, Src IP addr: 10.10.3.1
+            Addresses bound to peer LDP Ident:
+              10.10.3.1       10.0.0.3
+RR:
+  show bgp l2vpn evpn summary: |
+    BGP router identifier 10.0.0.100, local AS number 65000
+    BGP table version is 25, main routing table version 25
+    14 network entries using 5376 bytes of memory
+    14 path entries using 2968 bytes of memory
+
+    Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    10.0.0.1        4        65000      28      35       25    0    0 00:10:12        5
+    10.0.0.2        4        65000      27      35       25    0    0 00:10:09        4
+    10.0.0.3        4        65000      28      34       25    0    0 00:10:05        5
+PE1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    P1               Eth 0/0           166              R B   Linux Uni Eth 0/0
+    CE1              Eth 0/1           150              R B   Linux Uni Eth 0/0
+    CE1              Eth 0/2           150              R B   Linux Uni Eth 0/1
+
+    Total cdp entries displayed : 3
+  show ip route ospf: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+
+    Gateway of last resort is not set
+
+          10.0.0.0/8 is variably subnetted, 9 subnets, 2 masks
+    O        10.0.0.2/32 [110/21] via 10.10.1.2, 00:14:10, %if0%
+    O        10.0.0.3/32 [110/21] via 10.10.1.2, 00:14:10, %if0%
+    O        10.0.0.10/32 [110/11] via 10.10.1.2, 00:14:10, %if0%
+    O        10.0.0.100/32 [110/21] via 10.10.1.2, 00:14:10, %if0%
+    O        10.10.2.0/30 [110/20] via 10.10.1.2, 00:14:10, %if0%
+    O        10.10.3.0/30 [110/20] via 10.10.1.2, 00:14:10, %if0%
+    O        10.10.100.0/30 [110/20] via 10.10.1.2, 00:14:10, %if0%
+  ping 10.0.0.3 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.0.0.3, timeout is 2 seconds:
+    Packet sent with a source address of 10.0.0.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show mpls forwarding-table 10.0.0.3 32: |
+    Local      Outgoing   Prefix           Bytes Label   Outgoing   Next Hop
+    Label      Label      or Tunnel Id     Switched      interface
+    19         18         10.0.0.3/32      0             %if0s%      10.10.1.2
+  ping mpls ipv4 10.0.0.3/32 repeat 5: |
+    Sending 5, 72-byte MPLS Echos to 10.0.0.3/32,
+         timeout is 2 seconds, send interval is 0 msec:
+
+    Codes: '!' - success, 'Q' - request not sent, '.' - timeout,
+      'L' - labeled output interface, 'B' - unlabeled output interface,
+      'D' - DS Map mismatch, 'F' - no FEC mapping, 'f' - FEC mismatch,
+      'M' - malformed request, 'm' - unsupported tlvs, 'N' - no label entry,
+      'P' - no rx intf label prot, 'p' - premature termination of LSP,
+      'R' - transit router, 'I' - unknown upstream index,
+      'l' - Label switched with FEC change, 'd' - see DDMAP for return code,
+      'X' - unknown return code, 'x' - return code 0
+
+    Type escape sequence to abort.
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/3 ms
+  show bgp l2vpn evpn summary: |
+    BGP router identifier 10.0.0.1, local AS number 65000
+    BGP table version is 31, main routing table version 31
+    14 network entries using 5376 bytes of memory
+    14 path entries using 2968 bytes of memory
+
+    Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    10.0.0.100      4        65000      36      27       31    0    0 00:10:12        9
+  show l2vpn evpn evi detail: |
+    EVPN instance:       10 (VLAN Based)
+      RD:                10.0.0.1:10 (auto)
+      Import-RTs:        65000:10
+      Export-RTs:        65000:10
+      Per-EVI Label:     none
+      State:             Established
+      Replication Type:  Ingress (global)
+      Encapsulation:     mpls
+      IP Local Learn:    Enabled (global)
+      Adv. Def. Gateway: Disabled (global)
+      Re-originate RT5:  Disabled
+      Bridge Domain:     10
+        Ethernet-Tag:    0
+        State:           Established
+        Flood Suppress:  Attached
+        Core If:
+        Access If:
+        NVE If:
+        RMAC:            0000.0000.0000
+        Core Vlan:       0
+        L2 VNI:          0
+        L3 VNI:          0
+        VTEP IP:         UNKNOWN
+        Pseudoports:
+          %if1% service instance 10
+            Routes: 1 MAC, 0 MAC/IP
+        Peers:
+          10.0.0.2
+            Routes: 1 MAC, 0 MAC/IP, 1 IMET, 0 EAD
+          10.0.0.3
+            Routes: 1 MAC, 0 MAC/IP, 1 IMET, 0 EAD
+
+    EVPN instance:       20 (VLAN Based)
+      RD:                10.0.0.1:20 (auto)
+      Import-RTs:        65000:20
+      Export-RTs:        65000:20
+      Per-EVI Label:     none
+      State:             Established
+      Replication Type:  Ingress (global)
+      Encapsulation:     mpls
+      IP Local Learn:    Enabled (global)
+      Adv. Def. Gateway: Disabled (global)
+      Re-originate RT5:  Disabled
+      Bridge Domain:     20
+        Ethernet-Tag:    0
+        State:           Established
+        Flood Suppress:  Attached
+        Pseudoports:
+          %if1% service instance 20
+            Routes: 1 MAC, 0 MAC/IP
+        Peers:
+          10.0.0.2
+            Routes: 1 MAC, 0 MAC/IP, 1 IMET, 0 EAD
+          10.0.0.3
+            Routes: 0 MAC, 0 MAC/IP, 1 IMET, 0 EAD
+
+    EVPN instance:       100 (Point to Point)
+      RD:                10.0.0.1:100 (auto)
+      Import-RTs:        65000:100
+      Export-RTs:        65000:100
+      State:             Established
+      Encapsulation:     mpls
+  show bgp l2vpn evpn route-type 3: |
+    BGP routing table entry for [3][10.0.0.1:10][0][32][10.0.0.1]/17, version 12
+      Paths: (1 available, best #1, table evi_10)
+      Local
+        :: (via default) from 0.0.0.0 (10.0.0.1)
+          Origin incomplete, localpref 100, weight 32768, valid, sourced, local, best
+          Extended Community: RT:65000:10
+          PMSI Attribute, Flags: 0x0, Tunnel type: IR, length 4, label: 17 tunnel parameters: 10.0.0.1
+    BGP routing table entry for [3][10.0.0.2:10][0][32][10.0.0.2]/17, version 14
+      Paths: (1 available, best #1, table evi_10)
+      Not advertised to any peer
+      Local
+        10.0.0.2 (metric 21) (via default) from 10.0.0.100 (10.0.0.100)
+          Origin incomplete, metric 0, localpref 100, valid, internal, best
+          Extended Community: RT:65000:10
+          Originator: 10.0.0.2, Cluster list: 10.0.0.100
+          PMSI Attribute, Flags: 0x0, Tunnel type: IR, length 4, label: 17 tunnel parameters: 10.0.0.2
+    BGP routing table entry for [3][10.0.0.3:10][0][32][10.0.0.3]/17, version 16
+      Paths: (1 available, best #1, table evi_10)
+      Not advertised to any peer
+      Local
+        10.0.0.3 (metric 21) (via default) from 10.0.0.100 (10.0.0.100)
+          Origin incomplete, metric 0, localpref 100, valid, internal, best
+          Extended Community: RT:65000:10
+          Originator: 10.0.0.3, Cluster list: 10.0.0.100
+          PMSI Attribute, Flags: 0x0, Tunnel type: IR, length 4, label: 17 tunnel parameters: 10.0.0.3
+    BGP routing table entry for [3][10.0.0.2:20][0][32][10.0.0.2]/17, version 18
+      Paths: (1 available, best #1, table evi_20)
+      Local
+        10.0.0.2 (metric 21) (via default) from 10.0.0.100 (10.0.0.100)
+          Origin incomplete, metric 0, localpref 100, valid, internal, best
+          Extended Community: RT:65000:20
+          Originator: 10.0.0.2, Cluster list: 10.0.0.100
+    BGP routing table entry for [3][10.0.0.3:20][0][32][10.0.0.3]/17, version 20
+      Paths: (1 available, best #1, table evi_20)
+      Local
+        10.0.0.3 (metric 21) (via default) from 10.0.0.100 (10.0.0.100)
+          Origin incomplete, metric 0, localpref 100, valid, internal, best
+          Extended Community: RT:65000:20
+          Originator: 10.0.0.3, Cluster list: 10.0.0.100
+  show bridge-domain 10: |
+    Bridge-domain 10 (2 ports in all)
+    State: UP                    Mac learning: Enabled
+    Aging-Timer: 300 second(s)
+    Unknown Unicast Flooding Suppression: Disabled
+        %if1% service instance 10
+        EVPN Instance 10
+       AED MAC address    Policy  Tag       Age  Pseudoport
+       -   0010.0000.0003 forward static_r  0    EVPN Instance 10
+       -   0010.0000.0002 forward static_r  0    EVPN Instance 10
+       -   0010.0000.0001 forward dynamic_c 290  %if1%.EFP10
+  show l2vpn evpn mac: |
+    MAC Address    EVI   BD    ESI                      Ether Tag  Next Hop
+    -------------- ----- ----- ------------------------ ---------- ---------------
+    0010.0000.0001 10    10    0000.0000.0000.0000.0000 0          %if1s%:10
+    0010.0000.0002 10    10    0000.0000.0000.0000.0000 0          10.0.0.2
+    0010.0000.0003 10    10    0000.0000.0000.0000.0000 0          10.0.0.3
+    0010.0000.0001 20    20    0000.0000.0000.0000.0000 0          %if1s%:20
+    0010.0000.0002 20    20    0000.0000.0000.0000.0000 0          10.0.0.2
+  show bgp l2vpn evpn route-type 2: |
+    BGP routing table entry for [2][10.0.0.1:10][0][48][001000000001][0][*]/20, version 22
+      Paths: (1 available, best #1, table evi_10)
+      Local
+        :: (via default) from 0.0.0.0 (10.0.0.1)
+          Origin incomplete, localpref 100, weight 32768, valid, sourced, local, best
+          EVPN ESI: 00000000000000000000, Label1 16
+          Extended Community: RT:65000:10 ENCAP:10
+    BGP routing table entry for [2][10.0.0.2:10][0][48][001000000002][0][*]/20, version 24
+      Paths: (1 available, best #1, table evi_10)
+      Local
+        10.0.0.2 (metric 21) (via default) from 10.0.0.100 (10.0.0.100)
+          Origin incomplete, metric 0, localpref 100, valid, internal, best
+          EVPN ESI: 00000000000000000000, Label1 16
+          Extended Community: RT:65000:10 ENCAP:10
+          Originator: 10.0.0.2, Cluster list: 10.0.0.100
+    BGP routing table entry for [2][10.0.0.3:10][0][48][001000000003][0][*]/20, version 26
+      Paths: (1 available, best #1, table evi_10)
+      Local
+        10.0.0.3 (metric 21) (via default) from 10.0.0.100 (10.0.0.100)
+          Origin incomplete, metric 0, localpref 100, valid, internal, best
+          EVPN ESI: 00000000000000000000, Label1 16
+          Extended Community: RT:65000:10 ENCAP:10
+          Originator: 10.0.0.3, Cluster list: 10.0.0.100
+    BGP routing table entry for [2][10.0.0.2:20][0][48][001000000002][0][*]/20, version 28
+      Paths: (1 available, best #1, table evi_20)
+      Local
+        10.0.0.2 (metric 21) (via default) from 10.0.0.100 (10.0.0.100)
+          Origin incomplete, metric 0, localpref 100, valid, internal, best
+          EVPN ESI: 00000000000000000000, Label1 18
+          Extended Community: RT:65000:20 ENCAP:10
+          Originator: 10.0.0.2, Cluster list: 10.0.0.100
+  show bgp l2vpn evpn route-type 1: |
+    BGP routing table entry for [1][10.0.0.1:100][00000000000000000000][1]/23, version 30
+      Paths: (1 available, best #1, table evi_100)
+      Local
+        :: (via default) from 0.0.0.0 (10.0.0.1)
+          Origin incomplete, localpref 100, weight 32768, valid, sourced, local, best
+          EVPN ESI: 00000000000000000000, Label1 20
+          Extended Community: RT:65000:100 ENCAP:10
+    BGP routing table entry for [1][10.0.0.3:100][00000000000000000000][3]/23, version 31
+      Paths: (1 available, best #1, table evi_100)
+      Local
+        10.0.0.3 (metric 21) (via default) from 10.0.0.100 (10.0.0.100)
+          Origin incomplete, metric 0, localpref 100, valid, internal, best
+          EVPN ESI: 00000000000000000000, Label1 21
+          Extended Community: RT:65000:100 ENCAP:10
+          Originator: 10.0.0.3, Cluster list: 10.0.0.100
+CE1:
+  ping 192.168.10.3: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.10.3, timeout is 2 seconds:
+    .!!!!
+    Success rate is 80 percent (4/5), round-trip min/avg/max = 2/2/3 ms
+  ping 192.168.20.2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.20.2, timeout is 2 seconds:
+    .!!!!
+    Success rate is 80 percent (4/5), round-trip min/avg/max = 2/2/4 ms
+  ping 192.168.100.3: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.100.3, timeout is 2 seconds:
+    .!!!!
+    Success rate is 80 percent (4/5), round-trip min/avg/max = 2/2/3 ms

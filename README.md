@@ -534,6 +534,29 @@ Then a **summary** page lists what you built and the complete config of every de
 > *Apply this step for me* has only been tested against a simulated NX-OS console. If a check fails on a correctly
 > built fabric, run it in *Config* grading mode and please report the device output.
 
+### Walkthrough lab: BGP EVPN over MPLS
+The `19-evpn-mpls` walkthrough (*Walkthrough: BGP EVPN over MPLS (IOS-XE, IOL)*, in the lab library) builds an MPLS
+service-provider core and stretches VLANs 10 and 20 across three customer sites with EVPN.
+
+**Topology** (8 `iol-xe` nodes, about **8 GB of CML RAM**, not RAM heavy): P1 (core label switch), RR (BGP route
+reflector), PE1-PE3 (provider edge) and CE1-CE3 (pre-configured customer routers with VLAN 10/20 subinterfaces). IOL only:
+the EVPN commands need IOS-XE.
+
+| # | Step | What you do | Verified with |
+|---|---|---|---|
+| 1 | The service | Concepts: EVPN vs VPLS, route types 1/2/3, service + transport labels; cabling check | `show cdp neighbors` |
+| 2 | Core OSPF | Loopbacks, /30 core links, OSPF area 0 point-to-point | `show ip ospf neighbor`, `ping ... source Loopback0` |
+| 3 | Core LDP | `mpls ldp router-id Loopback0 force`, `mpls ip` on the PE-P links (SR-MPLS mentioned as the alternative) | `show mpls ldp neighbor`, `show mpls forwarding-table`, `ping mpls ipv4` |
+| 4 | BGP EVPN | iBGP AS 65000, `l2vpn evpn` only, RR with `route-reflector-client`, `send-community both` | `show bgp l2vpn evpn summary` |
+| 5 | EVPN instances | `l2vpn evpn` (ingress replication, router-id), VLAN-based EVIs 10 and 20 with auto RD/RT | running config |
+| 6 | Bridge domains | `service instance 10/20 ethernet` + `encapsulation dot1q`, `bridge-domain` with `member evpn-instance` | `show l2vpn evpn evi detail`, type-3 routes, `show bridge-domain` |
+| 7 | Verify | Same-VLAN pings CE1-CE3 (VLAN 10) and CE1-CE2 (VLAN 20) across the core | `show l2vpn evpn mac`, type-2 routes, `show mpls forwarding-table` |
+| 8 | EVPN-VPWS (optional) | Point-to-point EVI 100 (`vpws context`, `service target/source`) between CE1 and CE3 | type-1 routes, CE ping |
+
+> **Not verified on real devices yet.** The expected outputs were written from Cisco's IOS XE EVPN-over-MPLS and
+> EVPN-VPWS documentation, not captured from CML. EVPN data-plane forwarding on IOL in particular is untested. If a
+> check fails on a correctly built lab, run it in *Config* grading mode and please report the device output.
+
 ### RAM estimate and the RAM heavy tag
 Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node
 definition: `iol-xe`/`ioll2-xe` 1 GB, `iosv` 0.5 GB, `iosvl2` 0.75 GB, `csr1000v` 3 GB, `cat8000v` 4 GB, `nxosv9000`
@@ -707,6 +730,7 @@ are sent back to the AI for up to 2 retries, then the lab opens in the builder f
 Example packs live in [`examples/`](examples/) and are attached to every [release](https://github.com/Specops13/cml-lab-builder/releases):
 - `ospf-multiarea-stub`: OSPF multi-area, a totally stubby area and ABR /22 summarization (4 routers).
 - `troubleshoot-ospf-7node`: a troubleshooting ticket on a 7-router multi-area OSPF network with one planted fault.
+- `19-evpn-mpls` (lab library only): a walkthrough of BGP EVPN over MPLS on IOL (8 routers, about 8 GB RAM).
 
 ## Configuration
 Everything can be set on the **Settings** page; `.env` / environment variables provide defaults (copy `.env.example`).

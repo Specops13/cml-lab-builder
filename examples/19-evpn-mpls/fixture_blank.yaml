@@ -1,0 +1,37 @@
+# Synthesized from Cisco IOS XE documentation (not recorded on real hardware): freshly booted IOL-XE routers,
+# cabling present (CDP) but nothing configured on P1, RR and the PEs.
+P1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    PE1              Eth 0/0           165              R B   Linux Uni Eth 0/0
+    PE2              Eth 0/1           163              R B   Linux Uni Eth 0/0
+    PE3              Eth 0/2           171              R B   Linux Uni Eth 0/0
+    RR               Eth 0/3           158              R B   Linux Uni Eth 0/0
+
+    Total cdp entries displayed : 4
+PE1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    P1               Eth 0/0           166              R B   Linux Uni Eth 0/0
+    CE1              Eth 0/1           150              R B   Linux Uni Eth 0/0
+    CE1              Eth 0/2           150              R B   Linux Uni Eth 0/1
+
+    Total cdp entries displayed : 3
+  show ip route ospf: ""
+  show mpls forwarding-table 10.0.0.3 32: ""
+  show bgp l2vpn evpn summary: ""
+  show l2vpn evpn evi detail: ""
+  show bgp l2vpn evpn route-type 3: ""
+  show bgp l2vpn evpn route-type 2: ""
+  show bgp l2vpn evpn route-type 1: ""
+  show l2vpn evpn mac: ""
+  show bridge-domain 10: |
+    Bridge-domain 10 doesn't exist

@@ -316,6 +316,24 @@
       "ram_gb": 52.0
     },
     {
+      "file": "19-evpn-mpls.cmllab",
+      "sha256": "cb0fdeb0ce3fd6bcccb147be9c6f4eea934d18480fcb048a1b1f76d05c3e0b3d",
+      "size": 13481,
+      "kind": "lab",
+      "id": "19-evpn-mpls",
+      "title": "Walkthrough: BGP EVPN over MPLS (IOS-XE, IOL)",
+      "version": "1",
+      "description": "Step-by-step build of an EVPN over MPLS service provider core - OSPF and LDP in the core, iBGP l2vpn evpn through a route reflector, VLAN-based EVIs with bridge domains stretching VLANs 10 and 20 across three sites, route type 2/3 verification (optional EVPN-VPWS point-to-point service).",
+      "blueprint": [
+        "2.2",
+        "2.3"
+      ],
+      "nodes": 8,
+      "difficulty": 5,
+      "type": "walkthrough",
+      "ram_gb": 8.0
+    },
+    {
       "file": "data-center.cmlcourse",
       "sha256": "b4b6068514fe63db3dde3629651bfa52a5e2c485bfcc88230b6b761c8f492fe8",
       "size": 477,
