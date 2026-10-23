@@ -46,7 +46,7 @@
         <button data-help="lib.open" id="lib-btn">📚 Library &amp; courses</button>
       </div>
       <div class="filters">
-        <input data-help="filter.search" id="f-search" aria-label="Search labs" placeholder="Search labs…">
+        <input data-help="filter.search" id="f-search" aria-label="Search labs" placeholder="Search labs…  ( / )" type="search" autocomplete="off" spellcheck="false">
         <select data-help="filter.domain" id="f-domain" aria-label="Domain"><option value="">All domains</option></select>
         <select data-help="filter.diff" id="f-diff" aria-label="Difficulty"><option value="">Any difficulty</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
         <select data-help="filter.source" id="f-source" aria-label="Source"><option value="">All sources</option><option value="library">From the library</option><option value="user">My own / imported</option></select>
@@ -151,6 +151,7 @@
 </main>
 <script>window.APP_VERSION = "{{VERSION}}";</script>
 <script src="/static/help.js?v={{VERSION}}"></script>
+<script src="/static/fuzzy.js?v={{VERSION}}"></script>
 <script src="/static/app.js?v={{VERSION}}"></script>
 </body>
 </html>

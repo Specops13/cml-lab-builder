@@ -10,7 +10,7 @@
   "theme": "Switch between light and dark mode.",
   "import.button": "Import a .cmllab lab pack, a .cmlcourse course (or the older .encorlab / .encorcourse) or a lab .yaml file. It is validated right away and appears in the list.",
   "import.drop": "Drop one or more lab or course files anywhere on this page to import them. Invalid files show what to fix.",
-  "filter.search": "Filter labs by title, summary, id or blueprint item (e.g. 3.2.b).",
+  "filter.search": "Filter labs as you type (fuzzy: typos and abbreviations work) by title, summary, id, blueprint item (e.g. 3.2.b), domain or node type. Press / or Ctrl+K to jump here, Esc to clear.",
   "filter.domain": "Show only labs from one domain (the ENCOR exam domains, or a lab's own domain).",
   "filter.diff": "Show only labs with this difficulty (1 = easy, 5 = hard).",
   "filter.source": "Library labs come from the online lab library; 'My own / imported' are labs you made in the builder or imported from a file.",
@@ -235,5 +235,10 @@
   "s.device_username": "Username for device consoles that ask for a login (IOS/IOL labs normally don't). Default cisco.",
   "s.device_password": "Password for device console logins and the default for NX-OS. Kept in memory only; set CMLLAB_DEVICE_PASSWORD to keep it.",
   "s.nxos_username": "NX-OS (nxosv9000) console user, tried first; empty means the device username. Build's day-0 config creates it (and admin).",
-  "s.nxos_password": "NX-OS console password used for the day-0 users at Build and for login. Empty = the device password."
+  "s.nxos_password": "NX-OS console password used for the day-0 users at Build and for login. Empty = the device password.",
+  "lib.search": "Search the library as you type: titles, lab ids, descriptions, topics (blueprint items, domains), courses, platforms and node types (e.g. nexus, iol-xe). Typos and abbreviations work: 'vrf lit', 'ospf stb', 'mcast'. Best matches come first. Press / or Ctrl+K to jump here, Esc to clear.",
+  "lib.fKind": "Show only labs or only courses.",
+  "lib.fStatus": "Show what is installed, not installed yet, or has an update in the library.",
+  "lib.fCourse": "Show one course and the labs it contains.",
+  "lib.fHeavy": "Hide labs and courses that need more CML server RAM than the RAM-heavy threshold in Settings."
 }

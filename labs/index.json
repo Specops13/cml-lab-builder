@@ -17,7 +17,17 @@
       "nodes": 3,
       "difficulty": 2,
       "type": "challenge",
-      "ram_gb": 3.0
+      "ram_gb": 3.0,
+      "domain": "3.0 Infrastructure - Layer 2",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "ioll2-xe",
+        "iosvl2"
+      ]
     },
     {
       "file": "02-etherchannel.encorlab",
@@ -34,7 +44,17 @@
       "nodes": 2,
       "difficulty": 2,
       "type": "challenge",
-      "ram_gb": 2.0
+      "ram_gb": 2.0,
+      "domain": "3.0 Infrastructure - Layer 2",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "ioll2-xe",
+        "iosvl2"
+      ]
     },
     {
       "file": "03-ospf-multiarea.encorlab",
@@ -51,7 +71,17 @@
       "nodes": 4,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 4.0
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure - Layer 3",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "04-eigrp-named.encorlab",
@@ -68,7 +98,17 @@
       "nodes": 3,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 3.0
+      "ram_gb": 3.0,
+      "domain": "3.0 Infrastructure - Layer 3",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "05-bgp-ebgp-ibgp.encorlab",
@@ -85,7 +125,17 @@
       "nodes": 4,
       "difficulty": 4,
       "type": "challenge",
-      "ram_gb": 4.0
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure - Layer 3",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "06-hsrp.encorlab",
@@ -102,7 +152,19 @@
       "nodes": 4,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 4.0
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure - IP Services",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "ioll2-xe",
+        "iosv",
+        "iosvl2"
+      ]
     },
     {
       "file": "07-acl-nat.encorlab",
@@ -120,7 +182,17 @@
       "nodes": 3,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 3.0
+      "ram_gb": 3.0,
+      "domain": "3.0 Infrastructure - IP Services / 5.0 Security",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "08-vrf-lite.encorlab",
@@ -137,7 +209,17 @@
       "nodes": 3,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 3.0
+      "ram_gb": 3.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "09-gre-ipsec.encorlab",
@@ -154,7 +236,17 @@
       "nodes": 3,
       "difficulty": 4,
       "type": "challenge",
-      "ram_gb": 3.0
+      "ram_gb": 3.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "10-ntp-syslog-snmp.encorlab",
@@ -173,7 +265,17 @@
       "nodes": 3,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 3.0
+      "ram_gb": 3.0,
+      "domain": "3.0 Infrastructure - IP Services / 4.0 Network Assurance",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "11-ipsla-tracking.encorlab",
@@ -191,7 +293,19 @@
       "nodes": 4,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 4.0
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure - IP Services / 4.0 Network Assurance",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "ioll2-xe",
+        "iosv",
+        "iosvl2"
+      ]
     },
     {
       "file": "12-pbr.encorlab",
@@ -208,7 +322,17 @@
       "nodes": 4,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 4.0
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure - Layer 3",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "13-redistribution.encorlab",
@@ -226,7 +350,17 @@
       "nodes": 4,
       "difficulty": 4,
       "type": "challenge",
-      "ram_gb": 4.0
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure - Layer 3",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "14-multicast-pim-sm.encorlab",
@@ -243,7 +377,17 @@
       "nodes": 5,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 5.0
+      "ram_gb": 5.0,
+      "domain": "3.0 Infrastructure - IP services",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "15-multicast-bsr-ssm.encorlab",
@@ -260,7 +404,17 @@
       "nodes": 6,
       "difficulty": 4,
       "type": "challenge",
-      "ram_gb": 6.0
+      "ram_gb": 6.0,
+      "domain": "3.0 Infrastructure - IP services",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "16-mpls-ldp.encorlab",
@@ -277,7 +431,17 @@
       "nodes": 4,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 4.0
+      "ram_gb": 4.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "17-mpls-l3vpn.encorlab",
@@ -295,7 +459,17 @@
       "nodes": 5,
       "difficulty": 5,
       "type": "challenge",
-      "ram_gb": 5.0
+      "ram_gb": 5.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "18-evpn-vxlan.encorlab",
@@ -313,7 +487,18 @@
       "nodes": 8,
       "difficulty": 5,
       "type": "walkthrough",
-      "ram_gb": 52.0
+      "ram_gb": 52.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv",
+        "nxosv9000"
+      ]
     },
     {
       "file": "19-evpn-mpls.encorlab",
@@ -331,7 +516,15 @@
       "nodes": 8,
       "difficulty": 5,
       "type": "walkthrough",
-      "ram_gb": 8.0
+      "ram_gb": 8.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ]
     },
     {
       "file": "20-evpn-vxlan-superspine.encorlab",
@@ -349,7 +542,16 @@
       "nodes": 12,
       "difficulty": 5,
       "type": "walkthrough",
-      "ram_gb": 56.0
+      "ram_gb": 56.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe",
+        "nxosv9000"
+      ]
     },
     {
       "file": "data-center.encorcourse",
@@ -380,7 +582,17 @@
       "nodes": 2,
       "difficulty": 1,
       "type": "challenge",
-      "ram_gb": 2.0
+      "ram_gb": 2.0,
+      "domain": "3.0 Infrastructure - Layer 3",
+      "track": "ENCOR",
+      "platforms": [
+        "iol",
+        "iosv"
+      ],
+      "node_types": [
+        "iol-xe",
+        "iosv"
+      ]
     },
     {
       "file": "encor-multicast-mpls.encorcourse",
@@ -448,7 +660,15 @@
       "nodes": 4,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 4.0
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure - Layer 3",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ]
     },
     {
       "file": "troubleshoot-ospf-7node.encorlab",
@@ -465,7 +685,15 @@
       "nodes": 7,
       "difficulty": 3,
       "type": "challenge",
-      "ram_gb": 7.0
+      "ram_gb": 7.0,
+      "domain": "3.0 Infrastructure - Layer 3",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ]
     }
   ],
   "starter": [

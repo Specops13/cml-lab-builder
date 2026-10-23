@@ -107,6 +107,10 @@ def parse_starter(raw: bytes) -> list[str]:
     return [str(x) for x in st][:courses.MAX_LABS] if isinstance(st, list) else []
 
 
+def _strs(v, n: int) -> list[str]:
+    return [str(x)[:40] for x in v][:n] if isinstance(v, list) else []
+
+
 def parse_index(raw: bytes) -> list[dict]:
     d = _load_index(raw)
     items = d.get("items")
@@ -126,7 +130,10 @@ def parse_index(raw: bytes) -> list[dict]:
                     "ram_gb": float(it["ram_gb"]) if isinstance(it.get("ram_gb"), (int, float)) and 0 < it["ram_gb"] <= 4096 else None,
                     "type": it.get("type") if it.get("type") in ("challenge", "walkthrough") else None,
                     "version": str(it.get("version") or "1")[:20],
-                    "labs": [str(x) for x in it.get("labs", [])][:courses.MAX_LABS]})
+                    "labs": [str(x) for x in it.get("labs", [])][:courses.MAX_LABS],
+                    # search fields (3.1.0+ indexes; older ones simply have none)
+                    "domain": str(it.get("domain") or "")[:120], "track": str(it.get("track") or "")[:40],
+                    "platforms": _strs(it.get("platforms"), 10), "node_types": _strs(it.get("node_types"), 20)})
     return out
 
 
@@ -328,6 +335,9 @@ def build_index(folder, base_items: list[dict] | None = None, lab_roots: list | 
             lab, _ = packs.parse_lab_text(pk.lab_yaml)
             it.update(kind="lab", id=lab.id, title=lab.title, version=lab.version, description=lab.summary,
                       blueprint=lab.blueprint, nodes=len(lab.nodes), difficulty=lab.difficulty, type=lab.type,
-                      ram_gb=sizing.estimate(lab, lab.platforms[0])["gb"])
+                      ram_gb=sizing.estimate(lab, lab.platforms[0])["gb"],
+                      # for the library search: domain/track, image profiles and the CML node definitions used
+                      domain=lab.domain, track=lab.track, platforms=list(lab.platforms),
+                      node_types=sorted({d for p in lab.platforms for d in sizing.node_definitions(lab, p)}))
         items.append(it)
     return {"format": 1, "items": items}

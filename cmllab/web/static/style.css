@@ -130,3 +130,10 @@ aside.catalog.no-labs .filters { display: none; }
   margin: 0 0 .8em; display: flex; gap: .6em; align-items: center; flex-wrap: wrap; }
 .mig-banner[hidden] { display: none; }
 .notice { background: #eef6ff; border: 1px solid #9cc3f0; border-radius: 6px; padding: .5em .8em; margin: .4em 0; }
+
+/* library / lab list search (fuzzy.js) */
+mark{background:#ffe58a;color:inherit;border-radius:2px;padding:0}
+[data-theme=dark] mark{background:#6b5a12;color:#fff}
+.lib-search-bar{position:sticky;top:0;z-index:2;background:var(--card);padding:.4rem 0;gap:.4rem;flex-wrap:wrap}
+#lib-search{flex:1;min-width:18em;font-size:1rem;padding:.45rem .6rem}
+.lib-empty{padding:1rem;border:1px dashed var(--line);border-radius:8px;margin:.6rem 0}

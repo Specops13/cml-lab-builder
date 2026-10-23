@@ -17,6 +17,7 @@ const walkTag = (l) => l.type === "walkthrough" ? '<span class="tag walk">walkth
 const srcTag = (l) => (l.library || l.source === "builtin") ? "" : '<span class="tag user">imported</span>';
 const updTag = (l) => l.update_available ? '<span data-help="lab.updateTag" class="tag warn">update available</span>' : "";
 let migration = null, libraryUrl = "", libStarter = [];
+let labRecs = [], libIdx = null, libRecs = [], libRows = [], libQuery = {q: "", kind: "", status: "", course: "", noheavy: false}, libRaf = 0;
 
 /* ---------------------------------------------------------------- error banner */
 function banner(msg) {
@@ -156,6 +157,9 @@ async function loadLabs() {
   let data;
   try { data = await api("/api/labs"); } catch (e) { banner(`Could not load the lab list: ${e.message}`); e.shown = true; throw e; }
   labs = data.labs;
+  labRecs = labs.map((l) => Fuzzy.prepare({title: [l.title, 3], id: [l.id, 2.5], blueprint: [l.blueprint.join(", "), 2], domain: [l.domain, 2],
+    tags: [[l.type, l.track, Fuzzy.nodeTags(l.node_types), (l.platforms || []).join(" "), (l.ram && l.ram.heavy) ? "ram heavy" : ""].join(" "), 1.5],
+    summary: [l.summary, 1]}));
   migration = data.migration || null;
   renderMigration();
   document.querySelector("aside.catalog").classList.toggle("no-labs", !labs.length);
@@ -170,18 +174,22 @@ async function loadLabs() {
   lsel.innerHTML = `<option value="">Open existing lab…</option>` + labs.map((l) => `<option value="${esc(l.id)}">${esc(l.title)} (${l.source})</option>`).join("");
 }
 function renderList() {
-  const q = $("#f-search").value.toLowerCase(), dom = $("#f-domain").value, diff = $("#f-diff").value, src = $("#f-source").value;
+  const q = $("#f-search").value, dom = $("#f-domain").value, diff = $("#f-diff").value, src = $("#f-source").value;
   const crs = courseList.find((c) => c.id === $("#f-course").value);
-  let items = labs.filter((l) => (!q || (l.title + l.summary + l.id + l.blueprint.join(" ")).toLowerCase().includes(q)) &&
-    (!dom || l.domain === dom) && (!diff || String(l.difficulty) === diff) && (!src || (src === "library" ? (l.library || l.source === "builtin") : !(l.library || l.source === "builtin"))));
-  if (crs) { const order = crs.labs.map((x) => x.id); items = items.filter((l) => order.includes(l.id)).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); }
+  const hits = new Map();
+  let items = labs;
+  if (Fuzzy.tokens(q).length) items = Fuzzy.search(q, labRecs).map((r) => { hits.set(labs[r.i].id, r.hits); return labs[r.i]; });  // ranked
+  items = items.filter((l) => (!dom || l.domain === dom) && (!diff || String(l.difficulty) === diff) &&
+    (!src || (src === "library" ? (l.library || l.source === "builtin") : !(l.library || l.source === "builtin"))));
+  if (crs) { const order = crs.labs.map((x) => x.id); items = items.filter((l) => order.includes(l.id)); if (!hits.size) items.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); }
+  const hl = (l, k) => Fuzzy.highlight(l[k], (hits.get(l.id) || {})[k], esc);
   $("#lab-list").innerHTML = items.map((l) => `<li data-help="lab.item" data-id="${esc(l.id)}" class="${l.id === current ? "sel" : ""}">
-    <b>${esc(l.title)}</b><br>
+    <b>${hl(l, "title")}</b><br>
     ${walkTag(l)}<span class="tag">${"★".repeat(l.difficulty)}</span><span class="tag">${l.nodes} nodes</span>${ramTag(l.ram)}<span class="tag">${esc(l.blueprint.join(", "))}</span>
     ${srcTag(l)}${updTag(l)}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${l.walkthrough
       ? (l.walkthrough.completed ? '<span class="tag ok">completed</span>' : (l.walkthrough.required_passed ? `<span class="tag">${l.walkthrough.required_passed}/${l.walkthrough.required} steps</span>` : ""))
       : (l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : ""))}
-    <div class="muted small">${esc(l.summary)}</div></li>`).join("") || `<li class="muted">${labs.length ? "No labs match." : "Your labs will show up here."}</li>`;
+    <div class="muted small">${hl(l, "summary")}</div></li>`).join("") || `<li class="muted">${labs.length ? (q.trim() ? `No labs match "${esc(q.trim())}". Try fewer or shorter words, or clear the filters (Esc clears the search).` : "No labs match the filters.") : "Your labs will show up here."}</li>`;
   $$("#lab-list li[data-id]").forEach((li) => li.addEventListener("click", () => selectLab(li.dataset.id)));
 }
 ["#f-search", "#f-domain", "#f-diff", "#f-source", "#f-course"].forEach((s) => $(s).addEventListener("input", renderList));
@@ -330,12 +338,21 @@ async function openLibrary(fetchIndex) {
     <div class="toolbar"><input data-help="lib.url" id="lib-url" style="flex:1;min-width:20em" aria-label="Library index URL" value="${esc(url)}">
       <button data-help="lib.load" id="lib-load">Load library</button><button data-help="lib.default" id="lib-default" class="hint-btn">Default</button></div>
     <div class="muted small">The address is saved in Settings &gt; Library URL; changing it here only applies until you reload the page.</div>
+    <div id="lib-search-bar" class="toolbar lib-search-bar" hidden>
+      <input data-help="lib.search" id="lib-search" type="search" autocomplete="off" spellcheck="false" aria-label="Search the library"
+        placeholder="Search the library: title, id, topic, platform, node type…  ( / or Ctrl+K )">
+      <select data-help="lib.fKind" id="lib-kind" aria-label="Kind"><option value="">Labs and courses</option><option value="lab">Labs</option><option value="course">Courses</option></select>
+      <select data-help="lib.fStatus" id="lib-status" aria-label="Status"><option value="">Any status</option><option value="installed">Installed</option><option value="new">Not installed</option><option value="update">Update available</option></select>
+      <select data-help="lib.fCourse" id="lib-course" aria-label="Course"><option value="">Any course</option></select>
+      <label data-help="lib.fHeavy" class="small"><input type="checkbox" id="lib-noheavy"> Hide RAM heavy</label>
+      <span id="lib-count" class="muted small" aria-live="polite"></span></div>
     <div id="lib-items" class="muted">Click "Load library" to see the labs and courses published in the project repository.</div>
     <h3 data-help="lib.fromUrl">Install from a URL</h3>
     <div class="toolbar"><input data-help="lib.fileUrl" id="lib-file-url" style="flex:1;min-width:20em" placeholder="https://…/my-lab.cmllab or .cmlcourse" aria-label="File URL">
       <input data-help="lib.sha" id="lib-sha" style="width:22em" placeholder="sha256 (recommended)" aria-label="Expected sha256">
       <button data-help="lib.installUrl" id="lib-install-url">Install</button></div></div>`;
   renderCourses();
+  libBindFilters();
   $("#lib-load").onclick = () => loadLibrary();
   $("#lib-default").onclick = () => { $("#lib-url").value = libraryUrl || LIB_DEFAULT; loadLibrary(); };
   $("#lib-install-url").onclick = () => libInstall({url: $("#lib-file-url").value.trim(), sha256: $("#lib-sha").value.trim()});
@@ -385,17 +402,25 @@ async function loadLibrary() {
       if (it.update_available) return `<button data-help="lib.update" data-file="${esc(it.file)}" data-installed="1" class="primary">Update to v${esc(it.version)}</button>`;
       return `<button data-help="lib.install" data-file="${esc(it.file)}" data-installed="${it.installed ? 1 : ""}" class="${it.installed ? "" : "primary"}">${it.installed ? "Reinstall" : "Install"}</button>`;
     };
+    libPrepare(idx);
     $("#lib-items").innerHTML = idx.items.length ? `<div class="toolbar">
       ${starterLeft ? `<button data-help="lib.starter" id="lib-starter" class="primary">Install recommended starter set (${starterLeft})</button>` : ""}
       ${ups.length ? `<button data-help="lib.updateAll" id="lib-update-all" class="warn">Update all (${ups.length})</button>` : ""}</div>
-      <table><tr><th>Item</th><th>Type</th><th>Topics</th><th>Size</th><th></th></tr>${idx.items.map((it) => `<tr>
-      <td><b>${esc(it.title)}</b>${it.starter ? ' <span class="tag ok" data-help="lib.starterTag">starter</span>' : ""}${it.update_available ? ' <span class="tag warn">update available</span>' : ""}${it.kind === "lab" && it.installed ? ` <span class="tag">installed v${esc(it.installed_version || "1")}</span>` : ""}<div class="muted small">${esc(it.description)}</div>${it.kind === "course" ? `<div class="muted small">Labs: ${esc(it.labs.join(", "))}</div>` : ""}</td>
+      <table id="lib-table"><thead><tr><th>Item</th><th>Type</th><th>Topics</th><th>Size</th><th></th></tr></thead><tbody>${idx.items.map((it, i) => `<tr data-i="${i}">
+      <td><span class="c-title">${libCell(it, "title")}</span>${it.starter ? ' <span class="tag ok" data-help="lib.starterTag">starter</span>' : ""}${it.update_available ? ' <span class="tag warn">update available</span>' : ""}${it.kind === "lab" && it.installed ? ` <span class="tag">installed v${esc(it.installed_version || "1")}</span>` : ""}
+        <div class="muted small c-id"></div><div class="muted small c-description">${libCell(it, "description")}</div>${it.kind === "course" ? `<div class="muted small">Labs: <span class="c-labs">${libCell(it, "labs")}</span></div>` : ""}</td>
       <td><span class="tag">${it.kind}</span>${it.type === "walkthrough" ? walkTag(it) : ""}${it.nodes ? `<span class="tag">${it.nodes} nodes</span>` : ""}${it.difficulty ? `<span class="tag">${"★".repeat(it.difficulty)}</span>` : ""}${it.ram_gb ? ramTag({heavy: it.ram_heavy, label: `~${Math.round(it.ram_gb)} GB`,
-        tooltip: `About ${Math.round(it.ram_gb)} GB of CML server RAM${it.kind === "course" ? " for its heaviest lab" : ""}, estimated from the CML 2.9 node-definition defaults.${it.ram_heavy ? " Marked RAM heavy (threshold in Settings)." : ""}`}) : ""}</td>
-      <td>${esc(it.blueprint.join(", "))}</td><td class="small">${(it.size / 1024).toFixed(1)} KB</td>
-      <td>${libBtn(it)}</td></tr>`).join("")}</table>
+        tooltip: `About ${Math.round(it.ram_gb)} GB of CML server RAM${it.kind === "course" ? " for its heaviest lab" : ""}, estimated from the CML 2.9 node-definition defaults.${it.ram_heavy ? " Marked RAM heavy (threshold in Settings)." : ""}`}) : ""}
+        <div class="muted small c-nodes">${libCell(it, "nodes")}</div></td>
+      <td><span class="c-blueprint">${libCell(it, "blueprint")}</span><div class="muted small c-domain">${libCell(it, "domain")}</div><div class="muted small c-courses">${libCell(it, "courses")}</div></td>
+      <td class="small">${(it.size / 1024).toFixed(1)} KB</td>
+      <td>${libBtn(it)}</td></tr>`).join("")}</tbody></table>
+      <div id="lib-empty" class="lib-empty" hidden></div>
       <div class="muted small" data-help="lib.integrity">Every download is checked against the sha256 and size in the index, then validated like an imported file.</div>`
       : `<div class="muted">The library is empty.</div>`;
+    libRows = $$("#lib-table tbody tr");
+    $("#lib-search-bar").hidden = !idx.items.length;
+    libApply();
     $$("#lib-items [data-file]").forEach((b) => b.addEventListener("click", () => libInstall({file: b.dataset.file, index_url: url}, !!b.dataset.installed)));
     if ($("#lib-starter")) $("#lib-starter").onclick = () => installStarter($("#lib-starter"));
     if ($("#lib-update-all")) $("#lib-update-all").onclick = async () => {
@@ -411,6 +436,84 @@ async function loadLibrary() {
     const a = $("#lib-items [data-retry]"); if (a) a.onclick = (ev) => { ev.preventDefault(); loadLibrary(); };
   }
 }
+/* library search: fuzzy matching over the loaded index (fuzzy.js), no server calls while typing */
+const libText = (it, key) => Fuzzy.library.text(it, key);
+function libCell(it, key, hits) { return Fuzzy.highlight(libText(it, key), hits && hits[key], esc); }
+function libPrepare(idx) {
+  const t0 = performance.now();
+  libIdx = idx;
+  Fuzzy.library.addCourses(idx.items);
+  libRecs = idx.items.map(Fuzzy.library.record);
+  const sel = $("#lib-course");
+  if (sel) sel.innerHTML = `<option value="">Any course</option>` + idx.items.filter((c) => c.kind === "course")
+    .map((c) => `<option value="${esc(c.id)}" ${c.id === libQuery.course ? "selected" : ""}>Course: ${esc(c.title)}</option>`).join("");
+  libPrepare.ms = performance.now() - t0;
+}
+function libStatusOk(it, st) {
+  if (!st) return true;
+  if (st === "update") return !!it.update_available;
+  const inst = it.kind === "course" ? it.installed && !(it.missing || []).length : !!it.installed;
+  return st === "installed" ? inst : !inst;
+}
+function libBindFilters() {
+  const q = $("#lib-search");
+  q.value = libQuery.q; $("#lib-kind").value = libQuery.kind; $("#lib-status").value = libQuery.status; $("#lib-noheavy").checked = libQuery.noheavy;
+  const upd = () => { libQuery = {q: q.value, kind: $("#lib-kind").value, status: $("#lib-status").value, course: $("#lib-course").value, noheavy: $("#lib-noheavy").checked};
+    if (!libRaf) libRaf = requestAnimationFrame(() => { libRaf = 0; libApply(); }); };
+  ["#lib-search", "#lib-kind", "#lib-status", "#lib-course", "#lib-noheavy"].forEach((s) => $(s).addEventListener("input", upd));
+}
+// filter + rank + highlight the already-rendered rows (no re-render of the table, so typing stays instant)
+function libApply() {
+  const tbody = $("#lib-table tbody"); if (!libIdx || !tbody) return;
+  const t0 = performance.now();
+  const items = libIdx.items, {q, kind, status, course, noheavy} = libQuery;
+  const crs = course && items.find((c) => c.kind === "course" && c.id === course);
+  const keep = (it) => (!kind || it.kind === kind) && libStatusOk(it, status) && !(noheavy && it.ram_heavy) &&
+    (!crs || it === crs || (it.kind === "lab" && (crs.labs || []).includes(it.id)));
+  let order;
+  if (Fuzzy.tokens(q).length) order = Fuzzy.search(q, libRecs).filter((r) => keep(items[r.i]));
+  else order = items.map((it, i) => ({i, hits: null})).filter((r) => keep(items[r.i]));
+  const tMatch = performance.now() - t0;
+  const shown = new Set(order.map((r) => r.i));
+  const frag = document.createDocumentFragment();
+  for (const r of order) {
+    const tr = libRows[r.i], it = items[r.i];
+    if (r.hits || tr._hl) {
+      for (const k of ["title", "description", "blueprint", "domain", "nodes", "courses", "labs"]) {
+        const el = tr.querySelector(".c-" + k); if (el) el.innerHTML = libCell(it, k, r.hits);
+      }
+      const idEl = tr.querySelector(".c-id"); idEl.innerHTML = r.hits && r.hits.id ? "id: " + libCell(it, "id", r.hits) : "";
+      tr._hl = !!r.hits;
+    }
+    tr.hidden = false; frag.appendChild(tr);
+  }
+  libRows.forEach((tr, i) => { if (!shown.has(i)) { tr.hidden = true; frag.appendChild(tr); } });
+  tbody.appendChild(frag);
+  const filtered = q.trim() || kind || status || course || noheavy;
+  $("#lib-count").textContent = filtered ? `${order.length} of ${items.length}` : `${items.length} items`;
+  const empty = $("#lib-empty");
+  empty.hidden = order.length > 0; $("#lib-table").hidden = !order.length;
+  if (!order.length) {
+    empty.innerHTML = `No labs or courses match${q.trim() ? ` "<b>${esc(q.trim())}</b>"` : ""}${kind || status || course || noheavy ? " with these filters" : ""}.
+      Try fewer or shorter words (typos and abbreviations like "mcast" or "ospf stb" are fine). <button id="lib-clear" class="hint-btn">Clear search and filters</button>`;
+    $("#lib-clear").onclick = () => { libQuery = {q: "", kind: "", status: "", course: "", noheavy: false}; libBindValues(); libApply(); $("#lib-search").focus(); };
+  }
+  libApply.ms = {match: tMatch, total: performance.now() - t0};
+}
+function libBindValues() { $("#lib-search").value = libQuery.q; $("#lib-kind").value = libQuery.kind; $("#lib-status").value = libQuery.status; $("#lib-course").value = libQuery.course; $("#lib-noheavy").checked = libQuery.noheavy; }
+// "/" or Ctrl+K focuses the search (library page if open, else the lab list); Esc clears it
+document.addEventListener("keydown", (e) => {
+  const t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+  if ((e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) || ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k")) {
+    const box = ($("#lib-search-bar") && !$("#lib-search-bar").hidden) ? $("#lib-search") : $("#f-search");
+    if (!box || box.offsetParent === null) return;   // that view is not shown
+    e.preventDefault(); box.focus(); box.select();
+    return;
+  }
+  if (e.key === "Escape" && t && (t.id === "lib-search" || t.id === "f-search")) {
+    if (t.value) { t.value = ""; t.dispatchEvent(new Event("input")); e.preventDefault(); } else t.blur();
+  }
+});
 async function libInstall(body, replace = false) {
   if (!body.file && !body.url) { toast("Enter the https URL of a .cmllab or .cmlcourse file", "err"); return; }
   if (body.url && !body.sha256 && !confirm("No sha256 given, so the download cannot be verified. It will still be validated before it is installed. Continue?")) return;
