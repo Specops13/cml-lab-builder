@@ -8,3 +8,32 @@ starter:
   - 03-ospf-multiarea
   - 05-bgp-ebgp-ibgp
   - 06-hsrp
+
+# topics: the subject topics of every published lab (labsrc/ and examples/), from the vocabulary in cmllab/topics.py.
+# The Library page groups labs under their first topic and filters by any of them. The type (walkthrough/challenge)
+# and the track (ENCOR) are added automatically. Topics live in the index only, so changing them never changes a
+# pack or offers an update. packaging/build_library.py fails if a lab is missing here or uses an unknown topic.
+topics:
+  01-vlan-trunk-stp: [switching]
+  02-etherchannel: [switching]
+  03-ospf-multiarea: [ospf]
+  04-eigrp-named: [eigrp]
+  05-bgp-ebgp-ibgp: [bgp, ospf]
+  06-hsrp: [fhrp]
+  07-acl-nat: [security, ip-services]
+  08-vrf-lite: [vrf]
+  09-gre-ipsec: [tunnels, security]
+  10-ntp-syslog-snmp: [assurance, ip-services]
+  11-ipsla-tracking: [assurance, fhrp]
+  12-pbr: [routing-policy]
+  13-redistribution: [routing-policy, ospf, eigrp]
+  14-multicast-pim-sm: [multicast]
+  15-multicast-bsr-ssm: [multicast]
+  16-mpls-ldp: [mpls]
+  17-mpls-l3vpn: [mpls, vrf, bgp]
+  18-evpn-vxlan: [evpn-vxlan, data-center, bgp]
+  19-evpn-mpls: [evpn-vxlan, mpls, bgp]
+  20-evpn-vxlan-superspine: [evpn-vxlan, data-center, bgp]
+  eigrp-basic: [eigrp]
+  ospf-multiarea-stub: [ospf]
+  troubleshoot-ospf-7node: [troubleshooting, ospf]

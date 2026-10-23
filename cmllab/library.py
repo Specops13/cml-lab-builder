@@ -17,7 +17,7 @@ import re
 from typing import Callable
 from urllib.parse import urljoin, urlparse
 
-from . import catalog, courses, packs, sizing
+from . import catalog, courses, packs, sizing, topics
 from .schema import version_key
 
 ORIGIN_FILE = ".library.json"
@@ -133,7 +133,17 @@ def parse_index(raw: bytes) -> list[dict]:
                     "labs": [str(x) for x in it.get("labs", [])][:courses.MAX_LABS],
                     # search fields (3.1.0+ indexes; older ones simply have none)
                     "domain": str(it.get("domain") or "")[:120], "track": str(it.get("track") or "")[:40],
-                    "platforms": _strs(it.get("platforms"), 10), "node_types": _strs(it.get("node_types"), 20)})
+                    "platforms": _strs(it.get("platforms"), 10), "node_types": _strs(it.get("node_types"), 20),
+                    "topics": _strs(it.get("topics"), topics.MAX_TOPICS)})
+    # topic tags (3.2.0+ indexes): known ids only; labs without any (older or third-party indexes) get derived ones
+    by_id = {}
+    for o in out:
+        if o["kind"] == "lab":
+            o["topics"] = topics.for_lab(o)
+            by_id[o["id"]] = o
+    for o in out:
+        if o["kind"] == "course":
+            o["topics"] = topics.for_course(o, by_id)
     return out
 
 
@@ -184,8 +194,9 @@ def index(url: str = DEFAULT_INDEX, fetch: Fetcher = http_fetch, *, heavy_gb: fl
     _LAST.clear()
     _LAST.update(url=url, updates=sorted(i["id"] for i in items if i.get("update_available")),
                  versions={i["id"]: i["version"] for i in items if i["kind"] == "lab"})
+    used = [t for it in items for t in it.get("topics", [])]
     return {"url": url, "items": items, "starter": [s for s in starter if s in by_id],
-            "updates": _LAST["updates"]}
+            "updates": _LAST["updates"], "topics": topics.vocabulary(used)}
 
 
 def install_bytes(name: str, data: bytes, node_limit: int = 20, overwrite: bool = False) -> dict:
@@ -302,7 +313,8 @@ def install_url(file_url: str, expected_sha256: str = "", fetch: Fetcher = http_
     return d
 
 
-def build_index(folder, base_items: list[dict] | None = None, lab_roots: list | None = None) -> dict:
+def build_index(folder, base_items: list[dict] | None = None, lab_roots: list | None = None,
+                topic_map: dict[str, list[str]] | None = None) -> dict:
     """Generate labs/index.json for a folder of .encorlab/.encorcourse files (used by packaging/build_library.py).
     lab_roots: folders with lab sources, to size courses that reference (not bundle) library labs."""
     from pathlib import Path
@@ -340,4 +352,13 @@ def build_index(folder, base_items: list[dict] | None = None, lab_roots: list | 
                       domain=lab.domain, track=lab.track, platforms=list(lab.platforms),
                       node_types=sorted({d for p in lab.platforms for d in sizing.node_definitions(lab, p)}))
         items.append(it)
+    # topic tags (3.2.0): subject topics from topic_map (labsrc/library.yaml), else derived; then type and track
+    by_id = {}
+    for it in items:
+        if it.get("kind") == "lab":
+            it["topics"] = topics.for_lab({**it, "topics": (topic_map or {}).get(it["id"])})
+            by_id[it["id"]] = it
+    for it in items:
+        if it.get("kind") == "course":
+            it["topics"] = topics.for_course(it, by_id)
     return {"format": 1, "items": items}

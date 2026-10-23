@@ -27,6 +27,11 @@
       "node_types": [
         "ioll2-xe",
         "iosvl2"
+      ],
+      "topics": [
+        "switching",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -54,6 +59,11 @@
       "node_types": [
         "ioll2-xe",
         "iosvl2"
+      ],
+      "topics": [
+        "switching",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -81,6 +91,11 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "ospf",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -108,6 +123,11 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "eigrp",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -135,6 +155,12 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "bgp",
+        "ospf",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -164,6 +190,11 @@
         "ioll2-xe",
         "iosv",
         "iosvl2"
+      ],
+      "topics": [
+        "fhrp",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -192,6 +223,12 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "security",
+        "ip-services",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -219,6 +256,11 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "vrf",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -246,6 +288,12 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "tunnels",
+        "security",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -275,6 +323,12 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "assurance",
+        "ip-services",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -305,6 +359,12 @@
         "ioll2-xe",
         "iosv",
         "iosvl2"
+      ],
+      "topics": [
+        "assurance",
+        "fhrp",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -332,6 +392,11 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "routing-policy",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -360,6 +425,13 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "routing-policy",
+        "ospf",
+        "eigrp",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -387,6 +459,11 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "multicast",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -414,6 +491,11 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "multicast",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -441,6 +523,11 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "mpls",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -469,6 +556,13 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "mpls",
+        "vrf",
+        "bgp",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -498,6 +592,13 @@
         "iol-xe",
         "iosv",
         "nxosv9000"
+      ],
+      "topics": [
+        "evpn-vxlan",
+        "data-center",
+        "bgp",
+        "walkthrough",
+        "encor"
       ]
     },
     {
@@ -524,6 +625,13 @@
       ],
       "node_types": [
         "iol-xe"
+      ],
+      "topics": [
+        "evpn-vxlan",
+        "mpls",
+        "bgp",
+        "walkthrough",
+        "encor"
       ]
     },
     {
@@ -551,6 +659,13 @@
       "node_types": [
         "iol-xe",
         "nxosv9000"
+      ],
+      "topics": [
+        "evpn-vxlan",
+        "data-center",
+        "bgp",
+        "walkthrough",
+        "encor"
       ]
     },
     {
@@ -565,7 +680,14 @@
         "08-vrf-lite",
         "18-evpn-vxlan"
       ],
-      "ram_gb": 52.0
+      "ram_gb": 52.0,
+      "topics": [
+        "bgp",
+        "vrf",
+        "evpn-vxlan",
+        "data-center",
+        "encor"
+      ]
     },
     {
       "file": "eigrp-basic.cmllab",
@@ -592,6 +714,11 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "topics": [
+        "eigrp",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -609,7 +736,14 @@
         "16-mpls-ldp",
         "17-mpls-l3vpn"
       ],
-      "ram_gb": 6.0
+      "ram_gb": 6.0,
+      "topics": [
+        "multicast",
+        "vrf",
+        "mpls",
+        "bgp",
+        "encor"
+      ]
     },
     {
       "file": "encor-routing.cmlcourse",
@@ -628,7 +762,15 @@
         "12-pbr",
         "13-redistribution"
       ],
-      "ram_gb": 4.0
+      "ram_gb": 4.0,
+      "topics": [
+        "ospf",
+        "eigrp",
+        "routing-policy",
+        "bgp",
+        "vrf",
+        "encor"
+      ]
     },
     {
       "file": "ospf-mastery.cmlcourse",
@@ -643,7 +785,12 @@
         "ospf-multiarea-stub",
         "troubleshoot-ospf-7node"
       ],
-      "ram_gb": 7.0
+      "ram_gb": 7.0,
+      "topics": [
+        "ospf",
+        "troubleshooting",
+        "encor"
+      ]
     },
     {
       "file": "ospf-multiarea-stub.cmllab",
@@ -668,6 +815,11 @@
       ],
       "node_types": [
         "iol-xe"
+      ],
+      "topics": [
+        "ospf",
+        "challenge",
+        "encor"
       ]
     },
     {
@@ -693,6 +845,12 @@
       ],
       "node_types": [
         "iol-xe"
+      ],
+      "topics": [
+        "troubleshooting",
+        "ospf",
+        "challenge",
+        "encor"
       ]
     }
   ],

@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 import yaml  # noqa: E402
 
-from cmllab import courses, library, packs  # noqa: E402
+from cmllab import courses, library, packs, topics  # noqa: E402
 from cmllab.schema import version_key  # noqa: E402
 
 LABSRC = ROOT / "labsrc"
@@ -42,6 +42,21 @@ def starter() -> list[str]:
     return [str(x) for x in d.get("starter", [])]
 
 
+def topic_map(ids: set[str]) -> dict[str, list[str]]:
+    """labsrc/library.yaml `topics:`: every library lab, known subject topics only (cmllab/topics.py)."""
+    d = yaml.safe_load((LABSRC / "library.yaml").read_text(encoding="utf-8")) or {}
+    m = {str(k): v for k, v in (d.get("topics") or {}).items()}
+    errs = [f"{k}: not a library lab" for k in m if k not in ids]
+    errs += [f"{k}: no topics in labsrc/library.yaml" for k in sorted(ids) if not m.get(k)]
+    for k, v in m.items():
+        bad = [t for t in (v or []) if t not in topics.SUBJECTS]
+        if bad:
+            errs.append(f"{k}: unknown topic(s) {bad} (see cmllab/topics.py)")
+    if errs:
+        sys.exit("labsrc/library.yaml topics: " + "; ".join(errs))
+    return {k: list(v) for k, v in m.items()}
+
+
 def build(out: Path, previous: dict | None = None, pack_ext: str = packs.PACK_EXT,
           course_ext: str = courses.COURSE_EXT) -> None:
     out.mkdir(parents=True, exist_ok=True)
@@ -58,7 +73,7 @@ def build(out: Path, previous: dict | None = None, pack_ext: str = packs.PACK_EX
     for d in sorted(p for p in (ex / "courses").iterdir() if (p / "course.yaml").is_file()):
         c = courses.parse_course_yaml((d / "course.yaml").read_text(encoding="utf-8"))
         (out / f"{c.id}{course_ext}").write_bytes(courses.build(d, search=[ex], known=lib_ids))
-    idx = library.build_index(out, lab_roots=[LABSRC, ex])
+    idx = library.build_index(out, lab_roots=[LABSRC, ex], topic_map=topic_map(ids))
     bad = [s for s in starter() if s not in ids]
     if bad:
         sys.exit(f"labsrc/library.yaml: starter labs not in the library: {bad}")
