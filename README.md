@@ -540,7 +540,8 @@ service-provider core and stretches VLANs 10 and 20 across three customer sites 
 
 **Topology** (8 `iol-xe` nodes, about **8 GB of CML RAM**, not RAM heavy): P1 (core label switch), RR (BGP route
 reflector), PE1-PE3 (provider edge) and CE1-CE3 (pre-configured customer routers with VLAN 10/20 subinterfaces). IOL only:
-the EVPN commands need IOS-XE.
+the EVPN commands need IOS-XE. Day-0: every router boots with its hostname, `no ip domain lookup`, a description on
+every port and its cabled links enabled (no IP addressing yet); the CEs are fully configured.
 
 | # | Step | What you do | Verified with |
 |---|---|---|---|
@@ -566,7 +567,8 @@ transit, and the super spines are the iBGP EVPN route reflectors. VXLAN EVPN Mul
 choice for separate fault domains per DC, is covered as the next step in the solution summary.
 
 **Topology** (12 nodes, about **56 GB of CML RAM**, RAM heavy): 4 `nxosv9000` leaves (DC1-LEAF1/2, DC2-LEAF1/2, 12 GB
-each), 2 `iol-xe` super spines (SS1, SS2), 2 `iol-xe` DC spines and 4 pre-configured IOL hosts. IOL only.
+each), 2 `iol-xe` super spines (SS1, SS2), 2 `iol-xe` DC spines and 4 pre-configured IOL hosts. IOL only. Day-0: every switch boots with its hostname, logins,
+`no ip domain lookup`, a description on every port and its cabled links enabled (no IP addressing yet).
 
 | # | Step | What you do | Verified with |
 |---|---|---|---|

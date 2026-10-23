@@ -17,6 +17,18 @@ No app changes. Install from *Library & courses* (*Browse library*).
   DC1 to DC2, and an optional L3VNI VRF with a distributed anycast gateway. Published as
   `library/20-evpn-vxlan-superspine.cmllab` (and `labs/20-evpn-vxlan-superspine.encorlab` for 2.x). Expected outputs
   come from Cisco documentation and are not yet verified on CML.
+### Fixed
+- **Library labs `19-evpn-mpls` and `20-evpn-vxlan-superspine` (now version 2): the routers booted with no day-0
+  config on CML** (no hostname, unconfigured CEs/hosts, IOL setup dialog). Cisco's `iol-xe` node definition requires
+  every Ethernet port to have some IP configuration in the day-0 config, or IOL ignores the whole config and starts the
+  initial configuration dialog; the hostname-only core routers and the CEs/hosts (only their cabled ports) did not.
+  Every IOL node now lists all four ports (description, `no ip address`, cabled links `no shutdown`, unused ports
+  `shutdown`), so the hostname, `no ip domain lookup` and the CE/host configs apply, and the step 1 CDP check sees
+  its neighbors. The Nexus leaves in lab 20 also get port descriptions and their links enabled. Update both labs in
+  the library, then destroy and rebuild them in CML.
+- **Library lab `19-evpn-mpls`:** *Apply this step* on the BGP EVPN step no longer sends a stray
+  `exit-address-family` in router configuration mode (where IOS rejects it) on the RR and PE1-PE3. The line was removed
+  from the step config. Installed copies show *Update available* in the library.
 
 ## [3.0.0] - 2026-10-21
 **The full rename: the program, downloads, package, data and CML labs are all CML Lab Builder now.** This is a full

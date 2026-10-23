@@ -7,38 +7,118 @@ difficulty: 5
 platforms: [iol]
 summary: Step-by-step build of an EVPN over MPLS service provider core - OSPF and LDP in the core, iBGP l2vpn evpn through a route reflector, VLAN-based EVIs with bridge domains stretching VLANs 10 and 20 across three sites, route type 2/3 verification (optional EVPN-VPWS point-to-point service).
 author: CML Lab Builder
-version: "1"
+version: "2"
 nodes:
   - name: P1
     kind: router
     x: 0
     y: 0
     config: |
-      ! Core P router. Day-0: hostname only. You build the rest in the walkthrough steps.
+      ! Core P router. Day-0: hostname, interface descriptions and links enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+      interface %if0%
+       description to PE1
+       no ip address
+       no shutdown
+      interface %if1%
+       description to PE2
+       no ip address
+       no shutdown
+      interface %if2%
+       description to PE3
+       no ip address
+       no shutdown
+      interface %if3%
+       description to RR
+       no ip address
+       no shutdown
   - name: RR
     kind: router
     x: 0
     y: -230
     config: |
-      ! BGP route reflector. Day-0: hostname only. You build the rest in the walkthrough steps.
+      ! BGP route reflector. Day-0: hostname, interface descriptions and links enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+      interface %if0%
+       description to P1
+       no ip address
+       no shutdown
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: PE1
     kind: router
     x: -320
     y: -80
     config: |
-      ! Provider edge for site 1. Day-0: hostname only. You build the rest in the walkthrough steps.
+      ! Provider edge for site 1. Day-0: hostname, interface descriptions and links enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+      interface %if0%
+       description to P1
+       no ip address
+       no shutdown
+      interface %if1%
+       description to CE1 (customer trunk, VLANs 10/20)
+       no ip address
+       no shutdown
+      interface %if2%
+       description to CE1 (E-Line, optional VPWS step)
+       no ip address
+       no shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: PE2
     kind: router
     x: 320
     y: -80
     config: |
-      ! Provider edge for site 2. Day-0: hostname only. You build the rest in the walkthrough steps.
+      ! Provider edge for site 2. Day-0: hostname, interface descriptions and links enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+      interface %if0%
+       description to P1
+       no ip address
+       no shutdown
+      interface %if1%
+       description to CE2 (customer trunk, VLANs 10/20)
+       no ip address
+       no shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: PE3
     kind: router
     x: 0
     y: 220
     config: |
-      ! Provider edge for site 3. Day-0: hostname only. You build the rest in the walkthrough steps.
+      ! Provider edge for site 3. Day-0: hostname, interface descriptions and links enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+      interface %if0%
+       description to P1
+       no ip address
+       no shutdown
+      interface %if1%
+       description to CE3 (customer trunk, VLANs 10/20)
+       no ip address
+       no shutdown
+      interface %if2%
+       description to CE3 (E-Line, optional VPWS step)
+       no ip address
+       no shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: CE1
     kind: router
     x: -600
@@ -64,6 +144,14 @@ nodes:
       interface %if1%.100
        encapsulation dot1Q 100
        ip address 192.168.100.1 255.255.255.0
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: CE2
     kind: router
     x: 600
@@ -81,6 +169,18 @@ nodes:
       interface %if0%.20
        encapsulation dot1Q 20
        ip address 192.168.20.2 255.255.255.0
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: CE3
     kind: router
     x: 0
@@ -106,6 +206,14 @@ nodes:
       interface %if1%.100
        encapsulation dot1Q 100
        ip address 192.168.100.3 255.255.255.0
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
 links:
   - {a: {node: P1, port: 0}, b: {node: PE1, port: 0}}
   - {a: {node: P1, port: 1}, b: {node: PE2, port: 0}}
@@ -171,7 +279,8 @@ steps:
       swaps the transport label. EVPN can also run over VXLAN (see the *BGP EVPN VXLAN* walkthrough) or over
       segment routing (SR-MPLS) instead of LDP - the BGP part is identical.
 
-      This first step only checks the cabling. The core routers start with just a hostname.
+      This first step only checks the cabling. The core routers start with a hostname, interface descriptions and
+      their links enabled, but no IP addressing, routing or MPLS yet; the CEs are already fully configured.
     verify:
       - device: P1
         command: show cdp neighbors
@@ -425,7 +534,6 @@ steps:
           neighbor 10.0.0.3 activate
           neighbor 10.0.0.3 send-community both
           neighbor 10.0.0.3 route-reflector-client
-         exit-address-family
       PE1: |
         router bgp 65000
          bgp router-id 10.0.0.1
@@ -436,7 +544,6 @@ steps:
          address-family l2vpn evpn
           neighbor 10.0.0.100 activate
           neighbor 10.0.0.100 send-community both
-         exit-address-family
       PE2: |
         router bgp 65000
          bgp router-id 10.0.0.2
@@ -447,7 +554,6 @@ steps:
          address-family l2vpn evpn
           neighbor 10.0.0.100 activate
           neighbor 10.0.0.100 send-community both
-         exit-address-family
       PE3: |
         router bgp 65000
          bgp router-id 10.0.0.3
@@ -458,7 +564,6 @@ steps:
          address-family l2vpn evpn
           neighbor 10.0.0.100 activate
           neighbor 10.0.0.100 send-community both
-         exit-address-family
     verify:
       - device: RR
         command: show bgp l2vpn evpn summary

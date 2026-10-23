@@ -317,12 +317,12 @@
     },
     {
       "file": "19-evpn-mpls.encorlab",
-      "sha256": "cb0fdeb0ce3fd6bcccb147be9c6f4eea934d18480fcb048a1b1f76d05c3e0b3d",
-      "size": 13481,
+      "sha256": "0f3f9563824dd1e7db9127fd34fbd4ea750eda84d491a490f30ccc6f11ef4c67",
+      "size": 13633,
       "kind": "lab",
       "id": "19-evpn-mpls",
       "title": "Walkthrough: BGP EVPN over MPLS (IOS-XE, IOL)",
-      "version": "1",
+      "version": "2",
       "description": "Step-by-step build of an EVPN over MPLS service provider core - OSPF and LDP in the core, iBGP l2vpn evpn through a route reflector, VLAN-based EVIs with bridge domains stretching VLANs 10 and 20 across three sites, route type 2/3 verification (optional EVPN-VPWS point-to-point service).",
       "blueprint": [
         "2.2",
@@ -335,12 +335,12 @@
     },
     {
       "file": "20-evpn-vxlan-superspine.encorlab",
-      "sha256": "ae8b3b2690328eedf1f500a1f29e26c565ba05e6474cf3ae0ac9be25b9d2045c",
-      "size": 16200,
+      "sha256": "9fe7351f5a20acf1f175cd4e2eb47579ebe778a63811f2c766fe22bc5fed7efd",
+      "size": 16392,
       "kind": "lab",
       "id": "20-evpn-vxlan-superspine",
       "title": "Walkthrough: BGP EVPN VXLAN across two data centers with super spines (5-stage Clos)",
-      "version": "1",
+      "version": "2",
       "description": "Step-by-step build of one VXLAN EVPN fabric spanning two data centers (two spine-and-leaf pods) joined by a super-spine layer - Cisco's 5-stage Clos. OSPF underlay through leaf-spine-super spine-spine-leaf, iBGP EVPN with the super spines as route reflectors, NX-OS VTEPs, VLANs 10 and 20 stretched across both DCs (optional L3VNI VRF with a distributed anycast gateway).",
       "blueprint": [
         "2.3",

@@ -7,60 +7,148 @@ difficulty: 5
 platforms: [iol]
 summary: Step-by-step build of one VXLAN EVPN fabric spanning two data centers (two spine-and-leaf pods) joined by a super-spine layer - Cisco's 5-stage Clos. OSPF underlay through leaf-spine-super spine-spine-leaf, iBGP EVPN with the super spines as route reflectors, NX-OS VTEPs, VLANs 10 and 20 stretched across both DCs (optional L3VNI VRF with a distributed anycast gateway).
 author: CML Lab Builder
-version: "1"
+version: "2"
 nodes:
   - name: SS1
     kind: router
     x: -150
     y: -420
     config: |
-      ! Day-0: hostname only. Super spine 1 - you build it in the walkthrough steps.
+      ! Super spine 1 (BGP EVPN route reflector). Day-0: hostname, interface descriptions and links enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+      interface %if0%
+       description to DC1-SPINE
+       no ip address
+       no shutdown
+      interface %if1%
+       description to DC2-SPINE
+       no ip address
+       no shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: SS2
     kind: router
     x: 150
     y: -420
     config: |
-      ! Day-0: hostname only. Super spine 2 - you build it in the walkthrough steps.
+      ! Super spine 2 (BGP EVPN route reflector). Day-0: hostname, interface descriptions and links enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+      interface %if0%
+       description to DC1-SPINE
+       no ip address
+       no shutdown
+      interface %if1%
+       description to DC2-SPINE
+       no ip address
+       no shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: DC1-SPINE
     kind: router
     x: -300
     y: -220
     config: |
-      ! Day-0: hostname only. DC1 spine - you build it in the walkthrough steps.
+      ! DC1 spine. Day-0: hostname, interface descriptions and links enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+      interface %if0%
+       description to SS1
+       no ip address
+       no shutdown
+      interface %if1%
+       description to SS2
+       no ip address
+       no shutdown
+      interface %if2%
+       description to DC1-LEAF1
+       no ip address
+       no shutdown
+      interface %if3%
+       description to DC1-LEAF2
+       no ip address
+       no shutdown
   - name: DC2-SPINE
     kind: router
     x: 300
     y: -220
     config: |
-      ! Day-0: hostname only. DC2 spine - you build it in the walkthrough steps.
+      ! DC2 spine. Day-0: hostname, interface descriptions and links enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+      interface %if0%
+       description to SS1
+       no ip address
+       no shutdown
+      interface %if1%
+       description to SS2
+       no ip address
+       no shutdown
+      interface %if2%
+       description to DC2-LEAF1
+       no ip address
+       no shutdown
+      interface %if3%
+       description to DC2-LEAF2
+       no ip address
+       no shutdown
   - name: DC1-LEAF1
     kind: switch
     definition: nxosv9000
     x: -420
     y: 0
     config: |
-      ! Day-0: hostname and logins only. You build the rest in the walkthrough steps.
+      ! Day-0: hostname, logins, interface descriptions and links enabled. You build the rest in the walkthrough steps.
+      interface Ethernet1/1
+        description to DC1-SPINE
+        no shutdown
+      interface Ethernet1/2
+        description to H1
+        no shutdown
   - name: DC1-LEAF2
     kind: switch
     definition: nxosv9000
     x: -180
     y: 0
     config: |
-      ! Day-0: hostname and logins only. You build the rest in the walkthrough steps.
+      ! Day-0: hostname, logins, interface descriptions and links enabled. You build the rest in the walkthrough steps.
+      interface Ethernet1/1
+        description to DC1-SPINE
+        no shutdown
+      interface Ethernet1/2
+        description to H2
+        no shutdown
   - name: DC2-LEAF1
     kind: switch
     definition: nxosv9000
     x: 180
     y: 0
     config: |
-      ! Day-0: hostname and logins only. You build the rest in the walkthrough steps.
+      ! Day-0: hostname, logins, interface descriptions and links enabled. You build the rest in the walkthrough steps.
+      interface Ethernet1/1
+        description to DC2-SPINE
+        no shutdown
+      interface Ethernet1/2
+        description to H3
+        no shutdown
   - name: DC2-LEAF2
     kind: switch
     definition: nxosv9000
     x: 420
     y: 0
     config: |
-      ! Day-0: hostname and logins only. You build the rest in the walkthrough steps.
+      ! Day-0: hostname, logins, interface descriptions and links enabled. You build the rest in the walkthrough steps.
+      interface Ethernet1/1
+        description to DC2-SPINE
+        no shutdown
+      interface Ethernet1/2
+        description to H4
+        no shutdown
   - name: H1
     kind: router
     x: -420
@@ -73,6 +161,18 @@ nodes:
        ip address 192.168.10.11 255.255.255.0
        no shutdown
       ip route 0.0.0.0 0.0.0.0 192.168.10.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: H2
     kind: router
     x: -180
@@ -85,6 +185,18 @@ nodes:
        ip address 192.168.20.12 255.255.255.0
        no shutdown
       ip route 0.0.0.0 0.0.0.0 192.168.20.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: H3
     kind: router
     x: 180
@@ -97,6 +209,18 @@ nodes:
        ip address 192.168.10.13 255.255.255.0
        no shutdown
       ip route 0.0.0.0 0.0.0.0 192.168.10.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: H4
     kind: router
     x: 420
@@ -109,6 +233,18 @@ nodes:
        ip address 192.168.20.14 255.255.255.0
        no shutdown
       ip route 0.0.0.0 0.0.0.0 192.168.20.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
 links:
   - {a: {node: SS1, port: 0}, b: {node: DC1-SPINE, port: 0}}
   - {a: {node: SS1, port: 1}, b: {node: DC2-SPINE, port: 0}}
@@ -194,7 +330,8 @@ steps:
       with **border gateways (BGWs)** per site re-originating routes over an eBGP DCI. BGWs need more NX-OS nodes
       (and more RAM), so they are the "where to go next" at the end.
 
-      This first step only checks the cabling. The switches start with just a hostname and logins.
+      This first step only checks the cabling. The switches start with a hostname, logins, interface descriptions
+      and their links enabled, but no IP addressing or routing yet; the test hosts are already fully configured.
     verify:
       - device: DC1-SPINE
         command: show cdp neighbors

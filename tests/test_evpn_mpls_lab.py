@@ -64,3 +64,18 @@ def test_apply_script_enters_and_leaves_service_instances():
     i = lines.index("service instance 10 ethernet")
     assert lines[i + 1] == "encapsulation dot1q 10" and lines[i + 2] == "exit"
     assert "member evpn-instance 20" in lines
+
+
+def test_apply_scripts_have_no_exit_address_family_and_version_bumped():
+    # "Apply this step" already sends `exit` when the indentation leaves a sub-mode, so a trailing
+    # `exit-address-family` would reach the device in router mode, where IOS rejects it.
+    lab = _lab()
+    for step in lab.steps:
+        for dev, cfg in step.config.items():
+            assert "exit-address-family" not in config_script(cfg), (step.id, dev)
+    rr = config_script(lab.step("bgp-evpn").config["RR"])
+    assert rr[-1] == "neighbor 10.0.0.3 route-reflector-client"
+    assert lab.version == "2"                       # installed copies show "Update available"
+    for folder in ("library", "labs"):
+        item = next(i for i in json.loads((ROOT / folder / "index.json").read_text())["items"] if i["id"] == LAB_ID)
+        assert item["version"] == "2"
