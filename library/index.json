@@ -124,12 +124,12 @@
     },
     {
       "file": "08-vrf-lite.cmllab",
-      "sha256": "a4c3bb111345dfd0cfdfa6466ee0a2bf3a96cf317165da0761add7b47a078cb6",
-      "size": 3483,
+      "sha256": "78b927fbdc60ee4e1fb7d73c500a2e6f85c5a12bacc6dbdef9bd8a0aa4f052dc",
+      "size": 3538,
       "kind": "lab",
       "id": "08-vrf-lite",
       "title": "VRF-Lite with Overlapping Customer Addressing",
-      "version": "1",
+      "version": "2",
       "description": "Separate two customers with identical addressing on one router using VRF-lite and per-VRF static routing.",
       "blueprint": [
         "2.2.a"

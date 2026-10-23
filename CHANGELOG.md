@@ -26,6 +26,12 @@ No app changes. Install from *Library & courses* (*Browse library*).
   `shutdown`), so the hostname, `no ip domain lookup` and the CE/host configs apply, and the step 1 CDP check sees
   its neighbors. The Nexus leaves in lab 20 also get port descriptions and their links enabled. Update both labs in
   the library, then destroy and rebuild them in CML.
+- **Library lab `08-vrf-lite` (now version 2): PE booted with no day-0 config on IOL** (no hostname, setup dialog):
+  its two ports had descriptions but no IP configuration, the same IOL trigger as above. Every IOL node (PE, CEA, CEB)
+  now lists all four ports (`no ip address` on the PE links, descriptions on the CE links, unused ports shut); the
+  customer configs are unchanged. An audit of every library lab found no other `iol-xe` node without IP configuration
+  on an Ethernet port (IOL L2 switches have no such requirement), and a test now checks the whole library. Update
+  the lab in the library, then destroy and rebuild it in CML.
 - **Library lab `19-evpn-mpls`:** *Apply this step* on the BGP EVPN step no longer sends a stray
   `exit-address-family` in router configuration mode (where IOS rejects it) on the RR and PE1-PE3. The line was removed
   from the step config. Installed copies show *Update available* in the library.

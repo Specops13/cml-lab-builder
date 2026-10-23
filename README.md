@@ -932,6 +932,10 @@ via `CMLLAB_BUILTIN_LABS_DIR=labsrc` (set by `tests/conftest.py`); set it yourse
 (`CMLLAB_BUILTIN_LABS_DIR=labsrc python -m cmllab web`) or validate them with `python -m cmllab validate labsrc/*`.
 In configs, checks and fixtures, `%if0%` / `%if0s%`
 become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv.
+Every `iol-xe` router needs IP configuration (`ip address` or `no ip address`) on at least one Ethernet port in its
+starting config, or IOL ignores the whole config and starts the setup dialog (Cisco's node definition asks for all
+ports); the library labs list all four ports where it matters, and `tests/test_library_walkthrough_day0.py` checks
+every library lab. IOL L2 switches (`ioll2-xe`) have no such requirement.
 After changing the schema, templates, guide or example, run `python -m cmllab docs` (a test checks `docs/` is current).
 
 ## Version and changelog

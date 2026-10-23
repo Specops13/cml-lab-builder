@@ -3,6 +3,7 @@ title: VRF-Lite with Overlapping Customer Addressing
 blueprint: ["2.2.a"]
 domain: "2.0 Virtualization"
 difficulty: 3
+version: "2"
 summary: Separate two customers with identical addressing on one router using VRF-lite and per-VRF static routing.
 nodes:
   - name: PE
@@ -12,10 +13,20 @@ nodes:
     config: |
       interface %if0%
        description to CE-A (customer A)
+       no ip address
        no shutdown
       interface %if1%
        description to CE-B (customer B)
+       no ip address
        no shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: CEA
     kind: router
     x: -250
@@ -24,9 +35,22 @@ nodes:
       interface Loopback1
        ip address 192.168.100.1 255.255.255.0
       interface %if0%
+       description to PE (customer A)
        ip address 10.1.1.2 255.255.255.252
        no shutdown
       ip route 0.0.0.0 0.0.0.0 10.1.1.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
   - name: CEB
     kind: router
     x: 250
@@ -35,9 +59,22 @@ nodes:
       interface Loopback1
        ip address 192.168.100.1 255.255.255.0
       interface %if0%
+       description to PE (customer B)
        ip address 10.1.1.2 255.255.255.252
        no shutdown
       ip route 0.0.0.0 0.0.0.0 10.1.1.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
 links:
   - {a: {node: PE, port: 0}, b: {node: CEA, port: 0}}
   - {a: {node: PE, port: 1}, b: {node: CEB, port: 0}}
