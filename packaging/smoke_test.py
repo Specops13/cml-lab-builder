@@ -86,6 +86,19 @@ def make_patch(tmp: Path, version: str, broken: bool = False, min_runtime: int |
     return build_patch.build_patch(src, tmp / "out", version, min_runtime)
 
 
+def wait_json(path: Path, ok, timeout: float = 30.0) -> dict:
+    """Poll a JSON file until ok(data) holds (or the timeout passes); returns the last value read (no fixed sleeps)."""
+    end, data = time.monotonic() + timeout, {}
+    while True:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        if ok(data) or time.monotonic() > end:
+            return data
+        time.sleep(0.2)
+
+
 def patch_tests(exe, version: str, data_dir: Path, port: int, check, boot_dir: Path | None = None) -> None:
     boot_dir = boot_dir or data_dir
     import shutil
@@ -118,8 +131,7 @@ def patch_tests(exe, version: str, data_dir: Path, port: int, check, boot_dir: P
                         pass
                 time.sleep(0.5)
             check(health and health.get("version") == "99.0.0", f"patched web UI is up: {health}")
-            time.sleep(1.5)
-            st = json.loads((boot_dir / "app" / "state.json").read_text(encoding="utf-8"))
+            st = wait_json(boot_dir / "app" / "state.json", lambda d: d.get("current") == "99.0.0" and not d.get("pending"))
             check(st.get("current") == "99.0.0" and not st.get("pending"), "patch marked good after the UI started")
         finally:
             try:
@@ -195,7 +207,7 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre, b
         a = post_json(f"{base}/api/update/apply?version={new}")
         check(a.get("state") == "waiting" and any("exam" in w for w in a.get("waiting_for", [])),
               f"Update now waits for the running exam: {a.get('waiting_for')}")
-        time.sleep(3)
+        time.sleep(3)                     # observation window: the update must NOT happen while the exam runs
         h = json.loads(get(base + "/api/health")[2])
         check(h.get("version") == version and not (boot_dir / "app" / new).exists(), "nothing installed while the exam runs")
         post_json(f"{base}/api/labs/{lab_id}/exam/abort")
@@ -211,8 +223,7 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre, b
         check(health and health.get("version") == new, f"installed and restarted on the same port: {health}")
         st = json.loads(get(base + "/api/update/auto")[2])
         check((st.get("just_updated") or {}).get("version") == new, f"page gets 'Updated to {new}': {st.get('just_updated')}")
-        time.sleep(1.5)
-        boot = json.loads((boot_dir / "app" / "state.json").read_text(encoding="utf-8"))
+        boot = wait_json(boot_dir / "app" / "state.json", lambda d: d.get("current") == new and not d.get("pending"))
         check(boot.get("current") == new and not boot.get("pending"), "new version confirmed by the boot loader")
         etags = [r for r in fake.requests if r[0].endswith("/releases/latest")]
         check(bool(etags) and etags[0][1] is None, f"release API polled ({len(etags)} request(s))")
@@ -274,7 +285,8 @@ def main() -> int:
                             text=True, encoding="utf-8", errors="replace", env=dict(os.environ, CMLLAB_LIBRARY_URL=lib_url),
                             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
     lines: list[str] = []
-    threading.Thread(target=lambda: [lines.append(l) for l in proc.stdout], daemon=True).start()
+    reader = threading.Thread(target=lambda: [lines.append(l) for l in proc.stdout], daemon=True)
+    reader.start()
     base = None
     for _ in range(240):  # the launcher may move to the next free port; take the URL from its banner
         m = re.search(r"Web UI:\s+(http://127\.0\.0\.1:\d+)", "".join(lines))
@@ -343,7 +355,7 @@ def main() -> int:
             proc.wait(timeout=20)
         except subprocess.TimeoutExpired:
             proc.kill(); proc.wait()
-        time.sleep(0.5)
+        reader.join(10)                   # all launcher output read (EOF), no fixed sleep
         out = "".join(lines)
         print(f"---- launcher output (exit {proc.returncode}) ----\n" + out.strip() + "\n-------------------------")
     check("Web UI:" in out and "127.0.0.1" in out, "launcher printed its banner")

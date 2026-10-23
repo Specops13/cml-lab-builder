@@ -73,7 +73,13 @@ def test_build_files_present_and_consistent():
     assert "from cmllab.launcher import main" in entry and "cmlboot.activate" in entry
     assert "build_patch.py" in wf and "cml-lab-builder-patch-" in wf and "--check-lock" in wf
     # the .deb is built from the smoke-tested Linux build, linted, tested on Debian 12 and released
-    assert "build_deb.py" in wf and "lintian" in wf and "container: debian:12" in wf
+    assert "build_deb.py" in wf and "lintian" in wf and "packaging/deb_docker_test.sh" in wf
+    # deb-test: the local chroot checks in a debian:12 image pinned by digest, no stale shell asserts in the workflow
+    dock = (pk / "deb_docker_test.sh").read_text(encoding="utf-8")
+    assert re.search(r"debian:12@sha256:[0-9a-f]{64}", dock) and "deb_chroot_inner.sh" in dock and "deb_test_prep.sh" in dock
+    assert "test -d /home/tester/.config/cml-lab-builder/app" not in wf
+    inner = (pk / "deb_chroot_inner.sh").read_text(encoding="utf-8")
+    assert "wait_up http://127.0.0.1:8765/api/health" in inner and "DEB TEST FAILED" in inner and "Acquire::Retries" in inner
     assert "sha256sum CMLLabBuilder-* cml-lab-builder_*.deb cml-lab-builder-patch-*.zip ENCORLab-* encorlab_*.deb encorlab-patch-*.zip" in wf
     assert wf.count("dist/cml-lab-builder_*.deb") >= 3 and "build_compat.py --dist dist" in wf
 

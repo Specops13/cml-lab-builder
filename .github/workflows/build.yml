@@ -6,7 +6,7 @@
 #  - every run also builds cml-lab-builder-patch-<version>.zip (app code only, used by the in-app "Install update")
 #    and checks packaging/runtime.lock.json, so a runtime change cannot ship as a patch by accident.
 #  - the Linux job also wraps the smoke-tested Linux build into cml-lab-builder_<version>_amd64.deb (lintian +
-#    desktop-file-validate), and deb-test installs it in a clean Debian 12 container and smoke-tests it.
+#    desktop-file-validate), and deb-test runs packaging/deb_docker_test.sh on it (pinned debian:12 container).
 #  - the release also carries the transition files for ENCOR Lab Builder 1.7 - 2.1 (packaging/build_compat.py:
 #    old-name copies and a manifest-only encorlab-patch-<version>.zip that makes old apps offer the full download).
 name: CML Lab Builder build
@@ -88,28 +88,19 @@ jobs:
             dist/cml-lab-builder_*.deb
           if-no-files-found: error
   deb-test:
+    # The .deb end to end in a fresh Debian 12 container pinned by digest (packaging/deb_docker_test.sh, the same
+    # checks as the local packaging/deb_chroot_test.sh): apt install with deps, menu entry + launch (waits for the
+    # port), single instance, smoke test with patch + auto-update tests as a normal user, /opt and dpkg --verify
+    # untouched, deb upgrades vs. a user patch, remove + purge keep the user data. Every check prints PASS/FAIL.
     needs: bundle
     runs-on: ubuntu-22.04
-    container: debian:12
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: {name: CMLLabBuilder-linux, path: dist}
-      - name: apt install the .deb on a clean Debian 12, then smoke-test it as a normal user
-        run: |
-          apt-get update -qq
-          apt-get install -y ./dist/cml-lab-builder_*.deb
-          apt-get install -y -qq python3 desktop-file-utils
-          desktop-file-validate /usr/share/applications/cml-lab-builder.desktop
-          useradd -m tester && cp -r . /home/tester/src && chown -R tester /home/tester/src
-          V=$(dpkg-query -W -f='${Version}' cml-lab-builder)
-          su tester -c "cd ~ && python3 src/packaging/smoke_test.py /usr/bin/cml-lab-builder --version $V \
-            --data-dir /home/tester/.config/cml-lab-builder --patch-test --auto-update-test"
-          test -L /usr/bin/cmllab && su tester -c "cmllab version"
-          test -z "$(dpkg --verify cml-lab-builder)"   # updates went to ~/.config/cml-lab-builder/app, /opt untouched
-          test -d /home/tester/.config/cml-lab-builder/app
-          apt-get purge -y cml-lab-builder && test ! -e /opt/cml-lab-builder && test ! -e /usr/bin/cmllab \
-            && test -d /home/tester/.config/cml-lab-builder
+      - name: install, launch, smoke-test, upgrade and purge the .deb on a clean Debian 12 as a normal user
+        run: packaging/deb_docker_test.sh dist/cml-lab-builder_*_amd64.deb
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.publish && inputs.tag != ''
     needs: [bundle, patch, deb-test]

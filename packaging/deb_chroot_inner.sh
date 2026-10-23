@@ -2,10 +2,18 @@
 # Runs inside the chroot (see deb_chroot_test.sh). Packages are in /tmp/debtest, the repo at /src (read-only).
 set -uo pipefail
 export DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8
-FAILS=0; D=/tmp/debtest; U=tester; H=/home/$U; DATA=$H/.config/cml-lab-builder   # data and app updates (3.0.0+)
+FAILS=0; FAILED=(); D=/tmp/debtest; U=tester; H=/home/$U; DATA=$H/.config/cml-lab-builder   # data and app updates (3.0.0+)
 P=cml-lab-builder; DEB=$D/${P}_${VER}_amd64.deb
 ok()   { echo "PASS $*"; }
-bad()  { echo "FAIL $*"; FAILS=$((FAILS+1)); }
+bad()  { echo "FAIL $*"; FAILS=$((FAILS+1)); FAILED+=("$*"); }
+# poll instead of fixed sleeps: up URL | down URL | gone PATTERN, with a timeout in seconds
+http_ok() { python3 -c "import sys,urllib.request;urllib.request.urlopen(sys.argv[1],timeout=1)" "$1" 2>/dev/null; }
+wait_up()   { local t=$(( $2 * 4 )); while [ $t -gt 0 ]; do http_ok "$1" && return 0; sleep 0.25; t=$((t-1)); done; return 1; }
+wait_down() { local t=$(( $2 * 4 )); while [ $t -gt 0 ]; do http_ok "$1" || return 0; sleep 0.25; t=$((t-1)); done; return 1; }
+wait_gone() { local t=$(( $2 * 4 )); while [ $t -gt 0 ]; do pgrep -f "$1" >/dev/null || return 0; sleep 0.25; t=$((t-1)); done; return 1; }
+# apt is the only network use: retry transient mirror errors instead of failing the run
+printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\n' > /etc/apt/apt.conf.d/80deb-test-retries
+echo "== Debian $(cat /etc/debian_version) | package $P $VER | test packages: $(ls $D | tr '\n' ' ')"
 chk()  { local msg=$1; shift; local o; if o=$("$@" 2>&1); then ok "$msg"; else bad "$msg"; echo "$o" | sed 's/^/   /' | head; fi; }
 as()   { su "$U" -s /bin/bash -c "cd $H && $*"; }
 appver() { as "cmllab version" 2>/dev/null | head -1 | awk '{print $NF}'; }
@@ -70,8 +78,7 @@ echo "== launch like the menu entry"
 EXEC=$(sed -n 's/^Exec=//p' /usr/share/applications/$P.desktop)
 printf '#!/bin/sh\necho "$1" >> /tmp/browser.log\n' > /tmp/fakebrowser; chmod 755 /tmp/fakebrowser; rm -f /tmp/browser.log
 as "BROWSER=/tmp/fakebrowser nohup $EXEC > /tmp/launch1.log 2>&1 &"
-up=0; for i in $(seq 60); do python3 -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8765/api/health',timeout=1)" 2>/dev/null && { up=1; break; }; sleep 0.5; done
-[ $up = 1 ] && ok "menu launch ($EXEC) starts the server on 127.0.0.1:8765" || { bad "server did not start"; cat /tmp/launch1.log; }
+wait_up http://127.0.0.1:8765/api/health 60 && ok "menu launch ($EXEC) starts the server on 127.0.0.1:8765" || { bad "server did not start"; cat /tmp/launch1.log; }
 for i in $(seq 20); do [ -s /tmp/browser.log ] && break; sleep 0.25; done
 grep -q "http://127.0.0.1:8765" /tmp/browser.log 2>/dev/null && ok "browser opened at $(head -1 /tmp/browser.log)" || bad "browser not opened"
 n1=$(pgrep -c -f "^/opt/$P/$P") || true
@@ -82,7 +89,9 @@ echo "   second launch: $(echo "$out" | tail -2 | tr '\n' ' ')"
 n2=$(pgrep -c -f "^/opt/$P/$P") || true
 [ "$n1" = "$n2" ] && ok "still one app instance ($n2 process(es))" || bad "processes $n1 -> $n2"
 python3 -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8766/api/health',timeout=1)" 2>/dev/null && bad "a second server on 8766" || ok "no second server on the next port"
-pkill -f "^/opt/$P/$P"; sleep 1
+pkill -f "^/opt/$P/$P"
+wait_gone "^/opt/$P/$P" 20 || { echo "   app did not stop on SIGTERM within 20s, killing"; pkill -KILL -f "^/opt/$P/$P"; wait_gone "^/opt/$P/$P" 10; }
+wait_down http://127.0.0.1:8765/api/health 10 && ok "app stopped, port 8765 free" || bad "port 8765 still answering after stop"
 
 echo "== smoke test of the installed package as $U (patches + auto-update against a fake release)"
 find /opt/$P -printf '%p %s %m\n' | sort > /tmp/opt.before
@@ -118,4 +127,7 @@ grep -i "kept" /tmp/apt-purge.log | sed 's/^/   /'
 chk "package fully gone from dpkg" test -z "$(dpkg -l $P 2>/dev/null | grep -E '^(ii|rc)')"
 chk "~/.config/cml-lab-builder (data + app updates) kept after purge" test -d "$DATA/labs/ospf-multiarea-stub" -a -d "$DATA/app/$PV"
 
-echo; [ $FAILS = 0 ] && echo "DEB CHROOT TEST PASSED" || { echo "DEB CHROOT TEST FAILED ($FAILS)"; exit 1; }
+echo; [ $FAILS = 0 ] && { echo "DEB TEST PASSED"; exit 0; }
+echo "DEB TEST FAILED ($FAILS):"; printf '  - %s\n' "${FAILED[@]}"
+for f in /tmp/smoke.log /tmp/apt-install.log /tmp/launch1.log; do [ -s $f ] && { echo "---- $f (tail)"; tail -40 $f; }; done
+exit 1

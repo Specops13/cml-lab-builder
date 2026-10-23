@@ -848,6 +848,8 @@ far fewer antivirus false positives.
   packages over a user patch, and remove/purge (data kept). With an old `encorlab_<2.x>_amd64.deb` as a third
   argument it first tests the upgrade from it: the old updater's banner, `apt install ./encorlab_<v>_amd64.deb` (the
   old-name copy) replacing the `encorlab` package, the data move and a patch round trip (`upgrade3_test.py`).
+  CI runs the same checks (`deb_chroot_inner.sh`) in a `debian:12` container pinned by digest:
+  `packaging/deb_docker_test.sh <deb>` (needs docker; `deb_test_prep.sh` builds the test packages on the host).
 - **Upgrade from ENCOR Lab Builder (3.0.0):** `packaging/upgrade3_test.py --old <1.9/2.0/2.1 build> [--old …]
   --new <3.x build> --base <folder holding encorlab/> [--runner wine]` runs each real old build against a fake 3.x
   release on 127.0.0.1 (its banner must link the right old-name copy and say *needs runtime 2*, nothing installed),
@@ -912,7 +914,7 @@ labsrc/<id>/              lab sources of the library (the 19 former built-in lab
 cmlboot.py                boot loader for packaged builds: picks the app-code bundle, rollback, RUNTIME_VERSION
 cmllab_launcher.py        frozen entry point (runs cmlboot, then cmllab.launcher)
 packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, fake_release.py, icons
-                          build_deb.py (.deb from the Linux build), icons/hicolor/, deb_chroot_test.sh (+ _inner.sh),
+                          build_deb.py (.deb from the Linux build), icons/hicolor/, deb_chroot_test.sh / deb_docker_test.sh (+ _inner.sh, deb_test_prep.sh),
                           build_compat.py + upgrade3_test.py (upgrade from ENCOR Lab Builder 1.7 - 2.1)
                           third_party_notices.py (THIRD-PARTY-NOTICES.txt from the PyInstaller build)
 LICENSE                   MIT license

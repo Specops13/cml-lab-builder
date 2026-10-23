@@ -35,6 +35,14 @@ No app changes. Install from *Library & courses* (*Browse library*).
 - **Library lab `19-evpn-mpls`:** *Apply this step* on the BGP EVPN step no longer sends a stray
   `exit-address-family` in router configuration mode (where IOS rejects it) on the RR and PE1-PE3. The line was removed
   from the step config. Installed copies show *Update available* in the library.
+- **CI: the Debian package check (`deb-test`) failed on 3.0.0 although the package was fine.** The workflow ended with
+  `test -d ~/.config/cml-lab-builder/app`, but the smoke test removes its test patches (`<data>/app`) when it
+  finishes, so that line could never pass; it failed silently because the plain `test` lines printed nothing. The
+  job now runs `packaging/deb_docker_test.sh`: the same checks as the local `deb_chroot_test.sh` (install with
+  dependencies, menu launch, single instance, smoke test with patch + auto-update as a normal user, `/opt` and
+  `dpkg --verify` unchanged, upgrades over a user patch, remove + purge keep the data), in a `debian:12` container
+  pinned by digest. Each check prints PASS/FAIL, and a failure lists the failed checks plus the log tails. The test
+  waits for the server port and for the app to stop, polls state files instead of sleeping, and retries apt.
 
 ## [3.0.0] - 2026-10-21
 **The full rename: the program, downloads, package, data and CML labs are all CML Lab Builder now.** This is a full
