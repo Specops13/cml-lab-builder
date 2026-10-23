@@ -94,6 +94,7 @@
   // greedy subsequence from a start position; at each step prefer the next word start if it comes before a
   // continuation that is not consecutive (keeps "ospf stb" -> s-t-u-b and "mcast" -> m...c-a-s-t tight)
   function subseqFrom(tok, f, p0) {
+    if (tok.length <= 3 && !f.starts[p0]) return null;     // short words: abbreviations start at a word ("stb")
     const n = f.n, idx = [p0];
     let p = p0, bounds = f.starts[p0], runs = 0;
     for (let k = 1; k < tok.length; k++) {

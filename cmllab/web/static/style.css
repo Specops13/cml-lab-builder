@@ -136,4 +136,5 @@ mark{background:#ffe58a;color:inherit;border-radius:2px;padding:0}
 [data-theme=dark] mark{background:#6b5a12;color:#fff}
 .lib-search-bar{position:sticky;top:0;z-index:2;background:var(--card);padding:.4rem 0;gap:.4rem;flex-wrap:wrap}
 #lib-search{flex:1;min-width:18em;font-size:1rem;padding:.45rem .6rem}
+.lib-search-bar label{display:inline-flex;align-items:center;gap:.3rem;white-space:nowrap}.lib-search-bar label input{width:auto;margin:0}
 .lib-empty{padding:1rem;border:1px dashed var(--line);border-radius:8px;margin:.6rem 0}

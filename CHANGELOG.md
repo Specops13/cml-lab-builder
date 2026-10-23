@@ -2,9 +2,24 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
-## [Unreleased] - lab library update
-No app changes. Install from *Library & courses* (*Browse library*).
+## [3.1.0] - 2026-10-23
+**Fuzzy search in the library**, plus the library updates below. A patch for 3.0.0 (same runtime 2): 3.0.0 offers it
+by itself and installs it with *Install update*. ENCOR Lab Builder 1.7 - 2.1 still get the *full download* banner.
 ### Added
+- **Search bar in *Library & courses*.** Filters the online library as you type and ranks the results, best first,
+  with the matched letters highlighted. It searches titles, lab ids, descriptions, topics (blueprint items and
+  domains), the courses a lab is in, platforms and node types (`iol-xe`, `nxosv9000`, or *nexus*, *nx-os*, *ios-xe*).
+  The matching is fuzzy: it tolerates typos (`mutlicast`, `redistrbution`; 1 edit for 4-7 letters, 2 for longer
+  words) and accepts abbreviations and partial words (`vrf lit`, `ospf stb`, `mcast`, `evpn mpls`). Each word must
+  match. It works together with new filters for labs/courses, installed / not installed / update available, one
+  course, and *Hide RAM heavy*. `/` or `Ctrl+K` jumps to the box, `Esc` clears it, and a message with *Clear search
+  and filters* appears when nothing matches. It all runs in the page over the index that is already loaded
+  (`static/fuzzy.js`, no dependencies): no server calls while typing, the text is normalized once per load, and only
+  the word being typed is re-scored. About 1 ms per keystroke for 300 labs. The lab list's *Search labs* box now uses
+  the same fuzzy, ranked and highlighted matching.
+- **Library index search fields:** lab entries in `library/index.json` (and `labs/index.json`) now carry `domain`,
+  `track`, `platforms` and `node_types`, and `/api/labs` reports `track` and `node_types`. Older apps ignore the new
+  fields, and older indexes still load; search then simply has less to match.
 - **New library lab `19-evpn-mpls`: Walkthrough: BGP EVPN over MPLS (IOS-XE, IOL).** 8 `iol-xe` nodes (about 8 GB
   RAM): OSPF + LDP core, iBGP `l2vpn evpn` through a route reflector, VLAN-based EVIs 10/20 with bridge domains and
   service instances stretching two VLANs across three sites, route type 2/3 and MAC verification, same-VLAN pings,

@@ -1,6 +1,6 @@
 "use strict";
 /* CML Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "3.0.0";  // must equal cmllab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "3.1.0";  // must equal cmllab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -344,7 +344,7 @@ async function openLibrary(fetchIndex) {
       <select data-help="lib.fKind" id="lib-kind" aria-label="Kind"><option value="">Labs and courses</option><option value="lab">Labs</option><option value="course">Courses</option></select>
       <select data-help="lib.fStatus" id="lib-status" aria-label="Status"><option value="">Any status</option><option value="installed">Installed</option><option value="new">Not installed</option><option value="update">Update available</option></select>
       <select data-help="lib.fCourse" id="lib-course" aria-label="Course"><option value="">Any course</option></select>
-      <label data-help="lib.fHeavy" class="small"><input type="checkbox" id="lib-noheavy"> Hide RAM heavy</label>
+      <label class="small"><input data-help="lib.fHeavy" type="checkbox" id="lib-noheavy"> Hide RAM heavy</label>
       <span id="lib-count" class="muted small" aria-live="polite"></span></div>
     <div id="lib-items" class="muted">Click "Load library" to see the labs and courses published in the project repository.</div>
     <h3 data-help="lib.fromUrl">Install from a URL</h3>
@@ -495,7 +495,7 @@ function libApply() {
   empty.hidden = order.length > 0; $("#lib-table").hidden = !order.length;
   if (!order.length) {
     empty.innerHTML = `No labs or courses match${q.trim() ? ` "<b>${esc(q.trim())}</b>"` : ""}${kind || status || course || noheavy ? " with these filters" : ""}.
-      Try fewer or shorter words (typos and abbreviations like "mcast" or "ospf stb" are fine). <button id="lib-clear" class="hint-btn">Clear search and filters</button>`;
+      Try fewer or shorter words (typos and abbreviations like "mcast" or "ospf stb" are fine). <button data-help-text="Empty the search box and reset the filters." id="lib-clear" class="hint-btn">Clear search and filters</button>`;
     $("#lib-clear").onclick = () => { libQuery = {q: "", kind: "", status: "", course: "", noheavy: false}; libBindValues(); libApply(); $("#lib-search").focus(); };
   }
   libApply.ms = {match: tMatch, total: performance.now() - t0};

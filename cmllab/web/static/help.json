@@ -236,7 +236,7 @@
   "s.device_password": "Password for device console logins and the default for NX-OS. Kept in memory only; set CMLLAB_DEVICE_PASSWORD to keep it.",
   "s.nxos_username": "NX-OS (nxosv9000) console user, tried first; empty means the device username. Build's day-0 config creates it (and admin).",
   "s.nxos_password": "NX-OS console password used for the day-0 users at Build and for login. Empty = the device password.",
-  "lib.search": "Search the library as you type: titles, lab ids, descriptions, topics (blueprint items, domains), courses, platforms and node types (e.g. nexus, iol-xe). Typos and abbreviations work: 'vrf lit', 'ospf stb', 'mcast'. Best matches come first. Press / or Ctrl+K to jump here, Esc to clear.",
+  "lib.search": "Search titles, ids, descriptions, topics, courses and node types as you type; typos and abbreviations ('vrf lit', 'mcast') work. / or Ctrl+K jumps here, Esc clears.",
   "lib.fKind": "Show only labs or only courses.",
   "lib.fStatus": "Show what is installed, not installed yet, or has an update in the library.",
   "lib.fCourse": "Show one course and the labs it contains.",

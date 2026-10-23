@@ -154,7 +154,7 @@ instance, and automatic updates that ask first.
 
 **Install** (apt resolves the few dependencies: `libc6 (>= 2.28)`, `libgcc-s1`, `zlib1g`; `xdg-utils` is recommended so the browser opens):
 ```bash
-sudo apt install ./cml-lab-builder_3.0.0_amd64.deb
+sudo apt install ./cml-lab-builder_3.1.0_amd64.deb
 ```
 The `./` matters, because it tells apt this is a local file. The package installs:
 - the app in `/opt/cml-lab-builder/`, with the commands `cml-lab-builder` and `cmllab` in `/usr/bin` (plus the old
@@ -713,6 +713,14 @@ first start the Labs page offers the same buttons).
   validates it like any import, then installs it. The address is *Settings > Library URL* (`CMLLAB_LIBRARY_URL`; empty =
   this repo). Point it at your own `index.json` (https only, or http on localhost), for example a fork, a team share or
   an offline mirror.
+- **Search (3.1.0+):** the search box above the list filters as you type and puts the best matches first, with the
+  matched letters highlighted. It looks at titles, lab ids, descriptions, topics (blueprint items, domains), the
+  courses a lab is in, platforms and node types (`iol-xe`, `nxosv9000`; also words like *nexus*, *nx-os*, *ios-xe*).
+  It is fuzzy: typos (`mutlicast`, `redistrbution`) and abbreviations or partial words (`vrf lit`, `ospf stb`,
+  `mcast`) work, and every word must match. Combine it with the filters next to it: labs or courses, installed / not
+  installed / update available, one course, and *Hide RAM heavy*. Press `/` or `Ctrl+K` to jump to the box and `Esc`
+  to clear it. It runs in the page over the loaded index (no server calls while typing; about 1 ms per keystroke
+  for 300 labs). The *Search labs* box of the lab list uses the same matching.
 - **Courses: Install all.** Installing a course from the library also installs every lab it lists that you don't have yet.
   Importing a course file does the same while online; offline it tells you which labs to get first.
 - **Updates:** each lab has a `version:`. When the library has a newer version than your copy, the library shows
@@ -941,7 +949,7 @@ every library lab. IOL L2 switches (`ioll2-xe`) have no such requirement.
 After changing the schema, templates, guide or example, run `python -m cmllab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **3.0.0**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.1.0**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License
