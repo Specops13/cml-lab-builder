@@ -334,6 +334,24 @@
       "ram_gb": 8.0
     },
     {
+      "file": "20-evpn-vxlan-superspine.encorlab",
+      "sha256": "ae8b3b2690328eedf1f500a1f29e26c565ba05e6474cf3ae0ac9be25b9d2045c",
+      "size": 16200,
+      "kind": "lab",
+      "id": "20-evpn-vxlan-superspine",
+      "title": "Walkthrough: BGP EVPN VXLAN across two data centers with super spines (5-stage Clos)",
+      "version": "1",
+      "description": "Step-by-step build of one VXLAN EVPN fabric spanning two data centers (two spine-and-leaf pods) joined by a super-spine layer - Cisco's 5-stage Clos. OSPF underlay through leaf-spine-super spine-spine-leaf, iBGP EVPN with the super spines as route reflectors, NX-OS VTEPs, VLANs 10 and 20 stretched across both DCs (optional L3VNI VRF with a distributed anycast gateway).",
+      "blueprint": [
+        "2.3",
+        "1.1.a"
+      ],
+      "nodes": 12,
+      "difficulty": 5,
+      "type": "walkthrough",
+      "ram_gb": 56.0
+    },
+    {
       "file": "data-center.encorcourse",
       "sha256": "b4b6068514fe63db3dde3629651bfa52a5e2c485bfcc88230b6b761c8f492fe8",
       "size": 477,

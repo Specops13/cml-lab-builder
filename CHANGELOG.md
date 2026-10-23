@@ -10,6 +10,13 @@ No app changes. Install from *Library & courses* (*Browse library*).
   service instances stretching two VLANs across three sites, route type 2/3 and MAC verification, same-VLAN pings,
   and an optional EVPN-VPWS step. Published as `library/19-evpn-mpls.cmllab` (and `labs/19-evpn-mpls.encorlab` for
   2.x). Expected outputs come from Cisco documentation and are not yet verified on CML.
+- **New library lab `20-evpn-vxlan-superspine`: Walkthrough: BGP EVPN VXLAN across two data centers with super spines
+  (5-stage Clos).** 12 nodes (4 `nxosv9000` leaves, 4 `iol-xe` spines/super spines, 4 IOL hosts; about 56 GB RAM, RAM
+  heavy): OSPF underlay through leaf - spine - super spine - spine - leaf, iBGP `l2vpn evpn` with the super spines as
+  route reflectors, VLANs 10/20 as L2VNIs 10010/10020 on NVE VTEPs with BGP ingress replication, same-VLAN pings from
+  DC1 to DC2, and an optional L3VNI VRF with a distributed anycast gateway. Published as
+  `library/20-evpn-vxlan-superspine.cmllab` (and `labs/20-evpn-vxlan-superspine.encorlab` for 2.x). Expected outputs
+  come from Cisco documentation and are not yet verified on CML.
 
 ## [3.0.0] - 2026-10-21
 **The full rename: the program, downloads, package, data and CML labs are all CML Lab Builder now.** This is a full

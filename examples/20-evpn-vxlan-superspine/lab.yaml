@@ -1,0 +1,1160 @@
+id: 20-evpn-vxlan-superspine
+type: walkthrough
+title: "Walkthrough: BGP EVPN VXLAN across two data centers with super spines (5-stage Clos)"
+blueprint: ["2.3", "1.1.a"]
+domain: "2.0 Virtualization"
+difficulty: 5
+platforms: [iol]
+summary: Step-by-step build of one VXLAN EVPN fabric spanning two data centers (two spine-and-leaf pods) joined by a super-spine layer - Cisco's 5-stage Clos. OSPF underlay through leaf-spine-super spine-spine-leaf, iBGP EVPN with the super spines as route reflectors, NX-OS VTEPs, VLANs 10 and 20 stretched across both DCs (optional L3VNI VRF with a distributed anycast gateway).
+author: CML Lab Builder
+version: "1"
+nodes:
+  - name: SS1
+    kind: router
+    x: -150
+    y: -420
+    config: |
+      ! Day-0: hostname only. Super spine 1 - you build it in the walkthrough steps.
+  - name: SS2
+    kind: router
+    x: 150
+    y: -420
+    config: |
+      ! Day-0: hostname only. Super spine 2 - you build it in the walkthrough steps.
+  - name: DC1-SPINE
+    kind: router
+    x: -300
+    y: -220
+    config: |
+      ! Day-0: hostname only. DC1 spine - you build it in the walkthrough steps.
+  - name: DC2-SPINE
+    kind: router
+    x: 300
+    y: -220
+    config: |
+      ! Day-0: hostname only. DC2 spine - you build it in the walkthrough steps.
+  - name: DC1-LEAF1
+    kind: switch
+    definition: nxosv9000
+    x: -420
+    y: 0
+    config: |
+      ! Day-0: hostname and logins only. You build the rest in the walkthrough steps.
+  - name: DC1-LEAF2
+    kind: switch
+    definition: nxosv9000
+    x: -180
+    y: 0
+    config: |
+      ! Day-0: hostname and logins only. You build the rest in the walkthrough steps.
+  - name: DC2-LEAF1
+    kind: switch
+    definition: nxosv9000
+    x: 180
+    y: 0
+    config: |
+      ! Day-0: hostname and logins only. You build the rest in the walkthrough steps.
+  - name: DC2-LEAF2
+    kind: switch
+    definition: nxosv9000
+    x: 420
+    y: 0
+    config: |
+      ! Day-0: hostname and logins only. You build the rest in the walkthrough steps.
+  - name: H1
+    kind: router
+    x: -420
+    y: 220
+    config: |
+      ! Test host in VLAN 10 on DC1-LEAF1 (an IOS router used as a PC) - already configured
+      interface %if0%
+       description to DC1-LEAF1 Eth1/2 (VLAN 10)
+       mac-address 0010.0010.0011
+       ip address 192.168.10.11 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.10.1
+  - name: H2
+    kind: router
+    x: -180
+    y: 220
+    config: |
+      ! Test host in VLAN 20 on DC1-LEAF2 - already configured
+      interface %if0%
+       description to DC1-LEAF2 Eth1/2 (VLAN 20)
+       mac-address 0020.0020.0012
+       ip address 192.168.20.12 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.20.1
+  - name: H3
+    kind: router
+    x: 180
+    y: 220
+    config: |
+      ! Test host in VLAN 10 on DC2-LEAF1 - already configured
+      interface %if0%
+       description to DC2-LEAF1 Eth1/2 (VLAN 10)
+       mac-address 0010.0010.0013
+       ip address 192.168.10.13 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.10.1
+  - name: H4
+    kind: router
+    x: 420
+    y: 220
+    config: |
+      ! Test host in VLAN 20 on DC2-LEAF2 - already configured
+      interface %if0%
+       description to DC2-LEAF2 Eth1/2 (VLAN 20)
+       mac-address 0020.0020.0014
+       ip address 192.168.20.14 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.20.1
+links:
+  - {a: {node: SS1, port: 0}, b: {node: DC1-SPINE, port: 0}}
+  - {a: {node: SS1, port: 1}, b: {node: DC2-SPINE, port: 0}}
+  - {a: {node: SS2, port: 0}, b: {node: DC1-SPINE, port: 1}}
+  - {a: {node: SS2, port: 1}, b: {node: DC2-SPINE, port: 1}}
+  - {a: {node: DC1-SPINE, port: 2}, b: {node: DC1-LEAF1, port: 0}}
+  - {a: {node: DC1-SPINE, port: 3}, b: {node: DC1-LEAF2, port: 0}}
+  - {a: {node: DC2-SPINE, port: 2}, b: {node: DC2-LEAF1, port: 0}}
+  - {a: {node: DC2-SPINE, port: 3}, b: {node: DC2-LEAF2, port: 0}}
+  - {a: {node: DC1-LEAF1, port: 1}, b: {node: H1, port: 0}}
+  - {a: {node: DC1-LEAF2, port: 1}, b: {node: H2, port: 0}}
+  - {a: {node: DC2-LEAF1, port: 1}, b: {node: H3, port: 0}}
+  - {a: {node: DC2-LEAF2, port: 1}, b: {node: H4, port: 0}}
+task: |
+  A guided build, not a graded challenge. Two data centers, **DC1** and **DC2**, are each a small
+  spine-and-leaf pod. A **super-spine** layer (SS1, SS2) sits above both spines and joins the pods into one
+  **5-stage Clos** fabric, Cisco's design for scaling out or interconnecting pods. You build **one VXLAN BGP EVPN
+  fabric across both DCs** and stretch **VLAN 10** and **VLAN 20** from DC1 to DC2. Hosts in the same VLAN then
+  talk at Layer 2 through a VXLAN tunnel that crosses five switching stages:
+  leaf - spine - super spine - spine - leaf.
+
+  **The roles**
+
+  - **Leaves** (Nexus 9000v): the **VTEPs**. Only they know about VLANs, VNIs and hosts.
+  - **Spines** (IOS-XE IOL, one per DC): pure **IP transit** in the underlay. No BGP, no VXLAN.
+  - **Super spines** (IOS-XE IOL): IP transit between the DCs **and** the **BGP EVPN route reflectors** for
+    all leaves.
+
+  | Device | Loopback0 (router ID) | Loopback1 (VTEP) | Ports |
+  |---|---|---|---|
+  | SS1 | 10.0.0.1 | - | E0/0 DC1-SPINE, E0/1 DC2-SPINE |
+  | SS2 | 10.0.0.2 | - | E0/0 DC1-SPINE, E0/1 DC2-SPINE |
+  | DC1-SPINE | 10.0.0.11 | - | E0/0 SS1, E0/1 SS2, E0/2 DC1-LEAF1, E0/3 DC1-LEAF2 |
+  | DC2-SPINE | 10.0.0.21 | - | E0/0 SS1, E0/1 SS2, E0/2 DC2-LEAF1, E0/3 DC2-LEAF2 |
+  | DC1-LEAF1 | 10.0.0.111 | 10.0.1.111 | Eth1/1 DC1-SPINE, Eth1/2 H1 (VLAN 10) |
+  | DC1-LEAF2 | 10.0.0.112 | 10.0.1.112 | Eth1/1 DC1-SPINE, Eth1/2 H2 (VLAN 20) |
+  | DC2-LEAF1 | 10.0.0.121 | 10.0.1.121 | Eth1/1 DC2-SPINE, Eth1/2 H3 (VLAN 10) |
+  | DC2-LEAF2 | 10.0.0.122 | 10.0.1.122 | Eth1/1 DC2-SPINE, Eth1/2 H4 (VLAN 20) |
+
+  Fabric links are /30s; the upper device takes `.1`: SS1-DC1-SPINE 10.1.1.0/30, SS1-DC2-SPINE 10.1.2.0/30,
+  SS2-DC1-SPINE 10.2.1.0/30, SS2-DC2-SPINE 10.2.2.0/30, DC1-SPINE-DC1-LEAF1 10.11.1.0/30,
+  DC1-SPINE-DC1-LEAF2 10.11.2.0/30, DC2-SPINE-DC2-LEAF1 10.21.1.0/30, DC2-SPINE-DC2-LEAF2 10.21.2.0/30.
+  Hosts: H1 192.168.10.11 (DC1) and H3 192.168.10.13 (DC2) in VLAN 10; H2 192.168.20.12 (DC1) and
+  H4 192.168.20.14 (DC2) in VLAN 20.
+
+  **Resources**: 12 nodes - 4 x nxosv9000 (about 12 GB RAM and 2 vCPUs each) plus 8 IOL nodes (about 1 GB
+  each), so about **56 GB** of CML RAM and 16 vCPUs, well inside a 20-node license. NX-OS takes 10-15 minutes
+  to boot; the switch consoles show `login:` and the logins are your device username/password from Settings
+  (default cisco/cisco). Use an IOL image of 17.x for the spines and super spines.
+
+  Work through the steps in order. Each step explains the idea, gives the exact config (copy it into the
+  console, or use **Apply this step for me**), and lists the commands to verify it. **Check this step**
+  runs those checks for you.
+steps:
+  - id: fabric
+    title: "The design: two DC pods joined by super spines (a 5-stage Clos)"
+    explain: |
+      A normal spine-and-leaf fabric is a **3-stage Clos**: leaf - spine - leaf. When one pod is full, or when
+      you have a second data center, Cisco adds a **super-spine** layer above the spines. Every spine connects to
+      every super spine, and any leaf now reaches any other leaf in at most **five stages**:
+
+      `DC1-LEAF1 - DC1-SPINE - SS1/SS2 - DC2-SPINE - DC2-LEAF1`
+
+      That is the **5-stage Clos** in Cisco's *VXLAN BGP EVPN Data Center Fabrics* design guide and in
+      Nexus Dashboard Fabric Controller (NDFC): "the super-spine layer interconnects spines in different
+      locations and can act as the IP transport to interconnect DC sites".
+
+      **Who does what (the Cisco/NDFC super-spine model):**
+
+      - **Leaves** are the only VTEPs. They map VLANs to VNIs and encapsulate host traffic in VXLAN.
+      - **Spines** route the underlay inside their pod. In a 5-stage fabric they are *not* route reflectors.
+      - **Super spines** route the underlay between pods and are the **iBGP EVPN route reflectors** for every
+        leaf in both DCs.
+
+      **The build order** follows Cisco's VXLAN EVPN configuration flow: (1) underlay, (2) BGP EVPN control
+      plane, (3) VLAN-to-VNI mapping with an EVPN instance, (4) the NVE (VTEP) interface, and (5) the tenant
+      VRF with an L3VNI and anycast gateway (optional here). Between (4) and (5) you prove the stretched VLAN works
+      across the DCs.
+
+      **Why one fabric and not Multi-Site?** One EVPN fabric across two pods is the simplest correct design and
+      exactly what NDFC builds for a super-spine topology. It also makes both DCs one fault domain: a BUM storm or
+      a bad EVPN route reaches both sites. For truly independent DCs Cisco recommends **VXLAN EVPN Multi-Site**,
+      with **border gateways (BGWs)** per site re-originating routes over an eBGP DCI. BGWs need more NX-OS nodes
+      (and more RAM), so they are the "where to go next" at the end.
+
+      This first step only checks the cabling. The switches start with just a hostname and logins.
+    verify:
+      - device: DC1-SPINE
+        command: show cdp neighbors
+        expect: |
+          SS1 on `Eth 0/0`, SS2 on `Eth 0/1`, DC1-LEAF1 on `Eth 0/2` and DC1-LEAF2 on `Eth 0/3` (the Nexus device
+          IDs carry a serial number in brackets, e.g. `DC1-LEAF1(9KV0ABC123)`, and wrap onto their own line).
+      - device: DC1-LEAF1
+        command: show cdp neighbors
+        expect: DC1-SPINE on `Eth1/1` and H1 on `Eth1/2`.
+    checks:
+      - id: fabric-dc1-spine-cdp
+        description: DC1-SPINE sees both super spines and both DC1 leaves over CDP
+        device: DC1-SPINE
+        command: show cdp neighbors
+        match: ['SS1\S*\s+Eth ?0/0\b', 'SS2\S*\s+Eth ?0/1\b', 'DC1-LEAF1\S*\s+Eth ?0/2\b', 'DC1-LEAF2\S*\s+Eth ?0/3\b']
+        hint: Wait until every node is booted (NX-OS takes 10+ minutes); CDP needs about a minute after boot.
+      - id: fabric-dc2-spine-cdp
+        description: DC2-SPINE sees both super spines and both DC2 leaves over CDP
+        device: DC2-SPINE
+        command: show cdp neighbors
+        match: ['SS1\S*\s+Eth ?0/0\b', 'SS2\S*\s+Eth ?0/1\b', 'DC2-LEAF1\S*\s+Eth ?0/2\b', 'DC2-LEAF2\S*\s+Eth ?0/3\b']
+        hint: Check that every link is connected in CML and both DC2 leaves have booted.
+  - id: underlay
+    title: "Step 1 - Underlay: routed links, loopbacks and OSPF area 0 across all five stages"
+    explain: |
+      The underlay is an ordinary routed IP network. Cisco's recommended underlay is an IGP - **OSPF area 0 with
+      point-to-point links** (no DR election, faster adjacency) - and that is what you build on all eight fabric
+      nodes, both DCs and the super spines alike.
+
+      - Every fabric link is a routed /30.
+      - Each node gets **loopback0** as its router ID and BGP peering address.
+      - The leaves also get **loopback1**, the **VTEP address** that the VXLAN tunnels start and end on. Keeping
+        it separate from loopback0 is Cisco's recommendation (it lets you add a vPC anycast VTEP later).
+
+      IOS-XE (spines, super spines) puts interfaces into OSPF with `ip ospf 1 area 0`. NX-OS (leaves) needs
+      `feature ospf` first and uses `ip router ospf UNDERLAY area 0.0.0.0`. Both run area 0, so they form
+      adjacencies normally.
+
+      **MTU:** VXLAN adds 50 bytes to every frame, so production fabrics run MTU 9216 on every fabric link.
+      OSPF only forms an adjacency when both ends agree on the MTU, so this lab keeps the default 1500 on both
+      sides of every IOL-NX-OS link. The test pings are small, so they fit. On real hardware set `mtu 9216` on
+      both ends.
+
+      Each DC spine has **two equal-cost paths** (via SS1 and SS2) to every loopback in the other DC.
+
+      Optional extra: from DC1-LEAF1 run `traceroute 10.0.1.121 source 10.0.1.111` in exec mode. It shows the five
+      stages as four hops: DC1-SPINE (10.11.1.1), a super spine (10.1.1.1 = SS1 or 10.2.1.1 = SS2), DC2-SPINE
+      (10.1.2.2 or 10.2.2.2), then DC2-LEAF1 (10.0.1.121).
+    config:
+      SS1: |
+        router ospf 1
+         router-id 10.0.0.1
+        interface Loopback0
+         description router-id / BGP
+         ip address 10.0.0.1 255.255.255.255
+         ip ospf 1 area 0
+        interface %if0%
+         description to DC1-SPINE
+         ip address 10.1.1.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if1%
+         description to DC2-SPINE
+         ip address 10.1.2.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+      SS2: |
+        router ospf 1
+         router-id 10.0.0.2
+        interface Loopback0
+         description router-id / BGP
+         ip address 10.0.0.2 255.255.255.255
+         ip ospf 1 area 0
+        interface %if0%
+         description to DC1-SPINE
+         ip address 10.2.1.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if1%
+         description to DC2-SPINE
+         ip address 10.2.2.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+      DC1-SPINE: |
+        router ospf 1
+         router-id 10.0.0.11
+        interface Loopback0
+         description router-id / BGP
+         ip address 10.0.0.11 255.255.255.255
+         ip ospf 1 area 0
+        interface %if0%
+         description to SS1
+         ip address 10.1.1.2 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if1%
+         description to SS2
+         ip address 10.2.1.2 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if2%
+         description to DC1-LEAF1
+         ip address 10.11.1.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if3%
+         description to DC1-LEAF2
+         ip address 10.11.2.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+      DC2-SPINE: |
+        router ospf 1
+         router-id 10.0.0.21
+        interface Loopback0
+         description router-id / BGP
+         ip address 10.0.0.21 255.255.255.255
+         ip ospf 1 area 0
+        interface %if0%
+         description to SS1
+         ip address 10.1.2.2 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if1%
+         description to SS2
+         ip address 10.2.2.2 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if2%
+         description to DC2-LEAF1
+         ip address 10.21.1.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+        interface %if3%
+         description to DC2-LEAF2
+         ip address 10.21.2.1 255.255.255.252
+         ip ospf network point-to-point
+         ip ospf 1 area 0
+         no shutdown
+      DC1-LEAF1: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.0.0.111
+        interface Ethernet1/1
+          description uplink to DC1-SPINE
+          no switchport
+          ip address 10.11.1.2/30
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+          no shutdown
+        interface loopback0
+          description router-id / BGP
+          ip address 10.0.0.111/32
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface loopback1
+          description VTEP
+          ip address 10.0.1.111/32
+          ip router ospf UNDERLAY area 0.0.0.0
+      DC1-LEAF2: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.0.0.112
+        interface Ethernet1/1
+          description uplink to DC1-SPINE
+          no switchport
+          ip address 10.11.2.2/30
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+          no shutdown
+        interface loopback0
+          description router-id / BGP
+          ip address 10.0.0.112/32
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface loopback1
+          description VTEP
+          ip address 10.0.1.112/32
+          ip router ospf UNDERLAY area 0.0.0.0
+      DC2-LEAF1: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.0.0.121
+        interface Ethernet1/1
+          description uplink to DC2-SPINE
+          no switchport
+          ip address 10.21.1.2/30
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+          no shutdown
+        interface loopback0
+          description router-id / BGP
+          ip address 10.0.0.121/32
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface loopback1
+          description VTEP
+          ip address 10.0.1.121/32
+          ip router ospf UNDERLAY area 0.0.0.0
+      DC2-LEAF2: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.0.0.122
+        interface Ethernet1/1
+          description uplink to DC2-SPINE
+          no switchport
+          ip address 10.21.2.2/30
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+          no shutdown
+        interface loopback0
+          description router-id / BGP
+          ip address 10.0.0.122/32
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface loopback1
+          description VTEP
+          ip address 10.0.1.122/32
+          ip router ospf UNDERLAY area 0.0.0.0
+    verify:
+      - device: DC1-SPINE
+        command: show ip ospf neighbor
+        expect: "Four neighbors in `FULL/  -` (no DR on point-to-point): 10.0.0.1 and 10.0.0.2 (super spines), 10.0.0.111 and 10.0.0.112 (DC1 leaves)."
+      - device: DC1-SPINE
+        command: show ip route 10.0.1.121
+        expect: "`Routing entry for 10.0.1.121/32`, `Known via \"ospf 1\"` with two paths: `10.1.1.1 ... via Ethernet0/0` (SS1) and `10.2.1.1 ... via Ethernet0/1` (SS2)."
+      - device: DC1-LEAF1
+        command: show ip ospf neighbors
+        expect: "`10.0.0.11 1 FULL/ - ... Eth1/1` - DC1-SPINE."
+      - device: DC1-LEAF1
+        command: ping 10.0.1.121 source 10.0.1.111
+        expect: "`5 packets received` - VTEP to VTEP across both DCs, so the tunnels in step 4 have a path."
+    checks:
+      - id: ospf-dc1-spine-nbrs
+        description: DC1-SPINE is FULL with both super spines and both DC1 leaves
+        device: DC1-SPINE
+        command: show ip ospf neighbor
+        match: ['^10\.0\.0\.1\s+\d+\s+FULL', '^10\.0\.0\.2\s+\d+\s+FULL', '^10\.0\.0\.111\s+\d+\s+FULL', '^10\.0\.0\.112\s+\d+\s+FULL']
+        hint: Both ends of each link need OSPF area 0, the same network type (point-to-point) and the same MTU.
+      - id: ospf-dc2-spine-nbrs
+        description: DC2-SPINE is FULL with both super spines and both DC2 leaves
+        device: DC2-SPINE
+        command: show ip ospf neighbor
+        match: ['^10\.0\.0\.1\s+\d+\s+FULL', '^10\.0\.0\.2\s+\d+\s+FULL', '^10\.0\.0\.121\s+\d+\s+FULL', '^10\.0\.0\.122\s+\d+\s+FULL']
+        hint: Paste the DC2-SPINE block and both DC2 leaf blocks of this step.
+      - id: ospf-dc1-spine-ecmp
+        description: DC1-SPINE reaches DC2-LEAF1's VTEP over both super spines (ECMP)
+        device: DC1-SPINE
+        command: show ip route 10.0.1.121
+        match: ['Routing entry for 10\.0\.1\.121/32', '10\.1\.1\.1, from .*via %if0%', '10\.2\.1\.1, from .*via %if1%']
+        hint: DC2-LEAF1 must advertise loopback1 into OSPF, and both super spines must be FULL with both spines.
+      - id: ospf-vtep-ping
+        description: DC1-LEAF1's VTEP address pings DC2-LEAF1's VTEP address across the super spines
+        device: DC1-LEAF1
+        command: ping 10.0.1.121 source 10.0.1.111
+        match: ['\b[3-5] packets received']
+        hint: Both loopback1 interfaces must be in OSPF, and every stage in between must be FULL.
+      - id: ospf-ss1-cfg
+        description: SS1 runs OSPF area 0 on point-to-point links to both DC spines
+        device: SS1
+        mode: config
+        match: ['^router ospf 1', '^interface %if0%\n(?:[ \t]+.*\n)*?[ \t]+ip ospf network point-to-point', '^interface %if1%\n(?:[ \t]+.*\n)*?[ \t]+ip ospf 1 area 0']
+        hint: Paste the SS1 block of this step.
+      - id: ospf-dc2-leaf2-cfg
+        description: DC2-LEAF2 runs OSPF UNDERLAY on its uplink and both loopbacks
+        device: DC2-LEAF2
+        mode: config
+        match: ['^feature ospf', '^router ospf UNDERLAY', '^interface Ethernet1/1\n(?:[ \t]+.*\n)*?[ \t]+no switchport', '^interface loopback1\n(?:[ \t]+.*\n)*?[ \t]+ip router ospf UNDERLAY area 0\.0\.0\.0']
+        hint: Paste the DC2-LEAF2 block of this step.
+  - id: bgp-evpn
+    title: "Step 2 - BGP EVPN overlay with the super spines as route reflectors"
+    explain: |
+      All fabric nodes are in **AS 65000**. The overlay is **iBGP between loopback0 addresses**
+      (`update-source`), so a single link failure never drops a session.
+
+      iBGP does not pass a route learned from one iBGP peer on to another, so instead of a full mesh of leaves
+      **SS1 and SS2 are route reflectors**. Every leaf in both DCs peers with both super spines, and the
+      super spines reflect each leaf's EVPN routes to all the others (`route-reflector-client`). The DC spines
+      do not run BGP at all; they only route the sessions' packets. Two reflectors = no single point of failure.
+
+      **Leaves (NX-OS)** first enable the features (Cisco's leaf step 1):
+      - `nv overlay evpn` - the EVPN control plane (`l2vpn evpn` address family and the `evpn` block).
+      - `feature bgp` - the BGP process.
+      - `feature nv overlay` - VXLAN and the NVE interface.
+      - `feature vn-segment-vlan-based` - lets a VLAN be mapped to a VNI.
+
+      Then they peer with 10.0.0.1 and 10.0.0.2 in `address-family l2vpn evpn`. EVPN carries VNIs and route
+      targets in **extended communities**, so `send-community extended` is mandatory (NX-OS sends none by
+      default).
+
+      **Super spines (IOS-XE)** use `no bgp default ipv4-unicast` so the sessions carry only EVPN, then
+      `activate`, `send-community both` and `route-reflector-client` for each leaf under
+      `address-family l2vpn evpn`. A route reflector does not need to understand VXLAN, so IOL is fine here.
+
+      There is nothing to advertise yet, so the sessions come up with **0 prefixes** - that is expected.
+    config:
+      SS1: |
+        router bgp 65000
+         bgp router-id 10.0.0.1
+         bgp log-neighbor-changes
+         no bgp default ipv4-unicast
+         neighbor 10.0.0.111 remote-as 65000
+         neighbor 10.0.0.111 update-source Loopback0
+         neighbor 10.0.0.112 remote-as 65000
+         neighbor 10.0.0.112 update-source Loopback0
+         neighbor 10.0.0.121 remote-as 65000
+         neighbor 10.0.0.121 update-source Loopback0
+         neighbor 10.0.0.122 remote-as 65000
+         neighbor 10.0.0.122 update-source Loopback0
+         address-family l2vpn evpn
+          neighbor 10.0.0.111 activate
+          neighbor 10.0.0.111 send-community both
+          neighbor 10.0.0.111 route-reflector-client
+          neighbor 10.0.0.112 activate
+          neighbor 10.0.0.112 send-community both
+          neighbor 10.0.0.112 route-reflector-client
+          neighbor 10.0.0.121 activate
+          neighbor 10.0.0.121 send-community both
+          neighbor 10.0.0.121 route-reflector-client
+          neighbor 10.0.0.122 activate
+          neighbor 10.0.0.122 send-community both
+          neighbor 10.0.0.122 route-reflector-client
+      SS2: |
+        router bgp 65000
+         bgp router-id 10.0.0.2
+         bgp log-neighbor-changes
+         no bgp default ipv4-unicast
+         neighbor 10.0.0.111 remote-as 65000
+         neighbor 10.0.0.111 update-source Loopback0
+         neighbor 10.0.0.112 remote-as 65000
+         neighbor 10.0.0.112 update-source Loopback0
+         neighbor 10.0.0.121 remote-as 65000
+         neighbor 10.0.0.121 update-source Loopback0
+         neighbor 10.0.0.122 remote-as 65000
+         neighbor 10.0.0.122 update-source Loopback0
+         address-family l2vpn evpn
+          neighbor 10.0.0.111 activate
+          neighbor 10.0.0.111 send-community both
+          neighbor 10.0.0.111 route-reflector-client
+          neighbor 10.0.0.112 activate
+          neighbor 10.0.0.112 send-community both
+          neighbor 10.0.0.112 route-reflector-client
+          neighbor 10.0.0.121 activate
+          neighbor 10.0.0.121 send-community both
+          neighbor 10.0.0.121 route-reflector-client
+          neighbor 10.0.0.122 activate
+          neighbor 10.0.0.122 send-community both
+          neighbor 10.0.0.122 route-reflector-client
+      DC1-LEAF1: |
+        nv overlay evpn
+        feature bgp
+        feature nv overlay
+        feature vn-segment-vlan-based
+        router bgp 65000
+          router-id 10.0.0.111
+          address-family l2vpn evpn
+          neighbor 10.0.0.1
+            remote-as 65000
+            update-source loopback0
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+          neighbor 10.0.0.2
+            remote-as 65000
+            update-source loopback0
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+      DC1-LEAF2: |
+        nv overlay evpn
+        feature bgp
+        feature nv overlay
+        feature vn-segment-vlan-based
+        router bgp 65000
+          router-id 10.0.0.112
+          address-family l2vpn evpn
+          neighbor 10.0.0.1
+            remote-as 65000
+            update-source loopback0
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+          neighbor 10.0.0.2
+            remote-as 65000
+            update-source loopback0
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+      DC2-LEAF1: |
+        nv overlay evpn
+        feature bgp
+        feature nv overlay
+        feature vn-segment-vlan-based
+        router bgp 65000
+          router-id 10.0.0.121
+          address-family l2vpn evpn
+          neighbor 10.0.0.1
+            remote-as 65000
+            update-source loopback0
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+          neighbor 10.0.0.2
+            remote-as 65000
+            update-source loopback0
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+      DC2-LEAF2: |
+        nv overlay evpn
+        feature bgp
+        feature nv overlay
+        feature vn-segment-vlan-based
+        router bgp 65000
+          router-id 10.0.0.122
+          address-family l2vpn evpn
+          neighbor 10.0.0.1
+            remote-as 65000
+            update-source loopback0
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+          neighbor 10.0.0.2
+            remote-as 65000
+            update-source loopback0
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+    verify:
+      - device: SS1
+        command: show bgp l2vpn evpn summary
+        expect: "Four neighbors 10.0.0.111, 10.0.0.112, 10.0.0.121 and 10.0.0.122, each with a number (prefixes received, `0` for now) in the last column - not `Idle` or `Active`."
+      - device: DC2-LEAF1
+        command: show bgp l2vpn evpn summary
+        expect: "`L2VPN EVPN config peers 2, capable peers 2`, with 10.0.0.1 and 10.0.0.2 established."
+    checks:
+      - id: bgp-ss1-sum
+        description: SS1 has established EVPN sessions to all four leaves in both DCs
+        device: SS1
+        command: show bgp l2vpn evpn summary
+        match: ['^10\.0\.0\.111\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.0\.112\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.0\.121\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.0\.122\s+4\s+65000\s.*\s\d+\s*$']
+        absent: ['^10\.0\.0\.1[12][12]\s.*(Idle|Active|Connect|Open\w*)\s*$']
+        hint: Sessions stuck in Idle/Active usually mean a missing `update-source` or no OSPF route to the peer loopback.
+      - id: bgp-dc2-leaf1-sum
+        description: DC2-LEAF1 has established EVPN sessions to both super spines
+        device: DC2-LEAF1
+        command: show bgp l2vpn evpn summary
+        match: ['^10\.0\.0\.1\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.0\.2\s+4\s+65000\s.*\s\d+\s*$']
+        hint: Each leaf peers with both super spines, not with its DC spine.
+      - id: bgp-ss2-rr-cfg
+        description: SS2 reflects EVPN routes to all four leaves and sends extended communities
+        device: SS2
+        mode: config
+        match: ['^\s+address-family l2vpn evpn', '^\s+neighbor 10\.0\.0\.111 route-reflector-client', '^\s+neighbor 10\.0\.0\.122 route-reflector-client', '^\s+neighbor 10\.0\.0\.121 send-community (both|extended)']
+        hint: Under `address-family l2vpn evpn` on the super spine, activate each leaf and add `send-community both` and `route-reflector-client`.
+      - id: bgp-dc1-leaf2-cfg
+        description: DC1-LEAF2 has the EVPN features and peers with both super spines
+        device: DC1-LEAF2
+        mode: config
+        match: ['^nv overlay evpn', '^feature nv overlay', '^feature vn-segment-vlan-based', '^\s+neighbor 10\.0\.0\.1\n', '^\s+neighbor 10\.0\.0\.2\n', '^\s+send-community extended']
+        hint: Paste the DC1-LEAF2 block of this step.
+  - id: vlan-vni
+    title: "Step 3 - Map VLANs 10 and 20 to L2VNIs on every leaf"
+    explain: |
+      Now the actual goal: **extend VLAN 10 and VLAN 20** from DC1 to DC2. Each VLAN is mapped to a
+      **Layer-2 VNI** with `vn-segment`: VLAN 10 = **VNI 10010**, VLAN 20 = **VNI 10020**. The VLAN number is
+      only locally significant - the VNI is what every leaf in both DCs must agree on.
+
+      The `evpn` block creates an **EVPN instance (EVI)** per L2VNI:
+      - `rd auto` - route distinguisher `<router-id>:<32767+VLAN>`, e.g. `10.0.0.111:32777` for VLAN 10.
+      - `route-target import/export auto` - `<AS>:<VNI>`, e.g. `65000:10010`. Because both DCs are in the
+        same AS, every leaf generates the same value and imports the others' routes for the same VNI.
+
+      Both VLANs go on all four leaves (each leaf has one host port, an ordinary access port), so any leaf can
+      later route for either subnet.
+    config:
+      DC1-LEAF1: |
+        vlan 10
+          name TENANT1-WEB
+          vn-segment 10010
+        vlan 20
+          name TENANT1-APP
+          vn-segment 10020
+        interface Ethernet1/2
+          description H1 (VLAN 10)
+          switchport
+          switchport mode access
+          switchport access vlan 10
+          no shutdown
+        evpn
+          vni 10010 l2
+            rd auto
+            route-target import auto
+            route-target export auto
+          vni 10020 l2
+            rd auto
+            route-target import auto
+            route-target export auto
+      DC1-LEAF2: |
+        vlan 10
+          name TENANT1-WEB
+          vn-segment 10010
+        vlan 20
+          name TENANT1-APP
+          vn-segment 10020
+        interface Ethernet1/2
+          description H2 (VLAN 20)
+          switchport
+          switchport mode access
+          switchport access vlan 20
+          no shutdown
+        evpn
+          vni 10010 l2
+            rd auto
+            route-target import auto
+            route-target export auto
+          vni 10020 l2
+            rd auto
+            route-target import auto
+            route-target export auto
+      DC2-LEAF1: |
+        vlan 10
+          name TENANT1-WEB
+          vn-segment 10010
+        vlan 20
+          name TENANT1-APP
+          vn-segment 10020
+        interface Ethernet1/2
+          description H3 (VLAN 10)
+          switchport
+          switchport mode access
+          switchport access vlan 10
+          no shutdown
+        evpn
+          vni 10010 l2
+            rd auto
+            route-target import auto
+            route-target export auto
+          vni 10020 l2
+            rd auto
+            route-target import auto
+            route-target export auto
+      DC2-LEAF2: |
+        vlan 10
+          name TENANT1-WEB
+          vn-segment 10010
+        vlan 20
+          name TENANT1-APP
+          vn-segment 10020
+        interface Ethernet1/2
+          description H4 (VLAN 20)
+          switchport
+          switchport mode access
+          switchport access vlan 20
+          no shutdown
+        evpn
+          vni 10010 l2
+            rd auto
+            route-target import auto
+            route-target export auto
+          vni 10020 l2
+            rd auto
+            route-target import auto
+            route-target export auto
+    verify:
+      - device: DC1-LEAF1
+        command: show vxlan
+        expect: "Two lines: `10  10010` and `20  10020` (VLAN to VN-Segment)."
+      - device: DC2-LEAF1
+        command: show vlan brief
+        expect: "VLAN 10 `TENANT1-WEB` with Eth1/2 and VLAN 20 `TENANT1-APP`."
+    checks:
+      - id: vni-dc1-leaf1-vxlan
+        description: DC1-LEAF1 maps VLAN 10 to VNI 10010 and VLAN 20 to VNI 10020
+        device: DC1-LEAF1
+        command: show vxlan
+        match: ['^\s*10\s+10010\s*$', '^\s*20\s+10020\s*$']
+        hint: "`vn-segment` goes under the `vlan` and needs `feature vn-segment-vlan-based` (step 2)."
+      - id: vni-dc2-leaf1-vxlan
+        description: DC2-LEAF1 maps the same VLANs to the same VNIs
+        device: DC2-LEAF1
+        command: show vxlan
+        match: ['^\s*10\s+10010\s*$', '^\s*20\s+10020\s*$']
+        hint: Every leaf in both DCs must use the same VNIs.
+      - id: vni-dc2-leaf2-evpn-cfg
+        description: DC2-LEAF2 has EVPN instances with auto RD/RT for both L2VNIs and its host port in VLAN 20
+        device: DC2-LEAF2
+        mode: config
+        match: ['^evpn\n(?:[ \t]+.*\n)*?[ \t]+vni 10010 l2', '^evpn\n(?:[ \t]+.*\n)*?[ \t]+vni 10020 l2', '^\s+route-target import auto', '^vlan 20\n(?:[ \t]+.*\n)*?[ \t]+vn-segment 10020', '^\s+switchport access vlan 20']
+        hint: Paste the DC2-LEAF2 block of this step.
+  - id: nve
+    title: "Step 4 - The VTEPs: NVE interfaces with BGP ingress replication"
+    explain: |
+      `interface nve1` is the **VTEP**. It sources the tunnels from **loopback1**, and
+      `host-reachability protocol bgp` makes it learn remote MACs from **BGP EVPN** instead of flood-and-learn.
+
+      Each L2VNI becomes a **member** of the NVE. `ingress-replication protocol bgp` handles BUM traffic
+      (broadcast, unknown unicast, multicast - e.g. ARP): the leaf sends one unicast copy to every remote VTEP
+      that advertised a **type-3 IMET route** for that VNI. The underlay needs no multicast, which matters here
+      because the super spines would otherwise have to run PIM between the DCs.
+
+      As soon as the NVE is up, each leaf advertises one type-3 route per VNI to SS1 and SS2, they reflect it,
+      and every leaf sees the **three other VTEPs** - in its own DC and in the other one - as **NVE peers**.
+      (NX-OS may need about 30 seconds after `no shutdown`.)
+    config:
+      DC1-LEAF1: |
+        interface nve1
+          no shutdown
+          host-reachability protocol bgp
+          source-interface loopback1
+          member vni 10010
+            ingress-replication protocol bgp
+          member vni 10020
+            ingress-replication protocol bgp
+      DC1-LEAF2: |
+        interface nve1
+          no shutdown
+          host-reachability protocol bgp
+          source-interface loopback1
+          member vni 10010
+            ingress-replication protocol bgp
+          member vni 10020
+            ingress-replication protocol bgp
+      DC2-LEAF1: |
+        interface nve1
+          no shutdown
+          host-reachability protocol bgp
+          source-interface loopback1
+          member vni 10010
+            ingress-replication protocol bgp
+          member vni 10020
+            ingress-replication protocol bgp
+      DC2-LEAF2: |
+        interface nve1
+          no shutdown
+          host-reachability protocol bgp
+          source-interface loopback1
+          member vni 10010
+            ingress-replication protocol bgp
+          member vni 10020
+            ingress-replication protocol bgp
+    verify:
+      - device: DC1-LEAF1
+        command: show nve vni
+        expect: "`nve1 10010 UnicastBGP Up CP L2 [10]` and `nve1 10020 UnicastBGP Up CP L2 [20]` - CP = control-plane learning."
+      - device: DC1-LEAF1
+        command: show nve peers
+        expect: "Three peers `Up CP`: 10.0.1.112 (DC1-LEAF2), 10.0.1.121 and 10.0.1.122 (the DC2 leaves)."
+      - device: DC1-LEAF1
+        command: show bgp l2vpn evpn route-type 3
+        expect: |
+          Type-3 IMET routes from every VTEP, e.g. `*>i[3]:[0]:[32]:[10.0.1.121]/88` with next hop `10.0.1.121`
+          (reflected by SS1 and SS2, so each remote route shows two paths) and the local `*>l[3]:[0]:[32]:[10.0.1.111]/88`.
+    checks:
+      - id: nve-dc1-leaf1-vni
+        description: Both L2VNIs are Up on DC1-LEAF1's NVE with control-plane learning
+        device: DC1-LEAF1
+        command: show nve vni
+        match: ['^nve1\s+10010\s+UnicastBGP\s+Up\s+CP\s+L2', '^nve1\s+10020\s+UnicastBGP\s+Up\s+CP\s+L2']
+        hint: The VNI must be both a `vn-segment` (step 3) and a `member vni` of nve1, and nve1 needs `no shutdown`.
+      - id: nve-dc1-leaf1-peers
+        description: DC1-LEAF1 has both DC2 VTEPs (and DC1-LEAF2) as NVE peers
+        device: DC1-LEAF1
+        command: show nve peers
+        match: ['^nve1\s+10\.0\.1\.121\s+Up\s+CP', '^nve1\s+10\.0\.1\.122\s+Up\s+CP', '^nve1\s+10\.0\.1\.112\s+Up\s+CP']
+        hint: No peer means no type-3 route arrived; check the EVPN sessions to the super spines and `send-community extended`.
+      - id: nve-dc2-leaf1-peer
+        description: DC2-LEAF1 has DC1-LEAF1's VTEP as an NVE peer
+        device: DC2-LEAF1
+        command: show nve peers
+        match: ['^nve1\s+10\.0\.1\.111\s+Up\s+CP']
+        hint: Configure nve1 on every leaf the same way.
+      - id: nve-dc1-leaf1-imet
+        description: DC1-LEAF1 received the DC2 leaves' type-3 (IMET) routes through the super spines
+        device: DC1-LEAF1
+        command: show bgp l2vpn evpn route-type 3
+        match: ['\[3\]:\[0\]:\[32\]:\[10\.0\.1\.121\]', '\[3\]:\[0\]:\[32\]:\[10\.0\.1\.122\]', '\[3\]:\[0\]:\[32\]:\[10\.0\.1\.111\]']
+        hint: The super spines must reflect EVPN routes (`route-reflector-client`) and every leaf needs `ingress-replication protocol bgp`.
+      - id: nve-dc2-leaf2-cfg
+        description: DC2-LEAF2's NVE uses BGP host reachability, loopback1 and ingress replication for both VNIs
+        device: DC2-LEAF2
+        mode: config
+        match: ['^interface nve1\n(?:[ \t]+.*\n)*?[ \t]+host-reachability protocol bgp', '^\s+source-interface loopback1', '^\s+member vni 10010\n\s+ingress-replication protocol bgp', '^\s+member vni 10020\n\s+ingress-replication protocol bgp']
+        hint: Paste the DC2-LEAF2 block of this step.
+  - id: extend-vlans
+    title: "Test it: one VLAN, two data centers"
+    explain: |
+      No new config here - this is the payoff. H1 (DC1) and H3 (DC2) are both in **VLAN 10**, H2 (DC1) and
+      H4 (DC2) in **VLAN 20**: same subnet, different data centers. Ping between them:
+
+      1. H1 ARPs for 192.168.10.13. The broadcast is **ingress-replicated** to every VTEP in VNI 10010,
+         including DC2-LEAF1 - one unicast VXLAN packet each, carried through all five stages.
+      2. Each leaf learns its local host's MAC and advertises it as a **type-2 MAC route**
+         (`[2]:[0]:[0]:[48]:[0010.0010.0013]:[0]:[0.0.0.0]`). SS1 and SS2 reflect it to every leaf.
+      3. DC1-LEAF1 installs H3's MAC **behind the tunnel**: in the MAC table the port is
+         `nve1(10.0.1.121)`, i.e. "send to VTEP 10.0.1.121, VNI 10010".
+
+      The first ping may lose a packet while ARP resolves. **Check this step** runs the pings first so the MAC
+      tables are filled.
+    verify:
+      - device: H1
+        command: ping 192.168.10.13
+        expect: "`Success rate is 80 percent (4/5)` or 100 percent - VLAN 10 stretched from DC1 to DC2."
+      - device: H2
+        command: ping 192.168.20.14
+        expect: "Success rate of 80-100 percent across VLAN 20, DC1 to DC2."
+      - device: DC1-LEAF1
+        command: show mac address-table vlan 10
+        expect: "H1's MAC `0010.0010.0011` on `Eth1/2`, and H3's MAC `0010.0010.0013` on `nve1(10.0.1.121)` with a `C` (control plane) flag."
+      - device: DC1-LEAF1
+        command: show bgp l2vpn evpn route-type 2
+        expect: "`*>i[2]:[0]:[0]:[48]:[0010.0010.0013]:[0]:[0.0.0.0]/216` with next hop `10.0.1.121` (DC2-LEAF1), reflected by the super spines."
+      - device: DC1-LEAF1
+        command: show l2route evpn mac all
+        expect: "`10 0010.0010.0013 BGP Rcv ... 10.0.1.121` (remote, DC2) and `10 0010.0010.0011 Local L, ... Eth1/2`."
+    checks:
+      - id: l2-h1-h3-ping
+        description: H1 (DC1) pings H3 (DC2) in VLAN 10 across the super spines
+        device: H1
+        command: ping 192.168.10.13
+        min_success: 60
+        hint: Both LEAF1s need VLAN 10 mapped to VNI 10010 and an Up NVE peer (steps 3 and 4).
+      - id: l2-h2-h4-ping
+        description: H2 (DC1) pings H4 (DC2) in VLAN 20 across the super spines
+        device: H2
+        command: ping 192.168.20.14
+        min_success: 60
+        hint: Check `show nve vni` on both LEAF2s for VNI 10020.
+      - id: l2-dc1-leaf1-mac
+        description: DC1-LEAF1 learned H3's MAC over the tunnel to DC2-LEAF1's VTEP
+        device: DC1-LEAF1
+        command: show mac address-table vlan 10
+        match: ['0010\.0010\.0013\s+\S+\s+\S+\s+\S+\s+\S+\s+nve1\(10\.0\.1\.121\)', '0010\.0010\.0011\s.*Eth1/2']
+        hint: Ping from H1 to H3 first; the MAC appears behind nve1(10.0.1.121) once DC2-LEAF1 has advertised it.
+      - id: l2-dc1-leaf1-type2
+        description: DC1-LEAF1 has the DC2 type-2 MAC route for H3
+        device: DC1-LEAF1
+        command: show bgp l2vpn evpn route-type 2
+        match: ['\[2\]:\[0\]:\[0\]:\[48\]:\[0010\.0010\.0013\]']
+        hint: Type-2 routes appear once the remote leaf has learned the host MAC (after a ping) and the RTs match.
+  - id: l3vni-irb
+    title: "Step 5 (optional) - Tenant VRF with an L3VNI and a distributed anycast gateway"
+    optional: true
+    explain: |
+      So far the fabric only bridges. To route between VLAN 10 and 20 - including from one DC to the other -
+      the leaves become the **default gateway** with **symmetric IRB**, Cisco's L3 overlay steps:
+
+      - A tenant **VRF** (`TENANT1`) gets its own **L3VNI 50001** (`vni 50001`, auto RD/RT plus `evpn`),
+        carried on VLAN 999 with an SVI that only forwards (`ip forward`, no address). Routed traffic between
+        leaves uses VNI 50001.
+      - `fabric forwarding anycast-gateway-mac 2020.0000.00aa` and SVIs with `fabric forwarding mode
+        anycast-gateway`: `Vlan10` and `Vlan20` have the **same gateway IP and MAC on every leaf in both DCs**.
+        A host's gateway is always its local leaf, so a VM can move from DC1 to DC2 without re-ARPing.
+      - `member vni 50001 associate-vrf` ties the L3VNI to the NVE, and `redistribute direct` in the BGP VRF
+        advertises the subnets as **type-5 IP prefix** routes. Type-2 routes now carry **MAC + IP**.
+
+      Nothing changes on the spines or super spines: they still only route and reflect.
+    config:
+      DC1-LEAF1: |
+        feature interface-vlan
+        feature fabric forwarding
+        fabric forwarding anycast-gateway-mac 2020.0000.00aa
+        route-map PERMIT-ALL permit 10
+        vrf context TENANT1
+          vni 50001
+          rd auto
+          address-family ipv4 unicast
+            route-target both auto
+            route-target both auto evpn
+        vlan 999
+          name TENANT1-L3VNI
+          vn-segment 50001
+        interface Vlan999
+          description L3VNI for TENANT1
+          no shutdown
+          vrf member TENANT1
+          ip forward
+        interface Vlan10
+          no shutdown
+          vrf member TENANT1
+          ip address 192.168.10.1/24
+          fabric forwarding mode anycast-gateway
+        interface Vlan20
+          no shutdown
+          vrf member TENANT1
+          ip address 192.168.20.1/24
+          fabric forwarding mode anycast-gateway
+        interface nve1
+          member vni 50001 associate-vrf
+        router bgp 65000
+          vrf TENANT1
+            address-family ipv4 unicast
+              redistribute direct route-map PERMIT-ALL
+      DC1-LEAF2: |
+        feature interface-vlan
+        feature fabric forwarding
+        fabric forwarding anycast-gateway-mac 2020.0000.00aa
+        route-map PERMIT-ALL permit 10
+        vrf context TENANT1
+          vni 50001
+          rd auto
+          address-family ipv4 unicast
+            route-target both auto
+            route-target both auto evpn
+        vlan 999
+          name TENANT1-L3VNI
+          vn-segment 50001
+        interface Vlan999
+          description L3VNI for TENANT1
+          no shutdown
+          vrf member TENANT1
+          ip forward
+        interface Vlan10
+          no shutdown
+          vrf member TENANT1
+          ip address 192.168.10.1/24
+          fabric forwarding mode anycast-gateway
+        interface Vlan20
+          no shutdown
+          vrf member TENANT1
+          ip address 192.168.20.1/24
+          fabric forwarding mode anycast-gateway
+        interface nve1
+          member vni 50001 associate-vrf
+        router bgp 65000
+          vrf TENANT1
+            address-family ipv4 unicast
+              redistribute direct route-map PERMIT-ALL
+      DC2-LEAF1: |
+        feature interface-vlan
+        feature fabric forwarding
+        fabric forwarding anycast-gateway-mac 2020.0000.00aa
+        route-map PERMIT-ALL permit 10
+        vrf context TENANT1
+          vni 50001
+          rd auto
+          address-family ipv4 unicast
+            route-target both auto
+            route-target both auto evpn
+        vlan 999
+          name TENANT1-L3VNI
+          vn-segment 50001
+        interface Vlan999
+          description L3VNI for TENANT1
+          no shutdown
+          vrf member TENANT1
+          ip forward
+        interface Vlan10
+          no shutdown
+          vrf member TENANT1
+          ip address 192.168.10.1/24
+          fabric forwarding mode anycast-gateway
+        interface Vlan20
+          no shutdown
+          vrf member TENANT1
+          ip address 192.168.20.1/24
+          fabric forwarding mode anycast-gateway
+        interface nve1
+          member vni 50001 associate-vrf
+        router bgp 65000
+          vrf TENANT1
+            address-family ipv4 unicast
+              redistribute direct route-map PERMIT-ALL
+      DC2-LEAF2: |
+        feature interface-vlan
+        feature fabric forwarding
+        fabric forwarding anycast-gateway-mac 2020.0000.00aa
+        route-map PERMIT-ALL permit 10
+        vrf context TENANT1
+          vni 50001
+          rd auto
+          address-family ipv4 unicast
+            route-target both auto
+            route-target both auto evpn
+        vlan 999
+          name TENANT1-L3VNI
+          vn-segment 50001
+        interface Vlan999
+          description L3VNI for TENANT1
+          no shutdown
+          vrf member TENANT1
+          ip forward
+        interface Vlan10
+          no shutdown
+          vrf member TENANT1
+          ip address 192.168.10.1/24
+          fabric forwarding mode anycast-gateway
+        interface Vlan20
+          no shutdown
+          vrf member TENANT1
+          ip address 192.168.20.1/24
+          fabric forwarding mode anycast-gateway
+        interface nve1
+          member vni 50001 associate-vrf
+        router bgp 65000
+          vrf TENANT1
+            address-family ipv4 unicast
+              redistribute direct route-map PERMIT-ALL
+    verify:
+      - device: DC1-LEAF1
+        command: show nve vni
+        expect: "A third line `nve1 50001 n/a Up CP L3 [TENANT1]`."
+      - device: H1
+        command: ping 192.168.20.14
+        expect: "80-100 percent: H1 (VLAN 10, DC1) reaches H4 (VLAN 20, DC2), routed over the L3VNI."
+      - device: DC1-LEAF1
+        command: show ip route vrf TENANT1
+        expect: "`192.168.20.14/32` via `10.0.1.122%default` learned by `bgp-65000` with `segid: 50001` and `encap: VXLAN`."
+      - device: DC1-LEAF1
+        command: show bgp l2vpn evpn route-type 5
+        expect: "Type-5 prefixes `[5]:[0]:[0]:[24]:[192.168.10.0]/224` and `[192.168.20.0]` from the leaves of both DCs."
+    checks:
+      - id: l3-dc1-leaf1-l3vni
+        description: DC1-LEAF1 has L3VNI 50001 up for VRF TENANT1
+        device: DC1-LEAF1
+        command: show nve vni
+        match: ['^nve1\s+50001\s+\S+\s+Up\s+CP\s+L3\s+\[TENANT1\]']
+        hint: The L3VNI needs `vni 50001` in the VRF, `vlan 999 vn-segment 50001`, interface Vlan999 and `member vni 50001 associate-vrf`.
+      - id: l3-h1-h4-ping
+        description: H1 (VLAN 10, DC1) pings H4 (VLAN 20, DC2) through the anycast gateway and L3VNI
+        device: H1
+        command: ping 192.168.20.14
+        min_success: 60
+        hint: Every leaf needs the anycast gateway SVIs in VRF TENANT1.
+      - id: l3-dc1-leaf1-route
+        description: DC1-LEAF1 routes to H4 in VRF TENANT1 over VXLAN to DC2-LEAF2
+        device: DC1-LEAF1
+        command: show ip route vrf TENANT1
+        match: ['192\.168\.20\.14/32', 'via 10\.0\.1\.122%default.*segid: 50001.*encap: VXLAN']
+        hint: The remote leaf only learns the host IP once it has an SVI in that VLAN; check the L3VNI on DC2-LEAF2.
+      - id: l3-dc2-leaf2-cfg
+        description: DC2-LEAF2 has the anycast gateway and the L3VNI association
+        device: DC2-LEAF2
+        mode: config
+        match: ['^fabric forwarding anycast-gateway-mac 2020\.0000\.00aa', '^\s+fabric forwarding mode anycast-gateway', '^\s+member vni 50001 associate-vrf', '^vrf context TENANT1\n(?:[ \t]+.*\n)*?[ \t]+vni 50001']
+        hint: Paste the DC2-LEAF2 block of this step.
+solution_summary: |
+  **What you built:** one VXLAN BGP EVPN fabric across two data centers, wired as Cisco's **5-stage Clos**:
+  leaf - spine - super spine - spine - leaf.
+
+  - **Underlay**: routed /30 links and OSPF area 0 (point-to-point) on all eight fabric nodes. Each DC spine
+    reaches the other DC over both super spines (ECMP).
+  - **Control plane**: iBGP AS 65000, address family `l2vpn evpn` only. The four leaves peer loopback-to-loopback
+    with **SS1 and SS2, the route reflectors**. The DC spines carry no BGP - pure IP transit, as in Cisco's
+    super-spine (NDFC) model.
+  - **Data plane**: `nve1` on every leaf, sourced from loopback1 (10.0.1.111/.112/.121/.122), learning from BGP and
+    using ingress replication for BUM traffic, so no multicast is needed across the super spines.
+  - **Extended VLANs**: VLAN 10 = L2VNI 10010 and VLAN 20 = L2VNI 10020 on all four leaves with auto RD/RT
+    (`65000:10010`, `65000:10020`). H1-H3 and H2-H4 share a broadcast domain from DC1 to DC2.
+  - **Route types seen**: type 3 (IMET - the flood list, one per VTEP and VNI) and type 2 (MAC, then MAC+IP);
+    with the optional step also type 5 (IP prefix) and symmetric IRB through L3VNI 50001 with the
+    2020.0000.00aa anycast gateway on every leaf in both DCs.
+
+  **Where to go next**: **VXLAN EVPN Multi-Site** - give each DC its own fabric (and its own fault domain)
+  with **border gateways** (`evpn multisite border-gateway`, `multisite ingress-replication`) and an eBGP DCI
+  through the super spines; a second spine per DC; jumbo MTU 9216 end to end; ARP suppression; or an eBGP
+  underlay.

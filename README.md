@@ -557,6 +557,33 @@ the EVPN commands need IOS-XE.
 > EVPN-VPWS documentation, not captured from CML. EVPN data-plane forwarding on IOL in particular is untested. If a
 > check fails on a correctly built lab, run it in *Config* grading mode and please report the device output.
 
+### Walkthrough lab: BGP EVPN VXLAN across two data centers with super spines
+The `20-evpn-vxlan-superspine` walkthrough (*Walkthrough: BGP EVPN VXLAN across two data centers with super spines
+(5-stage Clos)*, in the lab library) builds one VXLAN EVPN fabric over two spine-and-leaf pods (DC1, DC2) that a
+super-spine layer joins into Cisco's **5-stage Clos** (leaf - spine - super spine - spine - leaf). It follows Cisco's
+super-spine model (Nexus 9000 VXLAN EVPN design guide, NDFC): the leaves are the only VTEPs, the DC spines are pure IP
+transit, and the super spines are the iBGP EVPN route reflectors. VXLAN EVPN Multi-Site with border gateways, the
+choice for separate fault domains per DC, is covered as the next step in the solution summary.
+
+**Topology** (12 nodes, about **56 GB of CML RAM**, RAM heavy): 4 `nxosv9000` leaves (DC1-LEAF1/2, DC2-LEAF1/2, 12 GB
+each), 2 `iol-xe` super spines (SS1, SS2), 2 `iol-xe` DC spines and 4 pre-configured IOL hosts. IOL only.
+
+| # | Step | What you do | Verified with |
+|---|---|---|---|
+| 0 | The design | Concepts: 5-stage Clos, roles of leaf/spine/super spine, one fabric vs Multi-Site; cabling check | `show cdp neighbors` |
+| 1 | Underlay | /30 links, loopback0 + loopback1 (VTEP), OSPF area 0 point-to-point through all five stages | `show ip ospf neighbor`, ECMP via both super spines, VTEP-to-VTEP ping across DCs |
+| 2 | BGP EVPN | Leaf features (`nv overlay evpn`, `feature nv overlay`, `vn-segment-vlan-based`); iBGP `l2vpn evpn` to SS1/SS2 as route reflectors | `show bgp l2vpn evpn summary` |
+| 3 | VLAN to VNI | VLAN 10 = L2VNI 10010, VLAN 20 = L2VNI 10020 on all four leaves, `evpn` with auto RD/RT | `show vxlan` |
+| 4 | NVE | `interface nve1`, `source-interface loopback1`, `host-reachability protocol bgp`, `ingress-replication protocol bgp` | `show nve vni`, `show nve peers` (both DCs), type-3 routes |
+| 5 | Test it | Same-VLAN pings DC1 to DC2 (H1-H3 VLAN 10, H2-H4 VLAN 20) | MAC behind `nve1(10.0.1.121)`, type-2 routes |
+| 6 | L3VNI (optional) | VRF TENANT1 with L3VNI 50001, distributed anycast gateway, `redistribute direct` (type 5) | `show nve vni`, VRF routes over VXLAN, H1 (VLAN 10, DC1) to H4 (VLAN 20, DC2) |
+
+> **Not verified on real devices yet.** The expected outputs were written from Cisco's NX-OS VXLAN BGP EVPN and IOS-XE
+> BGP EVPN documentation, not captured from CML. Untested in particular: IOL as the EVPN route reflector for NX-OS
+> VTEPs, OSPF between IOL and NX-OS 9000v, and the 9000v VXLAN data plane through IOL transit nodes (the lab keeps MTU
+> 1500 on the fabric links). If a check fails on a correctly built lab, run it in *Config* grading mode and please
+> report the device output.
+
 ### RAM estimate and the RAM heavy tag
 Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node
 definition: `iol-xe`/`ioll2-xe` 1 GB, `iosv` 0.5 GB, `iosvl2` 0.75 GB, `csr1000v` 3 GB, `cat8000v` 4 GB, `nxosv9000`
@@ -731,6 +758,8 @@ Example packs live in [`examples/`](examples/) and are attached to every [releas
 - `ospf-multiarea-stub`: OSPF multi-area, a totally stubby area and ABR /22 summarization (4 routers).
 - `troubleshoot-ospf-7node`: a troubleshooting ticket on a 7-router multi-area OSPF network with one planted fault.
 - `19-evpn-mpls` (lab library only): a walkthrough of BGP EVPN over MPLS on IOL (8 routers, about 8 GB RAM).
+- `20-evpn-vxlan-superspine` (lab library only): a walkthrough of BGP EVPN VXLAN across two data centers joined by
+  super spines (5-stage Clos), NX-OS 9000v leaves with IOL spines (12 nodes, about 56 GB RAM).
 
 ## Configuration
 Everything can be set on the **Settings** page; `.env` / environment variables provide defaults (copy `.env.example`).

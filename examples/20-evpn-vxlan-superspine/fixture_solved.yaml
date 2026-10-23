@@ -1,0 +1,355 @@
+# Synthesized from Cisco NX-OS 10.x VXLAN BGP EVPN and IOS-XE 17.x BGP EVPN configuration guide examples
+# (not recorded on real hardware). State: every step done, including the optional L3VNI step.
+DC1-SPINE:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    SS1              Eth 0/0           152              R B   Linux Uni Eth 0/0
+    SS2              Eth 0/1           147              R B   Linux Uni Eth 0/0
+    DC1-LEAF1(9KV9C0D1E2F)
+                     Eth 0/2           161            R S I s N9K-C9300 Eth1/1
+    DC1-LEAF2(9KV3A4B5C6D)
+                     Eth 0/3           158            R S I s N9K-C9300 Eth1/1
+
+    Total cdp entries displayed : 4
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    10.0.0.1          0   FULL/  -        00:00:35    10.1.1.1        Ethernet0/0
+    10.0.0.2          0   FULL/  -        00:00:38    10.2.1.1        Ethernet0/1
+    10.0.0.111        0   FULL/  -        00:00:36    10.11.1.2       Ethernet0/2
+    10.0.0.112        0   FULL/  -        00:00:31    10.11.2.2       Ethernet0/3
+  show ip route 10.0.1.121: |
+    Routing entry for 10.0.1.121/32
+      Known via "ospf 1", distance 110, metric 31, type intra area
+      Last update from 10.2.1.1 on Ethernet0/1, 00:39:48 ago
+      Routing Descriptor Blocks:
+        10.2.1.1, from 10.0.0.121, 00:39:48 ago, via Ethernet0/1
+          Route metric is 31, traffic share count is 1
+      * 10.1.1.1, from 10.0.0.121, 00:39:48 ago, via Ethernet0/0
+          Route metric is 31, traffic share count is 1
+DC2-SPINE:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    SS1              Eth 0/0           149              R B   Linux Uni Eth 0/1
+    SS2              Eth 0/1           155              R B   Linux Uni Eth 0/1
+    DC2-LEAF1(9KV1A2B3C4D)
+                     Eth 0/2           166            R S I s N9K-C9300 Eth1/1
+    DC2-LEAF2(9KV5E6F7A8B)
+                     Eth 0/3           163            R S I s N9K-C9300 Eth1/1
+
+    Total cdp entries displayed : 4
+  show ip ospf neighbor: |
+
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    10.0.0.1          0   FULL/  -        00:00:33    10.1.2.1        Ethernet0/0
+    10.0.0.2          0   FULL/  -        00:00:37    10.2.2.1        Ethernet0/1
+    10.0.0.121        0   FULL/  -        00:00:39    10.21.1.2       Ethernet0/2
+    10.0.0.122        0   FULL/  -        00:00:34    10.21.2.2       Ethernet0/3
+SS1:
+  show bgp l2vpn evpn summary: |
+    BGP router identifier 10.0.0.1, local AS number 65000
+    BGP table version is 45, main routing table version 45
+    30 network entries using 11520 bytes of memory
+    30 path entries using 6960 bytes of memory
+    14/14 BGP path/bestpath attribute entries using 4256 bytes of memory
+    4 BGP rrinfo entries using 160 bytes of memory
+    4 BGP extended community entries using 128 bytes of memory
+    0 BGP route-map cache entries using 0 bytes of memory
+    0 BGP filter-list cache entries using 0 bytes of memory
+    BGP using 23024 total bytes of memory
+    BGP activity 30/0 prefixes, 30/0 paths, scan interval 60 secs
+    30 networks peaked at 00:39:51 Oct 23 2026 UTC (00:02:11.402 ago)
+
+    Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    10.0.0.111      4        65000      50      61       45    0    0 00:41:00        7
+    10.0.0.112      4        65000      51      62       45    0    0 00:41:01        7
+    10.0.0.121      4        65000      52      63       45    0    0 00:41:02        8
+    10.0.0.122      4        65000      53      64       45    0    0 00:41:03        8
+DC1-LEAF1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater,
+                      V - VoIP-Phone, D - Remotely-Managed-Device,
+                      s - Supports-STP-Dispute
+
+    Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+    DC1-SPINE          Eth1/1         171    R B         Linux Unix    Eth0/2
+    H1                 Eth1/2         150    R B         Linux Unix    Ethernet0/0
+
+    Total entries displayed: 2
+  show ip ospf neighbors: |
+     OSPF Process ID UNDERLAY VRF default
+     Total number of neighbors: 1
+     Neighbor ID     Pri State            Up Time  Address         Interface
+     10.0.0.11         1 FULL/ -          00:41:07 10.11.1.1       Eth1/1
+  ping 10.0.1.121 source 10.0.1.111: |
+    PING 10.0.1.121 (10.0.1.121) from 10.0.1.111: 56 data bytes
+    64 bytes from 10.0.1.121: icmp_seq=0 ttl=252 time=5.812 ms
+    64 bytes from 10.0.1.121: icmp_seq=1 ttl=252 time=4.207 ms
+    64 bytes from 10.0.1.121: icmp_seq=2 ttl=252 time=4.118 ms
+    64 bytes from 10.0.1.121: icmp_seq=3 ttl=252 time=4.342 ms
+    64 bytes from 10.0.1.121: icmp_seq=4 ttl=252 time=4.093 ms
+
+    --- 10.0.1.121 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 4.093/4.514/5.812 ms
+  show bgp l2vpn evpn summary: |
+    BGP summary information for VRF default, address family L2VPN EVPN
+    BGP router identifier 10.0.0.111, local AS number 65000
+    BGP table version is 61, L2VPN EVPN config peers 2, capable peers 2
+    40 network entries and 64 paths using 14336 bytes of memory
+    BGP attribute entries [28/4928], BGP AS path entries [0/0]
+    BGP community entries [0/0], BGP clusterlist entries [4/16]
+
+    Neighbor        V    AS    MsgRcvd    MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    10.0.0.1        4 65000         74         58       61    0    0 00:40:12 22
+    10.0.0.2        4 65000         73         57       61    0    0 00:40:09 22
+  show vxlan: |
+    Vlan            VN-Segment
+    ====            ==========
+    10              10010
+    20              10020
+    999             50001
+  show nve vni: |
+    Codes: CP - Control Plane        DP - Data Plane
+           UC - Unconfigured         SA - Suppress ARP
+           S-ND - Suppress ND
+           SU - Suppress Unknown Unicast
+           Xconn - Crossconnect
+           MS-IR - Multisite Ingress Replication
+           HYB - Hybrid IRB mode
+
+    Interface VNI      Multicast-group   State Mode Type [BD/VRF]      Flags
+    --------- -------- ----------------- ----- ---- ------------------ -----
+    nve1      10010    UnicastBGP        Up    CP   L2 [10]
+    nve1      10020    UnicastBGP        Up    CP   L2 [20]
+    nve1      50001    n/a               Up    CP   L3 [TENANT1]
+  show nve peers: |
+    Interface Peer-IP                                 State LearnType Uptime   Router-Mac
+    --------- --------------------------------------  ----- --------- -------- -----------------
+    nve1      10.0.1.112                              Up    CP        00:30:40 5254.0005.4321
+    nve1      10.0.1.121                              Up    CP        00:31:40 5254.0015.4321
+    nve1      10.0.1.122                              Up    CP        00:32:40 5254.0025.4321
+  show bgp l2vpn evpn route-type 3: |
+    BGP routing table information for VRF default, address family L2VPN EVPN
+    BGP table version is 61, Local Router ID is 10.0.0.111
+    Status: s-suppressed, x-deleted, S-stale, d-dampened, h-history, *-valid, >-best
+    Path type: i-internal, e-external, c-confed, l-local, a-aggregate, r-redist, I-injected
+    Origin codes: i - IGP, e - EGP, ? - incomplete, | - multipath & - backup, 2 - best2
+
+       Network            Next Hop            Metric     LocPrf     Weight Path
+    Route Distinguisher: 10.0.0.111:32777    (L2VNI 10010)
+    *>l[3]:[0]:[32]:[10.0.1.111]/88
+                          10.0.1.111                         100      32768 i
+    *>i[3]:[0]:[32]:[10.0.1.112]/88
+                          10.0.1.112                         100          0 i
+    * i                   10.0.1.112                         100          0 i
+    *>i[3]:[0]:[32]:[10.0.1.121]/88
+                          10.0.1.121                         100          0 i
+    * i                   10.0.1.121                         100          0 i
+    *>i[3]:[0]:[32]:[10.0.1.122]/88
+                          10.0.1.122                         100          0 i
+    * i                   10.0.1.122                         100          0 i
+
+    Route Distinguisher: 10.0.0.111:32787    (L2VNI 10020)
+    *>l[3]:[0]:[32]:[10.0.1.111]/88
+                          10.0.1.111                         100      32768 i
+    *>i[3]:[0]:[32]:[10.0.1.112]/88
+                          10.0.1.112                         100          0 i
+    * i                   10.0.1.112                         100          0 i
+    *>i[3]:[0]:[32]:[10.0.1.121]/88
+                          10.0.1.121                         100          0 i
+    * i                   10.0.1.121                         100          0 i
+    *>i[3]:[0]:[32]:[10.0.1.122]/88
+                          10.0.1.122                         100          0 i
+    * i                   10.0.1.122                         100          0 i
+
+    Route Distinguisher: 10.0.0.112:32777
+    *>i[3]:[0]:[32]:[10.0.1.112]/88
+                          10.0.1.112                         100          0 i
+    * i                   10.0.1.112                         100          0 i
+
+    Route Distinguisher: 10.0.0.112:32787
+    *>i[3]:[0]:[32]:[10.0.1.112]/88
+                          10.0.1.112                         100          0 i
+    * i                   10.0.1.112                         100          0 i
+
+    Route Distinguisher: 10.0.0.121:32777
+    *>i[3]:[0]:[32]:[10.0.1.121]/88
+                          10.0.1.121                         100          0 i
+    * i                   10.0.1.121                         100          0 i
+
+    Route Distinguisher: 10.0.0.121:32787
+    *>i[3]:[0]:[32]:[10.0.1.121]/88
+                          10.0.1.121                         100          0 i
+    * i                   10.0.1.121                         100          0 i
+
+    Route Distinguisher: 10.0.0.122:32777
+    *>i[3]:[0]:[32]:[10.0.1.122]/88
+                          10.0.1.122                         100          0 i
+    * i                   10.0.1.122                         100          0 i
+
+    Route Distinguisher: 10.0.0.122:32787
+    *>i[3]:[0]:[32]:[10.0.1.122]/88
+                          10.0.1.122                         100          0 i
+    * i                   10.0.1.122                         100          0 i
+  show mac address-table vlan 10: |
+    Legend:
+            * - primary entry, G - Gateway MAC, (R) - Routed MAC, O - Overlay MAC
+            age - seconds since last seen,+ - primary entry using vPC Peer-Link,
+            (T) - True, (F) - False, C - ControlPlane MAC, ~ - vsan,
+            (NA)- Not Applicable
+       VLAN     MAC Address      Type      age     Secure NTFY Ports
+    ---------+-----------------+--------+---------+------+----+------------------
+    *   10     0010.0010.0011   dynamic  NA         F      F    Eth1/2
+    C   10     0010.0010.0013   dynamic  NA         F      F    nve1(10.0.1.121)
+    G   10     2020.0000.00aa   static   -          F      F    sup-eth1(R)
+  show bgp l2vpn evpn route-type 2: |
+    BGP routing table information for VRF default, address family L2VPN EVPN
+    BGP table version is 61, Local Router ID is 10.0.0.111
+    Status: s-suppressed, x-deleted, S-stale, d-dampened, h-history, *-valid, >-best
+    Path type: i-internal, e-external, c-confed, l-local, a-aggregate, r-redist, I-injected
+    Origin codes: i - IGP, e - EGP, ? - incomplete, | - multipath & - backup, 2 - best2
+
+       Network            Next Hop            Metric     LocPrf     Weight Path
+    Route Distinguisher: 10.0.0.111:32777    (L2VNI 10010)
+    *>l[2]:[0]:[0]:[48]:[0010.0010.0011]:[0]:[0.0.0.0]/216
+                          10.0.1.111                         100      32768 i
+    *>i[2]:[0]:[0]:[48]:[0010.0010.0013]:[0]:[0.0.0.0]/216
+                          10.0.1.121                         100          0 i
+    * i                   10.0.1.121                         100          0 i
+    *>l[2]:[0]:[0]:[48]:[0010.0010.0011]:[32]:[192.168.10.11]/272
+                          10.0.1.111                         100      32768 i
+    *>i[2]:[0]:[0]:[48]:[0010.0010.0013]:[32]:[192.168.10.13]/272
+                          10.0.1.121                         100          0 i
+    * i                   10.0.1.121                         100          0 i
+
+    Route Distinguisher: 10.0.0.111:32787    (L2VNI 10020)
+    *>i[2]:[0]:[0]:[48]:[0020.0020.0012]:[0]:[0.0.0.0]/216
+                          10.0.1.112                         100          0 i
+    * i                   10.0.1.112                         100          0 i
+    *>i[2]:[0]:[0]:[48]:[0020.0020.0014]:[0]:[0.0.0.0]/216
+                          10.0.1.122                         100          0 i
+    * i                   10.0.1.122                         100          0 i
+    *>i[2]:[0]:[0]:[48]:[0020.0020.0012]:[32]:[192.168.20.12]/272
+                          10.0.1.112                         100          0 i
+    * i                   10.0.1.112                         100          0 i
+    *>i[2]:[0]:[0]:[48]:[0020.0020.0014]:[32]:[192.168.20.14]/272
+                          10.0.1.122                         100          0 i
+    * i                   10.0.1.122                         100          0 i
+
+    Route Distinguisher: 10.0.0.121:32777
+    *>i[2]:[0]:[0]:[48]:[0010.0010.0013]:[0]:[0.0.0.0]/216
+                          10.0.1.121                         100          0 i
+    * i                   10.0.1.121                         100          0 i
+    *>i[2]:[0]:[0]:[48]:[0010.0010.0013]:[32]:[192.168.10.13]/272
+                          10.0.1.121                         100          0 i
+    * i                   10.0.1.121                         100          0 i
+
+    Route Distinguisher: 10.0.0.122:32787
+    *>i[2]:[0]:[0]:[48]:[0020.0020.0014]:[0]:[0.0.0.0]/216
+                          10.0.1.122                         100          0 i
+    * i                   10.0.1.122                         100          0 i
+    *>i[2]:[0]:[0]:[48]:[0020.0020.0014]:[32]:[192.168.20.14]/272
+                          10.0.1.122                         100          0 i
+    * i                   10.0.1.122                         100          0 i
+  show l2route evpn mac all: |
+    Flags -(Rmac):Router MAC (Stt):Static (L):Local (R):Remote (V):vPC link
+    (Dup):Duplicate (Spl):Split (Rcv):Recv (AD):Auto-Delete (D):Del Pending
+    (S):Stale (C):Clear, (Ps):Peer Sync (O):Re-Originated (Nho):NH-Override
+    (Pf):Permanently-Frozen, (Orp): Orphan
+
+    Topology    Mac Address    Prod   Flags         Seq No     Next-Hops
+    ----------- -------------- ------ ------------- ---------- ----------------
+    10          0010.0010.0011 Local  L,            0          Eth1/2
+    10          0010.0010.0013 BGP    Rcv           0          10.0.1.121 (Label: 10010)
+    20          0020.0020.0012 BGP    Rcv           0          10.0.1.112 (Label: 10020)
+    20          0020.0020.0014 BGP    Rcv           0          10.0.1.122 (Label: 10020)
+  show bgp l2vpn evpn route-type 5: |
+    BGP routing table information for VRF default, address family L2VPN EVPN
+    BGP table version is 61, Local Router ID is 10.0.0.111
+
+       Network            Next Hop            Metric     LocPrf     Weight Path
+    Route Distinguisher: 10.0.0.111:3    (L3VNI 50001)
+    *>l[5]:[0]:[0]:[24]:[192.168.10.0]/224
+                          10.0.1.111               0        100      32768 ?
+    *>l[5]:[0]:[0]:[24]:[192.168.20.0]/224
+                          10.0.1.111               0        100      32768 ?
+
+    Route Distinguisher: 10.0.0.121:3
+    *>i[5]:[0]:[0]:[24]:[192.168.10.0]/224
+                          10.0.1.121               0        100          0 ?
+    *>i[5]:[0]:[0]:[24]:[192.168.20.0]/224
+                          10.0.1.121               0        100          0 ?
+
+    Route Distinguisher: 10.0.0.122:3
+    *>i[5]:[0]:[0]:[24]:[192.168.10.0]/224
+                          10.0.1.122               0        100          0 ?
+    *>i[5]:[0]:[0]:[24]:[192.168.20.0]/224
+                          10.0.1.122               0        100          0 ?
+  show ip route vrf TENANT1: |
+    IP Route Table for VRF "TENANT1"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+
+    192.168.10.0/24, ubest/mbest: 1/0, attached
+        *via 192.168.10.1, Vlan10, [0/0], 00:20:11, direct
+    192.168.10.13/32, ubest/mbest: 1/0
+        *via 10.0.1.121%default, [200/0], 00:19:52, bgp-65000, internal, tag 65000, segid: 50001 tunnelid: 0xa000179 encap: VXLAN
+
+    192.168.20.0/24, ubest/mbest: 1/0, attached
+        *via 192.168.20.1, Vlan20, [0/0], 00:20:10, direct
+    192.168.20.12/32, ubest/mbest: 1/0
+        *via 10.0.1.112%default, [200/0], 00:19:51, bgp-65000, internal, tag 65000, segid: 50001 tunnelid: 0xa000170 encap: VXLAN
+
+    192.168.20.14/32, ubest/mbest: 1/0
+        *via 10.0.1.122%default, [200/0], 00:19:50, bgp-65000, internal, tag 65000, segid: 50001 tunnelid: 0xa00017a encap: VXLAN
+DC2-LEAF1:
+  show bgp l2vpn evpn summary: |
+    BGP summary information for VRF default, address family L2VPN EVPN
+    BGP router identifier 10.0.0.121, local AS number 65000
+    BGP table version is 61, L2VPN EVPN config peers 2, capable peers 2
+    40 network entries and 64 paths using 14336 bytes of memory
+    BGP attribute entries [28/4928], BGP AS path entries [0/0]
+    BGP community entries [0/0], BGP clusterlist entries [4/16]
+
+    Neighbor        V    AS    MsgRcvd    MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    10.0.0.1        4 65000         74         58       61    0    0 00:40:12 22
+    10.0.0.2        4 65000         73         57       61    0    0 00:40:09 22
+  show vxlan: |
+    Vlan            VN-Segment
+    ====            ==========
+    10              10010
+    20              10020
+    999             50001
+  show nve peers: |
+    Interface Peer-IP                                 State LearnType Uptime   Router-Mac
+    --------- --------------------------------------  ----- --------- -------- -----------------
+    nve1      10.0.1.111                              Up    CP        00:30:40 5254.0005.4321
+    nve1      10.0.1.112                              Up    CP        00:31:40 5254.0015.4321
+    nve1      10.0.1.122                              Up    CP        00:32:40 5254.0025.4321
+H1:
+  ping 192.168.10.13: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.10.13, timeout is 2 seconds:
+    .!!!!
+    Success rate is 80 percent (4/5), round-trip min/avg/max = 6/7/9 ms
+  ping 192.168.20.14: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.20.14, timeout is 2 seconds:
+    .!!!!
+    Success rate is 80 percent (4/5), round-trip min/avg/max = 6/7/9 ms
+H2:
+  ping 192.168.20.14: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.20.14, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 6/7/9 ms

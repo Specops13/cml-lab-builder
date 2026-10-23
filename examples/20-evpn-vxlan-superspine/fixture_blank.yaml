@@ -1,0 +1,61 @@
+# Synthesized from Cisco IOS-XE 17.x and NX-OS 10.x documentation (not recorded on real hardware):
+# freshly booted nodes, cabling present (CDP) but nothing configured.
+DC1-SPINE:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    SS1              Eth 0/0           152              R B   Linux Uni Eth 0/0
+    SS2              Eth 0/1           147              R B   Linux Uni Eth 0/0
+    DC1-LEAF1(9KV9C0D1E2F)
+                     Eth 0/2           161            R S I s N9K-C9300 Eth1/1
+    DC1-LEAF2(9KV3A4B5C6D)
+                     Eth 0/3           158            R S I s N9K-C9300 Eth1/1
+
+    Total cdp entries displayed : 4
+  show ip ospf neighbor: ""
+DC2-SPINE:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    SS1              Eth 0/0           149              R B   Linux Uni Eth 0/1
+    SS2              Eth 0/1           155              R B   Linux Uni Eth 0/1
+    DC2-LEAF1(9KV1A2B3C4D)
+                     Eth 0/2           166            R S I s N9K-C9300 Eth1/1
+    DC2-LEAF2(9KV5E6F7A8B)
+                     Eth 0/3           163            R S I s N9K-C9300 Eth1/1
+
+    Total cdp entries displayed : 4
+DC1-LEAF1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater,
+                      V - VoIP-Phone, D - Remotely-Managed-Device,
+                      s - Supports-STP-Dispute
+
+    Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+    DC1-SPINE          Eth1/1         171    R B         Linux Unix    Eth0/2
+    H1                 Eth1/2         150    R B         Linux Unix    Ethernet0/0
+
+    Total entries displayed: 2
+  ping 10.0.1.121 source 10.0.1.111: |
+    ping: can't bind to address 10.0.1.111
+  show feature: |
+    Feature Name          Instance  State
+    --------------------  --------  --------
+    bfd                   1         disabled
+    bgp                   1         disabled
+    nve                   1         disabled
+    ospf                  1         disabled
+    vnseg_vlan            1         disabled
+H1:
+  ping 192.168.10.13: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 192.168.10.13, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)
