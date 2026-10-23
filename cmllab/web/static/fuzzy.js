@@ -267,9 +267,11 @@
   function nodeTags(defs) { return (defs || []).map((d) => d + " " + (NODE_ALIASES[d] || "")).join(" "); }
 
   // the library page's searchable fields (weights) for an index item (/api/library), shared with the tests
-  const LIB_FIELDS = {title: 3, id: 2.5, blueprint: 2, domain: 2, nodes: 2, aliases: 1.5, kind: 2, courses: 2, labs: 1.5, description: 1};
+  const LIB_FIELDS = {title: 3, id: 2.5, topics: 2.2, blueprint: 2, domain: 2, nodes: 2, aliases: 1.5, kind: 2, courses: 2, labs: 1.5, description: 1};
   const library = {
     FIELDS: LIB_FIELDS,
+    labels: {},           // topic id -> label (the vocabulary from /api/library), set by the page
+
     text(it, key) {
       switch (key) {
         case "blueprint": return (it.blueprint || []).join(", ");
@@ -278,6 +280,7 @@
         case "kind": return [it.kind, it.type, it.ram_heavy ? "ram heavy" : "", it.starter ? "starter" : ""].join(" ");
         case "courses": return (it.in_courses || []).length ? "In: " + it.in_courses.join(", ") : "";
         case "labs": return (it.labs || []).join(", ");
+        case "topics": return (it.topics || []).map((t) => library.labels[t] || t).join(", ");
         default: return it[key] == null ? "" : String(it[key]);
       }
     },

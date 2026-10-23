@@ -1,9 +1,10 @@
 // Ranking tests + benchmark for cmllab/web/static/fuzzy.js (run by tests/test_library_search.py with node).
-//   node tests/js/fuzzy_test.js <library/index.json>   -> prints JSON {failures, bench}
+//   node tests/js/fuzzy_test.js <library/index.json> [<topics vocabulary json>]   -> prints JSON {failures, bench}
 "use strict";
 const path = require("path");
 const F = require(path.join(__dirname, "../../cmllab/web/static/fuzzy.js"));
 const idx = require(path.resolve(process.argv[2]));
+if (process.argv[3]) F.library.labels = Object.fromEntries(require(path.resolve(process.argv[3])).map((t) => [t.id, t.label]));
 const items = F.library.addCourses(idx.items.map((x) => Object.assign({}, x)));
 const recs = items.map(F.library.record);
 const ids = (q) => F.search(q, recs).map((r) => items[r.i].id);
@@ -29,6 +30,12 @@ top("nxosv9000", "20-evpn-vxlan-superspine", 2);
 top("superspine", "20-evpn-vxlan-superspine");
 top("data center", "data-center");
 expect(ids("eigrp").length >= 2 && ids("eigrp").every((x) => /eigrp|routing|redistribution/.test(x) || true), "eigrp finds labs");
+// topic tags (3.2.0): searchable by label
+top("monitoring", "10-ntp-syslog-snmp", 2);
+top("troubleshooting ospf", "troubleshoot-ospf-7node", 2);
+top("walkthrough data center", "18-evpn-vxlan", 3);
+top("gre ipsec", "09-gre-ipsec");
+expect(ids("monitoring").includes("11-ipsla-tracking"), "monitoring topic -> 11: " + ids("monitoring").slice(0, 5));
 // ANDed words; nonsense finds nothing; case/punctuation-insensitive
 expect(ids("xyzzy").length === 0, "xyzzy should match nothing: " + ids("xyzzy"));
 expect(ids("evpn xyzzy").length === 0, "every word must match");
@@ -48,7 +55,7 @@ for (let k = 0; k < 11; k++) for (const it of items) big.push(Object.assign({}, 
 const t0 = process.hrtime.bigint();
 const bigRecs = big.map(F.library.record);
 const prepMs = Number(process.hrtime.bigint() - t0) / 1e6;
-const queries = ["evpn mpls", "vrf lit", "ospf stb", "mcast", "mutlicast pim", "redistrbution", "nexus vxlan", "3.2.b"];
+const queries = ["evpn mpls", "vrf lit", "ospf stb", "mcast", "mutlicast pim", "redistrbution", "nexus vxlan", "3.2.b", "monitoring", "data center"];
 const typeAll = (rs, sink) => { for (const q of queries) for (let i = 1; i <= q.length; i++) {
   const s = process.hrtime.bigint(); F.search(q.slice(0, i), rs); if (sink) sink.push(Number(process.hrtime.bigint() - s) / 1e6); } };
 typeAll(big.map(F.library.record));          // JIT warm-up on a separate copy (its own cache)

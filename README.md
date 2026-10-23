@@ -154,7 +154,7 @@ instance, and automatic updates that ask first.
 
 **Install** (apt resolves the few dependencies: `libc6 (>= 2.28)`, `libgcc-s1`, `zlib1g`; `xdg-utils` is recommended so the browser opens):
 ```bash
-sudo apt install ./cml-lab-builder_3.1.0_amd64.deb
+sudo apt install ./cml-lab-builder_3.2.0_amd64.deb
 ```
 The `./` matters, because it tells apt this is a local file. The package installs:
 - the app in `/opt/cml-lab-builder/`, with the commands `cml-lab-builder` and `cmllab` in `/usr/bin` (plus the old
@@ -721,6 +721,22 @@ first start the Labs page offers the same buttons).
   installed / update available, one course, and *Hide RAM heavy*. Press `/` or `Ctrl+K` to jump to the box and `Esc`
   to clear it. It runs in the page over the loaded index (no server calls while typing; about 1 ms per keystroke
   for 300 labs). The *Search labs* box of the lab list uses the same matching.
+- **Topics and groups (3.2.0+):** every lab and course has topic tags from one small list: OSPF, EIGRP, BGP,
+  Redistribution & PBR, VLAN / STP / EtherChannel, HSRP / FHRP, IP services, Multicast, VRF, GRE / IPsec, MPLS,
+  EVPN / VXLAN, Data center, Security, QoS, Monitoring & assurance, Automation, Troubleshooting and Other, plus the type
+  (Walkthrough / Challenge) and the track (ENCOR). A row of topic chips above the list shows how many items match
+  each one; click chips to filter (several in one area = any of them, e.g. OSPF or BGP; across areas = all, e.g. BGP
+  and Walkthrough), or click a topic on a card. The labs are grouped under collapsible topic headings (each lab once,
+  under its main topic, or under the topic you filter by), with *Expand all / Collapse all*, or shown as one flat
+  list (*List*). Each compact card shows the title, Walkthrough / Challenge, difficulty, node count, RAM (red
+  **RAM heavy** tag), installed / update status and its topics. Topic names are searchable too (`monitoring`,
+  `data center`), and search, topics and the other filters combine. The page remembers the view, the selected topics
+  and the collapsed groups (browser storage). Chips and headings work with the keyboard (Tab, arrow keys, Enter or
+  Space). The list of topics is `cmllab/topics.py`; the library labs get theirs in `labsrc/library.yaml` (`topics:`,
+  checked by `packaging/build_library.py`), which writes them into `index.json`. Labs from other indexes or URLs
+  without topics get derived ones (from the ENCOR blueprint items, keywords in the title and description, and node
+  types), so they are grouped too. The lab packs themselves are unchanged, so older apps ignore the new field.
+  ![Library grouped by topic](docs/images/library-topics.png)
 - **Courses: Install all.** Installing a course from the library also installs every lab it lists that you don't have yet.
   Importing a course file does the same while online; offline it tells you which labs to get first.
 - **Updates:** each lab has a `version:`. When the library has a newer version than your copy, the library shows
@@ -918,7 +934,7 @@ docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example l
 examples/                 example packs and courses/ (sources of labs/)
 library/                  online library: built packs, courses and index.json (packaging/build_library.py)
 labs/                     the same library under the old names (.encorlab/.encorcourse) for 2.0 and older
-labsrc/<id>/              lab sources of the library (the 19 former built-in labs) + library.yaml (starter set)
+labsrc/<id>/              lab sources of the library (the 19 former built-in labs) + library.yaml (starter set, topics)
 cmlboot.py                boot loader for packaged builds: picks the app-code bundle, rollback, RUNTIME_VERSION
 cmllab_launcher.py        frozen entry point (runs cmlboot, then cmllab.launcher)
 packaging/                PyInstaller spec, build.py, build_patch.py + runtime.lock.json, build_exe.bat, build_linux.sh, smoke_test.py, fake_release.py, icons
@@ -949,7 +965,7 @@ every library lab. IOL L2 switches (`ioll2-xe`) have no such requirement.
 After changing the schema, templates, guide or example, run `python -m cmllab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **3.1.0**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.2.0**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License

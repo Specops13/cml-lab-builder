@@ -2,6 +2,34 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [3.2.0] - 2026-10-23
+**Library sorted by topic.** A patch for 3.0.0 and 3.1.0 (same runtime 2): they offer it by themselves and install it
+with *Install update*. ENCOR Lab Builder 1.7 - 2.1 still get the *full download* banner.
+### Added
+- **Topic tags** for every library lab and course, from one controlled list (`cmllab/topics.py`): OSPF, EIGRP, BGP,
+  Redistribution & PBR, VLAN / STP / EtherChannel, HSRP / FHRP, IP services (NAT, NTP), Multicast, VRF, GRE / IPsec,
+  MPLS, EVPN / VXLAN, Data center, Security, QoS, Monitoring & assurance, Automation, Troubleshooting, Other, plus
+  Walkthrough / Challenge and the track (ENCOR). The library labs get theirs in `labsrc/library.yaml` (`topics:`;
+  `build_library.py` refuses unknown topics and labs without any), and both `library/index.json` and
+  `labs/index.json` carry them. Courses get the most common topics of their labs. Labs from an index without topics
+  (other libraries) get derived ones: ENCOR blueprint items, keywords in the id, title, domain and description, and
+  node types (`nxosv9000` = Data center). `/api/library` also returns the topic list (`topics`).
+- **New library layout:** a row of topic chips with counts (multi-select: any of the topics picked in one area, all
+  of the areas), labs grouped under collapsible topic headings (*Expand all / Collapse all*) or one flat list
+  (*Grouped by topic / List*), and compact cards instead of the table: title, Walkthrough / Challenge, difficulty,
+  node count, RAM with the red *RAM heavy* tag, starter / installed / update status, and topic chips that filter
+  when clicked. Works in light and dark mode and on narrow windows (one column).
+- **Search knows the topics:** the 3.1.0 fuzzy search also matches topic names (`monitoring`, `data center`, `gre
+  ipsec`), and search, topics and the other filters combine. Still client-side and about 1 ms per keystroke for
+  300 labs.
+- The library remembers the view, the selected topics and the collapsed groups (browser `localStorage`).
+- Keyboard and screen readers: chips are toggle buttons (`aria-pressed`, arrow keys move between them), the topic
+  headings are buttons with `aria-expanded`, and the chip row and the lists are labelled.
+### Compatibility
+- The lab packs are unchanged (the topics are only in the index, the lab format rejects unknown fields), so no lab
+  versions changed and no *Update available* shows up. Apps 2.0 - 3.1 ignore the new index field (checked with the
+  2.0.0, 2.1.0, 3.0.0 and 3.1.0 builds: they load the new index and install from it), and 1.7 - 1.9 parse it too.
+
 ## [3.1.0] - 2026-10-23
 **Fuzzy search in the library**, plus the library updates below. A patch for 3.0.0 (same runtime 2): 3.0.0 offers it
 by itself and installs it with *Install update*. ENCOR Lab Builder 1.7 - 2.1 still get the *full download* banner.

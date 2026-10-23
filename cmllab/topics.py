@@ -75,6 +75,8 @@ def slug(s: str) -> str:
 def normalize(values) -> list[str]:
     """Known topic ids from a list of ids or labels (case-insensitive); anything else is dropped. Order kept, no dups."""
     out: list[str] = []
+    if isinstance(values, str):
+        values = [values]
     for v in values if isinstance(values, list) else []:
         s = str(v).strip().lower()
         t = s if s in LABELS else _ALIASES.get(s) or (slug(s) if slug(s) in LABELS else None)

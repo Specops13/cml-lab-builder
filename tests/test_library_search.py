@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from cmllab import __version__, library
+from cmllab import __version__, library, topics
 from test_web_labs import make, upload, zip_dir, OSPF
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,10 +15,12 @@ NODE = shutil.which("node")
 
 
 @pytest.fixture(scope="module")
-def js_run():
+def js_run(tmp_path_factory):
     if not NODE:
         pytest.skip("node is not installed")
-    p = subprocess.run([NODE, str(ROOT / "tests/js/fuzzy_test.js"), str(ROOT / "library/index.json")],
+    voc = tmp_path_factory.mktemp("topics") / "topics.json"
+    voc.write_text(json.dumps(topics.vocabulary()), encoding="utf-8")
+    p = subprocess.run([NODE, str(ROOT / "tests/js/fuzzy_test.js"), str(ROOT / "library/index.json"), str(voc)],
                        capture_output=True, text=True, timeout=120)
     assert p.returncode == 0, p.stderr
     return json.loads(p.stdout)

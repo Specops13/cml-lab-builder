@@ -240,5 +240,13 @@
   "lib.fKind": "Show only labs or only courses.",
   "lib.fStatus": "Show what is installed, not installed yet, or has an update in the library.",
   "lib.fCourse": "Show one course and the labs it contains.",
-  "lib.fHeavy": "Hide labs and courses that need more CML server RAM than the RAM-heavy threshold in Settings."
+  "lib.fHeavy": "Hide labs and courses that need more CML server RAM than the RAM-heavy threshold in Settings.",
+  "lib.topic": "Show only items with this topic; the number is how many match. Picks in one area mean any of them (OSPF or BGP), across areas all of them (OSPF and Walkthrough).",
+  "lib.cardTopic": "Filter the library by this topic (click again to remove it).",
+  "lib.clearTopics": "Remove all topic filters.",
+  "lib.group": "Show or hide the labs of this topic. Labs are listed under their main topic; the chips filter by any of their topics.",
+  "lib.viewGrouped": "Show the labs grouped under topic headings (each lab under its main topic).",
+  "lib.viewList": "Show one list, best search matches first.",
+  "lib.expandAll": "Open all topic groups.",
+  "lib.collapseAll": "Close all topic groups, so you see only the headings and their counts."
 }
