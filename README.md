@@ -676,6 +676,27 @@ the breakdown. It appears in the lab list, on the lab page, in the **Build** con
 first), in courses (a course shows its heaviest lab) and in the online library, for library and imported labs alike.
 Your server's node or image settings can differ, so treat it as an estimate.
 
+### Resource check before Build
+Before a lab is built, the **Build** box asks CML (through `virl2_client`) for its free memory (`system stats`), the
+licensed node count (when the account may read it) and every running lab it can see, then says one of:
+
+- **Fits**: enough memory stays free, more than the *headroom* (default **4 GB**, *Settings > Lab options*);
+- **Tight**: it should start but leaves less than the headroom free;
+- **Won't fit**: the estimate is bigger than the free memory, or the lab would go over the licensed nodes or the
+  *node limit*;
+- **Can't tell**: CML did not answer or the account may not read system stats (non-admin users). Nothing is blocked.
+
+It shows a memory bar (in use / this lab / free) and the running labs with their node count and RAM (from each node's
+RAM setting, else its node definition default), biggest first. From there you can **Stop** a lab, or **Stop & wipe**
+one this app built (`CML-…` / `ENCOR-…`; labs of other people are never wiped), each after a confirmation, and the
+check runs again. When you rebuild a lab that is already running, its running copy counts as free, because the build
+replaces it. **Build** (or **Build anyway** when it is tight or will not fit) and **Cancel** decide.
+
+The **Library** cards also show a small *fits now / tight now / won't fit now* tag, from a check cached for 30
+seconds (no tag when CML is not set up or the check is off). The check can be turned off with *Settings > Check free
+CML memory before Build* or `CMLLAB_RESOURCE_CHECK=0`; `CMLLAB_RESOURCE_HEADROOM_GB` sets the headroom. The RAM
+numbers are estimates: CML can overcommit memory, and nodes may use less than they are given.
+
 ### Break my lab (fault practice)
 **Break my lab** rebuilds the lab in CML from its *working* configuration (starting config + reference solution) plus one
 random predefined fault, such as a wrong HSRP key, a missing `ip nat outside`, an LACP member forced to `mode on`, or
@@ -888,6 +909,8 @@ copied to the `CMLLAB_…` name at start, and if both are set, `CMLLAB_…` wins
 | CMLLAB_NODE_LIMIT | 20 | Refuse to start a lab if it would exceed this many running nodes |
 | CMLLAB_BOOT_TIMEOUT | 900 | Seconds to wait for nodes to boot (labs with NX-OS nodes wait at least 1500) |
 | CMLLAB_RAM_HEAVY_GB | 16 | Labs estimated at or above this many GB of CML RAM get the red *RAM heavy* tag |
+| CMLLAB_RESOURCE_CHECK | true | Check CML free memory, licensed nodes and running labs before Build |
+| CMLLAB_RESOURCE_HEADROOM_GB | 4 | Memory that should stay free on CML after a build (less = *tight*) |
 | CMLLAB_LIBRARY_URL | (the repo's `library/index.json`) | Lab library index (same as *Settings > Library URL*); https, or http on localhost |
 | CMLLAB_BUILTIN_LABS_DIR | (none) | Developers: use a folder of lab sources (e.g. `labsrc`) in place, read-only |
 | CMLLAB_DEVICE_USERNAME / _PASSWORD / _ENABLE | cisco | Used if a device console asks for a login or enable password, and as the NX-OS day-0 login |
@@ -1032,6 +1055,7 @@ cmllab/                   the application (Python package; `encorlab` up to 2.1.
   autoupdate.py           background update checker: ETag + backoff, staging, Update now / Later / Skip, idle gating
   report.py               printable HTML reports (web/templates/report_*.html)
   signing.py              Ed25519 release signatures (pure-Python verify, embedded public keys)
+  resources.py            resource check before Build: CML free memory, running labs, fits/tight/won't fit, stop/wipe
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
   catalog.py, history.py  lab catalog, results history    config.py     settings, secret store (keyring/0600), redaction
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders

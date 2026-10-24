@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import security
-from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, migrate, packs, progress, report, service, sizing, snapshots, updates, walkthrough
+from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, migrate, packs, progress, report, resources, service, sizing, snapshots, updates, walkthrough
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from .. import cml as _cml_mod
@@ -45,6 +45,11 @@ class LibInstallSet(BaseModel):
     index_url: str = ""
 
 
+class StopIn(BaseModel):
+    wipe: bool = False
+    confirm: bool = False
+
+
 class SettingsIn(BaseModel):
     cml_url: str | None = None
     username: str | None = None
@@ -65,6 +70,8 @@ class SettingsIn(BaseModel):
     show_help: bool | None = None
     check_updates: bool | None = None
     ram_heavy_gb: int | None = None
+    resource_check: bool | None = None
+    resource_headroom_gb: float | None = None
     library_url: str | None = None
     nxos_username: str | None = None
     nxos_password: str | None = None
@@ -95,7 +102,7 @@ class CmlDraftIn(BaseModel):
 JOB_LABELS = {"build": "a lab build", "check": "grading", "test-live": "a live test", "break": "fault injection",
               "restore": "a snapshot restore", "snapshot": "a snapshot", "reset": "a lab reset",
               "destroy": "a lab teardown", "ai": "AI lab generation", "step-check": "a walkthrough step check",
-              "step-apply": "applying a walkthrough step"}
+              "step-apply": "applying a walkthrough step", "cml-stop": "stopping a CML lab"}
 
 
 def create_app(store: config.SettingsStore | None = None, client_factory=None, runner_factory=None,
@@ -912,6 +919,55 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
             return {"configured": True, "error": f"{type(e).__name__}: {e}"}
         st["configured"] = True
         return st
+
+    # ------------------------------------------------------------ resource pre-check (3.3.0, resources.py)
+    res_cache = resources.Cache()
+
+    def _snapshot(s, fresh=False) -> dict:
+        def compute():
+            try:
+                return resources.snapshot(service.make_cml(s, client_factory).client, (s.lab_prefix,))
+            except Exception as e:
+                return {"ok": False, "errors": [config.redact(f"{type(e).__name__}: {e}")[:300]], "labs": [],
+                        "available_gb": None, "total_gb": None, "free_gb": None, "license": None, "running_nodes": 0}
+        return res_cache.get((s.cml_url, s.username), compute, fresh=fresh)
+
+    @app.get("/api/resources")
+    def cml_resources(fresh: bool = False):
+        s = store.get()
+        if not s.is_configured():
+            return {"configured": False, "enabled": s.resource_check}
+        out = _snapshot(s, fresh)
+        out.update(configured=True, enabled=s.resource_check, headroom_gb=float(s.resource_headroom_gb),
+                   node_limit=s.node_limit)
+        return out
+
+    @app.get("/api/labs/{lab_id}/precheck")
+    def precheck(lab_id: str):
+        e = _entry(lab_id)
+        s = store.get()
+        if not s.is_configured():
+            return {"configured": False, "enabled": s.resource_check}
+        if not s.resource_check:
+            return {"configured": True, "enabled": False}
+        snap = _snapshot(s, fresh=True)
+        est = sizing.estimate(e.lab, s.platform, s.ram_heavy_gb)
+        v = resources.verdict(snap, est["gb"], e.lab.node_count, float(s.resource_headroom_gb), s.node_limit,
+                              own_title=_cml_mod.lab_title(e.lab, s.lab_prefix))
+        return {"configured": True, "enabled": True, "snapshot": snap, "verdict": v, "ram": est}
+
+    @app.post("/api/cml/labs/{cml_id}/stop")
+    def cml_stop(cml_id: str, body: StopIn):
+        if not body.confirm:
+            raise HTTPException(400, "confirm=true is required (stopping a lab interrupts whoever uses it)")
+
+        def fn(s, p):
+            try:
+                return resources.stop_lab(service.make_cml(s, client_factory).client, cml_id, p, wipe=body.wipe,
+                                          prefixes=(s.lab_prefix,))
+            finally:
+                res_cache.clear()
+        return _start("cml-stop", "cml:" + cml_id, fn)
 
     @app.get("/api/cml/labs")
     def cml_labs():

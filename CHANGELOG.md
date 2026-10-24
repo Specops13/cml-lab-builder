@@ -28,6 +28,14 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
   needs the app (`Ctrl+P` works everywhere).
 
 ### Added
+- **Resource check before Build:** the Build box reads free memory, licensed nodes and running labs from CML and says
+  *Fits*, *Tight*, *Won't fit* or *Can't tell*, with a memory bar and the running labs (nodes, RAM). Stop a lab, or
+  stop & wipe one this app built, from there (with confirmation), then build, *Build anyway* or cancel. A running
+  copy of the same lab counts as free. Library cards show *fits now?* tags (cached 30 s). New settings *Check free
+  CML memory before Build* and *Keep this much CML memory free* (`CMLLAB_RESOURCE_CHECK`,
+  `CMLLAB_RESOURCE_HEADROOM_GB`, default 4 GB). Errors (no admin rights for system stats, CML down) show *Can't
+  tell* and never block a build. New API: `GET /api/resources`, `GET /api/labs/{id}/precheck`,
+  `POST /api/cml/labs/{id}/stop`.
 - **New library lab `21-nxos-ospf-multiarea`: NX-OS study path 1/3: OSPF multi-area on a super-spine Clos, with deep
   debug inspection** (walkthrough, 12 steps). Six Nexus 9000v in a 5-stage Clos (SS1/SS2, one spine and one leaf per
   pod) plus four IOL hosts, 10 nodes, about 76 GB of CML RAM. Area 0 on the super-spine layer, one area per pod with

@@ -6,6 +6,21 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 /* links that come from data (CML, GitHub, lab files) are only ever http(s): never javascript: or data: URLs */
 const safeUrl = (u) => /^https?:\/\//i.test(String(u ?? "")) ? String(u) : "#";
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+/* inline SVG icons (no icon font / CDN; CSP-safe). 24x24, stroke = currentColor */
+const ICONS = {
+  check: '<path d="M20 6 9 17l-5-5"/>', alert: '<path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+  block: '<circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/>', help: '<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3m.1 4h.01"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>', trash: '<path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/>', play: '<path d="m7 4 13 8-13 8z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>', upload: '<path d="M12 16V4m-5 5 5-5 5 5M4 20h16"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
+  memory: '<rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 7v10m5-10v10m5-10v10M5 17v3m14-3v3"/>',
+};
+function icon(name, cls = "") {
+  return `<svg class="icon${cls ? " " + cls : ""}" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[name] || ""}</svg>`;
+}
 const DOMAINS = ["1.0 Architecture", "2.0 Virtualization", "3.0 Infrastructure - Layer 2", "3.0 Infrastructure - Layer 3",
   "3.0 Infrastructure - Wireless", "3.0 Infrastructure - IP Services", "4.0 Network Assurance", "5.0 Security", "6.0 Automation"];
 let labs = [], current = null, templates = [], draft = null, draftSource = null, statusTimer = null;
@@ -437,6 +452,7 @@ async function loadLibrary() {
     if ($("#lib-expand")) { $("#lib-expand").onclick = () => libCollapseAll(false); $("#lib-collapse").onclick = () => libCollapseAll(true); }
     libApply();
     libCards.flatMap((c) => [...c.querySelectorAll("[data-file]")]).forEach((b) => b.addEventListener("click", () => libInstall({file: b.dataset.file, index_url: url}, !!b.dataset.installed)));
+    libFitTags();   // "fits now?" tags from the cached resource check (3.3.0); silent when CML is not set up
     if ($("#lib-starter")) $("#lib-starter").onclick = () => installStarter($("#lib-starter"));
     if ($("#lib-update-all")) $("#lib-update-all").onclick = async () => {
       if (!confirm(`Update ${ups.length} lab(s) to the library version? Your history and progress are kept; changes you made to those labs' files are replaced.`)) return;
@@ -494,7 +510,7 @@ function libCardHtml(it, i, action) {
   return `<article class="lib-card" role="listitem" data-i="${i}" aria-label="${esc(it.title)}">
     <div class="lib-card-head"><h5 class="lib-card-title c-title">${libCell(it, "title")}</h5><span class="type-badge ${type[0]}">${type[1]}</span></div>
     <div class="lib-meta">${it.difficulty ? `<span class="stars" title="Difficulty ${it.difficulty} of 5" aria-label="Difficulty ${it.difficulty} of 5">${"★".repeat(it.difficulty)}<span class="dim">${"★".repeat(Math.max(0, 5 - it.difficulty))}</span></span>` : ""}
-      ${it.kind === "course" ? `<span>${(it.labs || []).length} labs</span>` : it.nodes ? `<span>${it.nodes} nodes</span>` : ""}${libRamTag(it)}${status}</div>
+      ${it.kind === "course" ? `<span>${(it.labs || []).length} labs</span>` : it.nodes ? `<span>${it.nodes} nodes</span>` : ""}${libRamTag(it)}${it.ram_gb ? `<span class="fit-slot" data-gb="${Number(it.ram_gb) || 0}" data-nodes="${Number(it.nodes) || 0}"></span>` : ""}${status}</div>
     <p class="lib-desc c-description">${libCell(it, "description")}</p>
     <div class="muted small c-id"></div>
     ${it.kind === "course" ? `<div class="muted small">Labs: <span class="c-labs">${libCell(it, "labs")}</span></div>` : ""}
@@ -988,14 +1004,115 @@ async function loadHistory() {
 
 /* ---------------------------------------------------------------- build confirmation (shows the RAM estimate) */
 let currentLab = null;
+/* ---------------------------------------------------------------- resource pre-check before Build (3.3.0) */
+let resCache = null;   // {at, data}: GET /api/resources, kept 30 s (the server caches 30 s too)
+async function cmlResources(fresh) {
+  if (!fresh && resCache && Date.now() - resCache.at < 30000) return resCache.data;
+  const d = await api(`/api/resources${fresh ? "?fresh=true" : ""}`);
+  resCache = {at: Date.now(), data: d};
+  return d;
+}
+function fitLevel(snap, gb, nodes) {
+  if (!snap || snap.available_gb == null) return {level: "unknown"};
+  const margin = snap.available_gb - (gb || 0), head = snap.headroom_gb ?? 4;
+  let level = margin < 0 ? "nofit" : margin < head ? "tight" : "fits";
+  if (snap.license && nodes && snap.license.in_use + nodes > snap.license.max) level = "nofit";
+  if (snap.node_limit && nodes && (snap.running_nodes || 0) + nodes > snap.node_limit) level = "nofit";
+  return {level, margin};
+}
+const FIT = {fits: ["check", "Fits"], tight: ["alert", "Tight"], nofit: ["block", "Won't fit"], unknown: ["help", "Can't tell"]};
+const FIT_TAG = {fits: "fits now", tight: "tight now", nofit: "won't fit now", unknown: "fit unknown"};
+function fitTag(level, title) {
+  return `<span data-help="lib.fit" class="tag fit fit-${level}" title="${esc(title)}">${icon(FIT[level][0])}${FIT_TAG[level]}</span>`;
+}
+async function libFitTags() {
+  const slots = (typeof libCards !== "undefined" && libCards ? libCards : []).flatMap((c) => [...c.querySelectorAll(".fit-slot")]);
+  if (!slots.length) return;
+  let d;
+  try { d = await cmlResources(false); } catch { return; }
+  if (!d || !d.configured || !d.enabled || d.available_gb == null) return;   // nothing to say: no tag
+  for (const s of slots) {
+    const gb = Number(s.dataset.gb) || 0, nodes = Number(s.dataset.nodes) || 0, f = fitLevel(d, gb, nodes);
+    s.innerHTML = fitTag(f.level, `Needs about ${Math.round(gb)} GB; ${d.available_gb} GB of CML memory is free right now` +
+      ` (${d.headroom_gb} GB headroom). Checked within the last 30 s; the Build button checks again.`);
+  }
+}
+const gb1 = (x) => x == null ? "?" : (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10);
 function confirmBuild(l) {
   const box = $("#build-confirm"); if (!box) return run("build");
   const r = l.ram || {};
-  box.innerHTML = `<section class="${r.heavy ? "build-box heavy" : "build-box"}" data-help="lab.buildBox"><p><b>Build "${esc(l.title)}" in CML?</b> ${ramTag(r)}</p>
-    <p class="small">${l.nodes} nodes. ${esc(r.tooltip || "")}${r.vcpus ? ` About ${r.vcpus} vCPUs.` : ""}${r.heavy ? " Make sure your CML server has that much free memory before you start it." : ""}</p>
-    <div class="toolbar"><button data-help="lab.buildGo" id="bc-go" class="primary">Build</button><button data-help="lab.buildCancel" id="bc-cancel" class="hint-btn">Cancel</button></div></section>`;
-  $("#bc-go").onclick = () => { box.innerHTML = ""; run("build"); };
+  box.innerHTML = `<section class="${r.heavy ? "build-box heavy" : "build-box"}" data-help="lab.buildBox" aria-labelledby="bc-title">
+    <p id="bc-title"><b>Build "${esc(l.title)}" in CML?</b> ${ramTag(r)}</p>
+    <p class="small">${l.nodes} nodes. ${esc(r.tooltip || "")}${r.vcpus ? ` About ${r.vcpus} vCPUs.` : ""}</p>
+    <div id="res-panel" class="res-panel" aria-live="polite" aria-busy="true"><p class="muted small loading"><span class="spinner" aria-hidden="true"></span>Checking free memory and running labs on CML…</p></div>
+    <div class="toolbar"><button data-help="lab.buildGo" id="bc-go" class="primary">Build</button><button data-help="lab.buildCancel" id="bc-cancel" class="hint-btn">Cancel</button>
+      <button data-help="res.recheck" id="bc-recheck" class="hint-btn" hidden>${icon("refresh")}Check again</button></div></section>`;
+  $("#bc-go").onclick = () => { box.innerHTML = ""; resCache = null; run("build"); };
   $("#bc-cancel").onclick = () => { box.innerHTML = ""; };
+  $("#bc-recheck").onclick = () => renderPrecheck(l);
+  renderPrecheck(l);
+}
+function setBuildGo(level) {
+  const go = $("#bc-go"); if (!go) return;
+  go.textContent = level === "fits" || level === "tight" || level === "off" ? "Build" : "Build anyway";
+  go.className = level === "nofit" ? "danger" : level === "tight" || level === "unknown" ? "warn" : "primary";
+  if ($("#bc-recheck")) $("#bc-recheck").hidden = level === "off";
+}
+async function renderPrecheck(l) {
+  const panel = $("#res-panel"); if (!panel) return;
+  panel.setAttribute("aria-busy", "true");
+  panel.innerHTML = '<p class="muted small loading"><span class="spinner" aria-hidden="true"></span>Checking free memory and running labs on CML…</p>';
+  let d;
+  try { d = await api(`/api/labs/${encodeURIComponent(l.id)}/precheck`); }
+  catch (e) {
+    if (!$("#res-panel")) return;
+    panel.innerHTML = `<div class="res-head res-unknown">${icon("help")}<div><b>Couldn't check CML resources.</b><div class="small">${esc(e.message)}. You can build anyway or cancel.</div></div></div>`;
+    panel.removeAttribute("aria-busy"); setBuildGo("unknown"); return;
+  }
+  if (!$("#res-panel")) return;   // the box was closed meanwhile
+  panel.removeAttribute("aria-busy");
+  if (!d.configured) { panel.innerHTML = '<p class="muted small">Set up CML on the Settings page to check free memory before a build.</p>'; setBuildGo("off"); return; }
+  if (!d.enabled) { panel.innerHTML = '<p class="muted small">The resource check is turned off (Settings &gt; Resource check).</p>'; setBuildGo("off"); return; }
+  const v = d.verdict, s = d.snapshot, [ic, word] = FIT[v.level];
+  const total = s.total_gb, used = total != null && s.available_gb != null ? Math.max(0, total - s.available_gb) : null;
+  const pct = (x) => total ? Math.max(0, Math.min(100, (x / total) * 100)).toFixed(1) : 0;
+  const meter = total ? `<div class="meter" role="img" aria-label="CML memory: ${gb1(used)} GB in use, this lab needs ${gb1(v.need_gb)} GB, ${gb1(total)} GB total">
+      <span class="meter-used" style="width:${pct(used)}%"></span><span class="meter-need fit-${v.level}" style="width:${pct(Math.min(v.need_gb, Math.max(0, total - used)))}%"></span></div>
+      <div class="meter-legend small"><span><i class="sw used"></i>in use ${gb1(used)} GB</span><span><i class="sw need fit-${v.level}"></i>this lab ~${gb1(v.need_gb)} GB</span><span>free ${gb1(s.available_gb)} of ${gb1(total)} GB · headroom ${gb1(v.headroom_gb)} GB</span></div>` : "";
+  const summary = v.level === "fits" ? `Enough memory: about ${gb1(v.margin_gb)} GB stays free after the build.`
+    : v.level === "tight" ? "It should start, but the server will be nearly full."
+    : v.level === "nofit" ? "This lab will probably not start (or nodes will fail to boot) until you free resources."
+    : "The server's free memory could not be read.";
+  const lic = s.license ? `<span>Licensed nodes: ${s.license.in_use} of ${s.license.max} in use</span>` : "";
+  const rows = (s.labs || []).map((x) => {
+    const mine = v.running_copy && v.running_copy.id === x.id;
+    return `<tr><td>${esc(x.title)}${x.owner ? ` <span class="muted small">(${esc(x.owner)})</span>` : ""}${mine ? ' <span class="tag">this lab: replaced by the build</span>' : ""}</td>
+      <td class="num">${x.running_nodes}</td><td class="num">${gb1(x.ram_gb)} GB</td>
+      <td class="actions">${mine ? "" : `<button data-help="res.stop" class="hint-btn" data-stop="${esc(x.id)}" data-title="${esc(x.title)}">${icon("stop")}Stop</button>`}
+      ${x.ours && !mine ? `<button data-help="res.wipe" class="hint-btn danger-text" data-wipe="${esc(x.id)}" data-title="${esc(x.title)}">${icon("trash")}Stop &amp; wipe</button>` : ""}</td></tr>`;
+  }).join("");
+  panel.innerHTML = `<div class="res-head res-${v.level}">${icon(ic)}<div><b>${word}</b> <span class="small">${esc(summary)}</span>
+      ${v.reasons.length ? `<ul class="small reasons">${v.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div></div>
+    ${meter}<div class="small muted res-facts">${lic}${s.errors && s.errors.length ? `<span>Partial data: ${esc(s.errors.join("; "))}</span>` : ""}</div>
+    ${rows ? `<table class="res-labs"><caption class="small muted">Running labs on CML (biggest first)</caption><thead><tr><th scope="col">Lab</th><th scope="col" class="num">Nodes</th><th scope="col" class="num">RAM</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>${rows}</tbody></table>`
+      : '<p class="small muted">No labs are running on CML.</p>'}`;
+  setBuildGo(v.level);
+  $$("#res-panel [data-stop], #res-panel [data-wipe]").forEach((b) => b.onclick = () => stopCmlLab(l, b.dataset.stop || b.dataset.wipe, b.dataset.title, !!b.dataset.wipe));
+}
+async function stopCmlLab(l, id, title, wipe) {
+  const msg = wipe ? `Stop and wipe "${title}"?\n\nIts nodes shut down and their disks and configs are discarded (the lab stays in CML and starts fresh next time). Anyone using it is interrupted.`
+    : `Stop "${title}"?\n\nIts nodes shut down; unsaved device configs are lost and anyone using it is interrupted. You can start it again in CML.`;
+  if (!confirm(msg)) return;
+  const panel = $("#res-panel");
+  try {
+    if (panel) panel.innerHTML = `<p class="muted small loading"><span class="spinner" aria-hidden="true"></span>${wipe ? "Stopping and wiping" : "Stopping"} ${esc(title)}…</p>`;
+    const {job_id} = await api(`/api/cml/labs/${encodeURIComponent(id)}/stop`, {method: "POST", body: JSON.stringify({confirm: true, wipe})});
+    const j = await pollJob(job_id);
+    if (j.state === "error") toast(`Could not stop ${title}: ${j.error.split("\n")[0]}`, "err", 10000);
+    else toast(`${title} ${wipe ? "stopped and wiped" : "stopped"}`, "ok");
+  } catch (e) { toast(e.message, "err", 10000); }
+  resCache = null;
+  renderPrecheck(l);
 }
 
 /* ---------------------------------------------------------------- walkthrough labs: guided, ordered steps */
@@ -1375,6 +1492,7 @@ async function loadSettings() {
   tlsUi();
   f.show_help.checked = s.show_help !== false; if (window.Help) Help.setVisible(f.show_help.checked);
   f.check_updates.checked = s.check_updates === true;
+  f.resource_check.checked = s.resource_check !== false; f.resource_headroom_gb.value = s.resource_headroom_gb ?? 4;
   f.password.value = ""; f.password.placeholder = s.password_set ? "(saved - leave blank to keep)" : "";
   f.ai_api_key.value = ""; f.ai_api_key.placeholder = s.ai_api_key_set ? "(saved - leave blank to keep)" : "";
   presets = await api("/api/ai/presets");
@@ -1408,7 +1526,8 @@ $("#settings-form").addEventListener("submit", async (e) => {
     platform: f.platform.value, node_limit: Number(f.node_limit.value) || 20, ram_heavy_gb: Number(f.ram_heavy_gb.value) || 16, library_url: f.library_url.value.trim(), remember_password: f.remember_password.checked,
     device_username: f.device_username.value.trim(), device_password: f.device_password.value, nxos_username: f.nxos_username.value.trim(), nxos_password: f.nxos_password.value,
     ai_preset: f.ai_preset.value, ai_base_url: f.ai_base_url.value, ai_model: f.ai_model.value, ai_api_key: f.ai_api_key.value,
-    remember_ai_key: f.remember_ai_key.checked, show_help: f.show_help.checked, check_updates: f.check_updates.checked};
+    remember_ai_key: f.remember_ai_key.checked, show_help: f.show_help.checked, check_updates: f.check_updates.checked,
+    resource_check: f.resource_check.checked, resource_headroom_gb: f.resource_headroom_gb.value === "" ? 4 : Number(f.resource_headroom_gb.value)};
   try {
     const r = await api("/api/settings", {method: "POST", body: JSON.stringify(body)});
     if (window.Help) Help.setVisible(r.show_help !== false);

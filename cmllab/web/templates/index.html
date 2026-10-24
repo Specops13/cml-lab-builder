@@ -132,6 +132,8 @@
     <label>Device images <select data-help="s.platform" name="platform"><option value="iol">IOL / IOL-L2 (light)</option><option value="iosv">IOSv / IOSvL2</option></select></label>
     <label>Node limit <input data-help="s.node_limit" name="node_limit" type="number" min="1"></label>
     <label>Mark labs "RAM heavy" from (GB of CML RAM) <input data-help="s.ram_heavy_gb" name="ram_heavy_gb" type="number" min="1" max="1024"></label>
+    <label class="inline"><input data-help="s.resource_check" name="resource_check" type="checkbox"> Check free CML memory before Build</label>
+    <label>Keep this much CML memory free (GB) <input data-help="s.resource_headroom_gb" name="resource_headroom_gb" type="number" min="0" max="512" step="0.5"></label>
     <label>Library URL <input data-help="s.library_url" name="library_url" placeholder="(default: the project's GitHub repo)" style="min-width:28em"></label>
     <label class="inline"><input data-help="s.show_help" name="show_help" type="checkbox"> Show help icons</label>
     <h2>Updates</h2>

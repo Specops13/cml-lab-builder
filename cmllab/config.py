@@ -60,6 +60,8 @@ class Settings:
     ai_model: str = ""
     ai_api_key: str = field(default="", repr=False)
     show_help: bool = True          # web UI: show the small "?" help icons
+    resource_check: bool = True     # check free CML memory / licensed nodes before a build (resources.py)
+    resource_headroom_gb: float = 4.0   # memory that should stay free on the CML server after a build
     check_updates: bool = True      # packaged app: check GitHub Releases in the background and offer patch updates
 
     def __repr__(self) -> str:  # never leak secrets
@@ -102,6 +104,11 @@ class Settings:
             errs.append("node_limit must be between 1 and 1000")
         if not (1 <= int(self.ram_heavy_gb) <= 1024):
             errs.append("ram_heavy_gb must be between 1 and 1024")
+        try:
+            if not (0 <= float(self.resource_headroom_gb) <= 512):
+                errs.append("resource_headroom_gb must be between 0 and 512")
+        except (TypeError, ValueError):
+            errs.append("resource_headroom_gb must be a number")
         if self.library_url:
             u = urlparse(self.library_url)
             if not ((u.scheme == "https" and u.netloc) or (u.scheme == "http" and u.hostname in ("localhost", "127.0.0.1", "::1"))):
@@ -129,6 +136,8 @@ def from_env(env: dict | None = None) -> Settings:
     s.lab_prefix = e.get("CMLLAB_LAB_PREFIX", s.lab_prefix)
     s.boot_timeout = int(e.get("CMLLAB_BOOT_TIMEOUT", s.boot_timeout))
     s.ram_heavy_gb = int(e.get("CMLLAB_RAM_HEAVY_GB", s.ram_heavy_gb))
+    s.resource_headroom_gb = float(e.get("CMLLAB_RESOURCE_HEADROOM_GB", s.resource_headroom_gb))
+    s.resource_check = str(e.get("CMLLAB_RESOURCE_CHECK", "1")).strip().lower() not in ("0", "false", "no", "off")
     s.library_url = e.get("CMLLAB_LIBRARY_URL", s.library_url).strip()
     s.device_username = e.get("CMLLAB_DEVICE_USERNAME", s.device_username)
     s.device_password = e.get("CMLLAB_DEVICE_PASSWORD", s.device_password)
@@ -162,7 +171,8 @@ def from_env(env: dict | None = None) -> Settings:
 # Non-secret settings saved from the web Settings page. Passwords are never written here.
 PERSISTED = ("cml_url", "username", "verify_tls", "console_host", "console_port", "grading_mode",
              "platform", "node_limit", "boot_timeout", "ai_preset", "ai_base_url", "ai_model", "show_help",
-             "check_updates", "ram_heavy_gb", "library_url", "device_username", "nxos_username")
+             "check_updates", "ram_heavy_gb", "library_url", "device_username", "nxos_username",
+             "resource_check", "resource_headroom_gb")
 
 
 def settings_file(env=None) -> Path:
@@ -374,7 +384,9 @@ class SettingsStore:
                     v = int(v)
                 if k == "verify_tls" and isinstance(v, str):
                     v = _bool_or_path(v, True)
-                if k in ("show_help", "check_updates"):
+                if k == "resource_headroom_gb":
+                    v = float(v)
+                if k in ("show_help", "check_updates", "resource_check"):
                     v = v if isinstance(v, bool) else str(v).strip().lower() in ("1", "true", "yes", "on")
                 if k == "library_url":
                     v = str(v or "").strip()

@@ -18,6 +18,7 @@ class FakeNode:
         self.configuration = configuration
         self.running_config = None   # what the "device" currently runs (set by tests)
         self.extract_calls = 0
+        self.ram = None              # MiB, None = the node definition's default (like CML)
 
     def extract_configuration(self):
         self.extract_calls += 1
@@ -92,8 +93,26 @@ class FakeDefinitions:
         return [{"id": i} for i in self.ids]
 
 
+class FakeLicensing:
+    def __init__(self, status=None, error=None):
+        self._status, self.error = status, error
+
+    def status(self):
+        if self.error:
+            raise self.error
+        return self._status or {"features": []}
+
+
+GIB = 1024 ** 3
+
+
 class FakeClient:
-    def __init__(self, version="2.9.1+build.7", defs=("iol-xe", "ioll2-xe", "iosv", "iosvl2"), boot_polls=1):
+    def __init__(self, version="2.9.1+build.7", defs=("iol-xe", "ioll2-xe", "iosv", "iosvl2"), boot_polls=1,
+                 total_gb=64, free_gb=48):
+        self.stats = {"all": {"memory": {"total": total_gb * GIB, "free": free_gb * GIB, "used": (total_gb - free_gb) * GIB},
+                              "cpu": {"count": 16}}, "computes": {}}
+        self.stats_error = None
+        self.licensing = FakeLicensing()
         self.labs = []
         self.version = version
         self.definitions = FakeDefinitions(list(defs))
@@ -102,6 +121,11 @@ class FakeClient:
 
     def system_info(self):
         return {"version": self.version, "ready": True}
+
+    def get_system_stats(self):
+        if self.stats_error:
+            raise self.stats_error
+        return self.stats
 
     def all_labs(self, show_all=False):
         return [l for l in self.labs if not l.removed]
