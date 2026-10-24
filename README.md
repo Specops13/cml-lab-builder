@@ -638,6 +638,28 @@ inspection*): iBGP AS 65000 on loopbacks, SS1/SS2 as route reflectors, on top of
 | 10 | Failure drill | An underlay link failure that BGP never sees (ECMP in OSPF) | `show ip route 10.2.0.0/16`, `event-history` |
 | 11 | Wrap-up | The control plane lab 23 builds on | `show bgp ipv4 unicast summary` on SS2 |
 
+**`23-nxos-evpn-vxlan`** (*NX-OS study path 3/3: BGP EVPN VXLAN over iBGP and OSPF (L2VNI, L3VNI, anycast
+gateway), with deep debug inspection*): the leaves become VTEPs, SS1/SS2 reflect EVPN, the spines only route UDP.
+
+| # | Step | What you do | Main inspection / debug |
+|---|---|---|---|
+| 0 | Baseline | Verify the inherited OSPF + iBGP, VTEP loopback reachability, jumbo MTU | `show bgp ipv4 unicast summary`, `ping ... packet-size 8972 df-bit` |
+| 1 | Design | VXLAN header, EVPN route types 2/3/5, RD vs RT | (concepts) |
+| 2 | Features | `feature nv overlay`, `feature vn-segment-vlan-based`, `nv overlay evpn` | `show feature` |
+| 3 | EVPN family | L2VPN EVPN on the existing sessions, RRs reflect to the leaves only | `show bgp l2vpn evpn summary`, `debug bgp events` (capability reset) |
+| 4 | VNIs | VLAN 10/20 -> L2VNI 10010/10020, `evpn` with `rd auto` / `route-target auto` | `show vxlan`, `show bgp evi` |
+| 5 | NVE | `interface nve1`, loopback1 source, BGP ingress replication | `show nve peers/vni`, `route-type 3`, `debug nve` |
+| 6 | Host ports | Access VLANs, `spanning-tree port type edge` | `show vlan brief`, `show spanning-tree` |
+| 7 | Bridging | H1 -> H3 and H2 -> H4 across the fabric, trace a MAC | `show mac address-table`, `show l2route evpn mac all`, `route-type 2` |
+| 8 | BUM | Ingress replication vs multicast underlay (PIM, `mcast-group`), capture | `show nve vni ingress-replication`, `ethanalyzer` |
+| 9 | L3VNI | VRF TENANT1, VNI 50001, VLAN 999 / Vlan999 `ip forward` | `show nve vni` (L3), `show vrf TENANT1 detail` |
+| 10 | Anycast gateway | Same gateway IP and MAC 2020.0000.00aa on both leaves | `show mac address-table` (G), `debug hmm` |
+| 11 | Symmetric IRB | H1 -> H4 routed, packet walk | `show ip route ... vrf TENANT1` (segid 50001), MAC+IP type 2 |
+| 12 | Type 5 | Tenant loopbacks, `redistribute direct` | `route-type 5`, VRF ping |
+| 13 | ARP suppression (optional) | By hand: TCAM carving + `suppress-arp` | `show ip arp suppression-cache` |
+| 14 | Break and fix (optional) | Five classic EVPN VXLAN faults | control plane vs data plane method |
+| 15 | Wrap-up | Every host reaches every host, final read-out | `show bgp l2vpn evpn`, `show nve peers` |
+
 > **Not verified on real devices yet.** The expected outputs were written from Cisco's NX-OS 10.x documentation, not
 > captured from CML. Command keywords of `event-history`, `debug ip ospf` and `show forwarding` can differ on the
 > 9000v image. If a check fails on a correctly built lab, run it in *Config* grading mode and please report the output.
@@ -846,6 +868,8 @@ Example packs live in [`examples/`](examples/) and are attached to every [releas
   6 x Nexus 9000v super-spine Clos (10 nodes, about 76 GB RAM).
 - `22-nxos-bgp-over-ospf` (lab library only): NX-OS study path 2/3, iBGP over OSPF with super-spine route reflectors
   and deep debug inspection (10 nodes, about 76 GB RAM).
+- `23-nxos-evpn-vxlan` (lab library only): NX-OS study path 3/3, BGP EVPN VXLAN (L2VNI, L3VNI, anycast gateway)
+  with deep debug inspection on the same fabric (10 nodes, about 76 GB RAM).
 
 ## Configuration
 Everything can be set on the **Settings** page; `.env` / environment variables provide defaults (copy `.env.example`).

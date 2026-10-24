@@ -734,6 +734,40 @@
       ]
     },
     {
+      "file": "23-nxos-evpn-vxlan.cmllab",
+      "sha256": "ab5cc79958930adebd51cd2992fb5da0c2cd7a71c20e11ef0010e6b1391eccef",
+      "size": 23431,
+      "kind": "lab",
+      "id": "23-nxos-evpn-vxlan",
+      "title": "NX-OS study path 3/3: BGP EVPN VXLAN over iBGP and OSPF (L2VNI, L3VNI, anycast gateway), with deep debug inspection",
+      "version": "1",
+      "description": "Lab 3 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with labs 21 and 22 already in its day-0: multi-area OSPF underlay and iBGP with SS1/SS2 as route reflectors. Add the L2VPN EVPN address family, map VLANs to VNIs, bring up the NVE interface with BGP ingress replication (and learn the multicast alternative), extend two VLANs between the pods, then add a tenant VRF with an L3VNI, a distributed anycast gateway and symmetric IRB, and type-5 prefixes. Every step explains what NX-OS builds internally (EVPN route types, RD/RT, l2rib/l2route, NVE peers, MAC and host routes) and inspects it with show, event-history, debug and ethanalyzer.",
+      "blueprint": [
+        "2.3",
+        "1.1.a"
+      ],
+      "nodes": 10,
+      "difficulty": 5,
+      "type": "walkthrough",
+      "ram_gb": 76.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe",
+        "nxosv9000"
+      ],
+      "topics": [
+        "evpn-vxlan",
+        "bgp",
+        "data-center",
+        "walkthrough",
+        "encor"
+      ]
+    },
+    {
       "file": "data-center.cmlcourse",
       "sha256": "b4b6068514fe63db3dde3629651bfa52a5e2c485bfcc88230b6b761c8f492fe8",
       "size": 477,

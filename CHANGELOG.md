@@ -18,6 +18,11 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
   copies, the BGP-free-core problem, optional community/local-preference policy, eBGP and BFD design discussions
   (BFD is not supported on Nexus 9000v). `packaging/nxos_study_baseline.py` regenerates the study-path baselines; a
   test fails if one drifts.
+- **New library lab `23-nxos-evpn-vxlan`: NX-OS study path 3/3: BGP EVPN VXLAN over iBGP and OSPF (L2VNI, L3VNI,
+  anycast gateway), with deep debug inspection** (walkthrough, 16 steps, same 10-node / 76 GB topology). Boots
+  from its own baseline: lab 22's day-0 plus lab 22's required steps. L2VPN EVPN on the existing RR sessions,
+  VLAN-to-VNI mapping, NVE with BGP ingress replication (multicast underlay explained), cross-pod bridging,
+  L3VNI with anycast gateway and symmetric IRB, type-5 prefixes, optional ARP suppression and break/fix.
 
 ## [3.2.0] - 2026-10-23
 **Library sorted by topic.** A patch for 3.0.0 and 3.1.0 (same runtime 2): they offer it by themselves and install it

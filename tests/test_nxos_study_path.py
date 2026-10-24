@@ -14,7 +14,7 @@ from cmllab import courses, packs, sizing
 from cmllab.console import config_script
 
 ROOT = Path(__file__).resolve().parents[1]
-SERIES = ["21-nxos-ospf-multiarea", "22-nxos-bgp-over-ospf"]
+SERIES = ["21-nxos-ospf-multiarea", "22-nxos-bgp-over-ospf", "23-nxos-evpn-vxlan"]
 NXOS = {"SS1", "SS2", "P1-SPINE", "P2-SPINE", "P1-LEAF", "P2-LEAF"}
 HOSTS = {"H1", "H2", "H3", "H4"}
 
@@ -134,4 +134,41 @@ def test_lab22_bgp_design():
         assert must in text, must
     cmds = {c.command for s in lab.steps for c in s.checks} | {v.command for s in lab.steps for v in s.verify}
     for must in ("show bgp ipv4 unicast summary", "show bgp ipv4 unicast 172.16.2.0/24", "show ip route 172.16.2.0/24"):
+        assert must in cmds, must
+
+
+def test_lab23_evpn_vxlan_design():
+    lab = _lab("23-nxos-evpn-vxlan")
+    assert [s.id for s in lab.steps] == ["baseline", "design", "features", "evpn-af", "vni", "nve", "access", "l2-test",
+                                         "bum", "l3vni", "anycast-gw", "irb", "type5", "suppress-arp", "troubleshoot",
+                                         "wrap-up"]
+    for st in ("suppress-arp", "troubleshoot"):
+        assert lab.step(st).optional and not lab.step(st).config and not lab.step(st).checks, st
+    for n in NXOS:                                                                  # inherited labs 21 + 22
+        cfg = lab.node(n).config
+        assert "router ospf UNDERLAY" in cfg and "router bgp 65000" in cfg and "evpn" not in cfg, n
+    assert "set local-preference" not in lab.node("P1-LEAF").config                 # lab 22's optional policy: not carried
+    sol = lab.step_solution()
+    for spine in ("P1-SPINE", "P2-SPINE"):                                          # pure underlay transit
+        assert spine not in sol, spine
+    for ss in ("SS1", "SS2"):
+        assert "nv overlay evpn" in sol[ss] and sol[ss].count("route-reflector-client") == 2
+        assert "nve" not in sol[ss].replace("nv overlay evpn", "") and "vn-segment" not in sol[ss]
+    for leaf, vtep in (("P1-LEAF", "loopback1"), ("P2-LEAF", "loopback1")):
+        s = sol[leaf]
+        for must in ("feature nv overlay", "feature vn-segment-vlan-based", "vn-segment 10010", "vn-segment 10020",
+                     "vn-segment 50001", f"source-interface {vtep}", "host-reachability protocol bgp",
+                     "ingress-replication protocol bgp", "member vni 50001 associate-vrf",
+                     "fabric forwarding anycast-gateway-mac 2020.0000.00aa", "fabric forwarding mode anycast-gateway",
+                     "route-target both auto evpn", "redistribute direct route-map PERMIT-ALL",
+                     "spanning-tree port type edge"):
+            assert must in s, (leaf, must)
+        assert "mcast-group" not in s and "suppress-arp" not in s
+    text = "\n".join(s.explain for s in lab.steps)
+    for must in ("debug logfile", "debug-filter", "undebug all", "ethanalyzer", "mcast-group", "ip pim",
+                 "Route type", "symmetric", "suppress-arp", "show debug logfile"):
+        assert must in text, must
+    cmds = {c.command for s in lab.steps for c in s.checks} | {v.command for s in lab.steps for v in s.verify}
+    for must in ("show nve peers", "show nve vni", "show bgp l2vpn evpn route-type 2", "show bgp l2vpn evpn route-type 3",
+                 "show bgp l2vpn evpn route-type 5", "show l2route evpn mac all", "show nve vni ingress-replication"):
         assert must in cmds, must
