@@ -284,10 +284,7 @@ class Updater:
         patch = by_name.get(pname)
         if not patch:
             return self._full(latest, rel, f"release {rel['tag']} has no app patch")
-        sums = next((by_name[n] for n in updates.SUMS_NAMES if n in by_name), None)
-        if not sums:
-            raise updates.UpdateError(f"release {rel['tag']} has no SHA256SUMS.txt; the patch cannot be verified")
-        expected = updates.parse_sums(self.fetch(sums["url"], SUMS_LIMIT, None)[1].decode("utf-8", "replace")).get(pname)
+        expected = updates.signed_sums(by_name, rel["tag"], lambda u, lim: self.fetch(u, lim, None)[1]).get(pname)
         if not expected:
             raise updates.UpdateError(f"SHA256SUMS of {rel['tag']} has no entry for {pname}")
         data = self.fetch(patch["url"], updates.MAX_PATCH_BYTES, None)[1]

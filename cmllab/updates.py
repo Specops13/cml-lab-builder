@@ -132,7 +132,8 @@ def parse_release(raw: bytes, current: str = __version__) -> dict:
 # ====================================================================== patch updates (packaged app only)
 # A release can carry a small app-code patch, cml-lab-builder-patch-<version>.zip, next to the full downloads. The patch
 # contains manifest.json (app_version, min_runtime, sha256 of every file) and the cmllab/ package. "Install update"
-# downloads SHA256SUMS.txt and the patch from the GitHub release, checks the patch's sha256 against SHA256SUMS,
+# downloads SHA256SUMS.txt (+ its Ed25519 signature, signing.py, since 3.3.0) and the patch from the GitHub release,
+# checks the signature and the patch's sha256 against SHA256SUMS,
 # checks every file against the manifest, and extracts it to <data dir>/app/<version>/. The boot loader
 # (cmlboot.py, part of the runtime) uses it from the next start on. If the patch needs a newer runtime
 # (min_runtime), nothing is installed and the user is told to download the full release.
@@ -141,6 +142,8 @@ import os
 import shutil
 import zipfile
 from pathlib import Path, PurePosixPath
+
+from . import signing
 
 PATCH_PREFIX = "cml-lab-builder-patch-"   # encorlab-patch- up to 2.1.0 (runtime 1)
 SUMS_NAMES = ("SHA256SUMS.txt", "SHA256SUMS")
@@ -223,8 +226,24 @@ def parse_sums(text: str) -> dict[str, str]:
     return out
 
 
+def signed_sums(by_name: dict, tag: str, get) -> dict[str, str]:
+    """SHA256SUMS of a release, after checking its detached signature (SHA256SUMS.txt.sig) against the embedded
+    release keys (signing.py). get(url, limit) -> bytes. Raises UpdateError when it is missing, unsigned or forged."""
+    name = next((n for n in SUMS_NAMES if n in by_name), None)
+    if not name:
+        raise UpdateError(f"release {tag} has no SHA256SUMS.txt, so the patch cannot be verified")
+    raw = get(by_name[name]["url"], 1024 * 1024)
+    sig = by_name.get(name + signing.SIG_SUFFIX)
+    sig_raw = get(sig["url"], signing.MAX_SIG_BYTES) if sig else None
+    try:
+        signing.verify(raw, sig_raw, f"SHA256SUMS of {tag}")
+    except signing.SignatureError as e:
+        raise UpdateError(str(e))
+    return parse_sums(raw.decode("utf-8", "replace"))
+
+
 def _safe_member(name: str) -> bool:
-    if not name or "\\" in name or name.startswith("/") or ":" in name.split("/")[0]:
+    if not name or "\\" in name or "\x00" in name or name.startswith("/") or ":" in name.split("/")[0]:
         return False
     parts = PurePosixPath(name).parts
     return ".." not in parts and "" not in parts
@@ -342,14 +361,11 @@ def install(current: str = __version__, fetch=fetch, url: str | None = None) -> 
     by_name = {a["name"]: a for a in info["assets"]}
     pname = patch_name(info["latest"])
     patch = by_name.get(pname)
-    sums = next((by_name[n] for n in SUMS_NAMES if n in by_name), None)
     if not patch:
         return {"status": "full_download", "latest": info["latest"], "url": _dl_url(info), "page": info["url"],
                 "download": info.get("download"), "reason": f"release {info['tag']} has no app patch ({pname})"}
-    if not sums:
-        raise UpdateError(f"release {info['tag']} has no SHA256SUMS.txt, so the patch cannot be verified")
     try:
-        expected = parse_sums(fetch(sums["url"], 1024 * 1024).decode("utf-8", "replace")).get(pname)
+        expected = signed_sums(by_name, info["tag"], fetch).get(pname)
     except library.LibraryError as e:
         raise UpdateError(f"could not download SHA256SUMS: {e}")
     if not expected:
@@ -371,8 +387,8 @@ def install(current: str = __version__, fetch=fetch, url: str | None = None) -> 
 
 
 def install_file(path, sha256: str | None = None) -> dict:
-    """Install a patch zip from disk (offline installs, smoke tests). Same checks as install(), minus SHA256SUMS
-    unless the expected sha256 is given."""
+    """Install a patch zip from disk (offline installs, smoke tests). Same checks as install(): the patch needs its
+    detached signature <patch>.zip.sig next to it (a release asset); the sha256 is checked too when given."""
     ok, why = patchable()
     if not ok:
         raise UpdateError(f"Install update is not available: {why}")
@@ -380,6 +396,12 @@ def install_file(path, sha256: str | None = None) -> dict:
     got = library.sha256(data)
     if sha256 and got != sha256.strip().lower():
         raise UpdateError(f"checksum mismatch for {Path(path).name}: {got}")
+    sig = Path(str(path) + signing.SIG_SUFFIX)
+    try:
+        signing.verify(data, sig.read_bytes()[:signing.MAX_SIG_BYTES + 1] if sig.is_file() else None,
+                       f"{Path(path).name} ({sig.name} next to it)")
+    except signing.SignatureError as e:
+        raise UpdateError(str(e))
     try:
         res = install_bytes(data)
     except RuntimeTooOld as e:

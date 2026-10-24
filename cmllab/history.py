@@ -5,6 +5,7 @@ import json
 import os
 import time
 from pathlib import Path
+from .paths import safe_name as _safe
 
 MAX_ENTRIES = 50
 
@@ -18,7 +19,7 @@ def data_dir() -> Path:
 
 
 def _file(lab_id: str) -> Path:
-    return data_dir() / "history" / f"{lab_id}.json"
+    return data_dir() / "history" / f"{_safe(lab_id)}.json"
 
 
 def load(lab_id: str) -> list[dict]:

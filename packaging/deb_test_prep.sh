@@ -31,6 +31,10 @@ for v in (up1, up2):
                     "--version", v, "--out", str(out)], check=True)
 z = build_patch.build_patch(src(pv), work / "patch", pv, None)
 shutil.copy(z, out / f"user-patch-{pv}.zip")
+import fake_release   # 3.3.0+: patches must be signed; a throwaway key, trusted via CMLLAB_UPDATE_TEST_KEY (signing.py)
+seed, pub = fake_release.test_key()
+(out / f"user-patch-{pv}.zip.sig").write_bytes(fake_release.sign(seed, z.read_bytes()))
+(out / "testkey.pub").write_text(pub)
 PY
 cp "$DEB" "$OUT/"
 cp "$DEB" "$OUT/encorlab_${VER}_amd64.deb"        # the old-name copy a release carries (build_compat.py)

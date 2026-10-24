@@ -31,6 +31,27 @@ ROOT = Path(__file__).resolve().parents[1]
 LIBRARY = ROOT / "labs"
 
 
+# 3.3.0+: the GUI wants an access token and the CSRF header (cmllab/web/security.py); every request of this script
+# carries both (older versions ignore them). Test patches are signed with a throwaway key (cmllab/signing.py) that the
+# app trusts only while CMLLAB_UPDATE_URL points at 127.0.0.1.
+SMOKE_TOKEN = "smoke-test-access-token-0123456789"
+_KEY: list = []
+
+
+def smoke_key() -> tuple[bytes, str]:
+    if not _KEY:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from fake_release import test_key
+        _KEY.append(test_key())
+    return _KEY[0]
+
+
+def install_auth_opener() -> None:
+    op = urllib.request.build_opener()
+    op.addheaders = [("Authorization", "Bearer " + SMOKE_TOKEN), ("X-CMLLab-Request", "1")]
+    urllib.request.install_opener(op)
+
+
 def serve_library(folder: Path = LIBRARY):
     """Serve a library folder (index.json + packs) on 127.0.0.1; returns (server, index URL)."""
     import functools
@@ -83,7 +104,10 @@ def make_patch(tmp: Path, version: str, broken: bool = False, min_runtime: int |
     if broken:
         text += '\nraise RuntimeError("smoke test: deliberately broken patch")\n'
     init.write_text(text, encoding="utf-8")
-    return build_patch.build_patch(src, tmp / "out", version, min_runtime)
+    out = build_patch.build_patch(src, tmp / "out", version, min_runtime)
+    from fake_release import sign
+    Path(str(out) + ".sig").write_bytes(sign(smoke_key()[0], out.read_bytes()))
+    return out
 
 
 def wait_json(path: Path, ok, timeout: float = 30.0) -> dict:
@@ -104,6 +128,8 @@ def patch_tests(exe, version: str, data_dir: Path, port: int, check, boot_dir: P
     import shutil
     import tempfile
     tmp = Path(tempfile.mkdtemp(prefix="cmllab-smoke-"))
+    os.environ["CMLLAB_UPDATE_URL"] = "http://127.0.0.1:9/none"     # no GitHub; makes the test key trusted
+    os.environ["CMLLAB_UPDATE_TEST_KEY"] = smoke_key()[1]
     try:
         good = make_patch(tmp, "99.0.0")
         check(good.stat().st_size < 2_000_000, f"test patch built ({good.stat().st_size // 1024} KB)")
@@ -179,8 +205,9 @@ def auto_update_test(exe, version: str, data_dir: Path, port: int, check, pre, b
     from fake_release import FakeRelease
     tmp = Path(tempfile.mkdtemp(prefix="cmllab-auto-"))
     new = "99.2.0"
-    fake = FakeRelease(new, {f"cml-lab-builder-patch-{new}.zip": make_patch(tmp, new).read_bytes()}).start()
-    env = dict(os.environ, CMLLAB_UPDATE_URL=fake.url, CMLLAB_UPDATE_DELAY="1")
+    fake = FakeRelease(new, {f"cml-lab-builder-patch-{new}.zip": make_patch(tmp, new).read_bytes()},
+                       key=smoke_key()[0]).start()
+    env = dict(os.environ, CMLLAB_UPDATE_URL=fake.url, CMLLAB_UPDATE_DELAY="1", CMLLAB_UPDATE_TEST_KEY=smoke_key()[1])
     proc = subprocess.Popen(exe + ["--no-browser", "--port", str(port)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, encoding="utf-8", errors="replace", env=env,
                             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
@@ -272,6 +299,8 @@ def main() -> int:
 
     for k in [k for k in os.environ if k.startswith(("CMLLAB_", "ENCOR_"))]:
         del os.environ[k]
+    os.environ["CMLLAB_ACCESS_TOKEN"] = SMOKE_TOKEN
+    install_auth_opener()
     code, out = run(exe + ["version"])
     check(code == 0 and a.version in out, f"CLI 'version' -> {out.strip()[-40:]!r}")
     code, out = run(exe + ["list"])
@@ -306,6 +335,22 @@ def main() -> int:
         st, ct, html = get(base + "/")
         html = html.decode("utf-8")
         check(st == 200 and "CML Lab Builder" in html and f"app.js?v={a.version}" in html, "UI page served with versioned assets")
+        if tuple(int(x) for x in a.version.split(".")[:2]) >= (3, 3):   # web hardening (cmllab/web/security.py)
+            plain = urllib.request.build_opener()
+            codes = []
+            for req in (urllib.request.Request(base + "/api/labs"),
+                        urllib.request.Request(base + "/api/labs", headers={"Authorization": "Bearer " + SMOKE_TOKEN,
+                                                                           "Host": "evil.example"}),
+                        urllib.request.Request(base + "/api/settings", data=b"{}", method="POST",
+                                               headers={"Authorization": "Bearer " + SMOKE_TOKEN})):
+                try:
+                    codes.append(plain.open(req, timeout=5).status)
+                except urllib.error.HTTPError as e:
+                    codes.append(e.code)
+            check(codes == [401, 421, 403], f"no token -> 401, foreign Host -> 421, POST without CSRF header -> 403: {codes}")
+            with urllib.request.urlopen(base + "/", timeout=5) as r:
+                csp = r.headers.get("Content-Security-Policy", "")
+            check("script-src 'self'" in csp and "frame-ancestors 'none'" in csp, "strict Content-Security-Policy on the UI page")
         st, ct, js = get(base + f"/static/app.js?v={a.version}")
         check(st == 200 and "javascript" in ct and len(js) > 10000, f"app.js served ({ct})")
         st, ct, _ = get(base + "/static/help.json")

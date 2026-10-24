@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import cmlboot
+import fakes
 from cmllab import __version__, config, library, updates
 from cmllab.web.app import create_app
 
@@ -245,7 +246,7 @@ def test_verify_checks_version_and_runtime(patch_bytes, tmp_path):
 
 
 # ---------------------------------------------------------------- install flow against a fake GitHub release
-def fake_github(patch: bytes | None, sums_text: str | None, tag="v9.9.9"):
+def fake_github(patch: bytes | None, sums_text: str | None, tag="v9.9.9", sig=None):
     base = f"https://github.com/{updates.REPO}/releases/download/{tag}/"
     assets = [{"name": "CMLLabBuilder-9.9.9-windows-x64.zip", "size": 40_000_000,
                "browser_download_url": base + "CMLLabBuilder-9.9.9-windows-x64.zip"}]
@@ -257,6 +258,9 @@ def fake_github(patch: bytes | None, sums_text: str | None, tag="v9.9.9"):
     if sums_text is not None:
         assets.append({"name": "SHA256SUMS.txt", "size": len(sums_text), "browser_download_url": base + "SHA256SUMS.txt"})
         files[base + "SHA256SUMS.txt"] = sums_text.encode()
+        if sig is not False:
+            assets.append({"name": "SHA256SUMS.txt.sig", "size": 200, "browser_download_url": base + "SHA256SUMS.txt.sig"})
+            files[base + "SHA256SUMS.txt.sig"] = sig if sig is not None else fakes.sign(sums_text.encode())
     rel = json.dumps({"tag_name": tag, "html_url": f"https://github.com/{updates.REPO}/releases/tag/{tag}",
                       "assets": assets}).encode()
     calls = []
@@ -322,6 +326,9 @@ def test_install_up_to_date(packaged, patch_bytes):
 def test_install_file_and_rollback(packaged, tmp_path, patch_bytes):
     p = tmp_path / "cml-lab-builder-patch-9.9.9.zip"
     p.write_bytes(patch_bytes)
+    with pytest.raises(updates.UpdateError, match="not signed"):
+        updates.install_file(p)
+    (tmp_path / "cml-lab-builder-patch-9.9.9.zip.sig").write_bytes(fakes.sign(patch_bytes))
     with pytest.raises(updates.UpdateError, match="checksum mismatch"):
         updates.install_file(p, "0" * 64)
     assert updates.install_file(p)["version"] == "9.9.9"

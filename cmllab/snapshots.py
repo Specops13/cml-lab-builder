@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from .paths import safe_name as _safe
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
 MAX_PER_LAB = 20
@@ -19,7 +20,7 @@ class SnapshotError(ValueError):
 
 def _dir(lab_id: str):
     from .history import data_dir
-    return data_dir() / "snapshots" / lab_id
+    return data_dir() / "snapshots" / _safe(lab_id)
 
 
 _BANNER = re.compile(r"^(Building configuration\.\.\.|Current configuration\s*:.*|! Last configuration change.*|"

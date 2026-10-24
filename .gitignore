@@ -19,6 +19,11 @@ packaging/version_info.txt
 .env.*
 !.env.example
 settings.json
+secrets.json
+session.token
+# release signing key (kept outside the repo; never commit)
+.signing/
+*.key
 *.log
 # OS / editor
 .DS_Store

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>CML Lab Builder progress report</title>{% include "_report_style.html" %}</head>
 <body><div class="page">
-<div class="toolbar noprint"><button title="Open the print dialog; choose 'Save as PDF' to get a PDF" onclick="window.print()">Print / Save as PDF</button></div>
+<div class="toolbar noprint"><button title="Open the print dialog; choose 'Save as PDF' to get a PDF" data-print>Print / Save as PDF</button></div>
 {% set o = p.overall %}
 <div class="head"><div><div class="muted small">CML Lab Builder {{ version }} - progress report</div><h1>{% if p.tracks|length == 1 and p.tracks[0].encor %}CCNP ENCOR (350-401) practice progress{% else %}Lab practice progress{% endif %}</h1>
   <div class="small muted">{{ p.blueprint }}</div></div>

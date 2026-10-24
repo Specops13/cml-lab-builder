@@ -3,6 +3,8 @@
 const APP_JS_VERSION = "3.2.0";  // must equal cmllab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+/* links that come from data (CML, GitHub, lab files) are only ever http(s): never javascript: or data: URLs */
+const safeUrl = (u) => /^https?:\/\//i.test(String(u ?? "")) ? String(u) : "#";
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 const DOMAINS = ["1.0 Architecture", "2.0 Virtualization", "3.0 Infrastructure - Layer 2", "3.0 Infrastructure - Layer 3",
   "3.0 Infrastructure - Wireless", "3.0 Infrastructure - IP Services", "4.0 Network Assurance", "5.0 Security", "6.0 Automation"];
@@ -35,8 +37,9 @@ function banner(msg) {
   const line = document.createElement("div");
   line.textContent = msg;
   if (b.hidden) {
-    b.innerHTML = '<button data-help-text="Hide this message" class="hint-btn" onclick="banner()">Dismiss</button>' +
+    b.innerHTML = '<button data-help-text="Hide this message" class="hint-btn" data-dismiss>Dismiss</button>' +
       "<b>Something went wrong.</b> Try a hard refresh (Ctrl+Shift+R / Ctrl+F5). Details (also in the F12 console):";
+    b.querySelector("[data-dismiss]").addEventListener("click", () => banner());
     b.hidden = false;
   }
   if (b.childElementCount < 8) b.appendChild(line);
@@ -49,6 +52,8 @@ window.addEventListener("unhandledrejection", (e) => banner(`Unhandled error: ${
 async function api(path, opts = {}) {
   const o = Object.assign({}, opts);
   if (o.body && !(o.body instanceof FormData)) o.headers = Object.assign({"Content-Type": "application/json"}, o.headers || {});
+  // CSRF protection (web/security.py): state-changing requests must carry this header, which other sites cannot send
+  o.headers = Object.assign({"X-CMLLab-Request": "1"}, o.headers || {});
   const r = await fetch(path, o);
   const data = await r.json().catch(() => ({}));
   if (!r.ok) { const e = new Error(data.detail || (data.errors || []).join("\n") || r.statusText); e.data = data; e.status = r.status; throw e; }
@@ -900,7 +905,7 @@ function renderConsoles(s) {
   consKey = key; box.dataset.lab = current || "";
   box.hidden = !key; if (!key) { $("#consoles").innerHTML = ""; return; }
   $("#consoles").innerHTML = `<div class="toolbar">
-      ${s.cml_lab_url ? `<a data-help="lab.openCml" class="btn" href="${esc(s.cml_lab_url)}" target="_blank" rel="noopener">Open lab in CML ↗</a>` : ""}
+      ${s.cml_lab_url ? `<a data-help="lab.openCml" class="btn" href="${esc(safeUrl(s.cml_lab_url))}" target="_blank" rel="noopener">Open lab in CML ↗</a>` : ""}
       <button data-help="lab.copyAllConsoles" id="cons-copy-all" class="hint-btn">Copy all commands</button>
       <span class="muted small">Console server ${esc(s.console_host)}:${s.console_port}, lab "${esc(s.cml_title)}"</span></div>
     <table><tr><th>Node</th><th>State</th><th>Console server command</th><th></th></tr>${s.consoles.map((c) => `<tr>
@@ -1362,10 +1367,12 @@ async function loadSettings() {
   const s = await api("/api/settings");
   const f = $("#settings-form");
   for (const k of ["cml_url", "username", "console_host", "console_port", "grading_mode", "platform", "node_limit", "ram_heavy_gb", "library_url", "device_username", "nxos_username", "ai_base_url", "ai_model"]) f[k].value = s[k] ?? "";
-  for (const k of ["device_password", "nxos_password"]) { f[k].value = ""; f[k].placeholder = s[k + "_set"] ? "(set - leave blank to keep; not saved to disk)" : (k === "nxos_password" ? "(same as the device login)" : ""); }
+  for (const k of ["device_password", "nxos_password"]) { f[k].value = ""; f[k].placeholder = s[k + "_set"] ? "(set - leave blank to keep)" : (k === "nxos_password" ? "(same as the device login)" : ""); }
   loadHostKey().catch(() => {});
   libraryUrl = s.library_url || "";
-  f.verify_tls.value = s.verify_tls === false ? "false" : "true";
+  f.verify_tls.value = s.verify_tls === false ? "false" : (typeof s.verify_tls === "string" ? "ca" : "true");
+  f.tls_ca.value = typeof s.verify_tls === "string" ? s.verify_tls : "";
+  tlsUi();
   f.show_help.checked = s.show_help !== false; if (window.Help) Help.setVisible(f.show_help.checked);
   f.check_updates.checked = s.check_updates === true;
   f.password.value = ""; f.password.placeholder = s.password_set ? "(saved - leave blank to keep)" : "";
@@ -1386,11 +1393,17 @@ async function loadHostKey() {
     await api("/api/console/hostkey/forget", {method: "POST"}); toast("Host key forgotten", "ok"); loadHostKey();
   };
 }
+function tlsUi() {
+  const v = $("#s-verify-tls").value;
+  $("#tls-ca-row").hidden = v !== "ca"; $("#tls-warn").hidden = v !== "false";
+}
+$("#s-verify-tls").addEventListener("change", tlsUi);
 $("#ai-preset").onchange = (e) => { const p = presets[e.target.value]; if (p) { const f = $("#settings-form"); f.ai_base_url.value = p.base_url; f.ai_model.value = p.model; } };
 $("#settings-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
-  const body = {cml_url: f.cml_url.value, username: f.username.value, password: f.password.value, verify_tls: f.verify_tls.value,
+  const body = {cml_url: f.cml_url.value, username: f.username.value, password: f.password.value,
+    verify_tls: f.verify_tls.value === "ca" ? (f.tls_ca.value.trim() || "true") : f.verify_tls.value,
     console_host: f.console_host.value, console_port: Number(f.console_port.value) || 22, grading_mode: f.grading_mode.value,
     platform: f.platform.value, node_limit: Number(f.node_limit.value) || 20, ram_heavy_gb: Number(f.ram_heavy_gb.value) || 16, library_url: f.library_url.value.trim(), remember_password: f.remember_password.checked,
     device_username: f.device_username.value.trim(), device_password: f.device_password.value, nxos_username: f.nxos_username.value.trim(), nxos_password: f.nxos_password.value,
@@ -1427,7 +1440,7 @@ async function checkUpdates(manual) {
     const i = r.info;
     text = i.update_available ? `Version ${i.latest} is available (you have ${i.current}). Running from source: update with git pull.`
       : `You have the latest version (${i.current}).`;
-    if (out) out.innerHTML = `${esc(text)} <a data-help="s.releaseLink" href="${esc(i.url)}" target="_blank" rel="noopener">Release page ↗</a>`;
+    if (out) out.innerHTML = `${esc(text)} <a data-help="s.releaseLink" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">Release page ↗</a>`;
   } else {
     text = {up_to_date: `You have the latest version (${r.latest || APP_JS_VERSION}).`,
       staged: `Version ${r.version} is downloaded and verified: see the prompt at the bottom left.`,
@@ -1485,8 +1498,8 @@ function renderUpdatePrompt(st) {
     if (busy.length) msg += ` Update now will wait until ${esc(busy.join(", "))} finishes.`;
   }
   box.innerHTML = `<h3>CML Lab Builder ${v} is ready</h3><p>${msg}</p>
-    <p class="small"><a data-help="u.notes" href="${esc(o.url)}" target="_blank" rel="noopener">Release notes ↗</a> ·
-    <a data-help="u.notes" href="${esc(o.changelog)}" target="_blank" rel="noopener">Changelog ↗</a></p>
+    <p class="small"><a data-help="u.notes" href="${esc(safeUrl(o.url))}" target="_blank" rel="noopener">Release notes ↗</a> ·
+    <a data-help="u.notes" href="${esc(safeUrl(o.changelog))}" target="_blank" rel="noopener">Changelog ↗</a></p>
     <div class="toolbar">${buttons}</div>`;
   box.hidden = false;
   box.querySelectorAll("[data-upd]").forEach((b) => { b.onclick = () => updateAnswer(b.dataset.upd, o.version); });
@@ -1508,7 +1521,7 @@ function renderFullBanner(st) {
   b.dataset.version = f.version;
   b.innerHTML = `<button data-help="u.fullDismiss" type="button" class="hint-btn">Dismiss</button>
     CML Lab Builder ${esc(f.version)} is available but needs a <b>full download</b> (${esc(f.reason || "new runtime")}); it cannot be installed as a patch.
-    <a data-help="u.fullLink" href="${esc(f.url)}" target="_blank" rel="noopener">${f.asset ? "Download " + esc(f.asset) : "Download it from the release page"} ↗</a>${f.how ? ", then " + esc(f.how) : ""}.
+    <a data-help="u.fullLink" href="${esc(safeUrl(f.url))}" target="_blank" rel="noopener">${f.asset ? "Download " + esc(f.asset) : "Download it from the release page"} ↗</a>${f.how ? ", then " + esc(f.how) : ""}.
     Your data and settings are kept.`;
   b.hidden = false;
   b.querySelector("button").onclick = async () => {

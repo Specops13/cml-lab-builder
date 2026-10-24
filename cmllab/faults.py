@@ -12,6 +12,7 @@ import time
 
 from .platforms import Platform, render
 from .schema import Fault, Lab
+from .paths import safe_name as _safe
 
 
 class FaultError(ValueError):
@@ -21,7 +22,7 @@ class FaultError(ValueError):
 # ---------------------------------------------------------------- state
 def _file(lab_id: str):
     from .history import data_dir
-    return data_dir() / "faults" / f"{lab_id}.json"
+    return data_dir() / "faults" / f"{_safe(lab_id)}.json"
 
 
 def active(lab_id: str) -> dict | None:

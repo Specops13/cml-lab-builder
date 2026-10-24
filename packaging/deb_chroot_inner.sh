@@ -61,6 +61,9 @@ apt-get update -qq
 apt-get install -y "$DEB" > /tmp/apt-install.log 2>&1 && ok "apt install ./${P}_${VER}_amd64.deb (deps resolved)" || { bad "apt install"; tail -20 /tmp/apt-install.log; }
 grep -E "^(Setting up|Unpacking) " /tmp/apt-install.log | sed 's/^/   /' | head -20
 apt-get install -y -qq python3 desktop-file-utils procps >/tmp/apt-tools.log 2>&1 || { bad "test tools"; tail /tmp/apt-tools.log; }
+# 3.3.0 security: package files are root-owned, nothing world-writable, no setuid/setgid bits
+WW=$(dpkg -L $P | while read -r f; do [ -e "$f" ] && [ ! -L "$f" ] && find "$f" -maxdepth 0 \( -perm -0002 -o -perm -4000 -o -perm -2000 -o ! -user root \) -print; done | head -5)
+[ -z "$WW" ] && ok "package files root-owned, not world-writable, no setuid" || bad "unsafe package file permissions: $WW"
 chk "/usr/bin/$P is executable" test -x /usr/bin/$P
 chk "/usr/bin/cmllab and /usr/bin/encorlab -> $P" test "$(readlink /usr/bin/cmllab)" = $P -a "$(readlink /usr/bin/encorlab)" = $P
 chk "/opt/$P/install-type says deb" grep -qx deb /opt/$P/install-type
@@ -106,7 +109,7 @@ chk "nothing written to ~/.config/encorlab" test ! -e $H/.config/encorlab
 
 echo "== upgrades: user patch $PV vs newer debs"
 rm -rf "$DATA/app" "$DATA/updates"
-as "cmllab update-install --file $D/user-patch-$PV.zip" | tail -1 | sed 's/^/   /'
+as "CMLLAB_UPDATE_URL=http://127.0.0.1:9/none CMLLAB_UPDATE_TEST_KEY=$(cat $D/testkey.pub 2>/dev/null) cmllab update-install --file $D/user-patch-$PV.zip" | tail -1 | sed 's/^/   /'
 v=$(appver); [ "$v" = "$PV" ] && ok "user patch $PV runs over deb $VER" || bad "after patch -> $v"
 apt-get install -y "$D/${P}_${UP1}_amd64.deb" > /tmp/apt-up1.log 2>&1 && ok "apt install ./${P}_${UP1}_amd64.deb over $VER" || { bad "upgrade to $UP1"; tail /tmp/apt-up1.log; }
 chk "dpkg --verify clean after upgrade" test -z "$(dpkg --verify $P)"

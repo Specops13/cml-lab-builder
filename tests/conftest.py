@@ -40,3 +40,26 @@ def _isolated_config_home(tmp_path_factory, monkeypatch):
     monkeypatch.setattr(console, "OPEN_WAIT", 0.3)
     yield
     paths.reset_cache()
+
+
+@pytest.fixture(autouse=True)
+def _trust_test_signing_key(monkeypatch):
+    """Updates must be signed (signing.py); the suite signs fake releases with a throwaway key from fakes.py."""
+    from cmllab import signing
+    from fakes import TEST_PUB_HEX
+    monkeypatch.setattr(signing, "TRUSTED_KEYS", {**signing.TRUSTED_KEYS, "test": TEST_PUB_HEX})
+
+
+@pytest.fixture(autouse=True)
+def _web_client_defaults(monkeypatch):
+    """The web UI refuses unknown Host headers and state-changing requests without the CSRF header (web/security.py).
+    Test clients talk to http://testserver and act like the app's own page (app.js sends X-CMLLab-Request: 1);
+    tests/test_web_security.py checks the refusals with the header removed."""
+    monkeypatch.setenv("CMLLAB_ALLOWED_HOSTS", "testserver")
+    from starlette.testclient import TestClient
+    orig = TestClient.__init__
+
+    def init(self, *a, **kw):
+        orig(self, *a, **kw)
+        self.headers.setdefault("X-CMLLab-Request", "1")
+    monkeypatch.setattr(TestClient, "__init__", init)

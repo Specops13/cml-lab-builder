@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import itertools
+import sys
+from pathlib import Path
 
 import yaml
 
@@ -120,3 +122,15 @@ class FakeClient:
         lab.start()
         self.labs.append(lab)
         return lab
+
+
+# ---------------------------------------------------------------- update signing (a throwaway test key; conftest trusts it)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging"))
+import fake_release as _fr  # noqa: E402
+
+TEST_SEED, TEST_PUB_HEX = _fr.test_key()
+
+
+def sign(data: bytes) -> bytes:
+    """Detached signature file content (signing.py format) made with the test key."""
+    return _fr.sign(TEST_SEED, data)

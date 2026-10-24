@@ -15,9 +15,9 @@ def client(settings=None):
 
 def test_static_urls_are_versioned():
     html = client().get("/").text
-    for asset in ("style.css", "help.js", "app.js"):
+    for asset in ("style.css", "help.js", "app.js", "boot.js"):
         assert f"/static/{asset}?v={__version__}" in html
-    assert f'window.APP_VERSION = "{__version__}"' in html
+    assert f'data-version="{__version__}"' in html    # boot.js sets window.APP_VERSION from it (no inline script, CSP)
     assert 'id="error-banner"' in html and "{{VERSION}}" not in html
 
 

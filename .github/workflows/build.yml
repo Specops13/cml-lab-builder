@@ -9,6 +9,9 @@
 #    desktop-file-validate), and deb-test runs packaging/deb_docker_test.sh on it (pinned debian:12 container).
 #  - the release also carries the transition files for ENCOR Lab Builder 1.7 - 2.1 (packaging/build_compat.py:
 #    old-name copies and a manifest-only encorlab-patch-<version>.zip that makes old apps offer the full download).
+#  - 3.3.0+: the app only installs updates whose SHA256SUMS.txt (and patch zip) carry an Ed25519 signature
+#    (*.sig, see SECURITY.md). The release key is NOT in this repository; the maintainer signs the published
+#    SHA256SUMS.txt and patch locally and uploads the .sig files (or a RELEASE_SIGNING_KEY secret, if configured).
 name: CML Lab Builder build
 on:
   push:
@@ -33,6 +36,11 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install -e ".[dev]" && python -m pytest -q
+      # security gates: flake8-bandit rules (ruff "S", configured in pyproject.toml) and known-vulnerable dependencies
+      - name: Security lint (ruff S rules)
+        run: pip install "ruff>=0.6" && ruff check cmllab cmlboot.py cmllab_launcher.py
+      - name: Dependency audit (pip-audit)
+        run: python -m pip install -q -U pip "pip-audit>=2.7" && pip-audit --skip-editable --progress-spinner off
       # the runtime (Python, libraries, boot loader, spec) must not change without bumping RUNTIME_VERSION
       - run: python packaging/build_patch.py --check-lock
   patch:

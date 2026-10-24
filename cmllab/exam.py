@@ -10,6 +10,7 @@ import json
 import time
 
 from .schema import Lab
+from .paths import safe_name as _safe
 
 HINT_MODES = ("penalty", "off")
 DEFAULT_PENALTY = 10        # points per hint in penalty mode
@@ -29,7 +30,7 @@ def default_minutes(lab: Lab) -> int:
 
 def _file(lab_id: str):
     from .history import data_dir
-    return data_dir() / "exams" / f"{lab_id}.json"
+    return data_dir() / "exams" / f"{_safe(lab_id)}.json"
 
 
 def active(lab_id: str) -> dict | None:

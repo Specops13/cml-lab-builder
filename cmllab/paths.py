@@ -269,3 +269,13 @@ def reset_cache() -> None:
     """Tests: forget that this process already ran the move."""
     with _LOCK:
         _DONE.clear()
+
+
+_SAFE = __import__("re").compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
+
+
+def safe_name(name: str) -> str:
+    """A lab id / file stem used inside a data folder: no separators, no '..' (path traversal guard, 3.3.0)."""
+    if not isinstance(name, str) or not _SAFE.match(name) or ".." in name:
+        raise ValueError(f"invalid name: {name!r}")
+    return name

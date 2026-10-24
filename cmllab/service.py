@@ -289,17 +289,19 @@ class JobManager:
             job = Job(uuid.uuid4().hex[:12], kind, lab_id)
             self._jobs[job.id] = job
 
+        from .config import redact   # job logs and errors are shown in the UI: never with a secret in them
+
         def progress(msg: str):
-            job.log.append(time.strftime("%H:%M:%S ") + msg)
+            job.log.append(time.strftime("%H:%M:%S ") + redact(msg))
 
         def target():
             try:
                 job.result = fn(progress)
                 job.state = "done"
             except Exception as e:
-                job.error = f"{type(e).__name__}: {e}"
+                job.error = redact(f"{type(e).__name__}: {e}")
                 job.log.append("ERROR " + job.error)
-                job.log.append(traceback.format_exc(limit=3))
+                job.log.append(redact(traceback.format_exc(limit=3)))
                 job.state = "error"
 
         threading.Thread(target=target, daemon=True).start()

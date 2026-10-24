@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import security
 from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, migrate, packs, progress, report, service, sizing, snapshots, updates, walkthrough
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
@@ -100,10 +101,12 @@ JOB_LABELS = {"build": "a lab build", "check": "grading", "test-live": "a live t
 def create_app(store: config.SettingsStore | None = None, client_factory=None, runner_factory=None,
                config_factory=None, probe=None, persist: bool = True, ai_transport=None,
                library_fetch=None, update_fetch=None, update_http=None, auto_update: bool = False,
-               restart=None, auto_restore: bool | None = None, console_factory=None) -> FastAPI:
+               restart=None, auto_restore: bool | None = None, console_factory=None, access_token: str | None = None,
+               allowed_hosts=()) -> FastAPI:
     """auto_update=True (the desktop launcher) starts the background update checker; update_http / restart are
     test hooks for it (see autoupdate.Updater). auto_restore (default: same as auto_update) installs labs an older
-    version bundled from the library in the background when they could not be copied from disk (migrate.py)."""
+    version bundled from the library in the background when they could not be copied from disk (migrate.py).
+    access_token / allowed_hosts: see web/security.py (Host allowlist, CSRF, CSP and the optional access token)."""
     migrate.run_local()          # keep the labs 1.x bundled (copies them once into the user labs folder)
     store = store or config.SettingsStore()
     jobs = service.JobManager()
@@ -142,6 +145,8 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                 if ctype and ctype.startswith(("text/", "application/json")):
                     resp.headers["Content-Type"] = ctype + ("; charset=utf-8" if ctype.startswith("text/") or ctype.endswith("json") else "")
         return resp
+
+    security.install(app, access_token=access_token, extra_hosts=allowed_hosts)   # outermost: runs first
 
     def _entry(lab_id):
         try:
@@ -685,10 +690,15 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         if s.check_updates != before:
             updater.wake()
         saved = config.keyring_set(s.username, s.password) if (remember and s.username and s.password) else False
+        if saved:   # the device / NX-OS logins are remembered together with the CML password (3.3.0)
+            for k in ("device_password", "device_enable", "nxos_password"):
+                if getattr(s, k) and getattr(s, k) != "cisco":
+                    config.keyring_set("device:" + k, getattr(s, k))
         ai_saved = (config.keyring_set("ai-key:" + s.ai_base_url, s.ai_api_key)
                     if (remember_ai and s.ai_base_url and s.ai_api_key) else False)
         out = s.public_dict()
         out["keyring_saved"] = saved
+        out["secret_store"] = config.secret_backend() if (saved or ai_saved) else None
         out["ai_keyring_saved"] = ai_saved
         if persist:
             try:

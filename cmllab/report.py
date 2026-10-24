@@ -29,7 +29,7 @@ def _md(text: str) -> Markup:
                 t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
                 t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
                 out.append("<p>" + t.replace("\n", "<br>") + "</p>")
-    return Markup("".join(out))
+    return Markup("".join(out))  # noqa: S704 - every piece was html.escape()d above
 
 
 _env.filters["md"] = _md

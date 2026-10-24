@@ -20,7 +20,7 @@ def test_lab_report_after_check_and_escaping():
     assert "<script>alert" not in html and "&lt;script&gt;" in html
     with_out = c.get(f"/report/labs/{LAB}?outputs=true").text
     assert with_out.count("<pre>") > html.count("<pre>")
-    assert "window.print()" in html and "@media print" in html
+    assert "data-print" in html and "report.js" in html and "@media print" in html
 
 
 def test_report_trims_outputs_and_clears_with_history():

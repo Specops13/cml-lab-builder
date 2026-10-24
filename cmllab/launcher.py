@@ -8,6 +8,9 @@
     cml-lab-builder <command> [...]     run a CLI command instead, e.g. `cml-lab-builder list`, `cml-lab-builder check eigrp-basic`
 
 If the app is already running on the preferred port, the launcher just opens the browser there.
+Access token (3.3.0): every start makes a random token (kept in <data dir>/session.token, readable only by you) and
+opens http://127.0.0.1:<port>/?token=...; the page then works through an HttpOnly cookie and other local users get
+nothing without it. CMLLAB_ACCESS_TOKEN=0 turns this off; any other value (16+ characters) is used as the token.
 User data (settings.json, imported labs, history) stays in %APPDATA%\\cml-lab-builder or ~/.config/cml-lab-builder;
 nothing is written next to the executable."""
 from __future__ import annotations
@@ -60,6 +63,49 @@ def bind_socket(preferred: int = DEFAULT_PORT, span: int = 30) -> socket.socket:
     raise OSError("no free TCP port on 127.0.0.1")
 
 
+def _token_file():
+    from .config import settings_file
+    return settings_file().parent / "session.token"
+
+
+def _read_token() -> str | None:
+    try:
+        tok = _token_file().read_text(encoding="utf-8").strip()
+        return tok if len(tok) >= 16 else None
+    except OSError:
+        return None
+
+
+def launch_token(reuse: bool = False) -> tuple[str | None, bool]:
+    """(token, new): the per-launch access token (None = off). reuse=True (a restart after an update) keeps the
+    current one so the open browser tab keeps working."""
+    env = os.environ.get("CMLLAB_ACCESS_TOKEN", "").strip()
+    if env == "0":
+        return None, False
+    if len(env) >= 16:
+        return env, False
+    if reuse:
+        old = _read_token()
+        if old:
+            return old, False
+    from .web.security import new_token
+    tok = new_token()
+    f = _token_file()
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.unlink(missing_ok=True)
+        fd = os.open(str(f), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(tok)
+    except OSError:
+        pass   # the token still works for this run; a second launch then cannot reuse it
+    return tok, True
+
+
+def _with_token(url: str, token: str | None) -> str:
+    return f"{url}?token={token}" if token else url
+
+
 def _parse(argv: list[str]) -> tuple[dict, list[str] | None]:
     opts = {"port": DEFAULT_PORT, "browser": True}
     rest = list(argv)
@@ -99,11 +145,12 @@ def _respawn(port: int) -> None:
     args = [sys.executable, "--restarted", "--port", str(port)]
     print("Restarting CML Lab Builder...", flush=True)
     if os.name == "nt":   # a new console window becomes the "quit" control; this one closes
-        subprocess.Popen(args, creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0x10), close_fds=True)
+        subprocess.Popen(args, creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0x10),  # noqa: S603 - own exe
+                         close_fds=True)
         return
     sys.stdout.flush()
     sys.stderr.flush()
-    os.execv(sys.executable, args)   # same terminal, same PID
+    os.execv(sys.executable, args)   # noqa: S606 - same terminal, same PID; our own executable
 
 
 def _mark_good() -> None:
@@ -127,7 +174,8 @@ def serve(port: int = DEFAULT_PORT, browser: bool = True, ready: threading.Event
         url = f"http://{HOST}:{port}/"
         print(f"CML Lab Builder {other} is already running at {url} - opening it.")
         if browser:
-            webbrowser.open(url)
+            env = os.environ.get("CMLLAB_ACCESS_TOKEN", "").strip()
+            webbrowser.open(_with_token(url, None if env == "0" else (env if len(env) >= 16 else _read_token())))
         return 0
     global _SERVER, _RESTART
     sock = None
@@ -141,9 +189,14 @@ def serve(port: int = DEFAULT_PORT, browser: bool = True, ready: threading.Event
         sock = bind_socket(port)
     real = sock.getsockname()[1]
     url = f"http://{HOST}:{real}/"
+    token, new_token = launch_token(reuse=restarted)
     if restarted:
-        browser = real != port   # the open tab reconnects by itself unless the port changed
-    server = uvicorn.Server(uvicorn.Config(create_app(auto_update=True), log_level="warning", lifespan="off"))
+        # the open tab reconnects by itself unless the port changed or it has no access cookie yet (first start of
+        # 3.3.0+ after an update from an older version)
+        browser = real != port or new_token
+    open_url = _with_token(url, token)
+    server = uvicorn.Server(uvicorn.Config(create_app(auto_update=True, access_token=token), log_level="warning", access_log=False,
+                                           lifespan="off"))
     _SERVER, _RESTART = server, False
 
     def _when_up():
@@ -156,11 +209,13 @@ def serve(port: int = DEFAULT_PORT, browser: bool = True, ready: threading.Event
         if ready is not None:
             ready.set()
         if browser:
-            webbrowser.open(url)
+            webbrowser.open(open_url)
 
     print("=" * 64)
     print(f" CML Lab Builder {__version__}")
     print(f" Web UI:    {url}" + ("" if real == port else f"   (port {port} was busy)"))
+    if token:
+        print(f" With access: {open_url}")
     print(f" Your data: {settings_file().parent}")
     print(" Keep this window open while you use the app.")
     print(" To quit: close this window or press Ctrl+C.")
@@ -183,6 +238,11 @@ def serve(port: int = DEFAULT_PORT, browser: bool = True, ready: threading.Event
 
 def _fatal(exc: BaseException) -> int:
     text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    try:
+        from .config import redact
+        text = redact(text)
+    except Exception:
+        pass
     try:
         from .config import settings_file
         log = settings_file().parent / "launcher-error.log"

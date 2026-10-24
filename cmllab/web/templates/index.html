@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-version="{{VERSION}}">
 <head>
 <meta charset="utf-8">
 <title>CML Lab Builder</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%231f6feb%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css?v={{VERSION}}">
-<script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch (e) { /* storage blocked */ }</script>
+<script src="/static/boot.js?v={{VERSION}}"></script>
 </head>
 <body>
 <header>
@@ -111,8 +111,10 @@
     <label>CML URL <input data-help="s.cml_url" name="cml_url" placeholder="https://cml.example.ts.net"></label>
     <label>Username <input data-help="s.username" name="username"></label>
     <label>Password <input data-help="s.password" name="password" type="password"></label>
-    <label class="inline"><input data-help="s.remember_password" name="remember_password" type="checkbox"> Remember password in OS keyring</label>
-    <label>TLS verification <select data-help="s.verify_tls" name="verify_tls"><option value="true">On (recommended)</option><option value="false">Off</option></select></label>
+    <label class="inline"><input data-help="s.remember_password" name="remember_password" type="checkbox"> Remember passwords (OS keyring)</label>
+    <label>TLS verification <select data-help="s.verify_tls" name="verify_tls" id="s-verify-tls"><option value="true">On (recommended)</option><option value="ca">On, with my own CA certificate</option><option value="false">Off (insecure)</option></select></label>
+    <label id="tls-ca-row" hidden>CA bundle file (PEM) <input data-help="s.tls_ca" name="tls_ca" placeholder="/path/to/my-ca.pem or C:\certs\my-ca.pem" spellcheck="false"></label>
+    <div id="tls-warn" class="callout warn small" role="alert" hidden><b>TLS verification is off.</b> Anyone on the network path to CML could read your CML password and lab traffic. Use your own CA certificate instead if CML has a self-signed or private certificate.</div>
     <h2>Live console checks (SSH)</h2>
     <p class="muted">Separate from the CML URL. Must reach the CML console server over SSH: directly, or through a <b>TCP passthrough</b> proxy (nginx <code>stream</code>, HAProxy <code>mode tcp</code>). An HTTP reverse proxy will not work for SSH.</p>
     <label>Console server FQDN (port 22 proxy) <input data-help="s.console_host" name="console_host" placeholder="blank = host of the CML URL"></label>
@@ -149,7 +151,6 @@
   </form>
 </section>
 </main>
-<script>window.APP_VERSION = "{{VERSION}}";</script>
 <script src="/static/help.js?v={{VERSION}}"></script>
 <script src="/static/fuzzy.js?v={{VERSION}}"></script>
 <script src="/static/app.js?v={{VERSION}}"></script>

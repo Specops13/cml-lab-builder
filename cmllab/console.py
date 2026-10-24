@@ -318,7 +318,7 @@ def host_entry(host: str, port: int) -> str:
 def fingerprint(key) -> dict:
     raw = key.asbytes()
     return {"type": key.get_name(), "sha256": "SHA256:" + base64.b64encode(hashlib.sha256(raw).digest()).decode().rstrip("="),
-            "md5": ":".join(f"{b:02x}" for b in hashlib.md5(raw).digest())}
+            "md5": ":".join(f"{b:02x}" for b in hashlib.md5(raw, usedforsecurity=False).digest())}
 
 
 def _host_keys():

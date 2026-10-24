@@ -13,6 +13,7 @@ import time
 from . import catalog
 from .platforms import get as get_platform, node_def, render
 from .schema import Lab, Step
+from .paths import safe_name as _safe
 
 _lock = threading.Lock()
 
@@ -23,7 +24,7 @@ class WalkthroughError(RuntimeError):
 
 def _file(lab_id: str):
     from .history import data_dir
-    return data_dir() / "walkthroughs" / f"{lab_id}.json"
+    return data_dir() / "walkthroughs" / f"{_safe(lab_id)}.json"
 
 
 def load(lab_id: str) -> dict:

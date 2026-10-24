@@ -897,19 +897,40 @@ copied to the `CMLLAB_…` name at start, and if both are set, `CMLLAB_…` wins
 | CMLLAB_CONSOLE_BACKEND | ssh | `ssh` (paramiko, all OSes) or `pyats` (Linux/macOS only, needs `pip install -e .[pyats]`) |
 
 ### Security and safety
+See [SECURITY.md](SECURITY.md) for the full model, how to report a vulnerability and how update signing works.
 - Only touches labs titled `CML-…` (or `ENCOR-…`, built by ENCOR Lab Builder). Deleting anything else is refused.
 - Checks never change device configuration (only `show` and `ping` commands are allowed in labs).
-- Imported packs are size-limited (5 MB) and path-checked. A lab file only contains data (YAML/regex), never code.
+- Imported packs are size-limited (5 MB) and path-checked (no `..`, absolute paths, drive letters or `\` in zip
+  members). A lab file only contains data (YAML/regex, `yaml.safe_load`), never code.
+- **Web UI (3.3.0):** listens on 127.0.0.1 only. It answers only to `127.0.0.1` / `localhost` / `[::1]` Host headers
+  (DNS rebinding), refuses cross-site requests and state-changing requests without the app's `X-CMLLab-Request`
+  header or with a foreign `Origin` (CSRF), never answers CORS preflights, and sends a strict Content-Security-Policy
+  (no inline script, `frame-ancestors 'none'`), `nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`.
+  The desktop app also protects the UI with a random **per-launch access token**: the browser it opens gets it once
+  (`?token=…`, swapped for an HttpOnly SameSite=Strict cookie), so other local users and programs cannot use the UI.
+  The token is kept in `session.token` (0600) in the data folder so a restart keeps your open tab working.
+- `cmllab web --host 0.0.0.0` (or any non-loopback address) prints a loud warning and always requires a token.
+- **Secrets:** the CML password, device passwords and AI key are kept in the OS keyring (Windows Credential Manager,
+  macOS Keychain, Linux Secret Service) when you tick *Remember passwords*; without a keyring in `secrets.json`
+  (0600). Never in `settings.json` (also 0600): a password found there (old or hand-edited files) is moved to the
+  secret store at start. Secrets are never returned by the API, and are redacted from logs, job output and errors.
+- **TLS:** certificate verification is on by default. For a self-signed or private CA choose *On, with my own CA
+  certificate* and give the PEM file; turning it off shows a warning in Settings and in the log.
+- **Console SSH:** the console server's host key is remembered on first use and checked on every later connection
+  (*Settings > Forget host key* after a legitimate change; see "Console access" above).
 - Internet access: *Load library* / *Install* (raw.githubusercontent.com or your URL) when you click them, and once after
   an update from 1.x if labs have to be restored from the library (see above). The packaged
   app also makes an anonymous update check against api.github.com every 6 hours, which you can turn off in *Settings >
   Updates*. When there is a new release, it downloads the patch and `SHA256SUMS.txt` from github.com. Nothing is
   installed until you click *Update now*.
-- Patches are verified (SHA256SUMS, per-file manifest hashes, safe paths, version, runtime) before they are unpacked into
-  your data folder, and are rolled back automatically if they cannot start.
+- **Signed updates (3.3.0):** `SHA256SUMS.txt` and each patch carry an Ed25519 signature (`.sig`) made with the
+  project's release key, whose public half is built into the app. 3.3.0 and later refuse unsigned or wrongly signed
+  updates; then the patch is verified (SHA256SUMS, per-file manifest hashes, safe paths, version, runtime) before it
+  is unpacked into your data folder, and rolled back automatically if it cannot start. Older versions (up to 3.2.0)
+  keep checking `SHA256SUMS.txt` only.
 - Library downloads are https-only (redirects included; plain http only for a library on localhost), size-limited and
   verified against the sha256 in the index before they are validated and installed.
-- The UI listens on 127.0.0.1 only. Secrets are never returned by the API or written to logs.
+- CI runs a security lint (ruff `S` / flake8-bandit rules) and `pip-audit` on every build.
 
 ## Troubleshooting and diagnostics
 - **SmartScreen / antivirus warning on CMLLabBuilder.exe:** the build is unsigned. Use *More info* > *Run anyway*, and compare the zip with `SHA256SUMS.txt`.
@@ -1010,11 +1031,13 @@ cmllab/                   the application (Python package; `encorlab` up to 2.1.
   install.py              install type (deb / linux-tar / windows-zip / source) and the matching full-download asset
   autoupdate.py           background update checker: ETag + backoff, staging, Update now / Later / Skip, idle gating
   report.py               printable HTML reports (web/templates/report_*.html)
+  signing.py              Ed25519 release signatures (pure-Python verify, embedded public keys)
   solution.py             solution summary + hints        sim.py        offline simulator for validation/tests
-  catalog.py, history.py  lab catalog, results history    config.py     settings, keyring, settings.json
+  catalog.py, history.py  lab catalog, results history    config.py     settings, secret store (keyring/0600), redaction
   prompt.py, ai.py        AI prompt + optional generator  platforms.py  IOL/IOSv interface placeholders
   migrate.py              keeps the labs 1.x bundled (copies them / restores them from the library)
-  web/                    FastAPI app, templates/index.html, static/ (app.js, help.js, help.json, style.css)
+  web/                    FastAPI app, security.py (Host/CSRF/token/CSP guards), templates/index.html,
+                          static/ (boot.js, app.js, help.js, help.json, report.js, style.css)
   resources/              authoring guide + example lab (source of docs/)
 docs/                     LAB-AUTHORING.md, AI-PROMPT.md, JSON Schema, example lab, images/
 examples/                 example packs and courses/ (sources of labs/)

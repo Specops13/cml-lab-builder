@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Lab report - {{ lab.title }}</title>{% include "_report_style.html" %}</head>
 <body><div class="page">
-<div class="toolbar noprint"><button title="Open the print dialog; choose 'Save as PDF' to get a PDF" onclick="window.print()">Print / Save as PDF</button></div>
+<div class="toolbar noprint"><button title="Open the print dialog; choose 'Save as PDF' to get a PDF" data-print>Print / Save as PDF</button></div>
 <div class="head"><div>
   <div class="muted small">CML Lab Builder {{ version }} - lab report</div>
   <h1>{{ lab.title }}</h1>

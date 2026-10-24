@@ -626,19 +626,32 @@ def save_password():
 
 
 @app.command()
-def web(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = typer.Option(True, "--open/--no-open")):
-    """Start the local web UI (http://127.0.0.1:8765)."""
+def web(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = typer.Option(True, "--open/--no-open"),
+        token: bool = typer.Option(False, "--token/--no-token", help="require a random access token (always on "
+                                   "for a non-loopback --host)")):
+    """Start the local web UI (http://127.0.0.1:8765). The desktop app (cml-lab-builder without a command) is the
+    normal way to run it; this command is for running from source."""
     import threading
     import uvicorn
     import webbrowser
     from .web.app import create_app
-    if host not in ("127.0.0.1", "localhost", "::1"):
-        typer.echo("WARNING: binding to a non-loopback address exposes the UI to your network")
-    url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '::') else host}:{port}"
-    typer.echo(f"CML Lab Builder {__version__} on {url}  (Ctrl+C to stop)")
+    from .web.security import new_token
+    loopback = host in ("127.0.0.1", "localhost", "::1")
+    extra = ()
+    if not loopback:
+        typer.secho("=" * 70 + "\nWARNING: binding to a non-loopback address exposes the UI (and your CML credentials)\n"
+                    "to your network. Only do this on a trusted network; an access token is required.\n" + "=" * 70,
+                    fg=typer.colors.RED, bold=True, err=True)
+        token = True
+        if host not in ("0.0.0.0", "::"):  # noqa: S104 - explicit user choice, warned above
+            extra = (host,)
+    tok = new_token() if token else None
+    url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '::') else host}:{port}/"  # noqa: S104
+    open_url = f"{url}?token={tok}" if tok else url
+    typer.echo(f"CML Lab Builder {__version__} on {open_url}  (Ctrl+C to stop)")
     if open_browser:
-        threading.Timer(1.5, lambda: webbrowser.open(url)).start()
-    uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+        threading.Timer(1.5, lambda: webbrowser.open(open_url)).start()
+    uvicorn.run(create_app(access_token=tok, allowed_hosts=extra), host=host, port=port, log_level="warning", access_log=False)
 
 
 

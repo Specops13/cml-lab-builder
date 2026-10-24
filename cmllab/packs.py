@@ -107,7 +107,9 @@ def parse_lab_text(text: str) -> tuple[Lab, dict]:
 
 
 def _safe_member(name: str) -> bool:
-    return not (name.startswith(("/", "\\")) or ".." in Path(name).parts or ":" in name)
+    """Zip-slip guard: no absolute paths, drive letters, '..' (with / or \\ separators) or NUL bytes."""
+    parts = name.replace("\\", "/").split("/")
+    return not (name.startswith(("/", "\\")) or ".." in parts or ":" in name or "\x00" in name)
 
 
 def read_upload(filename: str, data: bytes) -> Pack:

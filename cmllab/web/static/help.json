@@ -87,8 +87,8 @@
   "s.cml_url": "Address of your CML server, e.g. https://cml.example.ts.net.",
   "s.username": "Your CML login (same as the CML web UI).",
   "s.password": "CML password, kept in memory only unless you tick Remember. Leave blank to keep the saved one.",
-  "s.remember_password": "Store the password in Windows Credential Manager / Linux Secret Service so you don't retype it.",
-  "s.verify_tls": "Keep On for a valid certificate (e.g. Let's Encrypt). Off only for self-signed test servers.",
+  "s.remember_password": "Remember the CML and device passwords in the OS keyring (Windows Credential Manager, macOS Keychain, Linux Secret Service); without one, in a file only you can read.",
+  "s.verify_tls": "Keep On for a valid certificate (e.g. Let's Encrypt). For a self-signed or private CA, choose your own CA certificate instead of turning it off.",
   "s.console_host": "Host name where CML's console SSH server (port 22) is reachable. Blank = same host as the CML URL.",
   "s.console_port": "SSH port of the console server, or of your TCP passthrough proxy in front of it. Default 22.",
   "s.grading_mode": "Default for Check. Auto uses the live console if reachable, otherwise the running config via HTTPS.",
@@ -233,7 +233,7 @@
   "s.hostkey": "The CML console server's SSH key, stored on the first connection. A different key later stops the connection with a warning.",
   "s.forgetHostKey": "Delete the stored key, e.g. after reinstalling CML. The next connection stores the new key.",
   "s.device_username": "Username for device consoles that ask for a login (IOS/IOL labs normally don't). Default cisco.",
-  "s.device_password": "Password for device console logins and the default for NX-OS. Kept in memory only; set CMLLAB_DEVICE_PASSWORD to keep it.",
+  "s.device_password": "Password for device console logins and the default for NX-OS. Remembered with 'Remember passwords', else kept in memory only.",
   "s.nxos_username": "NX-OS (nxosv9000) console user, tried first; empty means the device username. Build's day-0 config creates it (and admin).",
   "s.nxos_password": "NX-OS console password used for the day-0 users at Build and for login. Empty = the device password.",
   "lib.search": "Search titles, ids, descriptions, topics, courses and node types as you type; typos and abbreviations ('vrf lit', 'mcast') work. / or Ctrl+K jumps here, Esc clears.",
@@ -248,5 +248,6 @@
   "lib.viewGrouped": "Show the labs grouped under topic headings (each lab under its main topic).",
   "lib.viewList": "Show one list, best search matches first.",
   "lib.expandAll": "Open all topic groups.",
-  "lib.collapseAll": "Close all topic groups, so you see only the headings and their counts."
+  "lib.collapseAll": "Close all topic groups, so you see only the headings and their counts.",
+  "s.tls_ca": "Path of a PEM file with the CA certificate(s) that signed CML's certificate (on this computer)."
 }

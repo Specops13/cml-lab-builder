@@ -36,6 +36,9 @@ class LabStatus:
 
 def _default_factory(settings):
     from virl2_client import ClientLibrary
+    if settings.verify_tls is False:
+        log.warning("TLS certificate verification for %s is OFF (Settings): the connection can be intercepted",
+                    settings.cml_url)
     return ClientLibrary(settings.cml_url, settings.username, settings.password,
                          ssl_verify=settings.verify_tls, raise_for_auth_failure=True)
 

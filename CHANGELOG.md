@@ -3,6 +3,30 @@
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
 ## [Unreleased]
+### Security
+- **Security audit and hardening** (details in the new [SECURITY.md](SECURITY.md)):
+  - **Signed updates:** releases carry Ed25519 signatures of `SHA256SUMS.txt` and of the patch (`*.sig`); the
+    public release key is built into the app. From this version on, unsigned or wrongly signed updates are refused
+    (online and *Install update from file*). Up to 3.2.0 apps keep checking `SHA256SUMS.txt` as before.
+  - **Web UI guards:** Host allowlist against DNS rebinding (421), CSRF protection (`Origin` / `Sec-Fetch-Site`
+    checks plus a required `X-CMLLab-Request` header), CORS preflights refused, path traversal guard.
+  - **Per-launch access token** in the desktop app (HttpOnly SameSite=Strict cookie after the first open), so
+    other local users or programs cannot drive the UI. `CMLLAB_ACCESS_TOKEN=0` turns it off. `cmllab web --token`.
+  - `cmllab web --host` with a non-loopback address prints a loud warning and always requires a token.
+  - **Strict Content-Security-Policy** (no inline script or event handlers any more), `nosniff`,
+    `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, COOP/CORP. Links built from
+    lab or library data only allow http(s).
+  - **Secrets:** device passwords are now remembered too (OS keyring) when *Remember passwords* is ticked; without a
+    keyring, secrets go to `secrets.json` (0600) instead of being dropped, and move into the keyring once there is
+    one. A password found in `settings.json` is moved out at start; `settings.json` is written 0600.
+  - Secrets are redacted from job output, errors, tracebacks and startup errors; the access log is off.
+  - **TLS:** new *TLS verification > On, with my own CA certificate* (PEM path, checked in Settings); *Off* is
+    labelled insecure and shows a warning in Settings and in the log.
+  - Zip member checks also reject `\` and NUL; ids used as file names are checked.
+  - CI: security lint (ruff `S` rules) and `pip-audit`; the deb test checks file ownership and permissions.
+- Known limitation: a report saved as HTML by the CLI and opened from disk keeps working, but its *Print* button
+  needs the app (`Ctrl+P` works everywhere).
+
 ### Added
 - **New library lab `21-nxos-ospf-multiarea`: NX-OS study path 1/3: OSPF multi-area on a super-spine Clos, with deep
   debug inspection** (walkthrough, 12 steps). Six Nexus 9000v in a 5-stage Clos (SS1/SS2, one spine and one leaf per

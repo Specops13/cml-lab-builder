@@ -38,7 +38,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from fake_release import FakeRelease  # noqa: E402
-from smoke_test import ROOT, get, make_patch, run, serve_library  # noqa: E402
+from smoke_test import ROOT, SMOKE_TOKEN, get, install_auth_opener, make_patch, run, serve_library, smoke_key  # noqa: E402
 
 import build_compat  # noqa: E402
 
@@ -126,6 +126,8 @@ def env_for(**kw) -> dict:
     env = {k: v for k, v in os.environ.items() if not k.startswith(("CMLLAB_", "ENCOR_"))}
     for k, v in kw.items():
         env["ENCOR_" + k] = env["CMLLAB_" + k] = v
+    env["CMLLAB_ACCESS_TOKEN"] = SMOKE_TOKEN            # 3.3.0+ (web/security.py); older versions ignore both
+    env["CMLLAB_UPDATE_TEST_KEY"] = smoke_key()[1]      # trusted only while UPDATE_URL is on 127.0.0.1 (signing.py)
     return env
 
 
@@ -265,7 +267,7 @@ def patch_round_trip(new, base: Path, check) -> None:
         p = make_patch(tmp, nxt)
         check(p.name == f"cml-lab-builder-patch-{nxt}.zip", f"patch built: {p.name}")
         files = {p.name: p.read_bytes(), f"encorlab-patch-{nxt}.zip": build_compat.old_patch_bytes(nxt, 2)}
-        fake = FakeRelease(nxt, files).start()
+        fake = FakeRelease(nxt, files, key=smoke_key()[0]).start()
         env = env_for(UPDATE_URL=fake.url)
         try:
             r = subprocess.run(new + ["update-install"], capture_output=True, text=True, env=env, timeout=300,
@@ -319,6 +321,9 @@ def main() -> int:
     for k in [k for k in os.environ if k.startswith(("CMLLAB_", "ENCOR_"))]:
         del os.environ[k]
     os.environ["CMLLAB_UPDATE_URL"] = os.environ["ENCOR_UPDATE_URL"] = "http://127.0.0.1:9/none"   # CLI runs: no GitHub
+    os.environ["CMLLAB_ACCESS_TOKEN"] = SMOKE_TOKEN
+    os.environ["CMLLAB_UPDATE_TEST_KEY"] = smoke_key()[1]
+    install_auth_opener()
     if a.phase == "old":
         st = old_phase(olds[0], base, nv, a.port, pre, check)
         Path(a.state).write_text(json.dumps(st), encoding="utf-8")

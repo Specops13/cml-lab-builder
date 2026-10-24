@@ -1,10 +1,16 @@
 """Runtime settings. Sources (lowest -> highest priority): defaults, env vars,
-OS keyring (password only, opt-in), values set at runtime (web Settings page).
-The password is never logged, never written to disk by this app, and is masked in repr()."""
+saved secrets (opt-in "remember"), values set at runtime (web Settings page).
+
+Secrets (SECRETS) are never written to settings.json, never logged, masked in repr() and redacted from job logs and
+error messages (redact()). "Remember" stores them in the OS keyring (Windows Credential Manager, macOS Keychain,
+Secret Service on Linux); only where no keyring exists they go to secrets.json in the data folder, readable by the
+user only (0600). settings.json is 0600 too. Secrets found in an old or hand-edited settings.json are moved into the
+keyring on load (3.3.0)."""
 from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from pathlib import Path
 from dataclasses import dataclass, field, fields
@@ -102,6 +108,8 @@ class Settings:
                 errs.append("library_url must start with https:// (http:// only for localhost)")
         if self.cml_url and urlparse(self.cml_url).scheme not in ("https", "http"):
             errs.append("cml_url must start with https://")
+        if isinstance(self.verify_tls, str) and not Path(self.verify_tls).expanduser().is_file():
+            errs.append(f"CA bundle not found: {self.verify_tls} (TLS verification: a PEM file on this computer)")
         return errs
 
 
@@ -136,10 +144,18 @@ def from_env(env: dict | None = None) -> Settings:
         if k in PERSISTED:
             setattr(s, k, v)
     if e.get("CMLLAB_USE_KEYRING", "1") != "0":
+        if env is None:
+            migrate_secrets()
         if not s.password and s.username:
             s.password = keyring_get(s.username) or ""
         if not s.ai_api_key and s.ai_base_url:
             s.ai_api_key = keyring_get("ai-key:" + s.ai_base_url) or ""
+        for k in ("device_password", "device_enable", "nxos_password"):   # remembered with the CML password (3.3.0)
+            if not e.get({"device_password": "CMLLAB_DEVICE_PASSWORD", "device_enable": "CMLLAB_DEVICE_ENABLE",
+                          "nxos_password": "CMLLAB_NXOS_PASSWORD"}[k]):
+                v = keyring_get("device:" + k)
+                if v:
+                    setattr(s, k, v)
     return s
 
 
@@ -180,25 +196,157 @@ def save_settings(s: "Settings", env=None) -> Path:
     f = settings_file(env)
     f.parent.mkdir(parents=True, exist_ok=True)
     data = {"_format": SETTINGS_FORMAT, **{k: getattr(s, k) for k in PERSISTED}}
-    f.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    _write_private(f, json.dumps(data, indent=2))
     return f
 
 
-def keyring_get(username: str) -> str | None:
+# ---------------------------------------------------------------- secret storage (keyring, else a 0600 file)
+SECRETS_FILE = "secrets.json"
+
+
+def _keyring():
+    """The keyring module, or None when there is no usable backend (headless Linux without Secret Service, ...)."""
     try:
         import keyring
-        return keyring.get_password(KEYRING_SERVICE, username) or keyring.get_password(LEGACY_KEYRING_SERVICE, username)
+        from keyring.backends import fail
+        kr = keyring.get_keyring()
+        if isinstance(kr, fail.Keyring) or "fail" in type(kr).__module__ or "null" in type(kr).__module__:
+            return None
+        return keyring
     except Exception:
         return None
 
 
-def keyring_set(username: str, password: str) -> bool:
+def _secrets_file(env=None) -> Path:
+    return settings_file(env).parent / SECRETS_FILE
+
+
+def _write_private(f: Path, text: str) -> None:
+    """Write a file only the user can read (0600; on Windows the per-user data folder already is private)."""
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_name(f.name + f".tmp{os.getpid()}")
+    tmp.unlink(missing_ok=True)
+    fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.replace(tmp, f)
     try:
-        import keyring
-        keyring.set_password(KEYRING_SERVICE, username, password)
+        os.chmod(f, 0o600)
+    except OSError:
+        pass
+
+
+def _file_secrets(env=None) -> dict:
+    try:
+        d = json.loads(_secrets_file(env).read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def secret_backend() -> str:
+    return "keyring" if _keyring() else "file"
+
+
+def keyring_get(username: str) -> str | None:
+    """A remembered secret (the CML password is stored under the CML username; others under 'ai-key:<url>',
+    'device:<name>'). Keyring first (also the pre-2.1 service name), then the 0600 fallback file."""
+    kr = _keyring()
+    if kr is not None:
+        try:
+            v = kr.get_password(KEYRING_SERVICE, username) or kr.get_password(LEGACY_KEYRING_SERVICE, username)
+            if v:
+                return v
+        except Exception:
+            pass
+    v = _file_secrets().get(username)
+    return str(v) if v else None
+
+
+def keyring_set(username: str, password: str) -> bool:
+    """Remember a secret: OS keyring, else the 0600 fallback file. True when it was stored."""
+    kr = _keyring()
+    if kr is not None:
+        try:
+            kr.set_password(KEYRING_SERVICE, username, password)
+            _file_forget(username)     # moved into the keyring: drop a fallback copy
+            return True
+        except Exception:
+            pass
+    try:
+        d = _file_secrets()
+        d[username] = password
+        _write_private(_secrets_file(), json.dumps(d, indent=1))
         return True
-    except Exception:
+    except OSError:
         return False
+
+
+def _file_forget(username: str) -> None:
+    d = _file_secrets()
+    if username in d:
+        d.pop(username)
+        try:
+            if d:
+                _write_private(_secrets_file(), json.dumps(d, indent=1))
+            else:
+                _secrets_file().unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def migrate_secrets(env=None) -> list[str]:
+    """3.3.0: secrets never belong in settings.json. Move any found there (old or hand-edited files) into the secret
+    store, rewrite the file without them (0600), and move fallback-file secrets into the keyring once one exists.
+    Returns what was moved (names only)."""
+    moved = []
+    f = settings_file(env)
+    try:
+        data = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = None
+    if isinstance(data, dict):
+        user = str(data.get("username") or "")
+        found = {k: data.pop(k) for k in list(data) if k in SECRETS}
+        for k, v in found.items():
+            if v:
+                key = user if k == "password" else (("ai-key:" + str(data.get("ai_base_url") or "")) if k == "ai_api_key" else "device:" + k)
+                if (k != "password" or user) and keyring_set(key, str(v)):
+                    moved.append(k)
+        if found:
+            try:
+                _write_private(f, json.dumps(data, indent=2))
+            except OSError:
+                pass
+    if _keyring() is not None:
+        for k, v in list(_file_secrets(env).items()):
+            try:
+                _keyring().set_password(KEYRING_SERVICE, k, str(v))
+                _file_forget(k)
+                moved.append(k)
+            except Exception:
+                pass
+    return moved
+
+
+# ---------------------------------------------------------------- never log secrets
+_KNOWN: set[str] = set()
+_KV = re.compile(r"(?i)\b(password|passwd|secret|api[_-]?key|token|authorization)(\s*[=:]\s*)(bearer\s+)?([^\s,;&\"']+)")
+
+
+def remember_for_redaction(*values) -> None:
+    for v in values:
+        if isinstance(v, str) and len(v) >= 4:
+            _KNOWN.add(v)
+
+
+def redact(text) -> str:
+    """Remove secrets from a message: known secret values (current settings) and key=value / 'password xyz' forms."""
+    s = str(text)
+    for v in sorted(_KNOWN, key=len, reverse=True):
+        if v in s:
+            s = s.replace(v, "***")
+    return _KV.sub(lambda m: m.group(1) + m.group(2) + (m.group(3) or "") + "***", s)
 
 
 class SettingsStore:
@@ -210,6 +358,8 @@ class SettingsStore:
 
     def get(self) -> Settings:
         with self._lock:
+            remember_for_redaction(*(getattr(self._s, k) for k in SECRETS if k not in ("device_password", "device_enable")
+                                     or getattr(self._s, k) != "cisco"))
             return Settings(**{f.name: getattr(self._s, f.name) for f in fields(Settings)})
 
     def update(self, **kw) -> Settings:

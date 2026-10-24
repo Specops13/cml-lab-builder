@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import cmlboot
+import fakes
 from cmllab import __version__, autoupdate, catalog, config, exam, library, updates
 from cmllab.web.app import create_app
 from test_patching import build_patch, make_src, mkbundle
@@ -47,6 +48,7 @@ class GitHub:
         self.version, self.patch, self.sums_override = version, patch, sums
         self.calls: list[tuple[str, str | None]] = []
         self.fail: Exception | None = None
+        self.sig_override: bytes | None = None
 
     def release(self) -> bytes:
         assets = [{"name": f"CMLLabBuilder-{self.version}-windows-x64.zip", "size": 26_000_000,
@@ -54,7 +56,8 @@ class GitHub:
         if self.patch is not None:
             assets += [{"name": f"cml-lab-builder-patch-{self.version}.zip", "size": len(self.patch),
                         "browser_download_url": self.BASE + f"cml-lab-builder-patch-{self.version}.zip"},
-                       {"name": "SHA256SUMS.txt", "size": 100, "browser_download_url": self.BASE + "SHA256SUMS.txt"}]
+                       {"name": "SHA256SUMS.txt", "size": 100, "browser_download_url": self.BASE + "SHA256SUMS.txt"},
+                       {"name": "SHA256SUMS.txt.sig", "size": 200, "browser_download_url": self.BASE + "SHA256SUMS.txt.sig"}]
         return json.dumps({"tag_name": f"v{self.version}", "assets": assets,
                            "html_url": f"https://github.com/{updates.REPO}/releases/tag/v{self.version}"}).encode()
 
@@ -66,9 +69,11 @@ class GitHub:
             body = self.release()
             tag = '"' + library.sha256(body)[:16] + '"'
             return (304, b"", {"etag": tag}) if etag == tag else (200, body, {"etag": tag})
-        if url.endswith("SHA256SUMS.txt"):
+        if url.endswith(("SHA256SUMS.txt", "SHA256SUMS.txt.sig")):
             text = self.sums_override if self.sums_override is not None else \
                 f"{library.sha256(self.patch)}  cml-lab-builder-patch-{self.version}.zip\n"
+            if url.endswith(".sig"):
+                return 200, (self.sig_override if self.sig_override is not None else fakes.sign(text.encode())), {}
             return 200, text.encode(), {}
         if url.endswith(".zip"):
             return 200, self.patch, {}
@@ -122,11 +127,11 @@ def test_scheduler_checks_when_due_and_uses_etag(packaged, patches):
     u = make(gh, clock=clock)
     assert u.tick()["status"] == "staged"
     assert autoupdate.load()["next_check"] == clock.t + autoupdate.INTERVAL
-    assert u.tick() is None and len(gh.calls) == 3          # not due yet: no request
+    assert u.tick() is None and len(gh.calls) == 4          # not due yet: no request
     clock.t += autoupdate.INTERVAL + 1
     r = u.tick()
     assert r["status"] == "staged" and r["cached"]          # 304 + already staged: nothing downloaded again
-    assert gh.calls[-1][1] and gh.calls[-1][0] == updates.LATEST_URL and len(gh.calls) == 4
+    assert gh.calls[-1][1] and gh.calls[-1][0] == updates.LATEST_URL and len(gh.calls) == 5
 
 
 def test_background_thread_runs_first_check_after_delay(packaged, patches, monkeypatch):
@@ -389,7 +394,7 @@ def test_url_rules(monkeypatch):
 
 
 def test_http_end_to_end_with_etag(packaged, patches, monkeypatch):
-    fake = FakeRelease(NEW, {f"cml-lab-builder-patch-{NEW}.zip": patches["good"]}).start()
+    fake = FakeRelease(NEW, {f"cml-lab-builder-patch-{NEW}.zip": patches["good"]}, key=fakes.TEST_SEED).start()
     try:
         monkeypatch.setenv("CMLLAB_UPDATE_URL", fake.url)
         clock = Clock()
