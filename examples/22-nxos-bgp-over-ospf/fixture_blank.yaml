@@ -1,0 +1,49 @@
+# Synthesized from Cisco Nexus 9000 NX-OS 10.x unicast routing (BGP) configuration guide examples
+# (not recorded on real hardware). State: lab 22 baseline (lab 21's OSPF finished, no BGP).
+SS1:
+  show ip ospf neighbors: |2
+     OSPF Process ID UNDERLAY VRF default
+     Total number of neighbors: 3
+     Neighbor ID     Pri State            Up Time  Address         Interface
+     10.0.0.11         1 FULL/ -          00:41:12 10.0.1.2        Eth1/1
+     10.0.0.21         1 FULL/ -          00:41:12 10.0.2.2        Eth1/2
+     10.0.0.2          1 FULL/BDR         00:41:12 10.0.12.2       Eth1/3
+  show bgp ipv4 unicast summary: |
+    % Invalid command at '^' marker.
+P1-LEAF:
+  ping 10.2.0.121 source 10.1.0.111: |
+    PING 10.2.0.121 (10.2.0.121): 56 data bytes
+    64 bytes from 10.2.0.121: icmp_seq=0 ttl=252 time=2.000 ms
+    64 bytes from 10.2.0.121: icmp_seq=1 ttl=252 time=2.300 ms
+    64 bytes from 10.2.0.121: icmp_seq=2 ttl=252 time=2.600 ms
+    64 bytes from 10.2.0.121: icmp_seq=3 ttl=252 time=2.900 ms
+    64 bytes from 10.2.0.121: icmp_seq=4 ttl=252 time=3.200 ms
+
+    --- 10.2.0.121 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 2.000/2.600/3.200 ms
+  ping 172.16.2.1 source 172.16.1.1: |
+    PING 172.16.2.1 (172.16.2.1): 56 data bytes
+    Request 0 timed out
+    Request 1 timed out
+    Request 2 timed out
+    Request 3 timed out
+    Request 4 timed out
+
+    --- 172.16.2.1 ping statistics ---
+    5 packets transmitted, 0 packets received, 100.00% packet loss
+  show bgp ipv4 unicast: |
+    % Invalid command at '^' marker.
+P1-SPINE:
+  show ip route 10.2.0.0/16: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    10.2.0.0/16, ubest/mbest: 2/0
+        *via 10.0.1.1, Eth1/1, [110/121], 00:58:40, ospf-UNDERLAY, inter
+        *via 10.0.3.1, Eth1/2, [110/121], 00:58:40, ospf-UNDERLAY, inter
+  show ip route 172.16.2.0/24: |
+    % Route not found

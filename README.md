@@ -620,6 +620,24 @@ inspection*): area 0 on the super-spine layer, one area per pod with the spines 
 | 10 | End to end | VTEP-to-VTEP ping across five stages, ECMP via both super spines | `show ip route`, `show forwarding ipv4 route` |
 | 11 | Break and fix (optional) | MTU, timer and area mismatches | `event-history adjacency/hello`, debugs |
 
+**`22-nxos-bgp-over-ospf`** (*NX-OS study path 2/3: iBGP over OSPF with super-spine route reflectors, with deep debug
+inspection*): iBGP AS 65000 on loopbacks, SS1/SS2 as route reflectors, on top of lab 21's OSPF.
+
+| # | Step | What you do | Main inspection / debug |
+|---|---|---|---|
+| 0 | Baseline | Verify the inherited OSPF underlay (loopback reachability) | `show ip ospf neighbors`, loopback `ping` |
+| 1 | Route reflectors | `feature bgp`, AS 65000, `template peer` with `route-reflector-client` on SS1/SS2 | `show running-config bgp`, `show bgp ipv4 unicast summary` |
+| 2 | Leaf sessions | Leaves peer to both RRs from loopback0, the BGP FSM | `show bgp ipv4 unicast neighbors`, `show bgp event-history detail`, `debug bgp events` with `debug-filter bgp neighbor` |
+| 3 | Transport | TCP 179, update source, next-hop tracking over OSPF | `show sockets connection tcp`, `show bgp nexthop-database` |
+| 4 | Advertise | `network` for loopback200, NLRI and attributes, Originator/Cluster list | `show bgp ipv4 unicast <prefix>`, `show ip route` |
+| 5 | Best path | Two reflected copies, the tie-breakers | `not best reason`, `debug bgp updates` |
+| 6 | BGP-free core | Why the spines black-hole BGP traffic, the spines become RR clients | `show ip route 172.16.2.0/24`, `ping` |
+| 7 | Policy (optional) | Community 65000:200, local preference 200 via SS2 | `Community:`, `localpref` |
+| 8 | eBGP design | The same fabric with eBGP (RFC 7938), what changes | path detail, AS path |
+| 9 | BFD (optional) | Design only: BFD is not supported on Nexus 9000v | timers, `show bgp ... neighbors` |
+| 10 | Failure drill | An underlay link failure that BGP never sees (ECMP in OSPF) | `show ip route 10.2.0.0/16`, `event-history` |
+| 11 | Wrap-up | The control plane lab 23 builds on | `show bgp ipv4 unicast summary` on SS2 |
+
 > **Not verified on real devices yet.** The expected outputs were written from Cisco's NX-OS 10.x documentation, not
 > captured from CML. Command keywords of `event-history`, `debug ip ospf` and `show forwarding` can differ on the
 > 9000v image. If a check fails on a correctly built lab, run it in *Config* grading mode and please report the output.
@@ -826,6 +844,8 @@ Example packs live in [`examples/`](examples/) and are attached to every [releas
   super spines (5-stage Clos), NX-OS 9000v leaves with IOL spines (12 nodes, about 56 GB RAM).
 - `21-nxos-ospf-multiarea` (lab library only): NX-OS study path 1/3, OSPF multi-area with deep debug inspection on a
   6 x Nexus 9000v super-spine Clos (10 nodes, about 76 GB RAM).
+- `22-nxos-bgp-over-ospf` (lab library only): NX-OS study path 2/3, iBGP over OSPF with super-spine route reflectors
+  and deep debug inspection (10 nodes, about 76 GB RAM).
 
 ## Configuration
 Everything can be set on the **Settings** page; `.env` / environment variables provide defaults (copy `.env.example`).

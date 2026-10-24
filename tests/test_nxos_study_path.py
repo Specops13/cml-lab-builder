@@ -2,6 +2,8 @@
 (SS1/SS2 super spines, one spine and one leaf per pod) plus four IOL hosts, same topology in all three labs.
 Each lab is its own CML lab; lab N boots with lab N-1's day-0 plus lab N-1's required steps (no drift)."""
 import hashlib
+import subprocess
+import sys
 import json
 import re
 from pathlib import Path
@@ -12,7 +14,7 @@ from cmllab import courses, packs, sizing
 from cmllab.console import config_script
 
 ROOT = Path(__file__).resolve().parents[1]
-SERIES = ["21-nxos-ospf-multiarea"]
+SERIES = ["21-nxos-ospf-multiarea", "22-nxos-bgp-over-ospf"]
 NXOS = {"SS1", "SS2", "P1-SPINE", "P2-SPINE", "P1-LEAF", "P2-LEAF"}
 HOSTS = {"H1", "H2", "H3", "H4"}
 
@@ -86,4 +88,50 @@ def test_lab21_ospf_design():
     cmds = {c.command for s in lab.steps for c in s.checks} | {v.command for s in lab.steps for v in s.verify}
     for must in ("show ip ospf database nssa-external", "show ip ospf database external", "show ip ospf database summary",
                  "show ip ospf database asbr-summary", "show ip ospf event-history adjacency", "show ip ospf"):
+        assert must in cmds, must
+
+
+def _strip(cfg):
+    return [l.rstrip() for l in cfg.splitlines() if l.strip() and not l.lstrip().startswith("!")]
+
+
+@pytest.mark.parametrize("prev_id,lab_id", list(zip(SERIES, SERIES[1:])))
+def test_baseline_is_previous_baseline_plus_its_required_steps(prev_id, lab_id):
+    """Skippable labs, no drift: lab N boots with lab N-1's day-0 + lab N-1's required (non-optional) steps."""
+    prev, lab = _lab(prev_id), _lab(lab_id)
+    sol = prev.step_solution(include_optional=False)
+    for node in lab.nodes:
+        before = next(n for n in prev.nodes if n.name == node.name)
+        if node.name in HOSTS:
+            assert node.config == before.config, node.name
+        else:
+            assert _strip(node.config) == _strip(before.config) + _strip(sol[node.name]), node.name
+            assert node.config.startswith(f"! Lab {lab_id[:2]} baseline"), node.name
+    r = subprocess.run([sys.executable, str(ROOT / "packaging" / "nxos_study_baseline.py"), "--check"],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+
+
+def test_lab22_bgp_design():
+    lab = _lab("22-nxos-bgp-over-ospf")
+    assert [s.id for s in lab.steps] == ["baseline", "rr", "leaf-peering", "transport", "advertise", "bestpath",
+                                         "bgp-free-core", "policy", "ebgp", "bfd", "convergence", "wrap-up"]
+    assert lab.step("policy").optional and lab.step("bfd").optional and not lab.step("bfd").config
+    assert not lab.step("ebgp").config and not lab.step("baseline").config
+    for n in NXOS:                                                                  # inherited lab 21 underlay
+        assert "router ospf UNDERLAY" in lab.node(n).config and "router bgp" not in lab.node(n).config, n
+    sol = lab.step_solution()
+    for ss in ("SS1", "SS2"):
+        assert "router bgp 65000" in sol[ss] and "route-reflector-client" in sol[ss]
+        for peer in ("10.0.0.11", "10.0.0.21", "10.1.0.111", "10.2.0.121"):
+            assert f"neighbor {peer}" in sol[ss], (ss, peer)
+    for leaf in ("P1-LEAF", "P2-LEAF"):
+        assert "update-source loopback0" in sol[leaf] and "route-reflector-client" not in sol[leaf]
+        assert "neighbor 10.0.0.1" in sol[leaf] and "neighbor 10.0.0.2" in sol[leaf]
+    assert "set local-preference 200" in sol["P1-LEAF"] and "set community 65000:200" in sol["P2-LEAF"]
+    text = "\n".join(s.explain for s in lab.steps)
+    for must in ("debug logfile", "debug-filter", "undebug all", "event-history", "show debug logfile", "BFD"):
+        assert must in text, must
+    cmds = {c.command for s in lab.steps for c in s.checks} | {v.command for s in lab.steps for v in s.verify}
+    for must in ("show bgp ipv4 unicast summary", "show bgp ipv4 unicast 172.16.2.0/24", "show ip route 172.16.2.0/24"):
         assert must in cmds, must

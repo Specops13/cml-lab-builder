@@ -1,0 +1,279 @@
+# Synthesized from Cisco Nexus 9000 NX-OS 10.x unicast routing (BGP) configuration guide examples
+# (not recorded on real hardware). State: every step of lab 22 done, including the optional policy step.
+SS1:
+  show ip ospf neighbors: |2
+     OSPF Process ID UNDERLAY VRF default
+     Total number of neighbors: 3
+     Neighbor ID     Pri State            Up Time  Address         Interface
+     10.0.0.11         1 FULL/ -          00:41:12 10.0.1.2        Eth1/1
+     10.0.0.21         1 FULL/ -          00:41:12 10.0.2.2        Eth1/2
+     10.0.0.2          1 FULL/BDR         00:41:12 10.0.12.2       Eth1/3
+  show bgp ipv4 unicast summary: |
+    BGP summary information for VRF default, address family IPv4 Unicast
+    BGP router identifier 10.0.0.1, local AS number 65000
+    BGP table version is 11, IPv4 Unicast config peers 4, capable peers 4
+    2 network entries and 4 paths using 976 bytes of memory
+    BGP attribute entries [3/1056], BGP AS path entries [0/0]
+    BGP community entries [1/32], BGP clusterlist entries [2/8]
+
+    Neighbor        V    AS    MsgRcvd    MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    10.0.0.11       4 65000         58         61       11    0    0 00:52:11 0
+    10.0.0.21       4 65000         58         61       11    0    0 00:52:11 0
+    10.1.0.111      4 65000         58         61       11    0    0 00:52:11 1
+    10.2.0.121      4 65000         58         61       11    0    0 00:52:11 1
+SS2:
+  show bgp ipv4 unicast summary: |
+    BGP summary information for VRF default, address family IPv4 Unicast
+    BGP router identifier 10.0.0.2, local AS number 65000
+    BGP table version is 11, IPv4 Unicast config peers 4, capable peers 4
+    2 network entries and 4 paths using 976 bytes of memory
+    BGP attribute entries [3/1056], BGP AS path entries [0/0]
+    BGP community entries [1/32], BGP clusterlist entries [2/8]
+
+    Neighbor        V    AS    MsgRcvd    MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    10.0.0.11       4 65000         58         61       11    0    0 00:52:11 0
+    10.0.0.21       4 65000         58         61       11    0    0 00:52:11 0
+    10.1.0.111      4 65000         58         61       11    0    0 00:52:11 1
+    10.2.0.121      4 65000         58         61       11    0    0 00:52:11 1
+P1-LEAF:
+  ping 10.2.0.121 source 10.1.0.111: |
+    PING 10.2.0.121 (10.2.0.121): 56 data bytes
+    64 bytes from 10.2.0.121: icmp_seq=0 ttl=252 time=2.000 ms
+    64 bytes from 10.2.0.121: icmp_seq=1 ttl=252 time=2.300 ms
+    64 bytes from 10.2.0.121: icmp_seq=2 ttl=252 time=2.600 ms
+    64 bytes from 10.2.0.121: icmp_seq=3 ttl=252 time=2.900 ms
+    64 bytes from 10.2.0.121: icmp_seq=4 ttl=252 time=3.200 ms
+
+    --- 10.2.0.121 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 2.000/2.600/3.200 ms
+  show bgp ipv4 unicast neighbors 10.0.0.1: |
+    BGP neighbor is 10.0.0.1, remote AS 65000, ibgp link, Peer index 3
+      Inherits peer configuration from peer-template RR
+      Description: SS1 (route reflector)
+      BGP version 4, remote router ID 10.0.0.1
+      Neighbor previous state = OpenConfirm
+      BGP state = Established, up for 00:52:11
+      Neighbor vrf: default
+      Using loopback0 as update source for this peer
+      Using iod 65 (loopback0) as update source
+      Last read 00:00:22, hold time = 180, keepalive interval is 60 seconds
+      Last written 00:00:28, keepalive timer expiry due 00:00:31
+      Received 61 messages, 0 notifications, 0 bytes in queue
+      Sent 63 messages, 0 notifications, 0(0) bytes in queue
+      Enhanced error processing: On
+        0 discarded attributes
+      Connections established 1, dropped 0
+      Last update recd 00:51:40, Last update sent  = 00:51:41
+       Last reset by us never, due to No error
+      Last reset by peer never, due to No error
+
+      Neighbor capabilities:
+      Dynamic capability: advertised (mp, refresh, gr) received (mp, refresh, gr)
+      Dynamic capability (old): advertised received
+      Route refresh capability (new): advertised received
+      Route refresh capability (old): advertised received
+      4-Byte AS capability: advertised received
+      Address family IPv4 Unicast: advertised received
+      Graceful Restart capability: advertised received
+
+      Graceful Restart Parameters:
+      Address families advertised to peer:
+        IPv4 Unicast
+      Address families received from peer:
+        IPv4 Unicast
+      Forwarding state preserved by peer for:
+      Restart time advertised to peer: 120 seconds
+      Stale time for routes advertised by peer: 300 seconds
+      Restart time advertised by peer: 120 seconds
+      Extended Next Hop Encoding Capability: advertised received
+      Receive IPv6 next hop encoding Capability for AF:
+        IPv4 Unicast
+
+      Message statistics:
+                                  Sent               Rcvd
+      Opens:                         1                  1
+      Notifications:                 0                  0
+      Updates:                       3                  4
+      Keepalives:                   57                 55
+      Route Refresh:                 1                  0
+      Capability:                    2                  2
+      Total:                        64                 62
+      Total bytes:                1298               1310
+      Bytes in queue:                0                  0
+
+      For address family: IPv4 Unicast
+      BGP table version 11, neighbor version 11
+      1 accepted prefixes (1 paths), consuming 144 bytes of memory
+      0 received paths for inbound soft reconfiguration
+      1 sent prefixes (1 paths)
+      Community attribute sent to this neighbor
+      Extended community attribute sent to this neighbor
+      Third-party Nexthop will not be computed.
+
+      Local host: 10.1.0.111, Local port: 179
+      Foreign host: 10.0.0.1, Foreign port: 21541
+      fd = 80
+  show bgp ipv4 unicast neighbors 10.0.0.2: |
+    BGP neighbor is 10.0.0.2, remote AS 65000, ibgp link, Peer index 3
+      Inherits peer configuration from peer-template RR
+      Description: SS2 (route reflector)
+      BGP version 4, remote router ID 10.0.0.2
+      Neighbor previous state = OpenConfirm
+      BGP state = Established, up for 00:52:11
+      Neighbor vrf: default
+      Using loopback0 as update source for this peer
+      Using iod 65 (loopback0) as update source
+      Last read 00:00:22, hold time = 180, keepalive interval is 60 seconds
+      Last written 00:00:28, keepalive timer expiry due 00:00:31
+      Received 61 messages, 0 notifications, 0 bytes in queue
+      Sent 63 messages, 0 notifications, 0(0) bytes in queue
+      Enhanced error processing: On
+        0 discarded attributes
+      Connections established 1, dropped 0
+      Last update recd 00:51:40, Last update sent  = 00:51:41
+       Last reset by us never, due to No error
+      Last reset by peer never, due to No error
+
+      Neighbor capabilities:
+      Dynamic capability: advertised (mp, refresh, gr) received (mp, refresh, gr)
+      Dynamic capability (old): advertised received
+      Route refresh capability (new): advertised received
+      Route refresh capability (old): advertised received
+      4-Byte AS capability: advertised received
+      Address family IPv4 Unicast: advertised received
+      Graceful Restart capability: advertised received
+
+      Graceful Restart Parameters:
+      Address families advertised to peer:
+        IPv4 Unicast
+      Address families received from peer:
+        IPv4 Unicast
+      Forwarding state preserved by peer for:
+      Restart time advertised to peer: 120 seconds
+      Stale time for routes advertised by peer: 300 seconds
+      Restart time advertised by peer: 120 seconds
+      Extended Next Hop Encoding Capability: advertised received
+      Receive IPv6 next hop encoding Capability for AF:
+        IPv4 Unicast
+
+      Message statistics:
+                                  Sent               Rcvd
+      Opens:                         1                  1
+      Notifications:                 0                  0
+      Updates:                       3                  4
+      Keepalives:                   57                 55
+      Route Refresh:                 1                  0
+      Capability:                    2                  2
+      Total:                        64                 62
+      Total bytes:                1298               1310
+      Bytes in queue:                0                  0
+
+      For address family: IPv4 Unicast
+      BGP table version 11, neighbor version 11
+      1 accepted prefixes (1 paths), consuming 144 bytes of memory
+      0 received paths for inbound soft reconfiguration
+      1 sent prefixes (1 paths)
+      Community attribute sent to this neighbor
+      Extended community attribute sent to this neighbor
+      Third-party Nexthop will not be computed.
+
+      Local host: 10.1.0.111, Local port: 179
+      Foreign host: 10.0.0.2, Foreign port: 21541
+      fd = 80
+  show bgp ipv4 unicast: |
+    BGP routing table information for VRF default, address family IPv4 Unicast
+    BGP table version is 11, Local Router ID is 10.1.0.111
+    Status: s-suppressed, x-deleted, S-stale, d-dampened, h-history, *-valid, >-best
+    Path type: i-internal, e-external, c-confed, l-local, a-aggregate, r-redist, I-injected
+    Origin codes: i - IGP, e - EGP, ? - incomplete, | - multipath, & - backup, 2 - best2
+
+       Network            Next Hop            Metric     LocPrf     Weight Path
+    *>l172.16.1.0/24      0.0.0.0                           100      32768 i
+    *>i172.16.2.0/24      10.2.0.121                        200          0 i
+    * i                   10.2.0.121                        100          0 i
+  show bgp ipv4 unicast 172.16.2.0/24: |
+    BGP routing table information for VRF default, address family IPv4 Unicast
+    BGP routing table entry for 172.16.2.0/24, version 11
+    Paths: (2 available, best #2)
+    Flags: (0x08001a) (high32 00000000) on xmit-list, is in urib, is best urib route, is in HW
+
+      Path type: internal, path is valid, not best reason: Local Preference, no labeled nexthop
+      AS-Path: NONE, path sourced internal to AS
+        10.2.0.121 (metric 161) from 10.0.0.1 (10.0.0.1)
+          Origin IGP, MED not set, localpref 100, weight 0
+          Community: 65000:200
+          Originator: 10.2.0.121 Cluster list: 10.0.0.1
+
+      Advertised path-id 1
+      Path type: internal, path is valid, is best path, no labeled nexthop
+      AS-Path: NONE, path sourced internal to AS
+        10.2.0.121 (metric 161) from 10.0.0.2 (10.0.0.2)
+          Origin IGP, MED not set, localpref 200, weight 0
+          Community: 65000:200
+          Originator: 10.2.0.121 Cluster list: 10.0.0.2
+
+      Path-id 1 not advertised to any peer
+  ping 172.16.2.1 source 172.16.1.1: |
+    PING 172.16.2.1 (172.16.2.1): 56 data bytes
+    64 bytes from 172.16.2.1: icmp_seq=0 ttl=252 time=2.000 ms
+    64 bytes from 172.16.2.1: icmp_seq=1 ttl=252 time=2.300 ms
+    64 bytes from 172.16.2.1: icmp_seq=2 ttl=252 time=2.600 ms
+    64 bytes from 172.16.2.1: icmp_seq=3 ttl=252 time=2.900 ms
+    64 bytes from 172.16.2.1: icmp_seq=4 ttl=252 time=3.200 ms
+
+    --- 172.16.2.1 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 2.000/2.600/3.200 ms
+  show bgp ipv4 unicast summary: |
+    BGP summary information for VRF default, address family IPv4 Unicast
+    BGP router identifier 10.1.0.111, local AS number 65000
+    BGP table version is 11, IPv4 Unicast config peers 2, capable peers 2
+    2 network entries and 4 paths using 976 bytes of memory
+    BGP attribute entries [3/1056], BGP AS path entries [0/0]
+    BGP community entries [1/32], BGP clusterlist entries [2/8]
+
+    Neighbor        V    AS    MsgRcvd    MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+    10.0.0.1        4 65000         58         61       11    0    0 00:52:11 1
+    10.0.0.2        4 65000         58         61       11    0    0 00:52:11 1
+P2-LEAF:
+  show ip route 172.16.1.0/24: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    172.16.1.0/24, ubest/mbest: 1/0
+        *via 10.1.0.111, [200/0], 00:51:40, bgp-65000, internal, tag 65000
+  ping 172.16.1.1 source 172.16.2.1: |
+    PING 172.16.1.1 (172.16.1.1): 56 data bytes
+    64 bytes from 172.16.1.1: icmp_seq=0 ttl=252 time=2.000 ms
+    64 bytes from 172.16.1.1: icmp_seq=1 ttl=252 time=2.300 ms
+    64 bytes from 172.16.1.1: icmp_seq=2 ttl=252 time=2.600 ms
+    64 bytes from 172.16.1.1: icmp_seq=3 ttl=252 time=2.900 ms
+    64 bytes from 172.16.1.1: icmp_seq=4 ttl=252 time=3.200 ms
+
+    --- 172.16.1.1 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 2.000/2.600/3.200 ms
+P1-SPINE:
+  show ip route 172.16.2.0/24: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    172.16.2.0/24, ubest/mbest: 1/0
+        *via 10.2.0.121, [200/0], 00:40:02, bgp-65000, internal, tag 65000
+  show ip route 10.2.0.0/16: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    10.2.0.0/16, ubest/mbest: 2/0
+        *via 10.0.1.1, Eth1/1, [110/121], 00:58:40, ospf-UNDERLAY, inter
+        *via 10.0.3.1, Eth1/2, [110/121], 00:58:40, ospf-UNDERLAY, inter

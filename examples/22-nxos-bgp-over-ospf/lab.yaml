@@ -1,0 +1,1230 @@
+id: 22-nxos-bgp-over-ospf
+type: walkthrough
+title: "NX-OS study path 2/3: iBGP over OSPF with super-spine route reflectors, with deep debug inspection"
+blueprint: ["3.2.c"]
+domain: "3.0 Infrastructure"
+difficulty: 4
+platforms: [iol]
+summary: "Lab 2 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with lab 21's finished multi-area OSPF underlay already in its day-0. Build iBGP AS 65000 on top: SS1/SS2 as route reflectors with peer templates, loopback peering, prefix advertisement, best-path selection between two reflected copies, the BGP-free-core problem and its fix, optional policy with communities and local preference, plus eBGP and BFD design discussions. Every step explains the BGP internals and inspects them with show, event-history and filtered debugs in a debug logfile."
+author: CML Lab Builder
+version: "1"
+ram_gb: 76
+nodes:
+  - name: SS1
+    kind: router
+    definition: nxosv9000
+    x: -150
+    y: -420
+    config: |
+      ! Lab 22 baseline (the start of this lab) = the lab 21 baseline + every required step of lab 21 (OSPF multi-area). CML builds this lab fresh from this config; it never reuses an earlier lab.
+      interface Ethernet1/1
+        description to P1-SPINE Eth1/1
+        no shutdown
+      interface Ethernet1/2
+        description to P2-SPINE Eth1/1
+        no shutdown
+      interface Ethernet1/3
+        description to SS2 Eth1/3
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+      interface Ethernet1/1
+        no switchport
+        mtu 9216
+        ip address 10.0.1.1/30
+        no shutdown
+      interface Ethernet1/2
+        no switchport
+        mtu 9216
+        ip address 10.0.2.1/30
+        no shutdown
+      interface Ethernet1/3
+        no switchport
+        mtu 9216
+        ip address 10.0.12.1/24
+        no shutdown
+      interface loopback0
+        description router ID
+        ip address 10.0.0.1/32
+      feature ospf
+      router ospf UNDERLAY
+        router-id 10.0.0.1
+        log-adjacency-changes detail
+      interface loopback0
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/1
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/2
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/3
+        ip ospf priority 100
+        ip router ospf UNDERLAY area 0.0.0.0
+  - name: SS2
+    kind: router
+    definition: nxosv9000
+    x: 150
+    y: -420
+    config: |
+      ! Lab 22 baseline (the start of this lab) = the lab 21 baseline + every required step of lab 21 (OSPF multi-area). CML builds this lab fresh from this config; it never reuses an earlier lab.
+      interface Ethernet1/1
+        description to P1-SPINE Eth1/2
+        no shutdown
+      interface Ethernet1/2
+        description to P2-SPINE Eth1/2
+        no shutdown
+      interface Ethernet1/3
+        description to SS1 Eth1/3
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+      interface Ethernet1/1
+        no switchport
+        mtu 9216
+        ip address 10.0.3.1/30
+        no shutdown
+      interface Ethernet1/2
+        no switchport
+        mtu 9216
+        ip address 10.0.4.1/30
+        no shutdown
+      interface Ethernet1/3
+        no switchport
+        mtu 9216
+        ip address 10.0.12.2/24
+        no shutdown
+      interface loopback0
+        description router ID
+        ip address 10.0.0.2/32
+      feature ospf
+      router ospf UNDERLAY
+        router-id 10.0.0.2
+        log-adjacency-changes detail
+      interface loopback0
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/1
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/2
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/3
+        ip router ospf UNDERLAY area 0.0.0.0
+  - name: P1-SPINE
+    kind: router
+    definition: nxosv9000
+    x: -300
+    y: -220
+    config: |
+      ! Lab 22 baseline (the start of this lab) = the lab 21 baseline + every required step of lab 21 (OSPF multi-area). CML builds this lab fresh from this config; it never reuses an earlier lab.
+      interface Ethernet1/1
+        description to SS1 Eth1/1
+        no shutdown
+      interface Ethernet1/2
+        description to SS2 Eth1/1
+        no shutdown
+      interface Ethernet1/3
+        description to P1-LEAF Eth1/1
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+      interface Ethernet1/1
+        no switchport
+        mtu 9216
+        ip address 10.0.1.2/30
+        no shutdown
+      interface Ethernet1/2
+        no switchport
+        mtu 9216
+        ip address 10.0.3.2/30
+        no shutdown
+      interface Ethernet1/3
+        no switchport
+        mtu 9216
+        ip address 10.1.10.1/30
+        no shutdown
+      interface loopback0
+        description router ID
+        ip address 10.0.0.11/32
+      feature ospf
+      router ospf UNDERLAY
+        router-id 10.0.0.11
+        log-adjacency-changes detail
+      interface loopback0
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/1
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/2
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/3
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.1
+      router ospf UNDERLAY
+        area 0.0.0.1 range 10.1.0.0/16
+      router ospf UNDERLAY
+        area 0.0.0.1 nssa default-information-originate
+  - name: P2-SPINE
+    kind: router
+    definition: nxosv9000
+    x: 300
+    y: -220
+    config: |
+      ! Lab 22 baseline (the start of this lab) = the lab 21 baseline + every required step of lab 21 (OSPF multi-area). CML builds this lab fresh from this config; it never reuses an earlier lab.
+      interface Ethernet1/1
+        description to SS1 Eth1/2
+        no shutdown
+      interface Ethernet1/2
+        description to SS2 Eth1/2
+        no shutdown
+      interface Ethernet1/3
+        description to P2-LEAF Eth1/1
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+      interface Ethernet1/1
+        no switchport
+        mtu 9216
+        ip address 10.0.2.2/30
+        no shutdown
+      interface Ethernet1/2
+        no switchport
+        mtu 9216
+        ip address 10.0.4.2/30
+        no shutdown
+      interface Ethernet1/3
+        no switchport
+        mtu 9216
+        ip address 10.2.10.1/30
+        no shutdown
+      interface loopback0
+        description router ID
+        ip address 10.0.0.21/32
+      feature ospf
+      router ospf UNDERLAY
+        router-id 10.0.0.21
+        log-adjacency-changes detail
+      interface loopback0
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/1
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/2
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.0
+      interface Ethernet1/3
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.2
+      router ospf UNDERLAY
+        area 0.0.0.2 range 10.2.0.0/16
+      router ospf UNDERLAY
+        area 0.0.0.2 stub
+  - name: P1-LEAF
+    kind: switch
+    definition: nxosv9000
+    x: -300
+    y: 0
+    config: |
+      ! Lab 22 baseline (the start of this lab) = the lab 21 baseline + every required step of lab 21 (OSPF multi-area). CML builds this lab fresh from this config; it never reuses an earlier lab.
+      interface Ethernet1/1
+        description to P1-SPINE Eth1/3
+        no shutdown
+      interface Ethernet1/2
+        description to H1 (VLAN 10 in lab 23)
+        no shutdown
+      interface Ethernet1/3
+        description to H2 (VLAN 20 in lab 23)
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+      interface Ethernet1/1
+        no switchport
+        mtu 9216
+        ip address 10.1.10.2/30
+        no shutdown
+      interface loopback0
+        description router ID
+        ip address 10.1.0.111/32
+      interface loopback1
+        description VTEP source (lab 23)
+        ip address 10.1.1.111/32
+      feature ospf
+      router ospf UNDERLAY
+        router-id 10.1.0.111
+        log-adjacency-changes detail
+      interface loopback0
+        ip router ospf UNDERLAY area 0.0.0.1
+      interface loopback1
+        ip router ospf UNDERLAY area 0.0.0.1
+      interface Ethernet1/1
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.1
+      interface loopback100
+        description external test prefix (redistributed as NSSA type 7)
+        ip address 172.31.1.1/24
+      route-map RM-EXT permit 10
+        match interface loopback100
+      router ospf UNDERLAY
+        area 0.0.0.1 nssa
+        redistribute direct route-map RM-EXT
+  - name: P2-LEAF
+    kind: switch
+    definition: nxosv9000
+    x: 300
+    y: 0
+    config: |
+      ! Lab 22 baseline (the start of this lab) = the lab 21 baseline + every required step of lab 21 (OSPF multi-area). CML builds this lab fresh from this config; it never reuses an earlier lab.
+      interface Ethernet1/1
+        description to P2-SPINE Eth1/3
+        no shutdown
+      interface Ethernet1/2
+        description to H3 (VLAN 10 in lab 23)
+        no shutdown
+      interface Ethernet1/3
+        description to H4 (VLAN 20 in lab 23)
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+      interface Ethernet1/1
+        no switchport
+        mtu 9216
+        ip address 10.2.10.2/30
+        no shutdown
+      interface loopback0
+        description router ID
+        ip address 10.2.0.121/32
+      interface loopback1
+        description VTEP source (lab 23)
+        ip address 10.2.1.121/32
+      feature ospf
+      router ospf UNDERLAY
+        router-id 10.2.0.121
+        log-adjacency-changes detail
+      interface loopback0
+        ip router ospf UNDERLAY area 0.0.0.2
+      interface loopback1
+        ip router ospf UNDERLAY area 0.0.0.2
+      interface Ethernet1/1
+        ip ospf network point-to-point
+        ip router ospf UNDERLAY area 0.0.0.2
+      router ospf UNDERLAY
+        area 0.0.0.2 stub
+  - name: H1
+    kind: router
+    x: -420
+    y: 220
+    config: |
+      ! Test host (an IOS router used as a PC) - already configured. It is idle until lab 23 (VLAN 10 on P1-LEAF).
+      interface %if0%
+       description to P1-LEAF Eth1/2 (VLAN 10)
+       mac-address 0010.0010.0011
+       ip address 192.168.10.11 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.10.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
+  - name: H2
+    kind: router
+    x: -180
+    y: 220
+    config: |
+      ! Test host (an IOS router used as a PC) - already configured. It is idle until lab 23 (VLAN 20 on P1-LEAF).
+      interface %if0%
+       description to P1-LEAF Eth1/3 (VLAN 20)
+       mac-address 0020.0020.0012
+       ip address 192.168.20.12 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.20.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
+  - name: H3
+    kind: router
+    x: 180
+    y: 220
+    config: |
+      ! Test host (an IOS router used as a PC) - already configured. It is idle until lab 23 (VLAN 10 on P2-LEAF).
+      interface %if0%
+       description to P2-LEAF Eth1/2 (VLAN 10)
+       mac-address 0010.0010.0013
+       ip address 192.168.10.13 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.10.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
+  - name: H4
+    kind: router
+    x: 420
+    y: 220
+    config: |
+      ! Test host (an IOS router used as a PC) - already configured. It is idle until lab 23 (VLAN 20 on P2-LEAF).
+      interface %if0%
+       description to P2-LEAF Eth1/3 (VLAN 20)
+       mac-address 0020.0020.0014
+       ip address 192.168.20.14 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.20.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
+links:
+  - {a: {node: SS1, port: 0}, b: {node: P1-SPINE, port: 0}}
+  - {a: {node: SS1, port: 1}, b: {node: P2-SPINE, port: 0}}
+  - {a: {node: SS2, port: 0}, b: {node: P1-SPINE, port: 1}}
+  - {a: {node: SS2, port: 1}, b: {node: P2-SPINE, port: 1}}
+  - {a: {node: SS1, port: 2}, b: {node: SS2, port: 2}}
+  - {a: {node: P1-SPINE, port: 2}, b: {node: P1-LEAF, port: 0}}
+  - {a: {node: P2-SPINE, port: 2}, b: {node: P2-LEAF, port: 0}}
+  - {a: {node: P1-LEAF, port: 1}, b: {node: H1, port: 0}}
+  - {a: {node: P1-LEAF, port: 2}, b: {node: H2, port: 0}}
+  - {a: {node: P2-LEAF, port: 1}, b: {node: H3, port: 0}}
+  - {a: {node: P2-LEAF, port: 2}, b: {node: H4, port: 0}}
+task: |
+  A guided build, not a graded challenge. This is **lab 2 of 3** of the **NX-OS study path**
+  (OSPF -> BGP -> BGP EVPN VXLAN). It is a **separate CML lab that starts from its own baseline**: its day-0
+  already contains the complete OSPF underlay of lab 21 (area 0 on the super spines, pod 1 = NSSA area 1, pod 2 =
+  stub area 2, /16 summaries on the spine ABRs). You did not have to do lab 21 - and if you did, its running configs
+  are not used.
+
+  **What you build: iBGP AS 65000 over the OSPF underlay**
+
+  ```
+              SS1 (RR) ----------------- SS2 (RR)        route reflectors, cluster IDs 10.0.0.1 / 10.0.0.2
+             /   \                       /   \
+       P1-SPINE   +------- P2-SPINE ----+                 RR clients from step 6 (the BGP-free core fix)
+          |                    |
+       P1-LEAF                P2-LEAF                     RR clients: advertise 172.16.1.0/24 / 172.16.2.0/24
+  ```
+
+  - Every BGP session runs **loopback0 to loopback0** (`update-source loopback0`), carried by OSPF.
+  - **SS1 and SS2 are route reflectors**, configured with a **peer template** (`template peer RR-CLIENTS`). The
+    clients only peer with the two RRs, never with each other.
+  - The leaves advertise a test prefix each on **loopback200**: P1-LEAF **172.16.1.0/24**, P2-LEAF
+    **172.16.2.0/24**. In lab 23 the same sessions carry EVPN instead.
+
+  Addressing (same as lab 21): loopback0 SS1 10.0.0.1, SS2 10.0.0.2, P1-SPINE 10.0.0.11, P2-SPINE 10.0.0.21,
+  P1-LEAF 10.1.0.111, P2-LEAF 10.2.0.121; loopback1 (VTEP, lab 23) 10.1.1.111 / 10.2.1.121.
+
+  **Resources**: 10 nodes - 6 x nxosv9000 (12 GB each) + 4 IOL hosts = about **76 GB** of CML RAM. NX-OS takes
+  10-15 minutes to boot.
+
+  **How every step works**: *Under the hood*, then the config, then *Inspect* (show / event-history / debug and
+  what to look for). The app only runs `show` and `ping`, so debug commands are typed by hand - always into a debug
+  logfile, always ending with `undebug all`.
+steps:
+  - id: baseline
+    title: "Step 0 - This lab starts from its own baseline: verify the inherited OSPF underlay"
+    explain: |
+      **This lab starts from its own baseline.** CML built it fresh from this lab's day-0, which already holds lab
+      21's finished OSPF design. Before you put BGP on top, prove the underlay is healthy - BGP over loopbacks is
+      only as good as the IGP that carries the loopbacks.
+
+      **What BGP will need from OSPF**
+
+      - Every router must reach every BGP peer's **loopback0** with a specific route (NX-OS BGP does not
+        resolve a next hop or a peer address over a default route unless told to). P2-LEAF sits in a **stub**
+        area: it still has the inter-area summary **10.1.0.0/16**, so 10.1.0.111 is reachable - good.
+      - Later, BGP **next hops** (the leaves' loopback0) are resolved through OSPF. The IGP metric to the next
+        hop becomes a best-path tie-breaker, and an OSPF change triggers BGP **next-hop tracking**.
+
+      **Inspect the underlay** (the same toolkit as lab 21):
+
+      ```
+      show ip ospf neighbors                ! every adjacency FULL
+      show ip route ospf-UNDERLAY           ! intra / inter / type-2 / nssa routes
+      show ip ospf event-history adjacency  ! should be quiet: no flaps since boot
+      show running-config ospf              ! the inherited OSPF config
+      ```
+    verify:
+      - device: SS1
+        command: show ip ospf neighbors
+        expect: "10.0.0.11 and 10.0.0.21 `FULL/ -`, 10.0.0.2 `FULL/BDR` (or DR)."
+      - device: P2-LEAF
+        command: show ip route 10.1.0.111
+        expect: "`10.1.0.0/16 ... ospf-UNDERLAY, inter` - a specific route to P1-LEAF's loopback0 even in the stub area."
+      - device: P1-LEAF
+        command: ping 10.2.0.121 source 10.1.0.111
+        expect: "`5 packets received` - loopback to loopback across five stages, the path the leaf-to-RR and next-hop traffic takes."
+      - device: SS1
+        command: show running-config ospf
+        expect: "`router ospf UNDERLAY` with router-id 10.0.0.1 and `ip router ospf UNDERLAY area 0.0.0.0` on loopback0, Eth1/1-1/3."
+    checks:
+      - id: base-ss1-ospf
+        description: SS1 is FULL with both pod spines and SS2 (inherited underlay)
+        device: SS1
+        command: show ip ospf neighbors
+        match: ['^\s*10\.0\.0\.11\s+\d+\s+FULL', '^\s*10\.0\.0\.21\s+\d+\s+FULL', '^\s*10\.0\.0\.2\s+\d+\s+FULL']
+        hint: Wait until all six switches are booted; the OSPF config is in the day-0, nothing to configure.
+      - id: base-leaf-loopbacks
+        description: P1-LEAF loopback0 reaches P2-LEAF loopback0
+        device: P1-LEAF
+        command: ping 10.2.0.121 source 10.1.0.111
+        match: ['\b[3-5] packets received']
+        hint: "Check `show ip ospf neighbors` on both spines; the leaves must be FULL with their spine."
+  - id: rr
+    title: "Step 1 - Route reflectors on the super spines, with a peer template"
+    explain: |
+      **Why route reflectors?** iBGP has a loop-prevention rule: *a route learned from an iBGP peer is not
+      advertised to another iBGP peer* (iBGP does not change the AS_PATH, so it cannot detect loops). Without help
+      you need a **full mesh**: n(n-1)/2 sessions. A **route reflector** (RFC 4456) is allowed to break the rule
+      for its **clients**: a route from a client is reflected to all other clients and non-clients.
+
+      To keep loops impossible the RR adds two attributes when it reflects:
+
+      - **ORIGINATOR_ID** = the router ID of the router that injected the route. A router that sees its own
+        router ID there drops the update.
+      - **CLUSTER_LIST** = the cluster IDs the update passed through (by default the RR's router ID). An RR that
+        sees its own cluster ID drops it.
+
+      Two RRs, each its own cluster (default), means each leaf receives **two copies** of every route (one via
+      SS1, one via SS2) - redundancy you will see in step 4 and decide between in step 5.
+
+      **Peer templates (NX-OS).** `template peer RR-CLIENTS` holds everything the clients share: remote AS,
+      update source, the address family with `route-reflector-client` and `send-community` (lab 23's EVPN
+      route targets are *extended* communities, so both are enabled now). Each neighbor just says
+      `inherit peer RR-CLIENTS`. NX-OS also builds **update groups** automatically: neighbors with the same
+      outbound policy share one formatted update, which is how RRs scale.
+
+      **The NX-OS BGP state machine** you will watch in step 2: `Idle -> Connect -> Active -> OpenSent ->
+      OpenConfirm -> Established`. With only the RR side configured, the neighbors stay **Idle** / **Active**:
+      SS1 tries to open TCP 179 to 10.1.0.111 and gets a RST because nobody listens yet.
+
+      **Inspect / debug now** (SS1, before the leaves exist):
+
+      ```
+      show bgp ipv4 unicast summary          ! neighbors in Idle / Active, PfxRcd empty
+      show bgp peer-template RR-CLIENTS      ! what the template carries and who inherits it
+      show bgp sessions                      ! one line per session: state, flaps, last reset
+      show bgp event-history detail          ! connect attempts, "connection refused"
+      ```
+    config:
+      SS1: |
+        feature bgp
+        router bgp 65000
+          router-id 10.0.0.1
+          log-neighbor-changes
+          address-family ipv4 unicast
+          template peer RR-CLIENTS
+            remote-as 65000
+            update-source loopback0
+            address-family ipv4 unicast
+              send-community
+              send-community extended
+              route-reflector-client
+          neighbor 10.1.0.111
+            inherit peer RR-CLIENTS
+            description P1-LEAF
+          neighbor 10.2.0.121
+            inherit peer RR-CLIENTS
+            description P2-LEAF
+      SS2: |
+        feature bgp
+        router bgp 65000
+          router-id 10.0.0.2
+          log-neighbor-changes
+          address-family ipv4 unicast
+          template peer RR-CLIENTS
+            remote-as 65000
+            update-source loopback0
+            address-family ipv4 unicast
+              send-community
+              send-community extended
+              route-reflector-client
+          neighbor 10.1.0.111
+            inherit peer RR-CLIENTS
+            description P1-LEAF
+          neighbor 10.2.0.121
+            inherit peer RR-CLIENTS
+            description P2-LEAF
+    verify:
+      - device: SS1
+        command: show bgp peer-template RR-CLIENTS
+        expect: "`BGP peer-template is RR-CLIENTS`, `Remote AS 65000`, `Using loopback0 as update source`, `Route reflector client`, `Community attribute sent to this neighbor`, `Extended community attribute sent`, and the inheriting peers 10.1.0.111 and 10.2.0.121."
+      - device: SS1
+        command: show bgp ipv4 unicast summary
+        expect: "`BGP router identifier 10.0.0.1, local AS number 65000`; 10.1.0.111 and 10.2.0.121 with State/PfxRcd `Idle` or `Active` until step 2, then a number."
+      - device: SS1
+        command: show bgp sessions
+        expect: Both neighbors with their state, flaps and the last reset reason.
+    checks:
+      - id: rr-ss1-cfg
+        description: SS1 has the RR-CLIENTS template and both leaves inherit it
+        device: SS1
+        mode: config
+        match: ['^\s+template peer RR-CLIENTS\n(?:[ \t]+.*\n)*?[ \t]+route-reflector-client', '^\s+neighbor 10\.1\.0\.111\n\s+inherit peer RR-CLIENTS', '^\s+neighbor 10\.2\.0\.121\n\s+inherit peer RR-CLIENTS', '^\s+update-source loopback0']
+        hint: Paste the SS1 block of this step.
+      - id: rr-ss2-cfg
+        description: SS2 has the RR-CLIENTS template and both leaves inherit it
+        device: SS2
+        mode: config
+        match: ['^\s+template peer RR-CLIENTS\n(?:[ \t]+.*\n)*?[ \t]+route-reflector-client', '^\s+neighbor 10\.1\.0\.111\n\s+inherit peer RR-CLIENTS', '^\s+neighbor 10\.2\.0\.121\n\s+inherit peer RR-CLIENTS']
+        hint: Paste the SS2 block of this step.
+  - id: leaf-peering
+    title: "Step 2 - Leaf sessions to both RRs: watch the FSM with event-history and a filtered debug"
+    explain: |
+      **Under the hood: building the session.**
+
+      1. **Idle -> Connect**: BGP needs a route to the peer (OSPF gives 10.0.0.1 via the summary/intra routes) and
+         opens TCP to port **179** *from loopback0* (`update-source loopback0`). Without update-source the
+         source would be Eth1/1's address, which the RR does not have configured as a neighbor: it would refuse
+         the connection - the most common iBGP-over-loopback mistake.
+      2. Both sides may open TCP at the same time (**collision**): the connection initiated by the higher router ID
+         survives. That is why one side shows `Local port: 179` and the other an ephemeral port.
+      3. **OpenSent / OpenConfirm**: each side sends an OPEN with its AS (65000 = 65000 means iBGP), hold time
+         (NX-OS default 180 s, keepalive 60 s; the lower hold time wins), router ID and **capabilities**:
+         multiprotocol (address families, here IPv4 unicast), route refresh, 4-byte AS, graceful restart.
+         A mismatch (wrong AS, duplicate router ID) produces a NOTIFICATION and back to Idle.
+      4. **Established**: KEEPALIVEs every 60 s, then the UPDATEs. An End-of-RIB marker ends the initial table
+         exchange.
+
+      **Deep debug: catch the OPEN exchange** (on P1-LEAF, *before* you paste its block):
+
+      ```
+      debug logfile bgp-dbg size 4000000
+      debug-filter bgp neighbor 10.0.0.1        ! only the SS1 session
+      debug bgp events                           ! FSM transitions (keywords: debug bgp ?)
+      debug bgp keepalives
+      debug bgp updates
+      ! paste the P1-LEAF block, wait for Established, then:
+      show debug logfile bgp-dbg                 ! OPEN sent/received, capabilities, state changes
+      undebug all
+      no debug-filter all
+      dir log:                                   ! debug logfiles live in log:
+      ```
+
+      Without debugs: `show bgp event-history detail` (and `show bgp event-history msgs` for the packets) replays
+      the same transitions from the always-on buffer.
+    config:
+      P1-LEAF: |
+        feature bgp
+        router bgp 65000
+          router-id 10.1.0.111
+          log-neighbor-changes
+          address-family ipv4 unicast
+          template peer RR
+            remote-as 65000
+            update-source loopback0
+            address-family ipv4 unicast
+              send-community
+              send-community extended
+          neighbor 10.0.0.1
+            inherit peer RR
+            description SS1 (route reflector)
+          neighbor 10.0.0.2
+            inherit peer RR
+            description SS2 (route reflector)
+      P2-LEAF: |
+        feature bgp
+        router bgp 65000
+          router-id 10.2.0.121
+          log-neighbor-changes
+          address-family ipv4 unicast
+          template peer RR
+            remote-as 65000
+            update-source loopback0
+            address-family ipv4 unicast
+              send-community
+              send-community extended
+          neighbor 10.0.0.1
+            inherit peer RR
+            description SS1 (route reflector)
+          neighbor 10.0.0.2
+            inherit peer RR
+            description SS2 (route reflector)
+    verify:
+      - device: SS1
+        command: show bgp ipv4 unicast summary
+        expect: "10.1.0.111 and 10.2.0.121 `4 65000` with an Up/Down timer and a number (`0` until step 3) in State/PfxRcd - a number means Established."
+      - device: P1-LEAF
+        command: show bgp ipv4 unicast neighbors 10.0.0.1
+        expect: "`BGP state = Established`, `Using loopback0 as update source for this peer`, `Hold time is 180, keepalive interval is 60 seconds`, `Neighbor capabilities:` with `Dynamic capability`/`Route refresh capability`/`4-Byte AS capability` and `Address family IPv4 Unicast: advertised received`, and `Local host: 10.1.0.111 ... Foreign host: 10.0.0.1, Foreign port: 179` (or the reverse)."
+      - device: P1-LEAF
+        command: show bgp event-history detail
+        expect: The FSM transitions to Established for 10.0.0.1 and 10.0.0.2, the OPEN messages and the End-of-RIB.
+      - device: P1-LEAF
+        command: show bgp sessions
+        expect: "Two sessions, `E` (Established), 0 flaps."
+    checks:
+      - id: leaf-ss1-summary
+        description: SS1 has both leaves Established
+        device: SS1
+        command: show bgp ipv4 unicast summary
+        match: ['^10\.1\.0\.111\s+4\s+65000\s.*\s\d+\s*$', '^10\.2\.0\.121\s+4\s+65000\s.*\s\d+\s*$']
+        hint: "Both leaves need `update-source loopback0` (via template RR) and a route to 10.0.0.1/10.0.0.2."
+      - id: leaf-p1-established
+        description: P1-LEAF's session to SS1 is Established from loopback0
+        device: P1-LEAF
+        command: show bgp ipv4 unicast neighbors 10.0.0.1
+        match: ['BGP state = Established', 'Using loopback0 as update source']
+        hint: "If the RR shows the session Idle, the leaf is not sourcing from loopback0 (`update-source loopback0`)."
+      - id: leaf-ss2-summary
+        description: SS2 has both leaves Established
+        device: SS2
+        command: show bgp ipv4 unicast summary
+        match: ['^10\.1\.0\.111\s+4\s+65000\s.*\s\d+\s*$', '^10\.2\.0\.121\s+4\s+65000\s.*\s\d+\s*$']
+        hint: Paste the SS2 part of step 1 and the leaf blocks of this step.
+  - id: transport
+    title: "Step 3 - Under the session: TCP, the next hop and next-hop tracking"
+    explain: |
+      No config: understand what keeps a loopback session up and how BGP learns about underlay changes.
+
+      **Transport.** A BGP session is one TCP connection. Because it runs between loopbacks, it survives any
+      single link failure as long as OSPF finds another path: shut P1-SPINE Eth1/1 and the session to SS1 moves
+      to the path via SS2 - no flap. `show sockets connection tcp` (if available on your image) lists the
+      179 connection with its local/foreign addresses.
+
+      **Next hop.** iBGP does **not** change the next hop: a route originated by P2-LEAF keeps next hop
+      **10.2.0.121** as it is reflected by SS1/SS2 to P1-LEAF. P1-LEAF must resolve 10.2.0.121 recursively in the
+      URIB: `10.2.0.0/16` (OSPF inter-area) -> Eth1/1. If the next hop is unresolvable, the path is *invalid*
+      and never best.
+
+      **Next-hop tracking (NHT).** NX-OS BGP registers every next hop with the URIB and is told immediately
+      when the route to it changes (metric change, withdrawal). It then re-runs best path for just the affected
+      prefixes, instead of waiting for the 60 s scanner of older implementations. With the /16 summary,
+      a VTEP /32 disappearing is *not* signalled to remote leaves by OSPF - a design trade-off you met in lab 21.
+
+      **Inspect:**
+
+      ```
+      show bgp ipv4 unicast neighbors 10.0.0.1      ! timers, capabilities, messages sent/received
+      show bgp convergence                           ! when the initial table exchange finished
+      show bgp nexthop-database                      ! tracked next hops (if available on your release)
+      show ip route 10.2.0.121                       ! what NHT resolved the next hop through
+      ```
+    verify:
+      - device: P1-LEAF
+        command: show bgp ipv4 unicast neighbors 10.0.0.2
+        expect: "`BGP state = Established`, `Last read`, `Last written`, counters for opens/updates/keepalives and `Using loopback0 as update source`."
+      - device: P1-LEAF
+        command: show bgp convergence
+        expect: "Per address family: `First best path signalled` / `Convergence to URIB sent` with timestamps."
+      - device: P1-LEAF
+        command: show ip route 10.2.0.121
+        expect: "`10.2.0.0/16 ... via 10.1.10.1, Eth1/1, [110/161] ... ospf-UNDERLAY, inter` - the route BGP resolves the next hop through (161 = IGP metric to the next hop)."
+    checks:
+      - id: transport-ss2-loopback
+        description: P1-LEAF's session to SS2 is Established from loopback0
+        device: P1-LEAF
+        command: show bgp ipv4 unicast neighbors 10.0.0.2
+        match: ['BGP state = Established', 'Using loopback0 as update source']
+        hint: "Paste the SS2 block of step 1; check `show bgp sessions` on SS2."
+  - id: advertise
+    title: "Step 4 - Advertise prefixes: NLRI, attributes and the two reflected copies"
+    explain: |
+      **Under the hood.** `network 172.16.1.0/24` under `address-family ipv4 unicast` injects the prefix into
+      the BGP table **only if an exact match is in the URIB** (here the connected loopback200 /24). The new path is
+      *local* (weight 32768 on NX-OS for locally originated, next hop 0.0.0.0, origin IGP `i`).
+
+      The leaf sends an **UPDATE** to both RRs: NLRI 172.16.1.0/24, path attributes ORIGIN, AS_PATH (empty -
+      iBGP), NEXT_HOP 10.1.0.111, LOCAL_PREF 100. Each RR stores it in its Adj-RIB-In, runs best path, and
+      **reflects** it to its other clients, adding ORIGINATOR_ID 10.1.0.111 and its CLUSTER_LIST.
+
+      **What P2-LEAF ends up with:** two paths for 172.16.1.0/24, both with next hop 10.1.0.111 - one *from
+      10.0.0.1* (cluster list 10.0.0.1), one *from 10.0.0.2* (cluster list 10.0.0.2). Only one is best;
+      forwarding is identical because the next hop is the same.
+
+      **Deep debug: catch one UPDATE.**
+
+      ```
+      ! on SS1:
+      debug logfile bgp-dbg size 4000000
+      debug-filter bgp prefix 172.16.2.0/24      ! only this NLRI
+      debug bgp updates
+      ! paste the P2-LEAF block, then:
+      show debug logfile bgp-dbg                 ! UPDATE received from 10.2.0.121, then sent to 10.1.0.111
+      undebug all
+      no debug-filter all
+      ```
+
+      Read the table codes: `*` valid, `>` best, `i` internal, `l` local, `r` redistributed.
+    config:
+      P1-LEAF: |
+        interface loopback200
+          description tenant test prefix (advertised in BGP)
+          ip address 172.16.1.1/24
+        router bgp 65000
+          address-family ipv4 unicast
+            network 172.16.1.0/24
+      P2-LEAF: |
+        interface loopback200
+          description tenant test prefix (advertised in BGP)
+          ip address 172.16.2.1/24
+        router bgp 65000
+          address-family ipv4 unicast
+            network 172.16.2.0/24
+    verify:
+      - device: P1-LEAF
+        command: show bgp ipv4 unicast
+        expect: "`*>l172.16.1.0/24 0.0.0.0 100 32768 i` (local) and two lines for 172.16.2.0/24: `*>i` via next hop `10.2.0.121` and a second `* i` copy."
+      - device: P1-LEAF
+        command: show bgp ipv4 unicast 172.16.2.0/24
+        expect: "`Paths: (2 available, best #1)`; each path `10.2.0.121 (metric 161) from 10.0.0.x`, `localpref 100`, `Originator: 10.2.0.121 Cluster list: 10.0.0.1` (or `10.0.0.2`)."
+      - device: SS1
+        command: show bgp ipv4 unicast neighbors 10.1.0.111 advertised-routes
+        expect: "SS1 reflects 172.16.2.0/24 (next hop 10.2.0.121, unchanged) to P1-LEAF."
+      - device: P1-LEAF
+        command: show ip route 172.16.2.0/24
+        expect: "`*via 10.2.0.121, [200/0] ... bgp-65000, internal, tag 65000` - iBGP AD 200, recursive via OSPF."
+    checks:
+      - id: adv-p1-leaf-table
+        description: P1-LEAF has P2-LEAF's prefix as best internal path with next hop 10.2.0.121
+        device: P1-LEAF
+        command: show bgp ipv4 unicast
+        match: ['^\*>i172\.16\.2\.0/24\s+10\.2\.0\.121', '^\*>l172\.16\.1\.0/24']
+        hint: "P2-LEAF needs loopback200 172.16.2.1/24 and `network 172.16.2.0/24` under `address-family ipv4 unicast`."
+      - id: adv-p1-leaf-reflected
+        description: P1-LEAF sees the RR attributes on the reflected route
+        device: P1-LEAF
+        command: show bgp ipv4 unicast 172.16.2.0/24
+        match: ['Originator: 10\.2\.0\.121', 'Cluster list: 10\.0\.0\.[12]', 'Paths: \(2 available']
+        hint: Both RRs must have the leaves as route-reflector-client (template RR-CLIENTS).
+      - id: adv-p2-leaf-route
+        description: P2-LEAF installs P1-LEAF's prefix from BGP
+        device: P2-LEAF
+        command: show ip route 172.16.1.0/24
+        match: ['via 10\.1\.0\.111', 'bgp-65000, internal']
+        hint: "P1-LEAF needs `network 172.16.1.0/24`; check `show bgp ipv4 unicast` on SS1."
+  - id: bestpath
+    title: "Step 5 - Best-path selection: why one reflected copy wins"
+    explain: |
+      No config: walk the NX-OS best-path algorithm for P1-LEAF's two copies of 172.16.2.0/24 and predict the
+      winner before you look.
+
+      | # | Criterion | Copy via SS1 | Copy via SS2 | Result |
+      |---|---|---|---|---|
+      | 1 | valid next hop, weight (higher) | 10.2.0.121, 0 | 10.2.0.121, 0 | tie |
+      | 2 | LOCAL_PREF (higher) | 100 | 100 | tie |
+      | 3 | locally originated | no | no | tie |
+      | 4 | AS_PATH length (shorter) | 0 | 0 | tie |
+      | 5 | ORIGIN (IGP < EGP < ?) | i | i | tie |
+      | 6 | MED (lower, same neighbor AS) | - | - | tie |
+      | 7 | eBGP over iBGP | iBGP | iBGP | tie |
+      | 8 | IGP metric to next hop (lower) | 161 | 161 | tie (same next hop) |
+      | 9 | router ID - with RR, the **ORIGINATOR_ID** replaces it | 10.2.0.121 | 10.2.0.121 | tie |
+      | 10 | shorter CLUSTER_LIST | 1 | 1 | tie |
+      | 11 | **lowest neighbor address** | **10.0.0.1** | 10.0.0.2 | **SS1 wins** |
+
+      NX-OS tells you the reason: the losing path shows `not best reason: Neighbor Address`.
+
+      **Why keep both copies?** If SS1 fails, the SS2 copy is already in the table: no re-learning, just a new
+      best path. With a **shared cluster ID** on both RRs (`cluster-id 10.0.0.100`) each RR would drop the other's
+      reflection, saving memory but losing that pre-installed backup - a design choice.
+
+      **Inspect the decision log** with `show bgp event-history detail` (best-path runs per prefix) and, if you
+      want it live, `debug bgp updates` with `debug-filter bgp prefix 172.16.2.0/24` into a logfile while you
+      `clear bgp ipv4 unicast 10.0.0.1 soft in` (a route refresh, no session reset).
+    verify:
+      - device: P1-LEAF
+        command: show bgp ipv4 unicast 172.16.2.0/24
+        expect: "`Paths: (2 available, best #1)`: the path `from 10.0.0.1` is `is best path`, the path `from 10.0.0.2` says `not best reason: Neighbor Address` (until the optional step 7 changes local preference)."
+      - device: SS2
+        command: show bgp ipv4 unicast 172.16.2.0/24
+        expect: "One path, from the client 10.2.0.121 itself: SS1 and SS2 do not peer with each other in this design, so an RR never sees the other RR's reflection."
+    checks:
+      - id: bestpath-p1-leaf
+        description: P1-LEAF has a best path for 172.16.2.0/24 and names why the other lost
+        device: P1-LEAF
+        command: show bgp ipv4 unicast 172.16.2.0/24
+        match: ['is best path', 'not best reason']
+        hint: Both RRs must reflect the route (step 4); then P1-LEAF has two copies to choose from.
+  - id: bgp-free-core
+    title: "Step 6 - The BGP-free core problem: why ping fails, and the spines join BGP"
+    explain: |
+      **The experiment first** (before pasting): on P1-LEAF run `ping 172.16.2.1 source 172.16.1.1`. It
+      **fails**, although both leaves have each other's prefix in BGP and the next hops are reachable.
+
+      **Why - follow the packet.** P1-LEAF looks up 172.16.2.1: BGP route via next hop 10.2.0.121, resolved over
+      OSPF to Eth1/1 -> the packet goes to **P1-SPINE**, still carrying destination 172.16.2.1. P1-SPINE runs only
+      OSPF: it has no route for 172.16.0.0/16 and no default (it is an ABR in area 0) -> **dropped**.
+      `traceroute 172.16.2.1 source 172.16.1.1` stops after the first hop. The control plane is perfect, the data
+      plane is not: every router on the path must know the destination - *or* the packet must be **tunnelled**
+      to the next hop so the transit routers only need to know the tunnel endpoint.
+
+      | Fix | How | Used where |
+      |---|---|---|
+      | Transit routers run BGP | the spines (and super spines) learn the prefixes | what you do now |
+      | Tunnel to the next hop | MPLS labels, or **VXLAN** to the VTEP loopback | lab 23 - the spines then stay BGP-free |
+      | Redistribute BGP into the IGP | no - does not scale and loses BGP attributes | never in a fabric |
+
+      SS1/SS2 already have the routes (an RR installs what it learns). So the two spines become **RR clients** as
+      well: two more neighbors per RR, same template. The spines only receive (they advertise nothing).
+
+      After this step, follow the packet again: P1-SPINE has 172.16.2.0/24 via next hop 10.2.0.121, resolved to the
+      10.2.0.0/16 OSPF summary with **ECMP** via SS1 and SS2; the super spine resolves it to P2-SPINE, which has
+      the intra-area /32 to P2-LEAF. In lab 23 you will see that VXLAN makes all of this unnecessary for tenant
+      traffic.
+
+      **Debug the new sessions** on SS1: `debug logfile bgp-dbg size 4000000`,
+      `debug-filter bgp neighbor 10.0.0.11`, `debug bgp updates`, paste, `show debug logfile bgp-dbg` (you see the
+      full-table UPDATEs to the new client), `undebug all`, `no debug-filter all`.
+    config:
+      SS1: |
+        router bgp 65000
+          neighbor 10.0.0.11
+            inherit peer RR-CLIENTS
+            description P1-SPINE
+          neighbor 10.0.0.21
+            inherit peer RR-CLIENTS
+            description P2-SPINE
+      SS2: |
+        router bgp 65000
+          neighbor 10.0.0.11
+            inherit peer RR-CLIENTS
+            description P1-SPINE
+          neighbor 10.0.0.21
+            inherit peer RR-CLIENTS
+            description P2-SPINE
+      P1-SPINE: |
+        feature bgp
+        router bgp 65000
+          router-id 10.0.0.11
+          log-neighbor-changes
+          address-family ipv4 unicast
+          template peer RR
+            remote-as 65000
+            update-source loopback0
+            address-family ipv4 unicast
+              send-community
+              send-community extended
+          neighbor 10.0.0.1
+            inherit peer RR
+            description SS1 (route reflector)
+          neighbor 10.0.0.2
+            inherit peer RR
+            description SS2 (route reflector)
+      P2-SPINE: |
+        feature bgp
+        router bgp 65000
+          router-id 10.0.0.21
+          log-neighbor-changes
+          address-family ipv4 unicast
+          template peer RR
+            remote-as 65000
+            update-source loopback0
+            address-family ipv4 unicast
+              send-community
+              send-community extended
+          neighbor 10.0.0.1
+            inherit peer RR
+            description SS1 (route reflector)
+          neighbor 10.0.0.2
+            inherit peer RR
+            description SS2 (route reflector)
+    verify:
+      - device: P1-SPINE
+        command: show ip route 172.16.2.0/24
+        expect: "`*via 10.2.0.121, [200/0] ... bgp-65000, internal, tag 65000` - the spine now knows the destination."
+      - device: P1-LEAF
+        command: ping 172.16.2.1 source 172.16.1.1
+        expect: "`5 packets received` (it failed before this step)."
+      - device: SS1
+        command: show bgp ipv4 unicast summary
+        expect: "Four Established clients: 10.0.0.11, 10.0.0.21 (PfxRcd 0 - spines advertise nothing), 10.1.0.111, 10.2.0.121 (1 each)."
+    checks:
+      - id: core-p1-spine-route
+        description: P1-SPINE learned P2-LEAF's prefix from the RRs
+        device: P1-SPINE
+        command: show ip route 172.16.2.0/24
+        match: ['via 10\.2\.0\.121', 'bgp-65000, internal']
+        hint: "P1-SPINE needs `router bgp 65000` with neighbors 10.0.0.1/10.0.0.2 (template RR); the RRs need neighbor 10.0.0.11."
+      - id: core-leaf-ping
+        description: P1-LEAF's loopback200 reaches P2-LEAF's loopback200
+        device: P1-LEAF
+        command: ping 172.16.2.1 source 172.16.1.1
+        match: ['\b[3-5] packets received']
+        hint: Every transit hop needs the route - check P2-SPINE too (`show ip route 172.16.1.0/24`).
+      - id: core-ss1-four-clients
+        description: SS1 has all four clients Established
+        device: SS1
+        command: show bgp ipv4 unicast summary
+        match: ['^10\.0\.0\.11\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.0\.21\s+4\s+65000\s.*\s\d+\s*$']
+        hint: Paste the SS1 block of this step and the spine blocks.
+  - id: policy
+    title: "Step 7 (optional) - Policy: tag with a community, steer with local preference"
+    optional: true
+    explain: |
+      Optional and **not carried into lab 23** (lab 23's baseline leaves it out).
+
+      **Communities** are 32-bit tags (`ASN:value`) that travel with a route - but only if every sender has
+      `send-community` (NX-OS does not send them by default; the templates already enable it). They mean nothing by
+      themselves: policy elsewhere matches them. P2-LEAF tags 172.16.2.0/24 with **65000:200**.
+
+      **Local preference** is the first real tie-breaker inside an AS (higher wins). P1-LEAF sets it to **200** on
+      everything it receives from **SS2**, so the SS2 copy wins although SS1 has the lower address. Note the
+      NX-OS inheritance model: the neighbor still inherits template RR, and the neighbor-level
+      `address-family ipv4 unicast` only *adds* the inbound route-map.
+
+      **Under the hood of a policy change.** An inbound route-map applies to what arrives *after* the change.
+      NX-OS sends a **route refresh** to get the table again (both sides advertised the route-refresh
+      capability in step 2). If you see the old values, force it by hand: `clear bgp ipv4 unicast 10.0.0.2 soft in`
+      - a soft clear, the session stays up. A hard `clear bgp ipv4 unicast 10.0.0.2` resets the session:
+      avoid it in production.
+
+      **Debug:** `debug-filter bgp prefix 172.16.2.0/24`, `debug bgp updates` into a logfile, then the soft clear:
+      the refreshed UPDATE from SS2 arrives with community 65000:200 and is stored with local preference 200.
+    config:
+      P2-LEAF: |
+        route-map RM-TAG-LO200 permit 10
+          set community 65000:200
+        router bgp 65000
+          address-family ipv4 unicast
+            network 172.16.2.0/24 route-map RM-TAG-LO200
+      P1-LEAF: |
+        route-map RM-PREFER-SS2 permit 10
+          set local-preference 200
+        router bgp 65000
+          neighbor 10.0.0.2
+            address-family ipv4 unicast
+              route-map RM-PREFER-SS2 in
+    verify:
+      - device: P1-LEAF
+        command: show bgp ipv4 unicast 172.16.2.0/24
+        expect: "`best #2`: the path `from 10.0.0.2` with `localpref 200` is best, the SS1 path shows `not best reason: Local Preference`; both carry `Community: 65000:200`."
+      - device: P1-LEAF
+        command: show bgp ipv4 unicast community 65000:200
+        expect: Only 172.16.2.0/24 matches.
+      - device: P1-LEAF
+        command: show route-map RM-PREFER-SS2
+        expect: "`route-map RM-PREFER-SS2, permit, sequence 10`, `Set clauses: local-preference 200`."
+    checks:
+      - id: policy-p1-leaf-attrs
+        description: P1-LEAF prefers the SS2 copy (local preference 200) and sees the community
+        device: P1-LEAF
+        command: show bgp ipv4 unicast 172.16.2.0/24
+        match: ['Community: 65000:200', 'localpref 200']
+        hint: "If the attributes are missing, run `clear bgp ipv4 unicast 10.0.0.2 soft in` on P1-LEAF and check send-community on the RRs."
+  - id: ebgp
+    title: "Step 8 - Design discussion: the same fabric with eBGP (RFC 7938)"
+    explain: |
+      No config: this lab uses OSPF + iBGP, Cisco's classic VXLAN EVPN design. Many large fabrics use **eBGP
+      only** instead (RFC 7938). Know both - the EVPN mechanics in lab 23 are the same.
+
+      **eBGP version of this topology**: every leaf its own AS (P1-LEAF 65101, P2-LEAF 65102), each pod's spine
+      an AS (65011, 65021), the super spines a shared AS (65000). Sessions run on the **directly connected link
+      addresses** (no IGP needed at all, or only for loopbacks).
+
+      ```
+      ! P1-LEAF, eBGP style (do not paste)
+      router bgp 65101
+        router-id 10.1.0.111
+        neighbor 10.1.10.1
+          remote-as 65011
+          address-family ipv4 unicast
+      ```
+
+      | | iBGP + RR (this lab) | eBGP per tier |
+      |---|---|---|
+      | Underlay for loopbacks | OSPF (or IS-IS) | BGP itself |
+      | Loop prevention | ORIGINATOR_ID / CLUSTER_LIST | AS_PATH |
+      | Next hop | unchanged (always the originating leaf) | changed at every hop, unless `next-hop-unchanged` (EVPN needs the VTEP as next hop) |
+      | Route targets in EVPN | auto RT = `ASN:VNI` works everywhere | auto RT differs per leaf AS: use manual RTs or `rewrite-evpn-rt-asn` |
+      | Spines in EVPN | RR, no VTEP state | must keep EVPN routes they do not import: `retain route-target all` |
+      | Leaves with the same AS (some designs) | n/a | `allowas-in` / `disable-peer-as-check` |
+      | Convergence | IGP + NHT | per-hop BGP, BFD per link |
+
+      **Compare in this lab:** on P1-LEAF `show bgp ipv4 unicast 172.16.2.0/24` shows `AS-Path: NONE, path
+      sourced internal to AS` and the next hop 10.2.0.121 (the originator). In the eBGP design the same command
+      would show `AS-Path: 65011 65000 65021 65102` and the next hop of the directly connected spine.
+    verify:
+      - device: P1-LEAF
+        command: show bgp ipv4 unicast 172.16.2.0/24
+        expect: "`AS-Path: NONE, path sourced internal to AS` and next hop `10.2.0.121` - the iBGP signature."
+    checks:
+      - id: ebgp-compare-aspath
+        description: The iBGP route has an empty AS_PATH and the originator as next hop
+        device: P1-LEAF
+        command: show bgp ipv4 unicast 172.16.2.0/24
+        match: ['AS-Path: NONE, path sourced internal to AS', '10\.2\.0\.121 \(metric \d+\) from 10\.0\.0\.[12]']
+        hint: Step 4 must be done (P2-LEAF advertises 172.16.2.0/24).
+  - id: bfd
+    title: "Step 9 (optional) - Design discussion: BFD for fast failure detection"
+    optional: true
+    explain: |
+      No config to apply. **BFD is not in the Nexus 9000v supported-feature list** (Cisco's 9000v guide), so it
+      is shown here as a design step. On hardware Nexus it is standard practice.
+
+      **The problem it solves.** OSPF detects a dead neighbor after the dead interval (40 s); BGP after the hold
+      time (180 s) - unless the link goes physically down. On a fabric with media converters, optical breakouts or
+      VMs, links often fail *without* loss of carrier. **BFD** sends tiny UDP packets (port 3784, single hop) every
+      few hundred milliseconds and tells its clients (OSPF, BGP) within `interval x multiplier`.
+
+      ```
+      ! on every fabric node, hardware Nexus (do not paste into the 9000v lab)
+      feature bfd
+      interface Ethernet1/1
+        no ip redirects                 ! BFD requires ICMP redirects off on the interface
+        bfd interval 250 min_rx 250 multiplier 3
+      router ospf UNDERLAY
+        bfd                             ! all OSPF interfaces register with BFD
+      ! BGP over loopbacks would need multihop BFD (UDP 4784):
+      router bgp 65000
+        neighbor 10.0.0.1
+          bfd multihop
+      ```
+
+      **Which layer should use BFD here?** OSPF on the physical links (single hop). The BGP sessions run between
+      loopbacks and survive a link failure anyway; they follow OSPF via next-hop tracking. That is the usual
+      Cisco recommendation for an iBGP/OSPF fabric.
+
+      **Inspect (hardware):** `show bfd neighbors`, `show bfd neighbors details` (the registered clients, e.g.
+      `ospf`), `show ip ospf interface` (BFD enabled). On the 9000v, `feature bfd` may be accepted but
+      sessions may stay down.
+    verify:
+      - device: P1-SPINE
+        command: show ip ospf interface Ethernet1/1
+        expect: "No BFD line on the 9000v (not configured); on hardware with `bfd` under OSPF the interface shows `BFD is enabled`."
+  - id: convergence
+    title: "Step 10 - Failure drill: an underlay failure that BGP does not notice"
+    explain: |
+      No config: prove the loopback-peering design. Run by hand, inspect, and **undo**.
+
+      ```
+      ! P1-LEAF: start a logfile for BGP
+      debug logfile bgp-dbg size 4000000
+      debug bgp events
+      ! P1-SPINE: cut its link to SS1
+      interface Ethernet1/1
+        shutdown
+      ```
+
+      **What happens, layer by layer**
+
+      1. **OSPF** on P1-SPINE loses neighbor 10.0.0.1 immediately (link down), floods a new router LSA, runs SPF.
+         Pod-1 traffic to everything now goes via SS2 only (`show ip route 10.2.0.0/16` on P1-SPINE: one path).
+      2. **URIB** updates; BGP **next-hop tracking** on P1-SPINE re-resolves next hops - nothing becomes
+         unreachable.
+      3. **BGP**: P1-LEAF's session to SS1 (10.0.0.1) does **not** flap. Its TCP packets simply take P1-SPINE ->
+         SS2 -> SS1 now (SS2 and SS1 share the broadcast link and OSPF). `show bgp sessions` shows 0 new flaps.
+      4. `show debug logfile bgp-dbg` on P1-LEAF: no FSM changes. `show ip ospf event-history adjacency` on
+         P1-SPINE: the neighbor 10.0.0.1 DOWN event.
+
+      Undo: `no shutdown` on P1-SPINE Eth1/1, then `undebug all` on P1-LEAF. ECMP returns once the adjacency is
+      FULL again.
+
+      **Contrast:** if the BGP session ran on the Eth1/1 link addresses, the shutdown would kill it and all its
+      routes would be withdrawn and re-learned - exactly the churn loopback peering avoids.
+    verify:
+      - device: P1-LEAF
+        command: show bgp sessions
+        expect: Both sessions Established with no new flap after the drill.
+      - device: P1-SPINE
+        command: show ip route 10.2.0.0/16
+        expect: "During the drill one path (via 10.0.3.1, SS2); after `no shutdown` two paths again."
+    checks:
+      - id: conv-p1-spine-ecmp-back
+        description: P1-SPINE has both paths to pod 2 again after the drill
+        device: P1-SPINE
+        command: show ip route 10.2.0.0/16
+        match: ['ubest/mbest: 2/0']
+        hint: "`no shutdown` on P1-SPINE Ethernet1/1 (and wait for OSPF FULL)."
+      - id: conv-p1-leaf-sessions
+        description: P1-LEAF's sessions to both RRs are Established
+        device: P1-LEAF
+        command: show bgp ipv4 unicast summary
+        match: ['^10\.0\.0\.1\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.0\.2\s+4\s+65000\s.*\s\d+\s*$']
+        hint: Check `show bgp event-history detail` on P1-LEAF for the reason of a reset.
+  - id: wrap-up
+    title: "Step 11 - The control plane lab 23 needs: verify and read it end to end"
+    explain: |
+      Final review, no config. Lab 23 reuses exactly these sessions - leaf <-> SS1/SS2 over loopback0, template
+      based, communities on - and adds the **L2VPN EVPN** address family to them. Check everything lab 23 relies on:
+
+      - Leaves Established to **both** RRs, with `send-community extended` (EVPN route targets and the
+        encapsulation type are extended communities).
+      - The RRs reflect, the next hop stays the originating leaf (lab 23: the VTEP must be the next hop).
+      - Loopback0/loopback1 reachability via OSPF (loopback1 becomes the VTEP source).
+
+      **The safe-debug checklist, one more time**: `show debug` (nothing left on?), `undebug all`,
+      `no debug-filter all`, `clear debug logfile bgp-dbg` or `delete log:bgp-dbg` if you no longer need it.
+
+      **Where lab 23 starts**: its day-0 contains this lab's day-0 plus steps 1-6 (no policy step), so the
+      spines are RR clients too, and it moves the tenant traffic into VXLAN.
+    verify:
+      - device: SS2
+        command: show bgp ipv4 unicast summary
+        expect: Four clients Established; 10.1.0.111 and 10.2.0.121 with 1 prefix each.
+      - device: P2-LEAF
+        command: ping 172.16.1.1 source 172.16.2.1
+        expect: "`5 packets received` - the reverse direction of step 6."
+      - device: P2-LEAF
+        command: show bgp ipv4 unicast neighbors 10.0.0.1
+        expect: "`Extended community attribute sent to this neighbor` and `Community attribute sent to this neighbor` (inherited from template RR)."
+    checks:
+      - id: wrap-p2-leaf-ping
+        description: P2-LEAF's loopback200 reaches P1-LEAF's loopback200
+        device: P2-LEAF
+        command: ping 172.16.1.1 source 172.16.2.1
+        match: ['\b[3-5] packets received']
+        hint: P2-SPINE must be an RR client (step 6) and P1-LEAF must advertise 172.16.1.0/24.
+      - id: wrap-ss2-summary
+        description: SS2 has all four clients Established
+        device: SS2
+        command: show bgp ipv4 unicast summary
+        match: ['^10\.0\.0\.11\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.0\.21\s+4\s+65000\s.*\s\d+\s*$', '^10\.1\.0\.111\s+4\s+65000\s.*\s\d+\s*$', '^10\.2\.0\.121\s+4\s+65000\s.*\s\d+\s*$']
+        hint: Paste the SS2 blocks of steps 1 and 6.
+solution_summary: |
+  **What you built:** iBGP AS 65000 on top of lab 21's multi-area OSPF underlay, on six Nexus 9000v in a 5-stage Clos.
+
+  - **Route reflectors** SS1 and SS2 (separate clusters 10.0.0.1 / 10.0.0.2), one `template peer RR-CLIENTS`
+    with `route-reflector-client`, `send-community` and `send-community extended`.
+  - **Clients**: P1-LEAF, P2-LEAF and - after the BGP-free-core step - P1-SPINE and P2-SPINE, all peering
+    **loopback0 to loopback0** (`update-source loopback0`, template `RR`).
+  - **Prefixes**: 172.16.1.0/24 (P1-LEAF) and 172.16.2.0/24 (P2-LEAF) via `network`; every client holds two
+    reflected copies (ORIGINATOR_ID + CLUSTER_LIST), the one from the lowest neighbor address wins by default.
+  - **Lessons**: next hops stay the originating leaf and resolve over OSPF (next-hop tracking); transit routers
+    need the routes unless traffic is tunnelled - the motivation for VXLAN; loopback sessions survive link
+    failures. Optional: community tagging and local preference; eBGP (RFC 7938) and BFD as design comparisons.
+
+  **Inspection toolkit you used:** `show bgp ipv4 unicast summary / neighbors / <prefix> / advertised-routes`,
+  `show bgp peer-template`, `show bgp sessions`, `show bgp convergence`, `show bgp event-history detail`, and
+  `debug logfile` + `debug-filter bgp neighbor|prefix` + `debug bgp events|updates` -> `show debug logfile` ->
+  `undebug all`.
+
+  **Next:** lab 23 (NX-OS study path 3/3) boots with this lab's required steps in its day-0 and adds BGP EVPN and
+  VXLAN on the same sessions.

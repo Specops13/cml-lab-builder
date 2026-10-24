@@ -11,6 +11,13 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
   area. Each step explains what NX-OS does under the hood and lists the show, event-history and debug commands
   (`debug logfile`, `debug-filter`, `undebug all`) to inspect it. Library only: `library/21-nxos-ospf-multiarea.cmllab`
   (and `labs/21-nxos-ospf-multiarea.encorlab`). Expected outputs are synthesized from Cisco documentation.
+- **New library lab `22-nxos-bgp-over-ospf`: NX-OS study path 2/3: iBGP over OSPF with super-spine route reflectors,
+  with deep debug inspection** (walkthrough, 12 steps, same 10-node / 76 GB topology). Boots from its own baseline:
+  lab 21's day-0 plus lab 21's required steps. SS1/SS2 as route reflectors with peer templates, loopback peering,
+  the BGP FSM with `event-history` and filtered debugs, next-hop tracking, best-path selection between reflected
+  copies, the BGP-free-core problem, optional community/local-preference policy, eBGP and BFD design discussions
+  (BFD is not supported on Nexus 9000v). `packaging/nxos_study_baseline.py` regenerates the study-path baselines; a
+  test fails if one drifts.
 
 ## [3.2.0] - 2026-10-23
 **Library sorted by topic.** A patch for 3.0.0 and 3.1.0 (same runtime 2): they offer it by themselves and install it

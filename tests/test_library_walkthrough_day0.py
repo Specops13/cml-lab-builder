@@ -17,7 +17,8 @@ from cmllab.platforms import get as get_platform
 from cmllab.render import to_yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSIONS = {"08-vrf-lite": "2", "19-evpn-mpls": "2", "20-evpn-vxlan-superspine": "2", "21-nxos-ospf-multiarea": "1"}
+VERSIONS = {"08-vrf-lite": "2", "19-evpn-mpls": "2", "20-evpn-vxlan-superspine": "2", "21-nxos-ospf-multiarea": "1",
+            "22-nxos-bgp-over-ospf": "1"}
 LABS = list(VERSIONS)
 PACKS = [ROOT / "library" / f"{lab}.cmllab" for lab in LABS] + [ROOT / "labs" / f"{lab}.encorlab" for lab in LABS]
 IOL_PORTS = [f"Ethernet0/{p}" for p in range(4)]
