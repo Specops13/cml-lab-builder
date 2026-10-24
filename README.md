@@ -168,7 +168,7 @@ instance, and automatic updates that ask first.
 
 **Install** (apt resolves the few dependencies: `libc6 (>= 2.28)`, `libgcc-s1`, `zlib1g`; `xdg-utils` is recommended so the browser opens):
 ```bash
-sudo apt install ./cml-lab-builder_3.2.0_amd64.deb
+sudo apt install ./cml-lab-builder_3.3.0_amd64.deb
 ```
 The `./` matters, because it tells apt this is a local file. The package installs:
 - the app in `/opt/cml-lab-builder/`, with the commands `cml-lab-builder` and `cmllab` in `/usr/bin` (plus the old
@@ -1112,7 +1112,7 @@ every library lab. IOL L2 switches (`ioll2-xe`) have no such requirement.
 After changing the schema, templates, guide or example, run `python -m cmllab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **3.2.0**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.3.0**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License

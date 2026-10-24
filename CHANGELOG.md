@@ -2,7 +2,7 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
+## [3.3.0] - 2026-10-24
 ### Security
 - **Security audit and hardening** (details in the new [SECURITY.md](SECURITY.md)):
   - **Signed updates:** releases carry Ed25519 signatures of `SHA256SUMS.txt` and of the patch (`*.sig`); the
