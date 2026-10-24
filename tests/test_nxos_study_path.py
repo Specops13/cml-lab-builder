@@ -172,3 +172,12 @@ def test_lab23_evpn_vxlan_design():
     for must in ("show nve peers", "show nve vni", "show bgp l2vpn evpn route-type 2", "show bgp l2vpn evpn route-type 3",
                  "show bgp l2vpn evpn route-type 5", "show l2route evpn mac all", "show nve vni ingress-replication"):
         assert must in cmds, must
+
+
+def test_course_orders_the_study_path():
+    for folder, ext in (("library", "cmlcourse"), ("labs", "encorcourse")):
+        course, labs = courses.read_course((ROOT / folder / f"nxos-study-path.{ext}").read_bytes())
+        assert course.id == "nxos-study-path" and course.labs == SERIES and set(labs) == set(SERIES)
+        assert course.title == "NX-OS study path: OSPF \u2192 BGP \u2192 BGP EVPN VXLAN"
+        item = next(i for i in json.loads((ROOT / folder / "index.json").read_text())["items"] if i["id"] == "nxos-study-path")
+        assert item["kind"] == "course" and item["labs"] == SERIES and item["ram_gb"] == 76.0

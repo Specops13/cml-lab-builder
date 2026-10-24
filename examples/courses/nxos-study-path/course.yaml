@@ -1,0 +1,15 @@
+id: nxos-study-path
+title: "NX-OS study path: OSPF → BGP → BGP EVPN VXLAN"
+description: >-
+  Three long, deep-dive walkthroughs on six Nexus 9000v in a 5-stage super-spine Clos (plus four IOL hosts), built
+  for studying BGP EVPN VXLAN from the underlay up: OSPF multi-area (lab 21), iBGP with super-spine route
+  reflectors (lab 22), then BGP EVPN VXLAN with L2VNIs, an L3VNI and an anycast gateway (lab 23). Every step
+  explains what NX-OS does internally and how to inspect it with show, event-history and safe, filtered debugs.
+  Each lab is its own CML lab that starts from its own baseline (the previous lab's finished state), so you can
+  skip ahead. RAM heavy: about 76 GB of CML RAM per lab (6 x nxosv9000 at 12 GB).
+author: CML Lab Builder
+version: "1"
+labs:
+  - 21-nxos-ospf-multiarea
+  - 22-nxos-bgp-over-ospf
+  - 23-nxos-evpn-vxlan

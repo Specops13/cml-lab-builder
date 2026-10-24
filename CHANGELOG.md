@@ -23,6 +23,8 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
   from its own baseline: lab 22's day-0 plus lab 22's required steps. L2VPN EVPN on the existing RR sessions,
   VLAN-to-VNI mapping, NVE with BGP ingress replication (multicast underlay explained), cross-pod bridging,
   L3VNI with anycast gateway and symmetric IRB, type-5 prefixes, optional ARP suppression and break/fix.
+- **New course `nxos-study-path`: NX-OS study path: OSPF → BGP → BGP EVPN VXLAN** (labs 21, 22, 23 in order;
+  `library/nxos-study-path.cmlcourse`, `labs/nxos-study-path.encorcourse`).
 
 ## [3.2.0] - 2026-10-23
 **Library sorted by topic.** A patch for 3.0.0 and 3.1.0 (same runtime 2): they offer it by themselves and install it

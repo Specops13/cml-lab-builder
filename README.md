@@ -597,6 +597,8 @@ for me*), and an inspection list of `show` / `event-history` commands with what 
 because the app only runs `show` and `ping`: each lab teaches the safe NX-OS routine (`debug logfile` +
 `debug-filter`, then `show debug logfile` and `undebug all`).
 
+The **NX-OS study path** course (*Library & courses*) installs the three labs in order (21, 22, 23).
+
 **Each lab is a separate CML lab that starts from its own baseline**, never from your earlier running configs: lab 21
 boots with hostnames, descriptions and enabled links only; lab 22 boots with lab 21's finished OSPF in its day-0; lab
 23 boots with OSPF + BGP. So after lab 21 you can skip straight to lab 23. A test keeps each baseline equal to the
