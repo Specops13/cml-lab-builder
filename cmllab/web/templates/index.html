@@ -39,8 +39,11 @@
 <!-- ===================== LABS ===================== -->
 <section id="view-labs">
   <div id="mig-banner" class="mig-banner" role="status" hidden></div>
+  <div class="labs-bar">
+    <button data-help="labs.toggleList" type="button" id="catalog-toggle" class="hint-btn catalog-toggle" aria-controls="catalog" aria-expanded="true" title="Hide the lab list so the directions get the full width"><svg class="icon ico-hide" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m6-11-3 3 3 3"/></svg><svg class="icon ico-show" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m3-11 3 3-3 3"/></svg><span class="lbl">Hide lab list</span></button>
+  </div>
   <div class="cols">
-    <aside class="catalog">
+    <aside class="catalog" id="catalog" aria-label="Lab list">
       <div class="import-box">
         <button data-help="import.button" id="import-btn" class="primary big"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 16V4m-5 5 5-5 5 5M4 20h16"/></svg>Import lab</button>
         <div data-help="import.drop" class="muted small">or drag &amp; drop .cmllab / .cmlcourse / .yaml files anywhere on this page</div>

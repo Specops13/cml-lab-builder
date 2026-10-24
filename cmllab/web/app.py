@@ -952,7 +952,8 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
             return {"configured": True, "enabled": False}
         snap = _snapshot(s, fresh=True)
         est = sizing.estimate(e.lab, s.platform, s.ram_heavy_gb)
-        v = resources.verdict(snap, est["gb"], e.lab.node_count, float(s.resource_headroom_gb), s.node_limit,
+        v = resources.verdict(snap, est["gb"], resources.licensed_nodes(e.lab, s.platform),
+                              float(s.resource_headroom_gb), s.node_limit,
                               own_title=_cml_mod.lab_title(e.lab, s.lab_prefix))
         return {"configured": True, "enabled": True, "snapshot": snap, "verdict": v, "ram": est}
 

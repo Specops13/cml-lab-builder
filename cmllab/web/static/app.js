@@ -1,6 +1,6 @@
 "use strict";
 /* CML Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "3.3.0";  // must equal cmllab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "3.3.1";  // must equal cmllab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 /* links that come from data (CML, GitHub, lab files) are only ever http(s): never javascript: or data: URLs */
@@ -286,7 +286,7 @@ async function installStarter(btn) {
     const failed = Object.entries(r.failed || {});
     toast(`Installed ${r.installed.length} lab(s)` + (r.skipped.length ? `, ${r.skipped.length} already installed` : "") +
       (failed.length ? `\nFailed: ${failed.map(([k, v]) => `${k}: ${v}`).join("\n")}` : ""), failed.length ? "err" : "ok", 9000);
-    current = null; await loadLabs();
+    current = null; applyCatalog(); await loadLabs();
     if (labs.length && !$("#library")) selectLab(labs[0].id);
     if ($("#library")) loadLibrary();
   } catch (e) {
@@ -334,7 +334,7 @@ document.addEventListener("click", async (e) => {
 async function deleteLab(id, title) {
   if (!confirm(`Delete the lab "${title}" from this app? (It is not removed from CML.) You can install it again from the library.`)) return;
   const clear = confirm("Also delete your results history and progress for this lab?\n\nOK = delete history too, Cancel = keep it (it links up again if you re-install the lab).");
-  try { await api(`/api/user-labs/${encodeURIComponent(id)}?clear_history=${clear}`, {method: "DELETE"}); toast("Lab deleted" + (clear ? " with its history" : " (history kept)"), "ok"); current = null;
+  try { await api(`/api/user-labs/${encodeURIComponent(id)}?clear_history=${clear}`, {method: "DELETE"}); toast("Lab deleted" + (clear ? " with its history" : " (history kept)"), "ok"); current = null; applyCatalog();
     $("#lab-detail").innerHTML = '<div class="empty">Select a lab, or import one.</div>'; loadLabs(); } catch (e) { toast(e.message, "err"); }
 }
 
@@ -355,8 +355,35 @@ async function afterCourseInstall(rep) {
   if ($("#library")) await openLibrary(!!$("#lib-cards"));
 }
 $("#lib-btn").onclick = () => openLibrary(true);
+/* Collapsible lab list (3.3.1): hides the left column so the lab / walkthrough directions get the full width.
+   The choice is remembered (localStorage "cmllab.catalog" = "open" | "collapsed"); with no choice saved, the list
+   collapses by itself in narrow windows (<= 900 px, where it would sit above the directions) once a lab is open. */
+const CATALOG_KEY = "cmllab.catalog", narrowMq = window.matchMedia("(max-width: 900px)");
+function catalogPref() { try { return localStorage.getItem(CATALOG_KEY); } catch { return null; } }
+function catalogCollapsed() {
+  if (!current) return false;                       // nothing to read yet: the list is the page
+  const pref = catalogPref();
+  return pref === "collapsed" || pref === "open" ? pref === "collapsed" : narrowMq.matches && !!current;
+}
+function applyCatalog() {
+  const aside = $("#catalog"), btn = $("#catalog-toggle"); if (!aside || !btn) return;
+  const collapsed = catalogCollapsed();
+  aside.hidden = collapsed;
+  btn.hidden = !current;
+  $("#view-labs").classList.toggle("catalog-collapsed", collapsed);
+  btn.setAttribute("aria-expanded", String(!collapsed));
+  btn.querySelector(".lbl").textContent = collapsed ? "Show lab list" : "Hide lab list";
+  btn.title = collapsed ? "Show the lab list again" : "Hide the lab list so the directions get the full width";
+}
+function setCatalog(collapsed) {
+  try { localStorage.setItem(CATALOG_KEY, collapsed ? "collapsed" : "open"); } catch { /* private mode: this page only */ }
+  applyCatalog();
+}
+$("#catalog-toggle").onclick = () => setCatalog(!catalogCollapsed());
+narrowMq.addEventListener("change", applyCatalog);
+applyCatalog();
 async function openLibrary(fetchIndex) {
-  current = null; renderList();
+  current = null; renderList(); applyCatalog();
   await loadCourses();
   const url = libraryUrl || LIB_DEFAULT;
   $("#lab-detail").innerHTML = `<div id="library">
@@ -661,6 +688,7 @@ document.addEventListener("keydown", (e) => {
   const t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
   if ((e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) || ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k")) {
     const box = ($("#lib-search-bar") && !$("#lib-search-bar").hidden) ? $("#lib-search") : $("#f-search");
+    if (box && box.id === "f-search" && $("#catalog").hidden && $("#view-labs").offsetParent !== null) setCatalog(false);
     if (!box || box.offsetParent === null) return;   // that view is not shown
     e.preventDefault(); box.focus(); box.select();
     return;
@@ -727,7 +755,7 @@ async function consoleTest(id, node) {
 }
 
 async function selectLab(id) {
-  current = id; renderList();
+  current = id; renderList(); applyCatalog();
   const l = await api(`/api/labs/${id}`);
   currentLab = l;
   if (l.type === "walkthrough") return renderWalkthrough(l);
@@ -1016,9 +1044,12 @@ function fitLevel(snap, gb, nodes) {
   if (!snap || snap.available_gb == null) return {level: "unknown"};
   const margin = snap.available_gb - (gb || 0), head = snap.headroom_gb ?? 4;
   let level = margin < 0 ? "nofit" : margin < head ? "tight" : "fits";
-  if (snap.license && nodes && snap.license.in_use + nodes > snap.license.max) level = "nofit";
-  if (snap.node_limit && nodes && (snap.running_nodes || 0) + nodes > snap.node_limit) level = "nofit";
-  return {level, margin};
+  const ramLevel = level, lic = snap.license;
+  // node licenses only when CML reported both numbers (3.3.1: an unreadable license is "can't tell", never "won't fit")
+  const licFail = !!(lic && lic.known && nodes && lic.in_use + nodes > lic.max);
+  const limFail = !!(snap.node_limit && nodes && (snap.running_nodes || 0) + nodes > snap.node_limit);
+  if (licFail || limFail) level = "nofit";
+  return {level, margin, ramLevel, nodesFail: licFail || limFail};
 }
 const FIT = {fits: ["check", "Fits"], tight: ["alert", "Tight"], nofit: ["block", "Won't fit"], unknown: ["help", "Can't tell"]};
 const FIT_TAG = {fits: "fits now", tight: "tight now", nofit: "won't fit now", unknown: "fit unknown"};
@@ -1033,8 +1064,11 @@ async function libFitTags() {
   if (!d || !d.configured || !d.enabled || d.available_gb == null) return;   // nothing to say: no tag
   for (const s of slots) {
     const gb = Number(s.dataset.gb) || 0, nodes = Number(s.dataset.nodes) || 0, f = fitLevel(d, gb, nodes);
+    const lic = d.license && d.license.known ? ` Node licenses: ${d.license.in_use} of ${d.license.max} in use, this lab uses ${nodes}.` : "";
+    const why = f.level !== "nofit" ? "" : f.nodesFail && f.ramLevel === "nofit" ? " Not enough memory or node licenses."
+      : f.nodesFail ? " Memory is fine; not enough node licenses." : " Not enough free memory.";
     s.innerHTML = fitTag(f.level, `Needs about ${Math.round(gb)} GB; ${d.available_gb} GB of CML memory is free right now` +
-      ` (${d.headroom_gb} GB headroom). Checked within the last 30 s; the Build button checks again.`);
+      ` (${d.headroom_gb} GB headroom).${lic}${why} Checked within the last 30 s; the Build button checks again.`);
   }
 }
 const gb1 = (x) => x == null ? "?" : (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10);
@@ -1075,15 +1109,23 @@ async function renderPrecheck(l) {
   if (!d.enabled) { panel.innerHTML = '<p class="muted small">The resource check is turned off (Settings &gt; Resource check).</p>'; setBuildGo("off"); return; }
   const v = d.verdict, s = d.snapshot, [ic, word] = FIT[v.level];
   const total = s.total_gb, used = total != null && s.available_gb != null ? Math.max(0, total - s.available_gb) : null;
+  const ramLv = (v.ram && v.ram.level) || v.level, nd = v.node_check || {level: "unknown"};
   const pct = (x) => total ? Math.max(0, Math.min(100, (x / total) * 100)).toFixed(1) : 0;
   const meter = total ? `<div class="meter" role="img" aria-label="CML memory: ${gb1(used)} GB in use, this lab needs ${gb1(v.need_gb)} GB, ${gb1(total)} GB total">
-      <span class="meter-used" style="width:${pct(used)}%"></span><span class="meter-need fit-${v.level}" style="width:${pct(Math.min(v.need_gb, Math.max(0, total - used)))}%"></span></div>
-      <div class="meter-legend small"><span><i class="sw used"></i>in use ${gb1(used)} GB</span><span><i class="sw need fit-${v.level}"></i>this lab ~${gb1(v.need_gb)} GB</span><span>free ${gb1(s.available_gb)} of ${gb1(total)} GB · headroom ${gb1(v.headroom_gb)} GB</span></div>` : "";
+      <span class="meter-used" style="width:${pct(used)}%"></span><span class="meter-need fit-${ramLv}" style="width:${pct(Math.min(v.need_gb, Math.max(0, total - used)))}%"></span></div>
+      <div class="meter-legend small"><span><i class="sw used"></i>in use ${gb1(used)} GB</span><span><i class="sw need fit-${ramLv}"></i>this lab ~${gb1(v.need_gb)} GB</span><span>free ${gb1(s.available_gb)} of ${gb1(total)} GB · headroom ${gb1(v.headroom_gb)} GB</span></div>` : "";
   const summary = v.level === "fits" ? `Enough memory: about ${gb1(v.margin_gb)} GB stays free after the build.`
     : v.level === "tight" ? "It should start, but the server will be nearly full."
-    : v.level === "nofit" ? "This lab will probably not start (or nodes will fail to boot) until you free resources."
+    : v.level === "nofit" ? ((v.failed || []).length === 2 ? "Not enough free memory and not enough node licenses."
+      : (v.failed || [])[0] === "nodes" ? "Memory is fine, but there are not enough node licenses: the extra nodes will not start."
+      : "Not enough free memory: this lab will probably not start (or nodes will fail to boot) until you free some.")
     : "The server's free memory could not be read.";
-  const lic = s.license ? `<span>Licensed nodes: ${s.license.in_use} of ${s.license.max} in use</span>` : "";
+  const LV = {fits: "fits", tight: "tight", nofit: "won't fit", unknown: "can't tell"};
+  const limits = `<ul class="small res-limits" aria-label="Limits checked">
+      <li class="lim fit-${ramLv}">${icon(FIT[ramLv][0])}<b>Memory:</b> ${LV[ramLv]}${v.need_gb != null ? ` (needs ~${gb1(v.need_gb)} GB, ${gb1(s.available_gb)} GB free)` : ""}</li>
+      <li class="lim fit-${nd.level}">${icon(FIT[nd.level][0])}<b>Node licenses:</b> ${LV[nd.level]}${nd.max != null
+        ? ` (this lab uses ${v.nodes}; ${nd.in_use} of ${nd.max} in use)` : ` (this lab uses ${v.nodes}; ${esc((s.license && s.license.note) || "CML did not report its license: only admins can read it")})`}</li></ul>`;
+  const lic = s.license && s.license.product ? `<span>License: ${esc(s.license.product)}${s.license.source === "diagnostics" ? "" : s.license.source === "licensing+labs" ? " (nodes counted from running labs)" : ""}</span>` : "";
   const rows = (s.labs || []).map((x) => {
     const mine = v.running_copy && v.running_copy.id === x.id;
     return `<tr><td>${esc(x.title)}${x.owner ? ` <span class="muted small">(${esc(x.owner)})</span>` : ""}${mine ? ' <span class="tag">this lab: replaced by the build</span>' : ""}</td>
@@ -1092,7 +1134,7 @@ async function renderPrecheck(l) {
       ${x.ours && !mine ? `<button data-help="res.wipe" class="hint-btn danger-text" data-wipe="${esc(x.id)}" data-title="${esc(x.title)}">${icon("trash")}Stop &amp; wipe</button>` : ""}</td></tr>`;
   }).join("");
   panel.innerHTML = `<div class="res-head res-${v.level}">${icon(ic)}<div><b>${word}</b> <span class="small">${esc(summary)}</span>
-      ${v.reasons.length ? `<ul class="small reasons">${v.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div></div>
+      ${limits}${v.reasons.length ? `<ul class="small reasons">${v.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div></div>
     ${meter}<div class="small muted res-facts">${lic}${s.errors && s.errors.length ? `<span>Partial data: ${esc(s.errors.join("; "))}</span>` : ""}</div>
     ${rows ? `<table class="res-labs"><caption class="small muted">Running labs on CML (biggest first)</caption><thead><tr><th scope="col">Lab</th><th scope="col" class="num">Nodes</th><th scope="col" class="num">RAM</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>${rows}</tbody></table>`
       : '<p class="small muted">No labs are running on CML.</p>'}`;

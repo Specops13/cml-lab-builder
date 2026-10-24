@@ -2,6 +2,27 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [3.3.1] - 2026-10-24
+### Fixed
+- **Resource check read the wrong license.** 3.3.0 added up `max` / `in_use` of every CML license feature, so on a
+  CML Enterprise server it showed the base license (*1 of 1*) as the node count and every lab as *won't fit*. The
+  capacity is now the nodes included with the license (from its description, e.g. *"20 nodes capacity included"*, or
+  the product: Personal 20, Personal Plus 40, Enterprise 20, Free 5) plus the *Expansion Nodes* in use (not its 300
+  maximum); nodes in use come from CML's licensing diagnostics, else from the running labs. When the license can't be
+  read or isn't clear, the node check says **can't tell** instead of *won't fit*.
+- **"Won't fit" with enough RAM.** The memory bar and summary took their colour and wording from the overall verdict,
+  so a node-license failure looked like a memory problem. Memory and node licenses are now separate lines (fits /
+  tight / won't fit / can't tell) and the summary names the limit that failed. Free memory now counts reclaimable
+  page cache (`total - used` when that is more than *free*), and memory reported in KiB is recognised.
+- Unmanaged switches and external connectors no longer count toward licensed nodes (lab and running labs).
+- The CML resource-pool node quota is checked when CML reports it.
+
+### Added
+- **Collapsible lab list** on the Labs page: *Hide lab list* / *Show lab list* gives the directions the full width.
+  Keyboard and screen-reader friendly (`aria-expanded`, `aria-controls`, visible focus), light and dark, remembered
+  in the browser; folds away by itself in narrow windows (900 px or less) once a lab is open unless you chose
+  otherwise; **/** reopens it.
+
 ## Library update - 2026-10-24 (no app release)
 Library-only change: the apps pick up the new lab versions from the online library (*Library & courses* shows
 *update* on installed copies). No new executables.

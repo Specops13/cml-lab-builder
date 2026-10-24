@@ -168,7 +168,7 @@ instance, and automatic updates that ask first.
 
 **Install** (apt resolves the few dependencies: `libc6 (>= 2.28)`, `libgcc-s1`, `zlib1g`; `xdg-utils` is recommended so the browser opens):
 ```bash
-sudo apt install ./cml-lab-builder_3.3.0_amd64.deb
+sudo apt install ./cml-lab-builder_3.3.1_amd64.deb
 ```
 The `./` matters, because it tells apt this is a local file. The package installs:
 - the app in `/opt/cml-lab-builder/`, with the commands `cml-lab-builder` and `cmllab` in `/usr/bin` (plus the old
@@ -446,6 +446,12 @@ A timer starts on Build and stops when the lab is solved, and each lab keeps a r
 Small **?** icons explain each field. Turn them off with *Settings > Show help icons*; all help text is in `cmllab/web/static/help.json`.
 ◐ toggles dark mode.
 
+**Hide lab list** (above the lab page, 3.3.1) folds the lab list on the left away, so the lab's directions and
+walkthrough steps get the whole window; **Show lab list** brings it back, and **/** (search) also reopens it. The
+button is a normal keyboard button (`aria-expanded` / `aria-controls`). Your choice is remembered in this browser. If
+you never chose, the list folds away by itself in narrow windows (900 px or less, where it would sit above the
+directions) once you open a lab. With no lab open the list is always shown.
+
 CLI equivalents (`CMLLabBuilder.exe <cmd>` / `./cml-lab-builder <cmd>` for the downloads, `cmllab <cmd>` for the .deb and `pip install`; `run.bat <cmd>` / `./run.sh <cmd>` / `python -m cmllab <cmd>` from source):
 
 | Command | What it does |
@@ -704,6 +710,20 @@ licensed node count (when the account may read it) and every running lab it can 
 - **Won't fit**: the estimate is bigger than the free memory, or the lab would go over the licensed nodes or the
   *node limit*;
 - **Can't tell**: CML did not answer or the account may not read system stats (non-admin users). Nothing is blocked.
+
+Memory and node licenses are checked separately and the box lists both (**Memory:** fits / tight / won't fit / can't
+tell, **Node licenses:** the same), so a *Won't fit* always says which limit failed. How they are worked out (3.3.1):
+
+- **Free memory** is the free memory of the CML host(s) from `system_stats`, counting memory used only for the page
+  cache as free (CML gets it back when a node starts), so roughly `total - used`, minus the headroom.
+- **Node licenses**: capacity = the nodes included with the active license (read from the license description, e.g.
+  *"Enterprise License with 20 nodes capacity included"*, else from the product: Personal 20, Personal Plus 40,
+  Enterprise 20, Free 5) **plus** the *Expansion Nodes* count in use (its *max* of 300 is only the upper limit, not
+  your capacity). The base license's own *1 of 1* is not a node count. Nodes in use come from CML's licensing
+  diagnostics (`started` / `quota`) when available, else from the running nodes of all labs the account can see.
+  Unmanaged switches and external connectors never use a license and are not counted, in the lab or on the server.
+  When the license cannot be read (non-admin account) or is not clear, the node line says **can't tell**; it never
+  turns that into *won't fit*.
 
 It shows a memory bar (in use / this lab / free) and the running labs with their node count and RAM (from each node's
 RAM setting, else its node definition default), biggest first. From there you can **Stop** a lab, or **Stop & wipe**
@@ -1117,7 +1137,7 @@ every library lab. IOL L2 switches (`ioll2-xe`) have no such requirement.
 After changing the schema, templates, guide or example, run `python -m cmllab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **3.3.0**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.3.1**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License

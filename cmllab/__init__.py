@@ -3,7 +3,7 @@
 Up to 2.1.0 the app was ENCOR Lab Builder and this package was called `encorlab`; 3.0.0 renamed everything."""
 import os as _os
 
-__version__ = "3.3.0"
+__version__ = "3.3.1"
 PRODUCT = "CML Lab Builder"
 
 # Environment variables are CMLLAB_*. The pre-3.0 names (ENCOR_*) still work: they are copied to the CMLLAB_* name at

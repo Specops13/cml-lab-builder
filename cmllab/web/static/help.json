@@ -256,5 +256,6 @@
   "res.stop": "Stop this lab in CML to free its memory. Its nodes shut down; unsaved device configs are lost.",
   "res.wipe": "Stop the lab and discard its node disks and configs (labs built by this app only). The lab stays in CML.",
   "res.recheck": "Read free memory and running labs from CML again.",
-  "skip": "Jump past the menu to the page content (keyboard users)."
+  "skip": "Jump past the menu to the page content (keyboard users).",
+  "labs.toggleList": "Hide or show the lab list on the left, so the lab's directions can use the whole width. Remembered on this computer; \"/\" opens the list again and jumps to the search."
 }

@@ -113,6 +113,7 @@ class FakeClient:
                               "cpu": {"count": 16}}, "computes": {}}
         self.stats_error = None
         self.licensing = FakeLicensing()
+        self.diagnostics = None          # GET /diagnostics/licensing body, or None (older CML / not admin: 403)
         self.labs = []
         self.version = version
         self.definitions = FakeDefinitions(list(defs))
@@ -121,6 +122,11 @@ class FakeClient:
 
     def system_info(self):
         return {"version": self.version, "ready": True}
+
+    def get_diagnostics(self, *categories):
+        if self.diagnostics is None:
+            raise PermissionError("403 Forbidden")
+        return {c.value: self.diagnostics for c in categories}
 
     def get_system_stats(self):
         if self.stats_error:

@@ -361,3 +361,15 @@ mark{background:#ffe58a;color:#17202b}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 /* high contrast / forced colors */
 @media (forced-colors:active){.tag.ram-heavy,button.primary,.tag.walk{forced-color-adjust:none}:focus-visible{outline:2px solid CanvasText}}
+/* 3.3.1: memory and node licenses judged separately in the build pre-check */
+.res-limits{list-style:none;margin:var(--sp-1) 0 0;padding:0;display:flex;flex-wrap:wrap;gap:var(--sp-1) var(--sp-3)}
+.res-limits .lim{display:flex;align-items:center;gap:var(--sp-1)}.res-limits .lim .icon{width:16px;height:16px;flex:none}
+.res-limits .lim.fit-fits .icon{color:var(--ok)}.res-limits .lim.fit-tight .icon{color:#9a6700}
+.res-limits .lim.fit-nofit .icon{color:var(--bad)}.res-limits .lim.fit-nofit b{color:var(--bad)}.res-limits .lim.fit-unknown .icon{color:var(--muted)}
+/* 3.3.1: collapsible lab list. Hidden via the [hidden] attribute (no animation, so nothing to reduce for motion) */
+.labs-bar{display:flex;align-items:center;gap:var(--sp-2);margin:0 0 var(--sp-2)}
+.catalog-toggle{display:inline-flex;align-items:center;gap:var(--sp-1);min-height:32px}
+.catalog-toggle .ico-show{display:none}
+.catalog-collapsed .catalog-toggle .ico-show{display:inline-block}.catalog-collapsed .catalog-toggle .ico-hide{display:none}
+aside.catalog[hidden]{display:none}
+.catalog-collapsed #lab-detail{max-width:none}

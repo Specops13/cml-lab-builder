@@ -12,6 +12,8 @@ Verdict for a lab that needs N GB (sizing.estimate, or the author's ram_gb):
   tight     0 <= available - N < headroom   (it probably starts, but the server is nearly full)
   no-fit    available - N < 0, or the licensed node count / the node limit would be exceeded
   unknown   the memory could not be read (not an admin, older CML, network error): build anyway or cancel.
+Memory and node licenses are judged separately (3.3.1) and the verdict says which one failed; when the license
+cannot be read the node part is "can't tell", never "won't fit".
 Everything is best effort: a failing call never blocks a build, it only makes the verdict "unknown"."""
 from __future__ import annotations
 
@@ -43,6 +45,30 @@ def _gb(value, unit_hint: str = "auto") -> float | None:
     return v / 1024                                   # MiB
 
 
+def _host_memory(mem: dict) -> tuple[float | None, float | None]:
+    """(total_gb, free_gb) of one memory block of GET /system_stats.
+
+    CML reports bytes. "free" is the kernel's MemFree, which leaves out the page cache and buffers (on a CML host
+    that read a few qcow2 images, tens of GB): that memory is reclaimed as soon as a node starts, so the usable free
+    memory is total - used when "used" is there (3.3.1; 3.3.0 took MemFree and could call a roomy server full).
+    A server reporting less than 2 GB in "bytes" is really reporting KiB (no CML host has under 8 GB)."""
+    if not isinstance(mem, dict) or mem.get("total") is None:
+        return None, None
+    try:
+        raw = {k: float(mem[k]) for k in ("total", "free", "used") if mem.get(k) is not None}
+    except (TypeError, ValueError):
+        return None, None
+    scale = GIB
+    if raw["total"] < 2 * GIB:                         # not bytes: KiB (or MiB on something very odd)
+        scale = 1024 ** 2 if raw["total"] >= 2 * 1024 ** 2 else 1024
+    total = raw["total"] / scale
+    free = raw["free"] / scale if "free" in raw else None
+    if "used" in raw:
+        usable = max(0.0, total - raw["used"] / scale)
+        free = usable if free is None else max(free, usable)
+    return total, free
+
+
 def _memory(stats: dict) -> tuple[float | None, float | None]:
     """(total_gb, free_gb) summed over the compute hosts."""
     if not isinstance(stats, dict):
@@ -52,33 +78,98 @@ def _memory(stats: dict) -> tuple[float | None, float | None]:
         total = free = 0.0
         found = False
         for c in (stats.get("computes") or {}).values():
-            m = ((c or {}).get("stats") or {}).get("memory") or {}
-            if "total" in m:
+            t, f = _host_memory(((c or {}).get("stats") or {}).get("memory") or {})
+            if t is not None:
                 found = True
-                total += _gb(m.get("total"), "bytes") or 0.0
-                free += _gb(m.get("free"), "bytes") or 0.0
+                total += t
+                free += f or 0.0
         return (round(total, 1), round(free, 1)) if found else (None, None)
-    total, free = _gb(mem.get("total"), "bytes"), _gb(mem.get("free"), "bytes")
-    if free is None and total is not None and mem.get("used") is not None:
-        free = total - (_gb(mem.get("used"), "bytes") or 0.0)
+    total, free = _host_memory(mem)
     return (round(total, 1) if total is not None else None, round(free, 1) if free is not None else None)
 
 
-def _license(lic: dict) -> dict | None:
-    """{"max": licensed nodes, "in_use": nodes counted now} from GET /licensing, or None."""
-    feats = (lic or {}).get("features") if isinstance(lic, dict) else None
-    if not isinstance(feats, list):
+# ---------------------------------------------------------------- node licenses (3.3.1)
+# GET /licensing lists Smart Licensing *features*, not nodes. In CML 2.9 the base product license is one feature with
+# in_use 1 / max 1 ("CML - Enterprise License ... with 20 nodes capacity included"); extra capacity is the
+# "CML - Expansion Nodes" feature (id ...CML_NODE_COUNT...), whose in_use is the expansion count the admin chose
+# (max is only the most that may be chosen, 300). 3.3.0 summed every feature's max/in_use and so showed
+# "1 of 1 licensed nodes in use" and "won't fit" for every lab. The node capacity is the base's included nodes plus
+# the expansion count; how many nodes use a license right now comes from GET /diagnostics/licensing
+# ({"quota", "started", "user_quota", "user_started"}) or, failing that, from counting the running nodes of all
+# labs (minus unmanaged switches and external connectors, which never use a license).
+INCLUDED_NODES = {"enterprise": 20, "personal40": 40, "personal_plus": 40, "personalplus": 40, "personal": 20, "free": 5}
+
+
+def _int(v) -> int | None:
+    try:
+        return int(v) if v is not None and not isinstance(v, bool) else None
+    except (TypeError, ValueError):
         return None
-    mx = used = 0
+
+
+def _license_capacity(status: dict) -> tuple[int | None, str, list]:
+    """(licensed node capacity or None, product name, features as shown) from GET /licensing."""
+    import re
+    if not isinstance(status, dict):
+        return None, "", []
+    product = str(((status.get("product_license") or {}).get("active")) or "")
+    feats = [f for f in (status.get("features") or []) if isinstance(f, dict)]
+    shown = [{"name": str(f.get("name") or f.get("id") or "?")[:80], "in_use": _int(f.get("in_use")),
+              "max": _int(f.get("max"))} for f in feats]
+    included = expansion = None
     for f in feats:
-        if not isinstance(f, dict):
+        ident = f"{f.get('id') or ''} {f.get('name') or ''}".lower()
+        if "node_count" in ident or "expansion" in ident:
+            expansion = (expansion or 0) + (_int(f.get("in_use")) or 0)
             continue
-        try:
-            mx += int(f.get("max") or 0)
-            used += int(f.get("in_use") or 0)
-        except (TypeError, ValueError):
-            continue
-    return {"max": mx, "in_use": used} if mx > 0 else None
+        m = re.search(r"(\d+)\s*(?:cisco\s+)?nodes?\b", str(f.get("description") or "") + " " + str(f.get("name") or ""),
+                      re.I)
+        if m and (_int(f.get("in_use")) or 0) > 0:
+            included = max(included or 0, int(m.group(1)))
+    if included is None and product:
+        key = product.lower().replace("cml_", "").replace("-", "_")
+        for k in sorted(INCLUDED_NODES, key=len, reverse=True):
+            if key.startswith(k):
+                included = INCLUDED_NODES[k]
+                break
+    if included is None:
+        return None, product, shown
+    return included + (expansion or 0), product, shown
+
+
+def _license(status, diag, running_counted: int | None) -> dict | None:
+    """Node-license view for the verdict, or None when nothing could be read (non-admin login).
+
+    {"max", "in_use", "known", "source", "product", "features", "user_max", "user_in_use", "note"}; known is False
+    when either number is missing: the verdict then says "can't tell" for nodes instead of "won't fit"."""
+    capacity, product, shown = _license_capacity(status) if isinstance(status, dict) else (None, "", [])
+    out = {"max": capacity, "in_use": None, "known": False, "source": "licensing", "product": product,
+           "features": shown, "user_max": None, "user_in_use": None, "note": ""}
+    d = diag.get("licensing", diag) if isinstance(diag, dict) else None
+    if isinstance(d, dict) and "started" in d and "error" not in d:
+        started, quota = _int(d.get("started")), _int(d.get("quota"))
+        if started is not None:
+            out.update(in_use=started, source="diagnostics")
+            if quota is not None and quota > 0:
+                out["max"] = quota
+            out["user_max"], out["user_in_use"] = _int(d.get("user_quota")), _int(d.get("user_started"))
+    if out["in_use"] is None and running_counted is not None and out["max"] is not None:
+        out.update(in_use=running_counted, source="licensing+labs")
+    if out["max"] is None and out["in_use"] is None and not shown:
+        return None
+    out["known"] = out["max"] is not None and out["in_use"] is not None
+    if not out["known"]:
+        out["note"] = ("the licensed node count could not be read" if out["max"] is None
+                       else "the nodes in use could not be counted")
+    return out
+
+
+def licensed_nodes(lab, platform: str = "iol") -> int:
+    """Nodes of a lab that use a CML node license (unmanaged switches and external connectors do not)."""
+    try:
+        return sum(1 for d in sizing.node_definitions(lab, platform) if d not in UNCOUNTED)
+    except Exception:
+        return getattr(lab, "node_count", 0)
 
 
 def _node_gb(n) -> float:
@@ -100,15 +191,22 @@ def snapshot(client, prefixes=("CML-",)) -> dict:
             errors.append("the server did not report its memory")
     except Exception as e:
         errors.append(f"system stats: {_why(e)}")
-    lic = None
+    status = diag = None
     try:
-        lic = _license(client.licensing.status())
+        status = client.licensing.status()
     except Exception:
         pass      # non-admins cannot read licensing; that is normal
+    try:
+        from virl2_client.virl2_client import DiagnosticsCategory
+        diag = client.get_diagnostics(DiagnosticsCategory.LICENSING)
+    except Exception:
+        pass      # older CML, non-admin or a fake client: count the running nodes instead
+    saw_all = False
     labs = []
     try:
         try:
             all_labs = client.all_labs(show_all=True)
+            saw_all = True
         except Exception:
             all_labs = client.all_labs(show_all=False)
         for lab in all_labs:
@@ -131,6 +229,9 @@ def snapshot(client, prefixes=("CML-",)) -> dict:
     except Exception as e:
         errors.append(f"labs: {_why(e)}")
     labs.sort(key=lambda x: -x["ram_gb"])
+    counted = sum(x["counted_nodes"] for x in labs)
+    # every lab is only visible to an admin, who is also the only one who can read /licensing
+    lic = _license(status, diag, counted if (saw_all and isinstance(status, dict)) else None)
     committed = round(sum(x["ram_gb"] for x in labs), 1)
     available = None
     if free is not None:
@@ -148,35 +249,57 @@ def _why(e: Exception) -> str:
 
 def verdict(snap: dict, need_gb: float, nodes: int, headroom_gb: float = DEFAULT_HEADROOM_GB,
             node_limit: int | None = None, own_title: str | None = None) -> dict:
-    """Fit of a lab needing need_gb / nodes on top of snap. own_title: this lab's CML title (a rebuild frees it)."""
+    """Fit of a lab needing need_gb / nodes (license-using nodes) on top of snap. own_title: this lab's CML title
+    (a rebuild frees it). Memory and nodes get their own verdict (3.3.1) so the UI can say which limit failed:
+    {"level", "ram": {"level", "reason"}, "nodes": {"level", "reason", "in_use", "max"}, ...}."""
     own = next((x for x in snap.get("labs", []) if own_title and x["title"] == own_title), None)
-    reasons = []
-    level = "fits"
-    avail = snap.get("available_gb")
     if own:     # (re)building this lab replaces the running copy: its RAM and nodes come back
         need_gb = max(0.0, need_gb - own["ram_gb"])
         nodes = max(0, nodes - own["counted_nodes"])
+    freed = own["counted_nodes"] if own else 0
+
+    # memory
+    avail = snap.get("available_gb")
     margin = None
     if avail is None:
-        level = "unknown"
-        reasons.append("Could not read the server's free memory" + (f" ({snap['errors'][0]})" if snap.get("errors") else "") + ".")
+        ram = {"level": "unknown", "reason": "Could not read the server's free memory"
+               + (f" ({snap['errors'][0]})" if snap.get("errors") else "") + "."}
     else:
         margin = round(avail - need_gb, 1)
         if margin < 0:
-            level = "nofit"
-            reasons.append(f"Needs about {need_gb:.0f} GB but only {avail:.0f} GB is free.")
+            ram = {"level": "nofit", "reason": f"Memory: needs about {need_gb:.0f} GB but only {avail:.0f} GB is free."}
         elif margin < headroom_gb:
-            level = "tight"
-            reasons.append(f"Leaves only {margin:.0f} GB free (less than the {headroom_gb:g} GB headroom in Settings).")
+            ram = {"level": "tight", "reason": f"Memory: leaves only {margin:.0f} GB free (less than the "
+                                               f"{headroom_gb:g} GB headroom in Settings)."}
+        else:
+            ram = {"level": "fits", "reason": ""}
+
+    # node licenses (and the optional node limit in Settings)
     lic = snap.get("license")
-    if lic and lic["in_use"] + nodes > lic["max"]:
-        level = "nofit"
-        reasons.append(f"Needs {nodes} licensed nodes; {lic['in_use']} of {lic['max']} are in use.")
-    if node_limit and snap.get("running_nodes", 0) - (own["counted_nodes"] if own else 0) + nodes > node_limit:
-        level = "nofit"
-        reasons.append(f"Would exceed the node limit in Settings ({node_limit}).")
+    nd = {"level": "fits", "reason": "", "note": "", "in_use": None, "max": None, "need": nodes}
+    if lic and lic.get("known"):
+        in_use = max(0, int(lic["in_use"]) - freed)
+        nd.update(in_use=in_use, max=int(lic["max"]))
+        if in_use + nodes > lic["max"]:
+            nd.update(level="nofit", reason=f"Node licenses: needs {nodes}, but {in_use} of {lic['max']} are in use "
+                                            f"({lic['max'] - in_use} free).")
+        if lic.get("user_max") is not None and lic.get("user_in_use") is not None \
+                and lic["user_in_use"] - freed + nodes > lic["user_max"]:
+            nd.update(level="nofit", reason=f"Node licenses: your resource pool allows {lic['user_max']} nodes and "
+                                            f"{max(0, lic['user_in_use'] - freed)} are running.")
+    else:
+        nd["level"] = "unknown"
+        why = (lic or {}).get("note") or "CML did not report its license (only admins can read it)"
+        nd["note"] = f"Node licenses: can't tell ({why}); this lab uses {nodes}."
+    if node_limit and nd["level"] != "nofit" and snap.get("running_nodes", 0) - freed + nodes > node_limit:
+        nd.update(level="nofit", reason=f"Nodes: would exceed the node limit in Settings ({node_limit}).")
+
+    level = "nofit" if "nofit" in (ram["level"], nd["level"]) else ram["level"]
+    reasons = [r for r in (ram["reason"], nd["reason"]) if r]     # problems only; "can't tell" is in node_check
+    failed = [k for k, v in (("memory", ram), ("nodes", nd)) if v["level"] == "nofit"]
     return {"level": level, "need_gb": round(need_gb, 1), "nodes": nodes, "margin_gb": margin,
-            "headroom_gb": headroom_gb, "reasons": reasons, "running_copy": own}
+            "headroom_gb": headroom_gb, "reasons": reasons, "running_copy": own, "ram": ram, "node_check": nd,
+            "failed": failed}
 
 
 class Cache:

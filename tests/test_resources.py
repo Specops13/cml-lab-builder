@@ -54,9 +54,9 @@ def test_headroom_is_configurable():
 
 
 def test_license_and_node_limit():
-    snap = {"available_gb": 100.0, "labs": [], "running_nodes": 15, "license": {"max": 20, "in_use": 15}}
+    snap = {"available_gb": 100.0, "labs": [], "running_nodes": 15, "license": {"max": 20, "in_use": 15, "known": True}}
     v = resources.verdict(snap, 4, 6, node_limit=50)
-    assert v["level"] == "nofit" and "licensed nodes" in v["reasons"][0]
+    assert v["level"] == "nofit" and "Node licenses" in v["reasons"][0] and v["failed"] == ["nodes"]
     snap["license"] = None
     assert resources.verdict(snap, 4, 6, node_limit=20)["level"] == "nofit"
     assert resources.verdict(snap, 4, 5, node_limit=20)["level"] == "fits"
@@ -93,8 +93,10 @@ def test_failures_make_unknown_never_raise():
 
 def test_license_parsing():
     fc = FakeClient()
-    fc.licensing = FakeLicensing({"features": [{"name": "CML - Personal Edition", "in_use": 7, "max": 20}]})
-    assert resources.snapshot(fc)["license"] == {"max": 20, "in_use": 7}
+    fc.licensing = FakeLicensing({"features": [{"name": "CML - Personal Edition", "description": "20 nodes",
+                                                "in_use": 1, "max": 1}]})
+    lic = resources.snapshot(fc)["license"]
+    assert (lic["max"], lic["in_use"], lic["known"]) == (20, 0, True)
 
 
 def test_memory_from_computes_when_no_all():
@@ -156,7 +158,7 @@ def test_precheck_endpoint_fits_and_nofit():
     lab = _lab_id(c)
     d = c.get(f"/api/labs/{lab}/precheck").json()
     assert d["enabled"] and d["verdict"]["level"] == "fits" and d["snapshot"]["total_gb"] == 64
-    fc.stats["all"]["memory"]["free"] = 1 * GIB
+    fc.stats["all"]["memory"].update(free=1 * GIB, used=63 * GIB)
     _running(fc, "CML-hog", 4, "nxosv9000")
     d = c.get(f"/api/labs/{lab}/precheck").json()       # always fresh
     assert d["verdict"]["level"] == "nofit"
@@ -230,3 +232,164 @@ def test_ui_has_precheck_and_fit_tags():
     js = TestClient(create_app(config.SettingsStore(config.Settings()), persist=False)).get("/static/app.js").text
     for s in ("renderPrecheck", "/precheck", "fit-slot", "libFitTags", "stopCmlLab", "Build anyway"):
         assert s in js
+
+
+# ------------------------------------------------------------------ 3.3.1: CML 2.9 licensing + system_stats shapes
+# Shapes from the CML 2.9 API schema (simple_webserver.schemas.licensing / diagnostics / system) and the virl2_client
+# docs; ids, accounts and hostnames redacted. Not captured from a live server.
+def _feature(fid, name, desc, in_use, mx, with_minmax=True):
+    f = {"id": f"regid.2019-10.com.cisco.{fid},1.0_00000000-0000-4000-a000-000000000000", "name": name,
+         "description": desc, "in_use": in_use, "status": "IN_COMPLIANCE", "version": "1.0"}
+    if with_minmax:
+        f.update(min=0, max=mx)
+    return f
+
+
+def cml29_licensing(expansion=0, product="CML_Enterprise", with_minmax=True):
+    """GET /api/v0/licensing on a registered CML 2.9 Enterprise server: the base license with 20 nodes included
+    (in_use 1 of max 1, the "1 of 1" 3.3.0 showed) plus the Expansion Nodes feature (in_use = expansion count)."""
+    return {
+        "udi": {"hostname": "cml-controller", "product_uuid": "00000000-0000-4000-a000-000000000000"},
+        "registration": {"status": "COMPLETED", "smart_account": "REDACTED", "virtual_account": "REDACTED",
+                         "expires": "2027-06-10T20:17:39+00:00"},
+        "authorization": {"status": "IN_COMPLIANCE", "expires": "2026-12-23T16:39:07+00:00"},
+        "reservation_mode": False,
+        "features": [
+            _feature("CML_ENT_BASE", "CML - Enterprise License",
+                     "Cisco Modeling Labs - Enterprise License with 20 nodes capacity included", 1, 1, with_minmax),
+            _feature("CML_NODE_COUNT", "CML \u2013 Expansion Nodes",
+                     "Cisco Modeling Labs - Expansion node capacity for CML Enterprise Servers", expansion, 300, with_minmax),
+        ],
+        "product_license": {"active": product, "is_enterprise": product == "CML_Enterprise"},
+        "transport": {"ssms": "https://smartreceiver.cisco.com/licservice/license", "proxy": {"server": None, "port": None},
+                      "default_ssms": "https://smartreceiver.cisco.com/licservice/license"},
+    }
+
+
+def cml29_system_stats(total_gib=90, memfree_gib=6, used_gib=10, unit=GIB):
+    """GET /api/v0/system_stats, one all-in-one host: bytes; "free" is MemFree (page cache not included)."""
+    mem = {"total": int(total_gib * unit), "free": int(memfree_gib * unit), "used": int(used_gib * unit)}
+    host = {"cpu": {"count": 16, "percent": 3.5}, "memory": mem, "disk": {"used": 120 * GIB, "free": 380 * GIB, "total": 500 * GIB}}
+    return {"computes": {"6f5c1d2e-0000-4000-a000-000000000001": {
+                "hostname": "cml-controller", "is_controller": True,
+                "stats": dict(host, cpu={"count": 16, "percent": 3.5, "model": "Intel Xeon", "predicted": 16,
+                                         "load": [0.4, 0.5, 0.6], "hyperthreading": True},
+                              dominfo={"allocated_cpus": 12, "allocated_memory": 75497472, "total_nodes": 7,
+                                       "total_orphans": 0, "running_nodes": 7, "running_orphans": 0})}},
+            "all": host, "controller": {"disk": {"used": 120 * GIB, "free": 380 * GIB, "total": 500 * GIB}}}
+
+
+def test_dylans_server_20_node_license_is_not_1_of_1():
+    """The 3.3.0 bug: features summed -> "1 of 1 licensed nodes in use" and "won't fit" for every lab."""
+    fc = FakeClient()
+    fc.stats = cml29_system_stats(total_gib=90, memfree_gib=70, used_gib=12)
+    fc.licensing = FakeLicensing(cml29_licensing())
+    _running(fc, "colleague", 4, "iol-xe")
+    sw = _running(fc, "switchy", 1, "unmanaged_switch")      # never uses a license
+    assert sw
+    s = resources.snapshot(fc)
+    lic = s["license"]
+    assert (lic["max"], lic["in_use"], lic["known"]) == (20, 4, True)
+    assert lic["source"] == "licensing+labs" and lic["product"] == "CML_Enterprise"
+    v = resources.verdict(s, 76, 10, headroom_gb=4)
+    assert v["node_check"]["level"] == "fits" and v["failed"] == []
+    assert not any("1 of 1" in r for r in v["reasons"])
+
+
+def test_license_status_without_min_max_still_gives_20():
+    fc = FakeClient()
+    fc.licensing = FakeLicensing(cml29_licensing(with_minmax=False))
+    assert resources.snapshot(fc)["license"]["max"] == 20
+
+
+def test_expansion_nodes_add_their_chosen_count_not_the_300_maximum():
+    fc = FakeClient()
+    fc.licensing = FakeLicensing(cml29_licensing(expansion=50))
+    assert resources.snapshot(fc)["license"]["max"] == 70
+
+
+def test_diagnostics_licensing_wins_for_nodes_in_use():
+    fc = FakeClient()
+    fc.licensing = FakeLicensing(cml29_licensing())
+    fc.diagnostics = {"quota": 20, "started": 17, "user_quota": None, "user_started": 17}
+    _running(fc, "x", 2)
+    lic = resources.snapshot(fc)["license"]
+    assert (lic["max"], lic["in_use"], lic["source"]) == (20, 17, "diagnostics")
+    v = resources.verdict({"available_gb": 80.0, "labs": [], "running_nodes": 2, "license": lic}, 10, 6)
+    assert v["level"] == "nofit" and v["failed"] == ["nodes"] and v["ram"]["level"] == "fits"
+    assert v["reasons"] == ["Node licenses: needs 6, but 17 of 20 are in use (3 free)."]
+
+
+def test_diagnostics_error_body_falls_back():
+    fc = FakeClient()
+    fc.licensing = FakeLicensing(cml29_licensing())
+    fc.diagnostics = {"error": "Failed to fetch licensing diagnostics"}
+    assert resources.snapshot(fc)["license"]["source"] == "licensing+labs"
+
+
+def test_resource_pool_user_quota():
+    lic = {"max": 100, "in_use": 10, "known": True, "user_max": 12, "user_in_use": 10}
+    v = resources.verdict({"available_gb": 80.0, "labs": [], "running_nodes": 10, "license": lic}, 4, 3)
+    assert v["failed"] == ["nodes"] and "resource pool" in v["reasons"][0]
+
+
+@pytest.mark.parametrize("product,cap", [("CML_Personal", 20), ("CML_Personal40", 40), ("CML_Enterprise", 20)])
+def test_capacity_from_product_when_features_do_not_say(product, cap):
+    status = {"features": [{"id": "regid.x,1.0_y", "name": "CML - License", "in_use": 1, "max": 1}],
+              "product_license": {"active": product}}
+    assert resources._license_capacity(status)[0] == cap
+
+
+def test_ambiguous_license_means_cant_tell_for_nodes_not_wont_fit():
+    fc = FakeClient()
+    fc.licensing = FakeLicensing({"features": [{"id": "regid.x,1.0_y", "name": "CML - Education", "in_use": 1, "max": 1}],
+                                  "product_license": {"active": "CML_Education"}})
+    s = resources.snapshot(fc)
+    assert s["license"]["known"] is False and s["license"]["max"] is None
+    v = resources.verdict(s, 10, 10)
+    assert v["level"] == "fits" and v["node_check"]["level"] == "unknown" and "can't tell" in v["node_check"]["note"]
+
+
+def test_non_admin_no_license_is_cant_tell():
+    fc = FakeClient()
+    fc.licensing = FakeLicensing(error=PermissionError("403"))
+    s = resources.snapshot(fc)
+    assert s["license"] is None
+    v = resources.verdict(s, 10, 10)
+    assert v["level"] == "fits" and v["node_check"]["level"] == "unknown" and v["reasons"] == []
+
+
+def test_ram_failure_is_named_as_memory():
+    v = resources.verdict({"available_gb": 50.0, "labs": [], "running_nodes": 0,
+                           "license": {"max": 20, "in_use": 0, "known": True}}, 76, 10)
+    assert v["failed"] == ["memory"] and v["node_check"]["level"] == "fits" and v["reasons"][0].startswith("Memory:")
+
+
+def test_page_cache_counts_as_free_memory():
+    """MemFree leaves out the page cache; CML reclaims it when a node starts. 3.3.0 read only MemFree."""
+    assert resources._memory(cml29_system_stats(total_gib=90, memfree_gib=6, used_gib=10)) == (90.0, 80.0)
+
+
+def test_memory_in_kib_is_recognised():
+    assert resources._memory(cml29_system_stats(total_gib=90, memfree_gib=60, used_gib=20, unit=1024 ** 2)) == (90.0, 70.0)
+
+
+def test_memory_without_used_keeps_free():
+    assert resources._memory({"all": {"memory": {"total": 64 * GIB, "free": 20 * GIB}}}) == (64.0, 20.0)
+
+
+def test_dylans_lab21_fits_on_90_gb():
+    """Lab 21 (6 x nxosv9000 at 12 GB + 4 x iol-xe at 1 GB = 76 GB, 10 nodes) on an idle 90 GB / 20-node server."""
+    fc = FakeClient()
+    fc.stats = cml29_system_stats(total_gib=90, memfree_gib=9, used_gib=6)
+    fc.licensing = FakeLicensing(cml29_licensing())
+    s = resources.snapshot(fc)
+    v = resources.verdict(s, 76, 10, headroom_gb=4)
+    assert s["available_gb"] == 84.0 and v["level"] == "fits" and v["failed"] == []
+
+
+def test_licensed_nodes_skip_unmanaged_switch_and_external_connector():
+    from types import SimpleNamespace as NS
+    lab = NS(platforms=["iol"], node_count=4, nodes=[NS(definition=d, kind="router") for d in
+                                                     ("iol-xe", "iol-xe", "unmanaged_switch", "external_connector")])
+    assert resources.licensed_nodes(lab, "iol") == 2
