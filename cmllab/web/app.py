@@ -942,6 +942,18 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                    node_limit=s.node_limit)
         return out
 
+    @app.get("/api/resources/debug")
+    def cml_resources_debug():
+        """Redacted raw CML data behind the resource check, for bug reports (Copy diagnostics)."""
+        s = store.get()
+        if not s.is_configured():
+            return {"configured": False}
+        try:
+            dump = resources.debug_dump(service.make_cml(s, client_factory).client, (s.lab_prefix,))
+        except Exception as e:
+            dump = {"error": config.redact(f"{type(e).__name__}: {e}")[:300]}
+        return {"configured": True, "dump": dump}
+
     @app.get("/api/labs/{lab_id}/precheck")
     def precheck(lab_id: str):
         e = _entry(lab_id)

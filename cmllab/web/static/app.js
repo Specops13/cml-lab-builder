@@ -1,6 +1,6 @@
 "use strict";
 /* CML Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "3.3.1";  // must equal cmllab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "3.3.2";  // must equal cmllab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 /* links that come from data (CML, GitHub, lab files) are only ever http(s): never javascript: or data: URLs */
@@ -1080,11 +1080,22 @@ function confirmBuild(l) {
     <p class="small">${l.nodes} nodes. ${esc(r.tooltip || "")}${r.vcpus ? ` About ${r.vcpus} vCPUs.` : ""}</p>
     <div id="res-panel" class="res-panel" aria-live="polite" aria-busy="true"><p class="muted small loading"><span class="spinner" aria-hidden="true"></span>Checking free memory and running labs on CML…</p></div>
     <div class="toolbar"><button data-help="lab.buildGo" id="bc-go" class="primary">Build</button><button data-help="lab.buildCancel" id="bc-cancel" class="hint-btn">Cancel</button>
-      <button data-help="res.recheck" id="bc-recheck" class="hint-btn" hidden>${icon("refresh")}Check again</button></div></section>`;
+      <button data-help="res.recheck" id="bc-recheck" class="hint-btn" hidden>${icon("refresh")}Check again</button>
+      <button data-help="res.copyDiag" id="bc-diag" class="hint-btn">${icon("info")}Copy diagnostics</button></div></section>`;
   $("#bc-go").onclick = () => { box.innerHTML = ""; resCache = null; run("build"); };
   $("#bc-cancel").onclick = () => { box.innerHTML = ""; };
   $("#bc-recheck").onclick = () => renderPrecheck(l);
+  $("#bc-diag").onclick = copyResourceDiagnostics;
   renderPrecheck(l);
+}
+async function copyResourceDiagnostics() {
+  try {
+    const d = await api("/api/resources/debug");
+    if (!d.configured) { toast("Set up the CML connection in Settings first", "err"); return; }
+    const text = JSON.stringify(d.dump, null, 1);
+    toast(await copyText(text) ? "Diagnostics copied (secrets, serials, ids, host names and IP addresses removed). Paste them into your bug report."
+      : "Could not copy to clipboard; run `cmllab resource-diagnostics` instead", "ok", 8000);
+  } catch (e) { toast("Could not read diagnostics: " + e.message, "err"); }
 }
 function setBuildGo(level) {
   const go = $("#bc-go"); if (!go) return;
@@ -1124,7 +1135,7 @@ async function renderPrecheck(l) {
   const limits = `<ul class="small res-limits" aria-label="Limits checked">
       <li class="lim fit-${ramLv}">${icon(FIT[ramLv][0])}<b>Memory:</b> ${LV[ramLv]}${v.need_gb != null ? ` (needs ~${gb1(v.need_gb)} GB, ${gb1(s.available_gb)} GB free)` : ""}</li>
       <li class="lim fit-${nd.level}">${icon(FIT[nd.level][0])}<b>Node licenses:</b> ${LV[nd.level]}${nd.max != null
-        ? ` (this lab uses ${v.nodes}; ${nd.in_use} of ${nd.max} in use)` : ` (this lab uses ${v.nodes}; ${esc((s.license && s.license.note) || "CML did not report its license: only admins can read it")})`}</li></ul>`;
+        ? ` (this lab uses ${v.nodes}; ${nd.in_use} of ${nd.max} in use${nd.pool ? `; your resource pool${nd.pool.label ? " " + esc(nd.pool.label) : ""}: ${nd.pool.in_use} of ${nd.pool.max}` : ""})` : ` (this lab uses ${v.nodes}; ${esc((s.license && s.license.note) || "CML did not report its license: only admins can read it")})`}</li></ul>`;
   const lic = s.license && s.license.product ? `<span>License: ${esc(s.license.product)}${s.license.source === "diagnostics" ? "" : s.license.source === "licensing+labs" ? " (nodes counted from running labs)" : ""}</span>` : "";
   const rows = (s.labs || []).map((x) => {
     const mine = v.running_copy && v.running_copy.id === x.id;

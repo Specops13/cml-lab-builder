@@ -327,10 +327,12 @@ def test_diagnostics_error_body_falls_back():
     assert resources.snapshot(fc)["license"]["source"] == "licensing+labs"
 
 
-def test_resource_pool_user_quota():
-    lic = {"max": 100, "in_use": 10, "known": True, "user_max": 12, "user_in_use": 10}
-    v = resources.verdict({"available_gb": 80.0, "labs": [], "running_nodes": 10, "license": lic}, 4, 3)
-    assert v["failed"] == ["nodes"] and "resource pool" in v["reasons"][0]
+def test_resource_pool_node_limit():
+    lic = {"max": 100, "in_use": 10, "known": True}
+    pool = {"assigned": True, "label": "students", "max": 12, "in_use": 10}
+    v = resources.verdict({"available_gb": 80.0, "labs": [], "running_nodes": 10, "license": lic, "pool": pool}, 4, 3)
+    assert v["failed"] == ["nodes"] and "resource pool 'students' allows 12 nodes" in v["reasons"][0]
+    assert v["node_check"]["pool"] == {"label": "students", "max": 12, "in_use": 10}
 
 
 @pytest.mark.parametrize("product,cap", [("CML_Personal", 20), ("CML_Personal40", 40), ("CML_Enterprise", 20)])
@@ -393,3 +395,137 @@ def test_licensed_nodes_skip_unmanaged_switch_and_external_connector():
     lab = NS(platforms=["iol"], node_count=4, nodes=[NS(definition=d, kind="router") for d in
                                                      ("iol-xe", "iol-xe", "unmanaged_switch", "external_connector")])
     assert resources.licensed_nodes(lab, "iol") == 2
+
+
+# ------------------------------------------------------------------ 3.3.2: Dylan's CML 2.9.1 Personal server
+class _Resp:
+    def __init__(self, data):
+        self._d = data
+
+    def json(self):
+        return self._d
+
+
+class _Session:
+    def __init__(self, routes):
+        self.routes, self.calls = routes, []
+
+    def get(self, url):
+        self.calls.append(url)
+        if url not in self.routes:
+            raise RuntimeError(f"404 {url}")
+        return _Resp(self.routes[url])
+
+
+class _Users:
+    def __init__(self, user):
+        self.user = user
+
+    def user_id(self, username):
+        return "00000000-0000-4000-a000-0000000000aa"
+
+    def get_user(self, uid):
+        return self.user
+
+
+def cml29_personal():
+    """GET /licensing on a CML 2.9.1 Personal server (shape per the 2.9 schema; ids redacted)."""
+    return {"udi": {"hostname": "cml-controller", "product_uuid": "00000000-0000-4000-a000-000000000000"},
+            "registration": {"status": "COMPLETED", "smart_account": "REDACTED", "virtual_account": "REDACTED"},
+            "authorization": {"status": "IN_COMPLIANCE"}, "reservation_mode": False,
+            "features": [{"id": "regid.2019-10.com.cisco.CML_PERS,1.0_00000000-0000-4000-a000-000000000001",
+                          "name": "CML - Personal License", "description": "Cisco Modeling Labs - Personal",
+                          "in_use": 1, "status": "IN_COMPLIANCE", "version": "1.0"}],
+            "product_license": {"active": "CML_Personal", "is_enterprise": False},
+            "transport": {"ssms": "https://smartreceiver.cisco.com/licservice/license"}}
+
+
+def _dylan(user=None, pool_usage=None):
+    fc = FakeClient()
+    fc.stats = cml29_system_stats(total_gib=125, memfree_gib=97, used_gib=28)
+    fc.licensing = FakeLicensing(cml29_personal())
+    # what his server answered: user_quota 1 / user_started 0 is NOT a node limit
+    fc.diagnostics = {"quota": 20, "started": 0, "user_quota": 1, "user_started": 0}
+    fc.username = "admin"
+    fc.user_management = _Users(user if user is not None else {"username": "admin", "admin": True, "resource_pool": None})
+    fc._session = _Session({"resource_pool_usage/pool-1": pool_usage} if pool_usage else {})
+    return fc
+
+
+def test_screenshot_personal_user_quota_1_is_not_a_node_limit():
+    """3.3.1 said "Won't fit ... your resource pool allows 1 nodes and 0 are running" for lab 21 (10 nodes, 76 GB)."""
+    s = resources.snapshot(_dylan())
+    assert (s["license"]["max"], s["license"]["in_use"], s["license"]["product"]) == (20, 0, "CML_Personal")
+    assert s["pool"]["assigned"] is False and s["pool"]["max"] is None
+    v = resources.verdict(s, 76, 10, headroom_gb=4)
+    assert v["level"] == "fits" and v["failed"] == [] and v["reasons"] == []
+    assert v["node_check"] == {"level": "fits", "reason": "", "note": "", "in_use": 0, "max": 20, "need": 10}
+    assert "user_max" not in s["license"]
+
+
+def test_personal_without_diagnostics_is_20_and_personal_plus_40():
+    fc = _dylan()
+    fc.diagnostics = None
+    assert resources.snapshot(fc)["license"]["max"] == 20
+    st = cml29_personal()
+    st["product_license"]["active"] = "CML_PersonalPlus"
+    assert resources._license_capacity(st)[0] == 40
+
+
+def test_assigned_pool_with_null_licenses_is_unlimited():
+    fc = _dylan({"admin": False, "resource_pool": "pool-1"},
+                {"id": "pool-1", "label": "lab users", "limit": {"licenses": None, "ram": None, "cpus": None,
+                                                                "disk_space": None, "external_connectors": None},
+                 "usage": {"licenses": 4, "ram": 8192, "cpus": 400, "disk_space": 0, "external_connectors": []}})
+    s = resources.snapshot(fc)
+    assert s["pool"]["assigned"] is True and s["pool"]["max"] is None
+    assert resources.verdict(s, 10, 10)["node_check"]["level"] == "fits"
+
+
+def test_assigned_pool_with_a_node_limit_blocks():
+    fc = _dylan({"admin": False, "resource_pool": "pool-1"},
+                {"id": "pool-1", "label": "lab users", "limit": {"licenses": 8}, "usage": {"licenses": 2}})
+    s = resources.snapshot(fc)
+    assert (s["pool"]["max"], s["pool"]["in_use"]) == (8, 2)
+    v = resources.verdict(s, 10, 10)
+    assert v["failed"] == ["nodes"] and "allows 8 nodes and 2 are in use; this lab needs 10" in v["reasons"][0]
+
+
+def test_pool_that_cannot_be_read_never_blocks():
+    fc = _dylan({"admin": False, "resource_pool": "pool-9"})     # usage GET fails
+    s = resources.snapshot(fc)
+    assert s["pool"]["assigned"] is True and s["pool"]["max"] is None and s["pool"]["error"]
+    assert resources.verdict(s, 10, 10)["level"] == "fits"
+
+
+def test_debug_dump_is_redacted_and_has_the_raw_data():
+    import json
+    from cmllab import config
+    fc = _dylan()
+    fc.stats["computes"]["6f5c1d2e-0000-4000-a000-000000000001"]["stats"]["note"] = "mgmt 192.168.11.96 token=abc123"
+    d = resources.debug_dump(fc)
+    text = json.dumps(d)
+    assert d["cml"]["diagnostics_licensing"]["licensing"]["user_quota"] == 1
+    assert d["cml"]["licensing"]["product_license"]["active"] == "CML_Personal"
+    assert d["cml"]["licensing"]["udi"] == "***" and d["cml"]["licensing"]["registration"]["smart_account"] == "***"
+    assert "192.168.11.96" not in text and "abc123" not in text and "cml-controller" not in text
+    assert "00000000-0000-4000-a000" not in text and "smartreceiver" not in text
+    assert d["app_view"]["license"]["max"] == 20 and d["app_version"]
+
+
+def test_resource_diagnostics_endpoint_and_cli(monkeypatch, tmp_path):
+    fc = _dylan()
+    c = _app(fc)
+    d = c.get("/api/resources/debug").json()
+    assert d["configured"] and d["dump"]["cml"]["system_stats"]
+    from typer.testing import CliRunner
+    from cmllab import cli, service
+
+    class _C:
+        client = fc
+    monkeypatch.setattr(service, "make_cml", lambda s, *a, **k: _C())
+    monkeypatch.setattr(cli, "_settings", lambda: config.Settings(cml_url="https://x", username="u", password="p"))
+    out = tmp_path / "diag.json"
+    r = CliRunner().invoke(cli.app, ["resource-diagnostics", "-o", str(out)])
+    assert r.exit_code == 0, r.output
+    assert '"CML_Personal"' in out.read_text()

@@ -257,5 +257,6 @@
   "res.wipe": "Stop the lab and discard its node disks and configs (labs built by this app only). The lab stays in CML.",
   "res.recheck": "Read free memory and running labs from CML again.",
   "skip": "Jump past the menu to the page content (keyboard users).",
-  "labs.toggleList": "Hide or show the lab list on the left, so the lab's directions can use the whole width. Remembered on this computer; \"/\" opens the list again and jumps to the search."
+  "labs.toggleList": "Hide or show the lab list on the left, so the lab's directions can use the whole width. Remembered on this computer; \"/\" opens the list again and jumps to the search.",
+  "res.copyDiag": "Copy the raw license, memory and resource-pool data the check read from CML as JSON, with secrets, ids, host names and IPs removed, for a bug report."
 }

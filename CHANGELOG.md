@@ -2,6 +2,22 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [3.3.2] - 2026-10-24
+### Fixed
+- **"Your resource pool allows 1 nodes" on CML Personal.** 3.3.1 read `user_quota` / `user_started` from CML's
+  licensing diagnostics as a per-user node limit. They are not: on a CML 2.9.1 Personal server `user_quota` is 1
+  while 0 of 20 node licenses are in use, so every lab was *won't fit* even though memory and the 20 node licenses
+  were fine. Those numbers are no longer used. A per-user limit is now taken only from the login's assigned CML
+  resource pool when its limit has a number of node licenses (`GET /users/{id}` -> `resource_pool`, then
+  `GET /resource_pool_usage/{pool}`); no pool, `licenses: null` (unlimited) or an unreadable pool never blocks. The
+  node line shows the pool (*your resource pool: n of m*) when one applies.
+
+### Added
+- **Copy diagnostics** button in the Build box and `cmllab resource-diagnostics [-o file]`: the raw licensing,
+  licensing-diagnostics, system-stats and resource-pool JSON the check used plus the app's view of it, with
+  passwords, tokens, serials / UDI, accounts, ids, host names, user names, URLs and IP addresses removed, for bug
+  reports. Read-only.
+
 ## [3.3.1] - 2026-10-24
 ### Fixed
 - **Resource check read the wrong license.** 3.3.0 added up `max` / `in_use` of every CML license feature, so on a

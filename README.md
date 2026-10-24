@@ -168,7 +168,7 @@ instance, and automatic updates that ask first.
 
 **Install** (apt resolves the few dependencies: `libc6 (>= 2.28)`, `libgcc-s1`, `zlib1g`; `xdg-utils` is recommended so the browser opens):
 ```bash
-sudo apt install ./cml-lab-builder_3.3.1_amd64.deb
+sudo apt install ./cml-lab-builder_3.3.2_amd64.deb
 ```
 The `./` matters, because it tells apt this is a local file. The package installs:
 - the app in `/opt/cml-lab-builder/`, with the commands `cml-lab-builder` and `cmllab` in `/usr/bin` (plus the old
@@ -729,6 +729,18 @@ tell, **Node licenses:** the same), so a *Won't fit* always says which limit fai
   Unmanaged switches and external connectors never use a license and are not counted, in the lab or on the server.
   When the license cannot be read (non-admin account) or is not clear, the node line says **can't tell**; it never
   turns that into *won't fit*.
+- **Resource pool** (3.3.2): only when your CML login is assigned a resource pool whose limit has a number of node
+  licenses (CML *Resource pools*, `licenses`) is that limit checked too, and the node line shows *your resource pool:
+  n of m*. No pool (the usual case, e.g. admin accounts), a pool without a node limit (`null` = unlimited) or a pool
+  that cannot be read never blocks. The `user_quota` / `user_started` numbers of CML's licensing diagnostics are not
+  a node limit and are not used (3.3.1 did, which made every lab *won't fit* on CML Personal: "allows 1 nodes").
+
+**Copy diagnostics** (3.3.2, in the Build box) copies what the check read from CML as JSON: the licensing status,
+the licensing diagnostics, `system_stats`, your user's resource pool and its usage, and what the app made of them.
+Passwords, tokens, serial numbers / UDI, Smart Account names, ids, host names, user names, URLs and IP addresses
+are removed. The same from the command line: `cmllab resource-diagnostics` (or `-o diag.json`; with the desktop
+app, `cml-lab-builder resource-diagnostics`). Paste it into a bug report when a verdict looks wrong. It only reads
+from CML (GET requests).
 
 It shows a memory bar (in use / this lab / free) and the running labs with their node count and RAM (from each node's
 RAM setting, else its node definition default), biggest first. From there you can **Stop** a lab, or **Stop & wipe**
@@ -1023,7 +1035,8 @@ If the page looks wrong or buttons do nothing (especially right after an upgrade
 Ctrl+Shift+R (or Ctrl+F5). Since 1.3.1, asset URLs include the version and every response is sent with `no-cache`,
 so this should no longer be needed. Still stuck? Press **F12**, open the **Console** tab and look for red errors, and
 check the yellow banner at the top of the page, which shows any failed request or script error. Include both when
-reporting a problem, along with `run.bat doctor` output and the version shown in the header.
+reporting a problem, along with `run.bat doctor` output and the version shown in the header. For a wrong
+*fits / won't fit* verdict, add the output of **Copy diagnostics** (Build box) or `cmllab resource-diagnostics`.
   The page also checks its own version against the server and asks you to reload if they don't match.
 
 ## Building the executables
@@ -1142,7 +1155,7 @@ every library lab. IOL L2 switches (`ioll2-xe`) have no such requirement.
 After changing the schema, templates, guide or example, run `python -m cmllab docs` (a test checks `docs/` is current).
 
 ## Version and changelog
-Current version: **3.3.1**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.3.2**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License

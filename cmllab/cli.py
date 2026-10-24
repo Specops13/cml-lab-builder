@@ -238,6 +238,20 @@ def doctor():
         raise typer.Exit(1)
 
 
+@app.command("resource-diagnostics")
+def resource_diagnostics(out: Path = typer.Option(None, "-o", "--out", help="write to this file instead of the screen")):
+    """Print what the resource check reads from CML (licensing, licensing diagnostics, system stats, your resource
+    pool) and what it makes of it, as JSON with secrets, serials, ids, host names and IP addresses removed."""
+    import json as _json
+    from . import resources
+    text = _json.dumps(resources.debug_dump(service.make_cml(_settings()).client), indent=1, default=str)
+    if out:
+        out.write_text(text + "\n", encoding="utf-8")
+        typer.echo(f"Wrote {out}")
+    else:
+        typer.echo(text)
+
+
 @app.command()
 def build(lab_id: str, rebuild: bool = typer.Option(False, help="delete and re-import if it exists")):
     """Import + start a lab and wait for boot."""

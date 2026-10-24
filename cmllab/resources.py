@@ -95,8 +95,13 @@ def _memory(stats: dict) -> tuple[float | None, float | None]:
 # (max is only the most that may be chosen, 300). 3.3.0 summed every feature's max/in_use and so showed
 # "1 of 1 licensed nodes in use" and "won't fit" for every lab. The node capacity is the base's included nodes plus
 # the expansion count; how many nodes use a license right now comes from GET /diagnostics/licensing
-# ({"quota", "started", "user_quota", "user_started"}) or, failing that, from counting the running nodes of all
-# labs (minus unmanaged switches and external connectors, which never use a license).
+# ({"quota", "started", ...}) or, failing that, from counting the running nodes of all labs (minus unmanaged switches
+# and external connectors, which never use a license).
+# 3.3.2: "user_quota" / "user_started" of /diagnostics/licensing are NOT a per-user node limit (3.3.1 read them as
+# one): on a CML Personal server user_quota is 1 with 0 node licenses in use, i.e. a count of users, so every lab got
+# "your resource pool allows 1 nodes". A per-user node limit only exists when the login is assigned a CML resource
+# pool whose resolved limit has a number in "licenses" (GET /users/{id} -> resource_pool, then
+# GET /resource_pool_usage/{pool}); no pool, or licenses null, means unlimited.
 INCLUDED_NODES = {"enterprise": 20, "personal40": 40, "personal_plus": 40, "personalplus": 40, "personal": 20, "free": 5}
 
 
@@ -140,11 +145,11 @@ def _license_capacity(status: dict) -> tuple[int | None, str, list]:
 def _license(status, diag, running_counted: int | None) -> dict | None:
     """Node-license view for the verdict, or None when nothing could be read (non-admin login).
 
-    {"max", "in_use", "known", "source", "product", "features", "user_max", "user_in_use", "note"}; known is False
+    {"max", "in_use", "known", "source", "product", "features", "note"}; known is False
     when either number is missing: the verdict then says "can't tell" for nodes instead of "won't fit"."""
     capacity, product, shown = _license_capacity(status) if isinstance(status, dict) else (None, "", [])
     out = {"max": capacity, "in_use": None, "known": False, "source": "licensing", "product": product,
-           "features": shown, "user_max": None, "user_in_use": None, "note": ""}
+           "features": shown, "note": ""}
     d = diag.get("licensing", diag) if isinstance(diag, dict) else None
     if isinstance(d, dict) and "started" in d and "error" not in d:
         started, quota = _int(d.get("started")), _int(d.get("quota"))
@@ -152,7 +157,6 @@ def _license(status, diag, running_counted: int | None) -> dict | None:
             out.update(in_use=started, source="diagnostics")
             if quota is not None and quota > 0:
                 out["max"] = quota
-            out["user_max"], out["user_in_use"] = _int(d.get("user_quota")), _int(d.get("user_started"))
     if out["in_use"] is None and running_counted is not None and out["max"] is not None:
         out.update(in_use=running_counted, source="licensing+labs")
     if out["max"] is None and out["in_use"] is None and not shown:
@@ -162,6 +166,106 @@ def _license(status, diag, running_counted: int | None) -> dict | None:
         out["note"] = ("the licensed node count could not be read" if out["max"] is None
                        else "the nodes in use could not be counted")
     return out
+
+
+def _user_pool(client) -> dict:
+    """The login's CML resource pool and its node-license limit (read-only GETs).
+
+    {"assigned": True/False/None (None = could not tell), "id", "label", "max", "in_use", "error", "raw_usage"}.
+    "max" is only set when CML reports a whole number of node licenses for the pool (null = unlimited)."""
+    out = {"assigned": None, "id": None, "label": "", "max": None, "in_use": None, "error": "", "raw_usage": None}
+    try:
+        um = client.user_management
+        user = um.get_user(um.user_id(client.username))
+    except Exception as e:
+        out["error"] = f"user: {_why(e)}"
+        return out
+    pid = user.get("resource_pool") if isinstance(user, dict) else None
+    if not pid:
+        out["assigned"] = False
+        return out
+    out.update(assigned=True, id=str(pid))
+    try:
+        usage = client._session.get(f"resource_pool_usage/{pid}").json()
+    except Exception as e:
+        out["error"] = f"resource pool usage: {_why(e)}"
+        return out
+    out["raw_usage"] = usage
+    if isinstance(usage, dict):
+        out["label"] = str(usage.get("label") or "")[:80]
+        lim = (usage.get("limit") or {}).get("licenses") if isinstance(usage.get("limit"), dict) else None
+        used = (usage.get("usage") or {}).get("licenses") if isinstance(usage.get("usage"), dict) else None
+        lim, used = _int(lim), _int(used)
+        if lim is not None and lim > 0:
+            out["max"], out["in_use"] = lim, used
+    return out
+
+
+_SECRET_KEYS = ("password", "passwd", "secret", "token", "key", "serial", "udi", "uuid", "account", "hostname",
+                "email", "proxy", "ssms", "fullname", "username", "cookie", "auth_header", "sn")
+_UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+
+
+def redact_tree(v, _key: str = ""):
+    """Copy of a JSON value with secrets, serials, ids, host names, accounts and IP addresses removed."""
+    import re
+    from .config import redact
+    k = _key.lower()
+    if k and k not in ("key_id",) and any(s == k or s in k.split("_") or k.endswith(s) for s in _SECRET_KEYS) \
+            and v not in (None, "", [], {}):
+        return "***"
+    if isinstance(v, dict):
+        out, n = {}, 0
+        for kk, vv in v.items():
+            name = str(kk)
+            if re.fullmatch(_UUID, name):
+                n += 1
+                name = f"<id-{n}>"
+            out[name] = redact_tree(vv, str(kk))
+        return out
+    if isinstance(v, (list, tuple)):
+        return [redact_tree(x, _key) for x in v]
+    if isinstance(v, str):
+        s = re.sub(_UUID, "<id>", redact(v))
+        s = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "<ip>", s)
+        return re.sub(r"https?://[^\s\"']+", "<url>", s)
+    return v
+
+
+def debug_dump(client, prefixes=("CML-",)) -> dict:
+    """What the resource check read from CML (raw, read-only GETs) and what it made of it, redacted for sharing:
+    licensing status, licensing diagnostics, system stats, the login's resource pool and the computed view."""
+    from . import __version__
+    raw: dict = {}
+
+    def grab(name, fn):
+        try:
+            raw[name] = fn()
+        except Exception as e:
+            raw[name] = {"error": _why(e)}
+    grab("licensing", lambda: client.licensing.status())
+
+    def _diag():
+        from virl2_client.virl2_client import DiagnosticsCategory
+        return client.get_diagnostics(DiagnosticsCategory.LICENSING)
+    grab("diagnostics_licensing", _diag)
+    grab("system_stats", client.get_system_stats)
+    grab("resource_pool", lambda: _user_pool(client))
+    try:
+        user = client.user_management.get_user(client.user_management.user_id(client.username))
+        raw["user"] = {"admin": user.get("admin"), "resource_pool": user.get("resource_pool")}
+    except Exception as e:
+        raw["user"] = {"error": _why(e)}
+    try:
+        raw["server_version"] = str(getattr(client, "server_version", "") or "")
+    except Exception:
+        pass
+    snap = snapshot(client, prefixes)
+    view = {k: snap.get(k) for k in ("total_gb", "free_gb", "committed_gb", "available_gb", "license", "pool",
+                                     "running_nodes", "errors")}
+    view["labs"] = [{k: x.get(k) for k in ("running_nodes", "counted_nodes", "ram_gb", "ours")} for x in snap["labs"]]
+    return redact_tree({"app_version": __version__, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "cml": raw, "app_view": view})
 
 
 def licensed_nodes(lab, platform: str = "iol") -> int:
@@ -232,13 +336,15 @@ def snapshot(client, prefixes=("CML-",)) -> dict:
     counted = sum(x["counted_nodes"] for x in labs)
     # every lab is only visible to an admin, who is also the only one who can read /licensing
     lic = _license(status, diag, counted if (saw_all and isinstance(status, dict)) else None)
+    pool = _user_pool(client)
+    pool.pop("raw_usage", None)
     committed = round(sum(x["ram_gb"] for x in labs), 1)
     available = None
     if free is not None:
         available = free if total is None else min(free, max(0.0, total - committed))
         available = round(available, 1)
     return {"ok": available is not None, "total_gb": total, "free_gb": free,
-            "committed_gb": committed, "available_gb": available, "license": lic, "labs": labs,
+            "committed_gb": committed, "available_gb": available, "license": lic, "pool": pool, "labs": labs,
             "running_nodes": sum(x["counted_nodes"] for x in labs), "errors": errors, "at": time.time()}
 
 
@@ -283,14 +389,17 @@ def verdict(snap: dict, need_gb: float, nodes: int, headroom_gb: float = DEFAULT
         if in_use + nodes > lic["max"]:
             nd.update(level="nofit", reason=f"Node licenses: needs {nodes}, but {in_use} of {lic['max']} are in use "
                                             f"({lic['max'] - in_use} free).")
-        if lic.get("user_max") is not None and lic.get("user_in_use") is not None \
-                and lic["user_in_use"] - freed + nodes > lic["user_max"]:
-            nd.update(level="nofit", reason=f"Node licenses: your resource pool allows {lic['user_max']} nodes and "
-                                            f"{max(0, lic['user_in_use'] - freed)} are running.")
     else:
         nd["level"] = "unknown"
         why = (lic or {}).get("note") or "CML did not report its license (only admins can read it)"
         nd["note"] = f"Node licenses: can't tell ({why}); this lab uses {nodes}."
+    pool = snap.get("pool") or {}
+    if nd["level"] != "nofit" and _int(pool.get("max")) and _int(pool.get("in_use")) is not None:
+        p_use = max(0, int(pool["in_use"]) - freed)
+        nd["pool"] = {"label": pool.get("label") or "", "max": int(pool["max"]), "in_use": p_use}
+        if p_use + nodes > int(pool["max"]):
+            nd.update(level="nofit", reason=f"Node licenses: your CML resource pool{' ' + repr(pool['label']) if pool.get('label') else ''}"
+                                            f" allows {pool['max']} nodes and {p_use} are in use; this lab needs {nodes}.")
     if node_limit and nd["level"] != "nofit" and snap.get("running_nodes", 0) - freed + nodes > node_limit:
         nd.update(level="nofit", reason=f"Nodes: would exceed the node limit in Settings ({node_limit}).")
 
