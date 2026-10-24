@@ -14,16 +14,26 @@ P1-SPINE:
                        Eth1/3         163    R S I s     N9K-C9300v    Eth1/1
 
     Total entries displayed: 3
-  ping 10.0.1.1: |
-    PING 10.0.1.1 (10.0.1.1): 56 data bytes
+  ping 10.0.0.1: |
+    PING 10.0.0.1 (10.0.0.1): 56 data bytes
     Request 0 timed out
     Request 1 timed out
     Request 2 timed out
     Request 3 timed out
     Request 4 timed out
 
-    --- 10.0.1.1 ping statistics ---
+    --- 10.0.0.1 ping statistics ---
     5 packets transmitted, 0 packets received, 100.00% packet loss
+  show interface Ethernet1/1: |
+    Ethernet1/1 is up
+    admin state is up, Dedicated Interface
+      Hardware: 100/1000/10000 Ethernet, address: 5254.0012.3401 (bia 5254.0012.3401)
+      Description: to SS1 Eth1/1
+      MTU 1500 bytes, BW 1000000 Kbit , DLY 10 usec
+      reliability 255/255, txload 1/255, rxload 1/255
+      Encapsulation ARPA, medium is broadcast
+      Port mode is access
+      full-duplex, 1000 Mb/s
   show ip ospf neighbors: ''
   show ip route 10.0.0.21: |
     % Route not found
@@ -44,14 +54,14 @@ SS1:
     Total entries displayed: 3
   show ip ospf neighbors: ''
 P2-LEAF:
-  ping 10.2.10.1: |
-    PING 10.2.10.1 (10.2.10.1): 56 data bytes
-    Request 0 timed out
-    Request 1 timed out
-    Request 2 timed out
-    Request 3 timed out
-    Request 4 timed out
-
-    --- 10.2.10.1 ping statistics ---
-    5 packets transmitted, 0 packets received, 100.00% packet loss
+  show interface Ethernet1/1: |
+    Ethernet1/1 is up
+    admin state is up, Dedicated Interface
+      Hardware: 100/1000/10000 Ethernet, address: 5254.0012.3401 (bia 5254.0012.3401)
+      Description: to P2-SPINE Eth1/3
+      MTU 1500 bytes, BW 1000000 Kbit , DLY 10 usec
+      reliability 255/255, txload 1/255, rxload 1/255
+      Encapsulation ARPA, medium is broadcast
+      Port mode is access
+      full-duplex, 1000 Mb/s
   show ip ospf database external: ''

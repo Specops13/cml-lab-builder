@@ -5,9 +5,9 @@ SS1:
      OSPF Process ID UNDERLAY VRF default
      Total number of neighbors: 3
      Neighbor ID     Pri State            Up Time  Address         Interface
-     10.0.0.11         1 FULL/ -          00:41:12 10.0.1.2        Eth1/1
-     10.0.0.21         1 FULL/ -          00:41:12 10.0.2.2        Eth1/2
-     10.0.0.2          1 FULL/BDR         00:41:12 10.0.12.2       Eth1/3
+     10.0.0.11         1 FULL/ -          00:41:12 10.0.0.11       Eth1/1
+     10.0.0.21         1 FULL/ -          00:41:12 10.0.0.21       Eth1/2
+     10.0.0.2          1 FULL/ -          00:41:12 10.0.0.2        Eth1/3
   show bgp ipv4 unicast summary: |
     % Invalid command at '^' marker.
 P1-LEAF:
@@ -43,7 +43,7 @@ P1-SPINE:
     '%<string>' in via output denotes VRF <string>
 
     10.2.0.0/16, ubest/mbest: 2/0
-        *via 10.0.1.1, Eth1/1, [110/121], 00:58:40, ospf-UNDERLAY, inter
-        *via 10.0.3.1, Eth1/2, [110/121], 00:58:40, ospf-UNDERLAY, inter
+        *via 10.0.0.1, Eth1/1, [110/121], 00:58:40, ospf-UNDERLAY, inter
+        *via 10.0.0.2, Eth1/2, [110/121], 00:58:40, ospf-UNDERLAY, inter
   show ip route 172.16.2.0/24: |
     % Route not found

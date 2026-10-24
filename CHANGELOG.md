@@ -2,6 +2,31 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## Library update - 2026-10-24 (no app release)
+Library-only change: the apps pick up the new lab versions from the online library (*Library & courses* shows
+*update* on installed copies). No new executables.
+
+### Changed
+- **NX-OS study path labs 21-23 (now version 2): IP-unnumbered OSPF underlay.** Every fabric link (the four
+  super-spine-to-spine links, SS1-SS2 and both spine-to-leaf links) is now `no switchport` + `medium p2p` +
+  `mtu 9216` + `ip unnumbered loopback0` with `ip ospf network point-to-point`, instead of six /30s and a /24:
+  280 link addresses saved, the loopbacks are the only addresses left. Loopback0 is created before the links
+  borrow it and stays unique per switch (router ID = loopback0, checked by a test). Lab 21 rewrites the address
+  table, the step explanations (why unnumbered, `medium p2p` before `ip unnumbered`, next hops = neighbor
+  loopbacks, router LSA Link Data = ifIndex, no /30 stub networks, no DR and no network LSA on an all-p2p fabric),
+  the checks (link pings replaced by interface checks and a loopback ping after OSPF, `FULL/ -` on SS1-SS2,
+  ECMP via 10.0.0.1/10.0.0.2, `Num nets: 2` in the pod summaries) and adds a "borrowed loopback shut" fault to
+  break-and-fix. Labs 22 and 23 update their baselines (regenerated with `packaging/nxos_study_baseline.py`)
+  and expected outputs; lab 22's eBGP design discussion now shows how to peer over unnumbered links. The IOL
+  hosts are not on fabric links and keep their day-0 (iol-xe rule unchanged).
+- **Lab 23: new required step 13, `retain route-target all` on the spines and super spines.** Configured under
+  `router bgp 65000` / `address-family l2vpn evpn` on SS1, SS2, P1-SPINE and P2-SPINE; the spines get
+  `nv overlay evpn` and the L2VPN EVPN family towards the RRs, so they keep every EVPN route although they import
+  no RT (checked: config on all four, spine EVPN sessions with prefixes, type-3 routes kept on P1-SPINE). The step
+  explains what the command does and corrects a common claim: it does **not** remove BGP path hunting - in an
+  eBGP Clos that is solved by one ASN per spine tier. Later steps renumbered (14 ARP suppression, 15 break and
+  fix, 16 wrap-up).
+
 ## [3.3.0] - 2026-10-24
 ### Security
 - **Security audit and hardening** (details in the new [SECURITY.md](SECURITY.md)):

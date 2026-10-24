@@ -74,14 +74,28 @@ def test_lab21_ospf_design():
     sol = lab.step_solution()
     for ss in ("SS1", "SS2"):
         assert sol[ss].count("ip router ospf UNDERLAY area 0.0.0.0") == 4 and "area 0.0.0.1" not in sol[ss]
-    assert "ip ospf priority 100" in sol["SS1"]
+    assert "ip ospf priority" not in sol["SS1"] and "ip address 10.0.12" not in sol["SS1"]
     assert "ip router ospf UNDERLAY area 0.0.0.1" in sol["P1-SPINE"] and "area 0.0.0.1 range 10.1.0.0/16" in sol["P1-SPINE"]
     assert "area 0.0.0.1 nssa default-information-originate" in sol["P1-SPINE"]
     assert "area 0.0.0.2 range 10.2.0.0/16" in sol["P2-SPINE"] and "area 0.0.0.2 stub" in sol["P2-SPINE"]
     assert "redistribute direct route-map RM-EXT" in sol["P1-LEAF"] and "area 0.0.0.1 nssa\n" in sol["P1-LEAF"]
     assert "area 0.0.0.2 stub" in sol["P2-LEAF"] and "no-summary" not in sol["P2-LEAF"] + sol["P2-SPINE"]
-    for n in NXOS:
-        assert sol[n].count("mtu 9216") == sol[n].count("no switchport") >= 1, n
+    for n in NXOS:                                                                  # IP unnumbered fabric links
+        s = sol[n]
+        assert s.count("mtu 9216") == s.count("no switchport") == s.count("medium p2p") == \
+            s.count("ip unnumbered loopback0") >= 1, n
+        assert not re.search(r"^\s+ip address 10\.\d+\.\d+\.\d+/(?!32\b)", s, re.M), n    # only /32 loopbacks
+        assert s.index("interface loopback0") < s.index("ip unnumbered loopback0"), n  # loopback before borrowers
+        eths = re.findall(r"^interface (Ethernet1/\d)\n", lab.step("links").config[n], re.M)
+        assert s.count("ip ospf network point-to-point") == len(eths), n           # unnumbered => OSPF p2p
+    rids = [re.search(r"router-id (\S+)", sol[n]).group(1) for n in NXOS]
+    los = [re.search(r"interface loopback0\n(?:[ \t]+.*\n)*?[ \t]+ip address (\S+)/32", sol[n]).group(1) for n in NXOS]
+    assert len(set(rids)) == len(rids) == 6 and sorted(rids) == sorted(los)        # unique, router ID = loopback0
+    checks = {c.id: c for s in lab.steps for c in s.checks}
+    assert checks["lsdb-ss1-router-lsas-only"].absent                               # no network LSA without a DR
+    for c in checks.values():                                                       # no /30 link addresses left
+        text = ((c.command or "") + " " + " ".join(c.match)).replace("\\", "")
+        assert not re.search(r"10\.0\.[1-4]\.[12]\b|10\.0\.12\.|10\.[12]\.10\.", text), c.id
     text = "\n".join(s.explain for s in lab.steps)
     for must in ("debug logfile", "debug-filter", "undebug all", "event-history adjacency", "show debug logfile"):
         assert must in text, must
@@ -140,8 +154,9 @@ def test_lab22_bgp_design():
 def test_lab23_evpn_vxlan_design():
     lab = _lab("23-nxos-evpn-vxlan")
     assert [s.id for s in lab.steps] == ["baseline", "design", "features", "evpn-af", "vni", "nve", "access", "l2-test",
-                                         "bum", "l3vni", "anycast-gw", "irb", "type5", "suppress-arp", "troubleshoot",
-                                         "wrap-up"]
+                                         "bum", "l3vni", "anycast-gw", "irb", "type5", "retain-rt", "suppress-arp",
+                                         "troubleshoot", "wrap-up"]
+    assert not lab.step("retain-rt").optional and lab.step("retain-rt").checks
     for st in ("suppress-arp", "troubleshoot"):
         assert lab.step(st).optional and not lab.step(st).config and not lab.step(st).checks, st
     for n in NXOS:                                                                  # inherited labs 21 + 22
@@ -149,10 +164,18 @@ def test_lab23_evpn_vxlan_design():
         assert "router ospf UNDERLAY" in cfg and "router bgp 65000" in cfg and "evpn" not in cfg, n
     assert "set local-preference" not in lab.node("P1-LEAF").config                 # lab 22's optional policy: not carried
     sol = lab.step_solution()
-    for spine in ("P1-SPINE", "P2-SPINE"):                                          # pure underlay transit
-        assert spine not in sol, spine
+    retain = re.compile(r"^router bgp 65000\n  address-family l2vpn evpn\n    retain route-target all$", re.M)
+    for sw in ("SS1", "SS2", "P1-SPINE", "P2-SPINE"):                                 # retain RT on spines + super spines
+        assert retain.search(lab.step("retain-rt").config[sw]), sw
+    for spine in ("P1-SPINE", "P2-SPINE"):                                          # EVPN view, no VTEP state
+        assert "nv overlay evpn" in sol[spine] and "feature nv overlay" not in sol[spine] and "vn-segment" not in sol[spine]
+    for leaf in ("P1-LEAF", "P2-LEAF"):
+        assert "retain route-target" not in sol[leaf], leaf
+    explain = lab.step("retain-rt").explain
+    assert "does not remove BGP path hunting" in explain.replace("**", "").replace("NOT", "not")
+    assert "same ASN" in explain
     for ss in ("SS1", "SS2"):
-        assert "nv overlay evpn" in sol[ss] and sol[ss].count("route-reflector-client") == 2
+        assert "nv overlay evpn" in sol[ss] and sol[ss].count("route-reflector-client") == 4
         assert "nve" not in sol[ss].replace("nv overlay evpn", "") and "vn-segment" not in sol[ss]
     for leaf, vtep in (("P1-LEAF", "loopback1"), ("P2-LEAF", "loopback1")):
         s = sol[leaf]

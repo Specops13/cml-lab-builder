@@ -7,7 +7,7 @@ difficulty: 4
 platforms: [iol]
 summary: "Lab 2 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with lab 21's finished multi-area OSPF underlay already in its day-0. Build iBGP AS 65000 on top: SS1/SS2 as route reflectors with peer templates, loopback peering, prefix advertisement, best-path selection between two reflected copies, the BGP-free-core problem and its fix, optional policy with communities and local preference, plus eBGP and BFD design discussions. Every step explains the BGP internals and inspects them with show, event-history and filtered debugs in a debug logfile."
 author: CML Lab Builder
-version: "1"
+version: "2"
 ram_gb: 76
 nodes:
   - name: SS1
@@ -29,24 +29,27 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
+      interface loopback0
+        description router ID - lent to every unnumbered fabric link
+        ip address 10.0.0.1/32
       interface Ethernet1/1
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.1.1/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/2
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.2.1/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/3
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.12.1/24
+        ip unnumbered loopback0
         no shutdown
-      interface loopback0
-        description router ID
-        ip address 10.0.0.1/32
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.1
@@ -60,7 +63,7 @@ nodes:
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       interface Ethernet1/3
-        ip ospf priority 100
+        ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
   - name: SS2
     kind: router
@@ -81,24 +84,27 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
+      interface loopback0
+        description router ID - lent to every unnumbered fabric link
+        ip address 10.0.0.2/32
       interface Ethernet1/1
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.3.1/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/2
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.4.1/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/3
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.12.2/24
+        ip unnumbered loopback0
         no shutdown
-      interface loopback0
-        description router ID
-        ip address 10.0.0.2/32
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.2
@@ -112,6 +118,7 @@ nodes:
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       interface Ethernet1/3
+        ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
   - name: P1-SPINE
     kind: router
@@ -132,24 +139,27 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
+      interface loopback0
+        description router ID - lent to every unnumbered fabric link
+        ip address 10.0.0.11/32
       interface Ethernet1/1
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.1.2/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/2
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.3.2/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/3
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.1.10.1/30
+        ip unnumbered loopback0
         no shutdown
-      interface loopback0
-        description router ID
-        ip address 10.0.0.11/32
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.11
@@ -188,24 +198,27 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
+      interface loopback0
+        description router ID - lent to every unnumbered fabric link
+        ip address 10.0.0.21/32
       interface Ethernet1/1
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.2.2/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/2
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.4.2/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/3
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.2.10.1/30
+        ip unnumbered loopback0
         no shutdown
-      interface loopback0
-        description router ID
-        ip address 10.0.0.21/32
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.21
@@ -244,17 +257,18 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
-      interface Ethernet1/1
-        no switchport
-        mtu 9216
-        ip address 10.1.10.2/30
-        no shutdown
       interface loopback0
-        description router ID
+        description router ID - lent to every unnumbered fabric link
         ip address 10.1.0.111/32
       interface loopback1
         description VTEP source (lab 23)
         ip address 10.1.1.111/32
+      interface Ethernet1/1
+        no switchport
+        medium p2p
+        mtu 9216
+        ip unnumbered loopback0
+        no shutdown
       feature ospf
       router ospf UNDERLAY
         router-id 10.1.0.111
@@ -293,17 +307,18 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
-      interface Ethernet1/1
-        no switchport
-        mtu 9216
-        ip address 10.2.10.2/30
-        no shutdown
       interface loopback0
-        description router ID
+        description router ID - lent to every unnumbered fabric link
         ip address 10.2.0.121/32
       interface loopback1
         description VTEP source (lab 23)
         ip address 10.2.1.121/32
+      interface Ethernet1/1
+        no switchport
+        medium p2p
+        mtu 9216
+        ip unnumbered loopback0
+        no shutdown
       feature ospf
       router ospf UNDERLAY
         router-id 10.2.0.121
@@ -448,7 +463,8 @@ task: |
   - The leaves advertise a test prefix each on **loopback200**: P1-LEAF **172.16.1.0/24**, P2-LEAF
     **172.16.2.0/24**. In lab 23 the same sessions carry EVPN instead.
 
-  Addressing (same as lab 21): loopback0 SS1 10.0.0.1, SS2 10.0.0.2, P1-SPINE 10.0.0.11, P2-SPINE 10.0.0.21,
+  Addressing (same as lab 21): the fabric links are **IP unnumbered** (`medium p2p` + `ip unnumbered
+  loopback0`, OSPF point-to-point), so the loopbacks are the only addresses: loopback0 SS1 10.0.0.1, SS2 10.0.0.2, P1-SPINE 10.0.0.11, P2-SPINE 10.0.0.21,
   P1-LEAF 10.1.0.111, P2-LEAF 10.2.0.121; loopback1 (VTEP, lab 23) 10.1.1.111 / 10.2.1.121.
 
   **Resources**: 10 nodes - 6 x nxosv9000 (12 GB each) + 4 IOL hosts = about **76 GB** of CML RAM. NX-OS takes
@@ -484,7 +500,7 @@ steps:
     verify:
       - device: SS1
         command: show ip ospf neighbors
-        expect: "10.0.0.11 and 10.0.0.21 `FULL/ -`, 10.0.0.2 `FULL/BDR` (or DR)."
+        expect: "10.0.0.11, 10.0.0.21 and 10.0.0.2 all `FULL/ -` (point-to-point, no DR), each with its loopback0 in the Address column (unnumbered links)."
       - device: P2-LEAF
         command: show ip route 10.1.0.111
         expect: "`10.1.0.0/16 ... ospf-UNDERLAY, inter` - a specific route to P1-LEAF's loopback0 even in the stub area."
@@ -746,7 +762,7 @@ steps:
         expect: "Per address family: `First best path signalled` / `Convergence to URIB sent` with timestamps."
       - device: P1-LEAF
         command: show ip route 10.2.0.121
-        expect: "`10.2.0.0/16 ... via 10.1.10.1, Eth1/1, [110/161] ... ospf-UNDERLAY, inter` - the route BGP resolves the next hop through (161 = IGP metric to the next hop)."
+        expect: "`10.2.0.0/16 ... via 10.0.0.11, Eth1/1, [110/161] ... ospf-UNDERLAY, inter` - the route BGP resolves the next hop through (161 = IGP metric to the next hop)."
     checks:
       - id: transport-ss2-loopback
         description: P1-LEAF's session to SS2 is Established from loopback0
@@ -1046,15 +1062,26 @@ steps:
       only** instead (RFC 7938). Know both - the EVPN mechanics in lab 23 are the same.
 
       **eBGP version of this topology**: every leaf its own AS (P1-LEAF 65101, P2-LEAF 65102), each pod's spine
-      an AS (65011, 65021), the super spines a shared AS (65000). Sessions run on the **directly connected link
-      addresses** (no IGP needed at all, or only for loopbacks).
+      an AS (65011, 65021), the super spines a shared AS (65000). Classic eBGP fabrics peer on the **directly
+      connected link addresses** - but these links are **IP unnumbered**, so there is no link address to peer
+      with. Two ways to keep the addresses saved:
+
+      - **Loopback peering**: eBGP between loopback0s with `update-source loopback0` and `ebgp-multihop 2`; the
+        neighbor's loopback is reached through a /32 static route out of the unnumbered interface (or a minimal
+        IGP).
+      - **Interface peering over IPv6 link-local** (RFC 8950, IPv4 routes with an IPv6 next hop): the session is
+        bound to the interface, not to an IPv4 address. Supported on recent NX-OS releases; check your release
+        notes before relying on it.
 
       ```
-      ! P1-LEAF, eBGP style (do not paste)
+      ! P1-LEAF, eBGP style over the unnumbered uplink (do not paste)
+      ip route 10.0.0.11/32 Ethernet1/1
       router bgp 65101
         router-id 10.1.0.111
-        neighbor 10.1.10.1
+        neighbor 10.0.0.11
           remote-as 65011
+          update-source loopback0
+          ebgp-multihop 2
           address-family ipv4 unicast
       ```
 
@@ -1064,9 +1091,22 @@ steps:
       | Loop prevention | ORIGINATOR_ID / CLUSTER_LIST | AS_PATH |
       | Next hop | unchanged (always the originating leaf) | changed at every hop, unless `next-hop-unchanged` (EVPN needs the VTEP as next hop) |
       | Route targets in EVPN | auto RT = `ASN:VNI` works everywhere | auto RT differs per leaf AS: use manual RTs or `rewrite-evpn-rt-asn` |
-      | Spines in EVPN | RR, no VTEP state | must keep EVPN routes they do not import: `retain route-target all` |
+      | Spines in EVPN | RR, no VTEP state; `retain route-target all` configured anyway (lab 23) | must keep EVPN routes they do not import: `retain route-target all` |
       | Leaves with the same AS (some designs) | n/a | `allowas-in` / `disable-peer-as-check` |
       | Convergence | IGP + NHT | per-hop BGP, BFD per link |
+
+      **Path hunting, and what `retain route-target all` does (and does not do).** *Path hunting* is an eBGP
+      convergence problem: when a leaf withdraws a prefix, the other routers try every remaining alternative
+      path one after another - each with a longer AS_PATH, each advertised and withdrawn again - before the
+      prefix finally disappears. In a Clos it happens when routers of the same tier have **different ASNs**:
+      a super spine then accepts a path that loops down through another spine and back up. The fix is the ASN
+      plan: **all spines of a tier share one ASN** (here the super spines share 65000, and each pod has one
+      spine with its own ASN), so the AS_PATH loop check rejects those paths. `retain route-target all` is a
+      different tool: it makes a node keep EVPN routes **whose route targets it does not import** (a spine
+      with no VNIs would otherwise discard them). It is required on eBGP spines that must pass EVPN routes
+      on, and lab 23 configures it on the spines and super spines - but it does **not** remove path hunting.
+      In this iBGP design path hunting does not arise in that form: the RRs pick a best path and the
+      ORIGINATOR_ID / CLUSTER_LIST rules stop loops.
 
       **Compare in this lab:** on P1-LEAF `show bgp ipv4 unicast 172.16.2.0/24` shows `AS-Path: NONE, path
       sourced internal to AS` and the next hop 10.2.0.121 (the originator). In the eBGP design the same command
@@ -1140,14 +1180,15 @@ steps:
       2. **URIB** updates; BGP **next-hop tracking** on P1-SPINE re-resolves next hops - nothing becomes
          unreachable.
       3. **BGP**: P1-LEAF's session to SS1 (10.0.0.1) does **not** flap. Its TCP packets simply take P1-SPINE ->
-         SS2 -> SS1 now (SS2 and SS1 share the broadcast link and OSPF). `show bgp sessions` shows 0 new flaps.
+         SS2 -> SS1 now (over the unnumbered SS1-SS2 link, and OSPF). `show bgp sessions` shows 0 new flaps.
       4. `show debug logfile bgp-dbg` on P1-LEAF: no FSM changes. `show ip ospf event-history adjacency` on
          P1-SPINE: the neighbor 10.0.0.1 DOWN event.
 
       Undo: `no shutdown` on P1-SPINE Eth1/1, then `undebug all` on P1-LEAF. ECMP returns once the adjacency is
       FULL again.
 
-      **Contrast:** if the BGP session ran on the Eth1/1 link addresses, the shutdown would kill it and all its
+      **Contrast:** if the BGP session were bound to the Eth1/1 link (link addresses in a numbered fabric, or interface
+      peering on an unnumbered one), the shutdown would kill it and all its
       routes would be withdrawn and re-learned - exactly the churn loopback peering avoids.
     verify:
       - device: P1-LEAF
@@ -1155,7 +1196,7 @@ steps:
         expect: Both sessions Established with no new flap after the drill.
       - device: P1-SPINE
         command: show ip route 10.2.0.0/16
-        expect: "During the drill one path (via 10.0.3.1, SS2); after `no shutdown` two paths again."
+        expect: "During the drill one path (via 10.0.0.2, Eth1/2 - SS2's loopback); after `no shutdown` two paths again."
     checks:
       - id: conv-p1-spine-ecmp-back
         description: P1-SPINE has both paths to pod 2 again after the drill

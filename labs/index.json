@@ -670,13 +670,13 @@
     },
     {
       "file": "21-nxos-ospf-multiarea.encorlab",
-      "sha256": "1d9402a942fe331d0049551d4c004b0f1cb8cf06deec964286270cbba0614a76",
-      "size": 20293,
+      "sha256": "2f7393ecac5668d553b687491b450e0f3b98937f8da3bf8241d5a1a225807fea",
+      "size": 23163,
       "kind": "lab",
       "id": "21-nxos-ospf-multiarea",
       "title": "NX-OS study path 1/3: OSPF multi-area on a super-spine Clos, with deep debug inspection",
-      "version": "1",
-      "description": "Lab 1 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Six Nexus 9000v in a 5-stage Clos (2 super spines, a spine and a leaf per pod). Build the OSPF underlay step by step: area 0 on the super-spine layer, one area per pod with the spines as ABRs, a DR/BDR segment, inter-area summarization with discard routes, an NSSA with a translated external, and a stub area. Every step explains what NX-OS does under the hood and how to inspect it with show, event-history and filtered debugs written to a debug logfile.",
+      "version": "2",
+      "description": "Lab 1 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Six Nexus 9000v in a 5-stage Clos (2 super spines, a spine and a leaf per pod). Build the OSPF underlay step by step: area 0 on the super-spine layer, one area per pod with the spines as ABRs, IP-unnumbered point-to-point fabric links that borrow loopback0, inter-area summarization with discard routes, an NSSA with a translated external, and a stub area. Every step explains what NX-OS does under the hood and how to inspect it with show, event-history and filtered debugs written to a debug logfile.",
       "blueprint": [
         "3.2.b"
       ],
@@ -702,12 +702,12 @@
     },
     {
       "file": "22-nxos-bgp-over-ospf.encorlab",
-      "sha256": "2017ecb3dca58965edbcb3d829ce95b7b7979c1593d00c33e5376b19a99a00c3",
-      "size": 18254,
+      "sha256": "e65caec93bcc467d8801275c3dea4bc149b95efd82a3f77cfabe3f3919d94892",
+      "size": 18968,
       "kind": "lab",
       "id": "22-nxos-bgp-over-ospf",
       "title": "NX-OS study path 2/3: iBGP over OSPF with super-spine route reflectors, with deep debug inspection",
-      "version": "1",
+      "version": "2",
       "description": "Lab 2 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with lab 21's finished multi-area OSPF underlay already in its day-0. Build iBGP AS 65000 on top: SS1/SS2 as route reflectors with peer templates, loopback peering, prefix advertisement, best-path selection between two reflected copies, the BGP-free-core problem and its fix, optional policy with communities and local preference, plus eBGP and BFD design discussions. Every step explains the BGP internals and inspects them with show, event-history and filtered debugs in a debug logfile.",
       "blueprint": [
         "3.2.c"
@@ -735,13 +735,13 @@
     },
     {
       "file": "23-nxos-evpn-vxlan.encorlab",
-      "sha256": "ab5cc79958930adebd51cd2992fb5da0c2cd7a71c20e11ef0010e6b1391eccef",
-      "size": 23431,
+      "sha256": "4e0491dd9b84fcc22eea9264a995cf4e93d396464e0a1cad9ec77d6c3cb754e2",
+      "size": 26101,
       "kind": "lab",
       "id": "23-nxos-evpn-vxlan",
       "title": "NX-OS study path 3/3: BGP EVPN VXLAN over iBGP and OSPF (L2VNI, L3VNI, anycast gateway), with deep debug inspection",
-      "version": "1",
-      "description": "Lab 3 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with labs 21 and 22 already in its day-0: multi-area OSPF underlay and iBGP with SS1/SS2 as route reflectors. Add the L2VPN EVPN address family, map VLANs to VNIs, bring up the NVE interface with BGP ingress replication (and learn the multicast alternative), extend two VLANs between the pods, then add a tenant VRF with an L3VNI, a distributed anycast gateway and symmetric IRB, and type-5 prefixes. Every step explains what NX-OS builds internally (EVPN route types, RD/RT, l2rib/l2route, NVE peers, MAC and host routes) and inspects it with show, event-history, debug and ethanalyzer.",
+      "version": "2",
+      "description": "Lab 3 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with labs 21 and 22 already in its day-0: multi-area OSPF underlay and iBGP with SS1/SS2 as route reflectors. Add the L2VPN EVPN address family, map VLANs to VNIs, bring up the NVE interface with BGP ingress replication (and learn the multicast alternative), extend two VLANs between the pods, then add a tenant VRF with an L3VNI, a distributed anycast gateway and symmetric IRB, and type-5 prefixes; configure `retain route-target all` on the spines and super spines (with what it does and does not do for BGP path hunting). Every step explains what NX-OS builds internally (EVPN route types, RD/RT, l2rib/l2route, NVE peers, MAC and host routes) and inspects it with show, event-history, debug and ethanalyzer.",
       "blueprint": [
         "2.3",
         "1.1.a"
@@ -873,8 +873,8 @@
     },
     {
       "file": "nxos-study-path.encorcourse",
-      "sha256": "954822f5b734a890265286cba8f03a668b2b3d91e8010739b7982e547835326c",
-      "size": 63038,
+      "sha256": "89a793a72e1c8462b73fc70f4958423b2dbbf44b4e5528d51a3d6305e4fa32e9",
+      "size": 69292,
       "kind": "course",
       "id": "nxos-study-path",
       "title": "NX-OS study path: OSPF \u2192 BGP \u2192 BGP EVPN VXLAN",

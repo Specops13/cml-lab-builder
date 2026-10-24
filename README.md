@@ -619,14 +619,16 @@ boots with hostnames, descriptions and enabled links only; lab 22 boots with lab
 previous lab's day-0 plus its required steps (optional steps are not carried over).
 
 **`21-nxos-ospf-multiarea`** (*NX-OS study path 1/3: OSPF multi-area on a super-spine Clos, with deep debug
-inspection*): area 0 on the super-spine layer, one area per pod with the spines as ABRs.
+inspection*): area 0 on the super-spine layer, one area per pod with the spines as ABRs. The fabric links are **IP
+unnumbered** (they borrow loopback0, OSPF point-to-point), which saves the six /30s and the /24 a numbered design
+needs; labs 22 and 23 inherit it.
 
 | # | Step | What you do | Main inspection / debug |
 |---|---|---|---|
 | 0 | Design | 5-stage Clos, why one area per pod, area rules | `show cdp neighbors` |
-| 1 | Links | Routed `/30`s, loopback0/1, `mtu 9216` | `show ip interface brief`, `show interface`, `show ip arp` |
-| 2 | Area 0 | Super spines + spine uplinks, p2p links, DR/BDR on SS1-SS2 | `show ip ospf neighbors`, `event-history adjacency`, `debug ip ospf adjacency` to a logfile |
-| 3 | Area 0 LSDB | Router (type 1) and network (type 2) LSAs, SPF | `show ip ospf database router/network`, `event-history spf/lsa` |
+| 1 | Links | IP unnumbered links (`medium p2p`, `ip unnumbered loopback0`), loopback0/1 first, `mtu 9216` | `show ip interface brief`, `show interface`, `show ip interface` |
+| 2 | Area 0 | Super spines + spine uplinks, all links OSPF point-to-point (no DR), loopback next hops | `show ip ospf neighbors`, `event-history adjacency`, `debug ip ospf adjacency` to a logfile |
+| 3 | Area 0 LSDB | Router LSAs (Link Data = ifIndex, no /30 stubs), why there is no network LSA, SPF | `show ip ospf database router/network`, `event-history spf/lsa` |
 | 4 | Interface internals | What must match, network types, cost (40 Gbps reference) | `show ip ospf interface`, `show ip ospf` |
 | 5 | Pod areas | Area 1 and 2, spines become ABRs | type-3 LSAs, `inter` routes |
 | 6 | Summarization | `area range` per pod, discard route to Null0 | `show ip ospf database summary`, `show ip route` |
@@ -634,7 +636,7 @@ inspection*): area 0 on the super-spine layer, one area per pod with the spines 
 | 8 | Stub | Area 2 stub: type-3 default, no type 4/5 (totally stubby discussed) | `show ip route 0.0.0.0/0`, `database external` |
 | 9 | SPF and flaps | Controlled flaps, partial vs full SPF, summarization as fault isolation | `event-history spf`, `debug ip ospf spf` |
 | 10 | End to end | VTEP-to-VTEP ping across five stages, ECMP via both super spines | `show ip route`, `show forwarding ipv4 route` |
-| 11 | Break and fix (optional) | MTU, timer and area mismatches | `event-history adjacency/hello`, debugs |
+| 11 | Break and fix (optional) | MTU, timer and area mismatches, the borrowed loopback shut | `event-history adjacency/hello`, debugs |
 
 **`22-nxos-bgp-over-ospf`** (*NX-OS study path 2/3: iBGP over OSPF with super-spine route reflectors, with deep debug
 inspection*): iBGP AS 65000 on loopbacks, SS1/SS2 as route reflectors, on top of lab 21's OSPF.
@@ -655,7 +657,8 @@ inspection*): iBGP AS 65000 on loopbacks, SS1/SS2 as route reflectors, on top of
 | 11 | Wrap-up | The control plane lab 23 builds on | `show bgp ipv4 unicast summary` on SS2 |
 
 **`23-nxos-evpn-vxlan`** (*NX-OS study path 3/3: BGP EVPN VXLAN over iBGP and OSPF (L2VNI, L3VNI, anycast
-gateway), with deep debug inspection*): the leaves become VTEPs, SS1/SS2 reflect EVPN, the spines only route UDP.
+gateway), with deep debug inspection*): the leaves become VTEPs, SS1/SS2 reflect EVPN, the spines route VXLAN UDP,
+and the spines and super spines get `retain route-target all`.
 
 | # | Step | What you do | Main inspection / debug |
 |---|---|---|---|
@@ -672,13 +675,15 @@ gateway), with deep debug inspection*): the leaves become VTEPs, SS1/SS2 reflect
 | 10 | Anycast gateway | Same gateway IP and MAC 2020.0000.00aa on both leaves | `show mac address-table` (G), `debug hmm` |
 | 11 | Symmetric IRB | H1 -> H4 routed, packet walk | `show ip route ... vrf TENANT1` (segid 50001), MAC+IP type 2 |
 | 12 | Type 5 | Tenant loopbacks, `redistribute direct` | `route-type 5`, VRF ping |
-| 13 | ARP suppression (optional) | By hand: TCAM carving + `suppress-arp` | `show ip arp suppression-cache` |
-| 14 | Break and fix (optional) | Five classic EVPN VXLAN faults | control plane vs data plane method |
-| 15 | Wrap-up | Every host reaches every host, final read-out | `show bgp l2vpn evpn`, `show nve peers` |
+| 13 | Retain route targets | `retain route-target all` under `address-family l2vpn evpn` on SS1/SS2/P1-SPINE/P2-SPINE; what it does, and why it does not remove BGP path hunting (one ASN per spine tier does) | `show bgp l2vpn evpn summary` and `route-type 3` on a spine |
+| 14 | ARP suppression (optional) | By hand: TCAM carving + `suppress-arp` | `show ip arp suppression-cache` |
+| 15 | Break and fix (optional) | Five classic EVPN VXLAN faults | control plane vs data plane method |
+| 16 | Wrap-up | Every host reaches every host, final read-out | `show bgp l2vpn evpn`, `show nve peers` |
 
 > **Not verified on real devices yet.** The expected outputs were written from Cisco's NX-OS 10.x documentation, not
 > captured from CML. Command keywords of `event-history`, `debug ip ospf` and `show forwarding` can differ on the
-> 9000v image. If a check fails on a correctly built lab, run it in *Config* grading mode and please report the output.
+> 9000v image, and so can the wording NX-OS uses for unnumbered interfaces (`show ip interface`, `show ip ospf
+> interface`) and the ifIndex value shown as router-LSA Link Data. If a check fails on a correctly built lab, run it in *Config* grading mode and please report the output.
 
 ### RAM estimate and the RAM heavy tag
 Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node

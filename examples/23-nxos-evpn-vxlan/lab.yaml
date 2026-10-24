@@ -5,9 +5,9 @@ blueprint: ["2.3", "1.1.a"]
 domain: "2.0 Virtualization"
 difficulty: 5
 platforms: [iol]
-summary: "Lab 3 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with labs 21 and 22 already in its day-0: multi-area OSPF underlay and iBGP with SS1/SS2 as route reflectors. Add the L2VPN EVPN address family, map VLANs to VNIs, bring up the NVE interface with BGP ingress replication (and learn the multicast alternative), extend two VLANs between the pods, then add a tenant VRF with an L3VNI, a distributed anycast gateway and symmetric IRB, and type-5 prefixes. Every step explains what NX-OS builds internally (EVPN route types, RD/RT, l2rib/l2route, NVE peers, MAC and host routes) and inspects it with show, event-history, debug and ethanalyzer."
+summary: "Lab 3 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with labs 21 and 22 already in its day-0: multi-area OSPF underlay and iBGP with SS1/SS2 as route reflectors. Add the L2VPN EVPN address family, map VLANs to VNIs, bring up the NVE interface with BGP ingress replication (and learn the multicast alternative), extend two VLANs between the pods, then add a tenant VRF with an L3VNI, a distributed anycast gateway and symmetric IRB, and type-5 prefixes; configure `retain route-target all` on the spines and super spines (with what it does and does not do for BGP path hunting). Every step explains what NX-OS builds internally (EVPN route types, RD/RT, l2rib/l2route, NVE peers, MAC and host routes) and inspects it with show, event-history, debug and ethanalyzer."
 author: CML Lab Builder
-version: "1"
+version: "2"
 ram_gb: 76
 nodes:
   - name: SS1
@@ -29,24 +29,27 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
+      interface loopback0
+        description router ID - lent to every unnumbered fabric link
+        ip address 10.0.0.1/32
       interface Ethernet1/1
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.1.1/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/2
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.2.1/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/3
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.12.1/24
+        ip unnumbered loopback0
         no shutdown
-      interface loopback0
-        description router ID
-        ip address 10.0.0.1/32
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.1
@@ -60,7 +63,7 @@ nodes:
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       interface Ethernet1/3
-        ip ospf priority 100
+        ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       feature bgp
       router bgp 65000
@@ -106,24 +109,27 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
+      interface loopback0
+        description router ID - lent to every unnumbered fabric link
+        ip address 10.0.0.2/32
       interface Ethernet1/1
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.3.1/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/2
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.4.1/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/3
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.12.2/24
+        ip unnumbered loopback0
         no shutdown
-      interface loopback0
-        description router ID
-        ip address 10.0.0.2/32
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.2
@@ -137,6 +143,7 @@ nodes:
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       interface Ethernet1/3
+        ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       feature bgp
       router bgp 65000
@@ -182,24 +189,27 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
+      interface loopback0
+        description router ID - lent to every unnumbered fabric link
+        ip address 10.0.0.11/32
       interface Ethernet1/1
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.1.2/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/2
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.3.2/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/3
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.1.10.1/30
+        ip unnumbered loopback0
         no shutdown
-      interface loopback0
-        description router ID
-        ip address 10.0.0.11/32
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.11
@@ -255,24 +265,27 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
+      interface loopback0
+        description router ID - lent to every unnumbered fabric link
+        ip address 10.0.0.21/32
       interface Ethernet1/1
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.2.2/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/2
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.0.4.2/30
+        ip unnumbered loopback0
         no shutdown
       interface Ethernet1/3
         no switchport
+        medium p2p
         mtu 9216
-        ip address 10.2.10.1/30
+        ip unnumbered loopback0
         no shutdown
-      interface loopback0
-        description router ID
-        ip address 10.0.0.21/32
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.21
@@ -328,17 +341,18 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
-      interface Ethernet1/1
-        no switchport
-        mtu 9216
-        ip address 10.1.10.2/30
-        no shutdown
       interface loopback0
-        description router ID
+        description router ID - lent to every unnumbered fabric link
         ip address 10.1.0.111/32
       interface loopback1
         description VTEP source (lab 23)
         ip address 10.1.1.111/32
+      interface Ethernet1/1
+        no switchport
+        medium p2p
+        mtu 9216
+        ip unnumbered loopback0
+        no shutdown
       feature ospf
       router ospf UNDERLAY
         router-id 10.1.0.111
@@ -400,17 +414,18 @@ nodes:
       interface Ethernet1/4
         description unused
         shutdown
-      interface Ethernet1/1
-        no switchport
-        mtu 9216
-        ip address 10.2.10.2/30
-        no shutdown
       interface loopback0
-        description router ID
+        description router ID - lent to every unnumbered fabric link
         ip address 10.2.0.121/32
       interface loopback1
         description VTEP source (lab 23)
         ip address 10.2.1.121/32
+      interface Ethernet1/1
+        no switchport
+        medium p2p
+        mtu 9216
+        ip unnumbered loopback0
+        no shutdown
       feature ospf
       router ospf UNDERLAY
         router-id 10.2.0.121
@@ -565,9 +580,9 @@ task: |
   **What you build: BGP EVPN VXLAN with the leaves as VTEPs**
 
   ```
-              SS1 (EVPN RR) ------------- SS2 (EVPN RR)     L2VPN EVPN reflected to the leaves only
+              SS1 (EVPN RR) ------------- SS2 (EVPN RR)     L2VPN EVPN reflected to leaves (spines: step 13)
              /   \                         /   \
-       P1-SPINE   +-------- P2-SPINE -----+                  pure IP transit for VXLAN (UDP 4789), no EVPN
+       P1-SPINE   +-------- P2-SPINE -----+                  IP transit for VXLAN (UDP 4789); retain RT (step 13)
           |                     |
        P1-LEAF (VTEP)        P2-LEAF (VTEP)                  nve1 sourced from loopback1
        10.1.1.111            10.2.1.121
@@ -585,9 +600,12 @@ task: |
   | VTEP (NVE source) | loopback1: P1-LEAF 10.1.1.111, P2-LEAF 10.2.1.121 |
   | BUM replication | ingress replication learned by BGP (EVPN route type 3); multicast explained |
   | Tenant loopbacks (type 5) | loopback300 in TENANT1: P1-LEAF 10.255.1.1/32, P2-LEAF 10.255.2.1/32 |
+  | `retain route-target all` | under `router bgp 65000` / `address-family l2vpn evpn` on SS1, SS2, P1-SPINE, P2-SPINE (step 13) |
 
   The hosts H1-H4 are IOL routers used as PCs, already configured with their IP, a fixed MAC and the default
-  gateway .1. The fabric links already use `mtu 9216`, so the 50-byte VXLAN overhead fits.
+  gateway .1. The fabric links already use `mtu 9216`, so the 50-byte VXLAN overhead fits, and they are **IP
+  unnumbered** (`medium p2p` + `ip unnumbered loopback0`, OSPF point-to-point, lab 21): VXLAN only needs the
+  loopbacks to be reachable, never a link address.
 
   **Resources**: 10 nodes - 6 x nxosv9000 (12 GB each) + 4 IOL hosts = about **76 GB** of CML RAM. NX-OS takes
   10-15 minutes to boot.
@@ -633,7 +651,7 @@ steps:
         expect: "All four clients (10.0.0.11, 10.0.0.21, 10.1.0.111, 10.2.0.121) Established - a number in State/PfxRcd."
       - device: P1-LEAF
         command: show ip route 10.2.1.121
-        expect: "`10.2.0.0/16` via 10.1.10.1 Eth1/1, `ospf-UNDERLAY, inter` - the summary from lab 21 carries the remote VTEP."
+        expect: "`10.2.0.0/16` via 10.0.0.11 Eth1/1 (P1-SPINE's loopback0 - the uplink is unnumbered), `ospf-UNDERLAY, inter` - the summary from lab 21 carries the remote VTEP."
       - device: P1-LEAF
         command: ping 10.2.1.121 source 10.1.1.111
         expect: "`5 packets received` - loopback1 to loopback1, the VXLAN tunnel path."
@@ -678,7 +696,9 @@ steps:
       nothing is imported.
 
       **Who does what here:** the leaves are VTEPs; SS1/SS2 reflect EVPN routes (they do not need VLANs or
-      VNIs: a route reflector keeps every route regardless of RT); the spines only route UDP between loopbacks.
+      VNIs: a route reflector keeps every route regardless of RT); the spines route UDP between loopbacks. In step
+      13 the super spines and spines also get `retain route-target all`, and the spines an EVPN view of the
+      fabric.
 
       **Inspect** (before you start, to compare later): `show nve peers` (invalid / empty), `show mac
       address-table`, `show bgp l2vpn evpn summary` (not yet available).
@@ -700,7 +720,8 @@ steps:
         **l2rib/l2route** process connects MAC learning to BGP.
 
       The leaves need all three. The super spines are only route reflectors: `nv overlay evpn` is enough to
-      configure the L2VPN EVPN family. The spines need nothing - they never see EVPN.
+      configure the L2VPN EVPN family. The spines need nothing yet; they get `nv overlay evpn` in step 13 for
+      `retain route-target all`.
 
       Features start processes, which is why the first commands can take a few seconds. If a later command is
       rejected with *Invalid command*, the feature is missing.
@@ -770,12 +791,13 @@ steps:
 
       **Who gets EVPN.** On SS1/SS2 the leaves inherit `RR-CLIENTS`, and so do the spines. If you put the family
       into the template, the RRs also offer EVPN to the spines (harmless, it is not negotiated because the
-      spines do not offer it - but untidy). So the RRs add it **per neighbor**, for the two leaves only, with
+      spines do not offer it - but untidy). So the RRs add it **per neighbor**, for the two leaves now, with
       `route-reflector-client` and both communities. Neighbor-level settings add to what the template gives.
       On the leaves the family goes into their `RR` template (both RRs).
 
-      A route reflector normally drops routes whose RT it does not import; an **RR with clients keeps all EVPN
-      routes** (it imports no VNIs itself). With eBGP spines you would need `retain route-target all` instead.
+      A BGP speaker normally drops EVPN routes whose RT it does not import; an **RR with clients keeps all EVPN
+      routes** (it imports no VNIs itself). Step 13 adds `retain route-target all` on the super spines and the
+      spines, and explains what it changes.
 
       **Inspect / debug** (watch the reset on P1-LEAF while you paste the SS1 block):
 
@@ -787,7 +809,7 @@ steps:
       undebug all
       no debug-filter all
       show bgp ipv4 unicast neighbors 10.0.0.1       ! "Address family L2VPN EVPN: advertised received"
-      show bgp l2vpn evpn summary                    ! SS1: the two leaves, not the spines
+      show bgp l2vpn evpn summary                    ! SS1: the two leaves (the spines join in step 13)
       show bgp event-history detail                  ! reset reason for the capability change
       ```
     config:
@@ -834,7 +856,7 @@ steps:
     verify:
       - device: SS1
         command: show bgp l2vpn evpn summary
-        expect: "`address family L2VPN EVPN`, neighbors 10.1.0.111 and 10.2.0.121 only (State/PfxRcd 0 until step 5), no spines."
+        expect: "`address family L2VPN EVPN`, neighbors 10.1.0.111 and 10.2.0.121 (State/PfxRcd 0 until step 5); the spines join in step 13."
       - device: P1-LEAF
         command: show bgp ipv4 unicast neighbors 10.0.0.1
         expect: "`Address family L2VPN EVPN: advertised received` in the capabilities, `Connections established 2` (the reset)."
@@ -843,11 +865,10 @@ steps:
         expect: IPv4 routes re-learned after the reset - the 172.16.x prefixes are back.
     checks:
       - id: af-ss1-evpn-summary
-        description: SS1 has both leaves Established in L2VPN EVPN and no spine
+        description: SS1 has both leaves Established in L2VPN EVPN
         device: SS1
         command: show bgp l2vpn evpn summary
         match: ['^10\.1\.0\.111\s+4\s+65000\s.*\s\d+\s*$', '^10\.2\.0\.121\s+4\s+65000\s.*\s\d+\s*$']
-        absent: ['^10\.0\.0\.11\s', '^10\.0\.0\.21\s']
         hint: "The RR side needs `address-family l2vpn evpn` under each leaf neighbor; the leaf side under template RR."
       - id: af-leaf-capability
         description: P1-LEAF negotiated L2VPN EVPN with SS1
@@ -1571,8 +1592,163 @@ steps:
         command: ping 10.255.2.1 vrf TENANT1 source 10.255.1.1
         match: ['\b[3-5] packets received']
         hint: Both leaves need the type-5 config.
+  - id: retain-rt
+    title: "Step 13 - `retain route-target all` on the spines and super spines (and what it does not fix)"
+    explain: |
+      **Under the hood: route-target filtering.** Every EVPN route carries its route targets as extended
+      communities. A BGP speaker that is **not** a route reflector checks each received EVPN route against the
+      import RTs of its local VNIs and VRFs, and **discards** routes that match none - why store MACs for VNIs
+      you do not have? That is efficient on a leaf, but it means a switch with **no VNIs** keeps no EVPN routes
+      at all. `retain route-target all` (under `router bgp` / `address-family l2vpn evpn`) switches the filter
+      off: the switch keeps **every** EVPN route whatever its RT, and can advertise it on.
+
+      **Where it matters.**
+
+      - **eBGP spines** (RFC 7938 designs, lab 22 step 8): the spine is not an RR and has no VNIs, but it must
+        pass the leaves' EVPN routes on to other leaves. Without `retain route-target all` it drops them and
+        the overlay is silent. This is the classic reason for the command.
+      - **Route reflectors**: an RR with `route-reflector-client` neighbors already keeps all routes. With
+        `retain route-target all` configured too, SS1/SS2 keep everything even if their RR role changes
+        (for example when clients are moved, or the box becomes a plain transit peer) - the behavior is
+        explicit in the config rather than implied by the RR role.
+      - **Spines as RR clients** (here): P1-SPINE and P2-SPINE get the L2VPN EVPN family towards SS1/SS2. They
+        have no VNIs, so without the command they would discard every route. With it they hold the complete
+        EVPN table - a full overlay view on the spine, and the state a spine needs if it later becomes a route
+        reflector or route server itself. The spines still install nothing in the data plane: they have no
+        NVE interface and keep routing VXLAN as plain UDP between loopbacks.
+
+      **What it does NOT do: it does not remove BGP path hunting.** *Path hunting* happens when a prefix is
+      withdrawn and routers try the remaining alternative paths one after another (each with a longer
+      AS_PATH, each advertised and withdrawn again) before the prefix finally disappears. In an eBGP Clos the
+      cause is the **ASN plan**: if routers of the same tier have different ASNs, a path that loops down
+      through one spine and back up through another passes the AS_PATH loop check and is accepted as a
+      backup. The fix is to give **all spines of a tier the same ASN** (and all super spines one ASN), so such
+      paths contain the local AS and are rejected. `retain route-target all` changes which routes a node
+      *keeps*, not how alternatives are hunted. In this iBGP fabric the RRs select one best path and
+      ORIGINATOR_ID / CLUSTER_LIST stop reflection loops, so path hunting does not arise in that form.
+
+      **Watch the filter, then switch it off** (by hand, optional): paste the SS1 and SS2 blocks and only the
+      spine's `template peer RR` part first. `show bgp l2vpn evpn summary` on P1-SPINE shows the sessions up,
+      but `show bgp l2vpn evpn` stays empty - the routes arrived and were discarded. Then add `retain
+      route-target all`; NX-OS asks the RRs for the routes again (route refresh) and the table fills. If it does
+      not, `clear bgp l2vpn evpn 10.0.0.1 soft in`.
+
+      Adding the family resets the spine sessions once (capability change, as in step 3); the IPv4 routes are
+      re-learned within seconds.
+
+      **Inspect / debug**
+
+      ```
+      show running-config bgp                       ! retain route-target all under address-family l2vpn evpn
+      show bgp l2vpn evpn summary                   ! P1-SPINE: SS1 and SS2, PfxRcd > 0
+      show bgp l2vpn evpn route-type 3              ! P1-SPINE: both VTEPs' IMET routes, kept without any VNI
+      show bgp l2vpn evpn 0010.0010.0013            ! P1-SPINE: RT 65000:10010 - a target it does not import
+      debug logfile retain-dbg size 4000000
+      debug-filter bgp neighbor 10.0.0.1
+      debug bgp updates                             ! on P1-SPINE: UPDATEs received after the route refresh
+      show debug logfile retain-dbg
+      undebug all
+      no debug-filter all
+      ```
+    config:
+      SS1: |
+        router bgp 65000
+          address-family l2vpn evpn
+            retain route-target all
+          neighbor 10.0.0.11
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+              route-reflector-client
+          neighbor 10.0.0.21
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+              route-reflector-client
+      SS2: |
+        router bgp 65000
+          address-family l2vpn evpn
+            retain route-target all
+          neighbor 10.0.0.11
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+              route-reflector-client
+          neighbor 10.0.0.21
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+              route-reflector-client
+      P1-SPINE: |
+        nv overlay evpn
+        router bgp 65000
+          address-family l2vpn evpn
+            retain route-target all
+          template peer RR
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+      P2-SPINE: |
+        nv overlay evpn
+        router bgp 65000
+          address-family l2vpn evpn
+            retain route-target all
+          template peer RR
+            address-family l2vpn evpn
+              send-community
+              send-community extended
+    verify:
+      - device: P1-SPINE
+        command: show bgp l2vpn evpn summary
+        expect: "`address family L2VPN EVPN`, neighbors 10.0.0.1 and 10.0.0.2 Established with a prefix count > 0 - routes kept although P1-SPINE has no VNI."
+      - device: P1-SPINE
+        command: show bgp l2vpn evpn route-type 3
+        expect: "`[3]:[0]:[32]:[10.1.1.111]` and `[3]:[0]:[32]:[10.2.1.121]` under the leaves' RDs, each via both RRs (`*>i` and `* i`)."
+      - device: SS1
+        command: show bgp l2vpn evpn summary
+        expect: "Four EVPN neighbors now: the two leaves and the two spines."
+      - device: SS1
+        command: show running-config bgp
+        expect: "`retain route-target all` under `address-family l2vpn evpn`, and the spine neighbors with `address-family l2vpn evpn` + `route-reflector-client`."
+    checks:
+      - id: retain-ss1-cfg
+        description: SS1 retains all EVPN route targets and reflects EVPN to both spines
+        device: SS1
+        mode: config
+        match: ['^[ \t]+address-family l2vpn evpn\n[ \t]+retain route-target all', '^\s+neighbor 10\.0\.0\.11\n(?:[ \t]+.*\n)*?[ \t]+address-family l2vpn evpn\n(?:[ \t]+.*\n)*?[ \t]+route-reflector-client', '^\s+neighbor 10\.0\.0\.21\n(?:[ \t]+.*\n)*?[ \t]+address-family l2vpn evpn\n(?:[ \t]+.*\n)*?[ \t]+route-reflector-client']
+        hint: Paste the SS1 block of this step.
+      - id: retain-ss2-cfg
+        description: SS2 retains all EVPN route targets and reflects EVPN to both spines
+        device: SS2
+        mode: config
+        match: ['^[ \t]+address-family l2vpn evpn\n[ \t]+retain route-target all', '^\s+neighbor 10\.0\.0\.11\n(?:[ \t]+.*\n)*?[ \t]+address-family l2vpn evpn\n(?:[ \t]+.*\n)*?[ \t]+route-reflector-client', '^\s+neighbor 10\.0\.0\.21\n(?:[ \t]+.*\n)*?[ \t]+address-family l2vpn evpn\n(?:[ \t]+.*\n)*?[ \t]+route-reflector-client']
+        hint: Paste the SS2 block of this step.
+      - id: retain-p1-spine-cfg
+        description: P1-SPINE has EVPN enabled with retain route-target all
+        device: P1-SPINE
+        mode: config
+        match: ['^nv overlay evpn', '^[ \t]+address-family l2vpn evpn\n[ \t]+retain route-target all', '^\s+template peer RR\n(?:[ \t]+.*\n)*?[ \t]+address-family l2vpn evpn\n(?:[ \t]+.*\n)*?[ \t]+send-community extended']
+        hint: "Paste the P1-SPINE block; `nv overlay evpn` must come first or the l2vpn evpn family is rejected."
+      - id: retain-p2-spine-cfg
+        description: P2-SPINE has EVPN enabled with retain route-target all
+        device: P2-SPINE
+        mode: config
+        match: ['^nv overlay evpn', '^[ \t]+address-family l2vpn evpn\n[ \t]+retain route-target all', '^\s+template peer RR\n(?:[ \t]+.*\n)*?[ \t]+address-family l2vpn evpn\n(?:[ \t]+.*\n)*?[ \t]+send-community extended']
+        hint: Paste the P2-SPINE block of this step.
+      - id: retain-p1-spine-sessions
+        description: P1-SPINE has L2VPN EVPN sessions to both RRs with prefixes received
+        device: P1-SPINE
+        command: show bgp l2vpn evpn summary
+        match: ['^10\.0\.0\.1\s+4\s+65000\s.*\s[1-9]\d*\s*$', '^10\.0\.0\.2\s+4\s+65000\s.*\s[1-9]\d*\s*$']
+        hint: "Sessions up but 0 prefixes: `retain route-target all` is missing (routes discarded) - or run `clear bgp l2vpn evpn 10.0.0.1 soft in`."
+      - id: retain-p1-spine-kept-routes
+        description: P1-SPINE keeps both VTEPs' EVPN routes although it imports none of their RTs
+        device: P1-SPINE
+        command: show bgp l2vpn evpn route-type 3
+        match: ['\[3\]:\[0\]:\[32\]:\[10\.1\.1\.111\]', '\[3\]:\[0\]:\[32\]:\[10\.2\.1\.121\]']
+        hint: "An empty table means the route-target filter is still active: check `retain route-target all` under `address-family l2vpn evpn`."
   - id: suppress-arp
-    title: "Step 13 (optional) - ARP suppression: answer ARP at the leaf from EVPN"
+    title: "Step 14 (optional) - ARP suppression: answer ARP at the leaf from EVPN"
     optional: true
     explain: |
       No app config: a feature to try by hand, because it needs TCAM carving and a reload on Nexus 9000.
@@ -1614,7 +1790,7 @@ steps:
         command: show ip arp suppression-cache detail
         expect: "192.168.10.13 0010.0010.0013 as a remote (R) entry learned from BGP."
   - id: troubleshoot
-    title: "Step 14 (optional) - Break and fix: the five classic EVPN VXLAN faults"
+    title: "Step 15 (optional) - Break and fix: the five classic EVPN VXLAN faults"
     optional: true
     explain: |
       No app config: break one thing at a time by hand, find it with the commands, then undo it.
@@ -1641,7 +1817,7 @@ steps:
         command: ping 192.168.10.13
         expect: Works again after each undo.
   - id: wrap-up
-    title: "Step 15 - End to end: every host reaches every host, and read the whole fabric"
+    title: "Step 16 - End to end: every host reaches every host, and read the whole fabric"
     explain: |
       Final review, no config. You now have the complete stack of the study path:
 
@@ -1696,7 +1872,8 @@ steps:
         hint: Paste the SS2 blocks of steps 2 and 3.
 solution_summary: |
   **What you built:** BGP EVPN VXLAN on top of lab 21's OSPF underlay and lab 22's iBGP, on six Nexus 9000v in a
-  5-stage Clos. The leaves are the VTEPs; SS1/SS2 reflect EVPN; the spines only route VXLAN UDP.
+  5-stage Clos with IP-unnumbered fabric links. The leaves are the VTEPs; SS1/SS2 reflect EVPN; the spines route
+  VXLAN UDP and hold an EVPN view.
 
   - **EVPN control plane**: `nv overlay evpn`, the L2VPN EVPN family added per leaf neighbor on the RRs
     (`route-reflector-client`, both communities) and in the leaves' `RR` template.
@@ -1706,6 +1883,10 @@ solution_summary: |
   - **L3VNI / IRB**: VRF TENANT1 with VNI 50001 (VLAN 999, `interface Vlan999` with `ip forward`,
     `member vni 50001 associate-vrf`), anycast gateway 192.168.10.1 / 192.168.20.1 with MAC 2020.0000.00aa,
     symmetric IRB via /32 host routes from type-2 MAC+IP routes.
+  - **`retain route-target all`** under `router bgp 65000` / `address-family l2vpn evpn` on SS1, SS2, P1-SPINE
+    and P2-SPINE: the spines (EVPN clients of the RRs, no VNIs) keep every EVPN route instead of discarding
+    those whose RTs they do not import. It does not remove BGP path hunting - in an eBGP Clos that is solved by
+    one ASN per spine tier (and one for the super spines).
   - **Type 5**: loopback300 per leaf in TENANT1 and the SVI subnets via `redistribute direct route-map PERMIT-ALL`.
   - **Explained**: VXLAN encapsulation, EVPN route types 2/3/5, RD vs RT, ingress replication vs a multicast
     underlay (PIM, anycast RP, `mcast-group`), ARP suppression and its TCAM prerequisite.
