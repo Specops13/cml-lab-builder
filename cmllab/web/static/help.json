@@ -255,5 +255,6 @@
   "lib.fit": "Would this lab fit on your CML server right now? From free memory and licensed nodes, checked in the last 30 seconds.",
   "res.stop": "Stop this lab in CML to free its memory. Its nodes shut down; unsaved device configs are lost.",
   "res.wipe": "Stop the lab and discard its node disks and configs (labs built by this app only). The lab stays in CML.",
-  "res.recheck": "Read free memory and running labs from CML again."
+  "res.recheck": "Read free memory and running labs from CML again.",
+  "skip": "Jump past the menu to the page content (keyboard users)."
 }

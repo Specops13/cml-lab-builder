@@ -139,7 +139,7 @@ function show(view) {
   if (view === "builder" && !draft) newDraft();
 }
 $$("[data-view]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); location.hash = a.dataset.view; show(a.dataset.view); }));
-$("#more-btn").onclick = (e) => { e.stopPropagation(); $("#more-menu").hidden = !$("#more-menu").hidden; };
+$("#more-btn").onclick = (e) => { e.stopPropagation(); $("#more-menu").hidden = !$("#more-menu").hidden; $("#more-btn").setAttribute("aria-expanded", String(!$("#more-menu").hidden)); };
 document.addEventListener("click", () => { $("#more-menu").hidden = true; });
 $("#theme-btn").onclick = () => {
   const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
@@ -172,7 +172,7 @@ async function importFile(file, replace = false) {
     if (rep.kind === "course") { await afterCourseInstall(rep); return; }
     toast(`Imported "${rep.title}"` + (rep.warnings.length ? `\nNote: ${rep.warnings.join("\n")}` : ""), "ok", 7000);
     try { await loadLabs(); await selectLab(rep.lab_id); } catch (e) { return; }  // import succeeded; banner explains the list error
-    const li = $("#lab-list li.sel"); if (li) li.scrollIntoView({block: "nearest", behavior: "smooth"});
+    const li = $("#lab-list li.sel"); if (li) li.scrollIntoView({block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
   } catch (err) {
     const d = err.data || {};
     if (err.status === 409 && confirm(d.lab_id ? `A lab with id "${d.lab_id}" is already imported. Replace it?` : `${(d.errors || []).join("\n")}\n\nReplace the existing labs?`)) return importFile(file, true);
@@ -235,7 +235,7 @@ function renderEmpty(note = "") {
       <div class="choice"><h3>Follow a course</h3>
         <p>Courses put labs in a sensible order. <b>Install all</b> gets every lab of a course in one click.</p>
         <p class="muted small">You can also pick single labs; each shows its size and how much CML RAM it needs.</p>
-        <button data-help="lab.browse" id="e-browse" class="big">📚 Browse library &amp; courses</button></div>
+        <button data-help="lab.browse" id="e-browse" class="big">${icon("book")}Browse library &amp; courses</button></div>
       <div class="choice"><h3>Got a lab file?</h3>
         <p>Import a .cmllab or .cmlcourse file (or an older .encorlab / .encorcourse) someone shared with you, or drop it anywhere on this page.</p>
         <button data-help="import.button" id="e-import" class="big">⬆ Import a .cmllab file</button></div>
@@ -416,7 +416,7 @@ function renderCourses() {
 }
 async function loadLibrary() {
   const url = $("#lib-url").value.trim() || libraryUrl || LIB_DEFAULT;
-  $("#lib-items").textContent = "Loading…";
+  $("#lib-items").innerHTML = '<p class="muted loading" role="status"><span class="spinner" aria-hidden="true"></span>Loading the library…</p>';
   try {
     const idx = await api(`/api/library?url=${encodeURIComponent(url)}`);
     libStarter = idx.starter || [];
@@ -1161,7 +1161,7 @@ function renderWalkProgress() {
   const l = walk.lab, s = walk.status, n = l.steps.length;
   $("#walk-progress").innerHTML = `<div class="toolbar"><b data-help="w.progress">${walk.index >= n ? `Summary (after step ${n})` : `Step ${walk.index + 1} of ${n}`}</b>
       <span class="muted small">${s.required_passed}/${s.required} required steps checked${s.completed ? " · <span class=\"pass\">walkthrough completed</span>" : ""}</span></div>
-    <div class="pbar wide" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(100 * walk.index / n)}"><div style="width:${Math.round(100 * Math.min(walk.index, n) / n)}%"></div></div>
+    <div class="pbar wide" role="progressbar" aria-label="Walkthrough progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(100 * walk.index / n)}"><div style="width:${Math.round(100 * Math.min(walk.index, n) / n)}%"></div></div>
     <ol class="walk-steps">${l.steps.map((st, i) => `<li class="${i === walk.index ? "cur " : ""}${walkStepState(i)}"><button data-help="w.jump" class="hint-btn" data-step="${i}" title="${esc(st.title)}">${i + 1}${walkStepState(i) === "ok" ? " ✓" : walkStepState(i) === "bad" ? " ✗" : ""}${st.optional ? " (opt.)" : ""}</button></li>`).join("")}
       <li class="${walk.index >= n ? "cur" : ""}"><button data-help="w.summary" class="hint-btn" data-step="${n}">Summary</button></li></ol>`;
   $$("#walk-progress [data-step]").forEach((b) => b.onclick = () => walkGo(Number(b.dataset.step)));
@@ -1230,7 +1230,7 @@ async function afterStepJob(kind, res) {
 
 /* ---------------------------------------------------------------- progress dashboard */
 const fmtDur = (s) => `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, "0")}m`;
-const bar = (pct) => `<div class="pbar"><div style="width:${Math.max(0, Math.min(100, pct || 0))}%"></div></div>`;
+const bar = (pct) => `<div class="pbar" role="img" aria-label="${Math.round(Math.max(0, Math.min(100, pct || 0)))}%"><div style="width:${Math.max(0, Math.min(100, pct || 0))}%"></div></div>`;
 function openLab(id) { location.hash = "labs"; show("labs"); selectLab(id); }
 async function loadProgress() {
   let p;
@@ -1448,7 +1448,7 @@ $("#b-testlive").onclick = async () => {
   } catch (e) { toast(e.message, "err"); }
 };
 $("#b-cml").onclick = async () => {
-  $("#cml-dialog").showModal(); $("#cml-list").textContent = "Loading…";
+  $("#cml-dialog").showModal(); $("#cml-list").innerHTML = '<span class="spinner" aria-hidden="true"></span>Loading…';
   try {
     const list = await api("/api/cml/labs");
     $("#cml-list").innerHTML = list.length ? `<table>${list.map((l) => `<tr><td>${esc(l.title)}</td><td class="muted">${l.nodes ?? "?"} nodes</td><td><button data-help="cml.use" data-cml="${esc(l.id)}">Use</button></td></tr>`).join("")}</table>` : "No labs in CML.";

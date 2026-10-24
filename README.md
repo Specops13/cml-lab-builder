@@ -117,6 +117,20 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 | *Reveal solution* (after a confirm): summary plus the config per device | Lab builder with live validation |
 | ![Settings in dark mode](docs/images/settings-dark.png) | ![Progressive hints](docs/images/lab-hints.png) |
 | Settings: CML connection, console server, grading mode (dark mode) | Progressive hints on a troubleshooting lab |
+| ![Resource check before Build](docs/images/resource-check.png) | ![Library in dark mode](docs/images/library-dark.png) |
+| Resource check before Build: won't fit, running labs, stop / wipe | Library with *fits now?* tags (dark mode) |
+
+### Design and accessibility
+Since 3.3.0 the UI uses one set of design tokens (`style.css`): an 8 px spacing grid, a type scale (12 / 14 / 16 / 20
+/ 24 / 30 px), semantic colors (surface, text, primary, success, warning, danger) for the light and dark themes, and
+one shape for buttons, inputs, tags, cards and callouts. It aims at **WCAG 2.2 AA**: text and controls meet the
+contrast minimums in both themes, every control shows a visible focus ring for keyboard use, click targets are at least
+24 px (most are 36 px), there is a *Skip to content* link, progress bars and the memory bar have text alternatives, and
+state is never shown by color alone (the red **RAM heavy** tag keeps its words). Icons are inline SVG (no icon font or
+CDN, allowed by the strict CSP). The theme follows the OS (or the toggle in the header), the layout reflows down to
+phone width, and *reduce motion* in the OS turns animations off. Loading, empty and error states look the same
+everywhere. The release check runs [axe-core](https://github.com/dequelabs/axe-core) on the main screens in both
+themes (0 violations for 3.3.0).
 
 ## Quick start (ready-to-run download)
 Download from **[Releases](https://github.com/Specops13/cml-lab-builder/releases/latest)**. You don't need Python.

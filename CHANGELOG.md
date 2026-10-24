@@ -58,6 +58,17 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
 - **New course `nxos-study-path`: NX-OS study path: OSPF → BGP → BGP EVPN VXLAN** (labs 21, 22, 23 in order;
   `library/nxos-study-path.cmlcourse`, `labs/nxos-study-path.encorcourse`).
 
+### Changed
+- **Design refresh** following common design-system practice: design tokens (8 px spacing grid, a type scale,
+  semantic colors) for both themes; consistent buttons (36 px), inputs, tags, chips, cards, tables and callouts;
+  inline SVG icons instead of emoji (CSP-safe, no CDN); header with a brand mark and a sun/moon theme toggle;
+  loading spinners, empty and error states styled the same everywhere.
+- **Accessibility (WCAG 2.2 AA):** contrast fixed in both themes (muted text, the walkthrough tag, primary buttons in
+  dark mode, library topic names), a visible focus ring on every control, a *Skip to content* link, labelled progress
+  bars, `aria-expanded` on the *More* menu, `prefers-reduced-motion` honored (also for scrolling), forced-colors mode
+  support, a layout that reflows to phone width without horizontal scrolling. axe-core reports 0 violations on Labs, a
+  walkthrough step, Library, Settings and the resource check, light and dark (3.2.0: 94).
+
 ## [3.2.0] - 2026-10-23
 **Library sorted by topic.** A patch for 3.0.0 and 3.1.0 (same runtime 2): they offer it by themselves and install it
 with *Install update*. ENCOR Lab Builder 1.7 - 2.1 still get the *full download* banner.
