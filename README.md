@@ -586,6 +586,44 @@ each), 2 `iol-xe` super spines (SS1, SS2), 2 `iol-xe` DC spines and 4 pre-config
 > 1500 on the fabric links). If a check fails on a correctly built lab, run it in *Config* grading mode and please
 > report the device output.
 
+### NX-OS study path: OSPF -> BGP -> BGP EVPN VXLAN (labs 21-23)
+Three long walkthroughs in the lab library for studying BGP EVPN VXLAN on Nexus 9000v (NX-OS 10.5, CML 2.9), from the
+underlay up. All three use the same **5-stage Clos**, all NX-OS: super spines SS1/SS2, one spine and one leaf per pod
+(P1-SPINE, P1-LEAF, P2-SPINE, P2-LEAF) and four pre-configured IOL hosts (H1/H2 on P1-LEAF, H3/H4 on P2-LEAF).
+**10 nodes, about 76 GB of CML RAM** (6 x `nxosv9000` at 12 GB + 4 x `iol-xe`), RAM heavy. Ports: Ethernet1/1-1/4.
+
+Every step has three parts: *under the hood* (what NX-OS does internally), the config (paste it or *Apply this step
+for me*), and an inspection list of `show` / `event-history` commands with what to look for. Debugs are typed by hand
+because the app only runs `show` and `ping`: each lab teaches the safe NX-OS routine (`debug logfile` +
+`debug-filter`, then `show debug logfile` and `undebug all`).
+
+**Each lab is a separate CML lab that starts from its own baseline**, never from your earlier running configs: lab 21
+boots with hostnames, descriptions and enabled links only; lab 22 boots with lab 21's finished OSPF in its day-0; lab
+23 boots with OSPF + BGP. So after lab 21 you can skip straight to lab 23. A test keeps each baseline equal to the
+previous lab's day-0 plus its required steps (optional steps are not carried over).
+
+**`21-nxos-ospf-multiarea`** (*NX-OS study path 1/3: OSPF multi-area on a super-spine Clos, with deep debug
+inspection*): area 0 on the super-spine layer, one area per pod with the spines as ABRs.
+
+| # | Step | What you do | Main inspection / debug |
+|---|---|---|---|
+| 0 | Design | 5-stage Clos, why one area per pod, area rules | `show cdp neighbors` |
+| 1 | Links | Routed `/30`s, loopback0/1, `mtu 9216` | `show ip interface brief`, `show interface`, `show ip arp` |
+| 2 | Area 0 | Super spines + spine uplinks, p2p links, DR/BDR on SS1-SS2 | `show ip ospf neighbors`, `event-history adjacency`, `debug ip ospf adjacency` to a logfile |
+| 3 | Area 0 LSDB | Router (type 1) and network (type 2) LSAs, SPF | `show ip ospf database router/network`, `event-history spf/lsa` |
+| 4 | Interface internals | What must match, network types, cost (40 Gbps reference) | `show ip ospf interface`, `show ip ospf` |
+| 5 | Pod areas | Area 1 and 2, spines become ABRs | type-3 LSAs, `inter` routes |
+| 6 | Summarization | `area range` per pod, discard route to Null0 | `show ip ospf database summary`, `show ip route` |
+| 7 | NSSA | Area 1 NSSA, P1-LEAF redistributes 172.31.1.0/24 (type 7 -> type 5), live area-type mismatch | `database nssa-external/external/asbr-summary`, `debug ip ospf hello` |
+| 8 | Stub | Area 2 stub: type-3 default, no type 4/5 (totally stubby discussed) | `show ip route 0.0.0.0/0`, `database external` |
+| 9 | SPF and flaps | Controlled flaps, partial vs full SPF, summarization as fault isolation | `event-history spf`, `debug ip ospf spf` |
+| 10 | End to end | VTEP-to-VTEP ping across five stages, ECMP via both super spines | `show ip route`, `show forwarding ipv4 route` |
+| 11 | Break and fix (optional) | MTU, timer and area mismatches | `event-history adjacency/hello`, debugs |
+
+> **Not verified on real devices yet.** The expected outputs were written from Cisco's NX-OS 10.x documentation, not
+> captured from CML. Command keywords of `event-history`, `debug ip ospf` and `show forwarding` can differ on the
+> 9000v image. If a check fails on a correctly built lab, run it in *Config* grading mode and please report the output.
+
 ### RAM estimate and the RAM heavy tag
 Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node
 definition: `iol-xe`/`ioll2-xe` 1 GB, `iosv` 0.5 GB, `iosvl2` 0.75 GB, `csr1000v` 3 GB, `cat8000v` 4 GB, `nxosv9000`
@@ -786,6 +824,8 @@ Example packs live in [`examples/`](examples/) and are attached to every [releas
 - `19-evpn-mpls` (lab library only): a walkthrough of BGP EVPN over MPLS on IOL (8 routers, about 8 GB RAM).
 - `20-evpn-vxlan-superspine` (lab library only): a walkthrough of BGP EVPN VXLAN across two data centers joined by
   super spines (5-stage Clos), NX-OS 9000v leaves with IOL spines (12 nodes, about 56 GB RAM).
+- `21-nxos-ospf-multiarea` (lab library only): NX-OS study path 1/3, OSPF multi-area with deep debug inspection on a
+  6 x Nexus 9000v super-spine Clos (10 nodes, about 76 GB RAM).
 
 ## Configuration
 Everything can be set on the **Settings** page; `.env` / environment variables provide defaults (copy `.env.example`).

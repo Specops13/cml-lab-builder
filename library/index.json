@@ -669,6 +669,38 @@
       ]
     },
     {
+      "file": "21-nxos-ospf-multiarea.cmllab",
+      "sha256": "1d9402a942fe331d0049551d4c004b0f1cb8cf06deec964286270cbba0614a76",
+      "size": 20293,
+      "kind": "lab",
+      "id": "21-nxos-ospf-multiarea",
+      "title": "NX-OS study path 1/3: OSPF multi-area on a super-spine Clos, with deep debug inspection",
+      "version": "1",
+      "description": "Lab 1 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Six Nexus 9000v in a 5-stage Clos (2 super spines, a spine and a leaf per pod). Build the OSPF underlay step by step: area 0 on the super-spine layer, one area per pod with the spines as ABRs, a DR/BDR segment, inter-area summarization with discard routes, an NSSA with a translated external, and a stub area. Every step explains what NX-OS does under the hood and how to inspect it with show, event-history and filtered debugs written to a debug logfile.",
+      "blueprint": [
+        "3.2.b"
+      ],
+      "nodes": 10,
+      "difficulty": 4,
+      "type": "walkthrough",
+      "ram_gb": 76.0,
+      "domain": "3.0 Infrastructure",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe",
+        "nxosv9000"
+      ],
+      "topics": [
+        "ospf",
+        "data-center",
+        "walkthrough",
+        "encor"
+      ]
+    },
+    {
       "file": "data-center.cmlcourse",
       "sha256": "b4b6068514fe63db3dde3629651bfa52a5e2c485bfcc88230b6b761c8f492fe8",
       "size": 477,

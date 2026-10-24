@@ -1,0 +1,289 @@
+# Synthesized from Cisco Nexus 9000 NX-OS 10.x unicast routing (OSPFv2) configuration guide examples
+# (not recorded on real hardware). State: every step of lab 21 done.
+P1-SPINE:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater,
+                      V - VoIP-Phone, D - Remotely-Managed-Device,
+                      s - Supports-STP-Dispute
+
+    Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+    SS1(9N3KD63KWT0)   Eth1/1         163    R S I s     N9K-C9300v    Eth1/1
+    SS2(9N3KD63KWT1)   Eth1/2         163    R S I s     N9K-C9300v    Eth1/1
+    P1-LEAF(9N3KD63KWT4)
+                       Eth1/3         163    R S I s     N9K-C9300v    Eth1/1
+
+    Total entries displayed: 3
+  ping 10.0.1.1: |
+    PING 10.0.1.1 (10.0.1.1): 56 data bytes
+    64 bytes from 10.0.1.1: icmp_seq=0 ttl=252 time=2.000 ms
+    64 bytes from 10.0.1.1: icmp_seq=1 ttl=252 time=2.300 ms
+    64 bytes from 10.0.1.1: icmp_seq=2 ttl=252 time=2.600 ms
+    64 bytes from 10.0.1.1: icmp_seq=3 ttl=252 time=2.900 ms
+    64 bytes from 10.0.1.1: icmp_seq=4 ttl=252 time=3.200 ms
+
+    --- 10.0.1.1 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 2.000/2.600/3.200 ms
+  show ip route 10.0.0.21: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    10.0.0.21/32, ubest/mbest: 2/0
+        *via 10.0.1.1, Eth1/1, [110/81], 00:41:02, ospf-UNDERLAY, intra
+        *via 10.0.3.1, Eth1/2, [110/81], 00:41:02, ospf-UNDERLAY, intra
+  show ip ospf interface Ethernet1/1: |2
+     Ethernet1/1 is up, line protocol is up
+        IP address 10.0.1.2/30
+        Process ID UNDERLAY VRF default, area 0.0.0.0
+        Enabled by interface configuration
+        State P2P, Network type P2P, cost 40
+        Index 2, Transmit delay 1 sec
+        1 Neighbors, flooding to 1, adjacent with 1
+        Timer intervals: Hello 10, Dead 40, Wait 40, Retransmit 5
+          Hello timer due in 00:00:06
+        No authentication
+        Number of opaque link LSAs: 0, checksum sum 0
+        Interface ospf state change count: 1
+  show ip ospf neighbors: |2
+     OSPF Process ID UNDERLAY VRF default
+     Total number of neighbors: 3
+     Neighbor ID     Pri State            Up Time  Address         Interface
+     10.0.0.1          1 FULL/ -          00:41:12 10.0.1.1        Eth1/1
+     10.0.0.2          1 FULL/ -          00:41:12 10.0.3.1        Eth1/2
+     10.1.0.111        1 FULL/ -          00:41:12 10.1.10.2       Eth1/3
+  show ip route 10.2.0.0/16: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    10.2.0.0/16, ubest/mbest: 2/0
+        *via 10.0.1.1, Eth1/1, [110/121], 00:38:40, ospf-UNDERLAY, inter
+        *via 10.0.3.1, Eth1/2, [110/121], 00:38:40, ospf-UNDERLAY, inter
+SS1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater,
+                      V - VoIP-Phone, D - Remotely-Managed-Device,
+                      s - Supports-STP-Dispute
+
+    Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+    P1-SPINE(9N3KD63KWT2)
+                       Eth1/1         163    R S I s     N9K-C9300v    Eth1/1
+    P2-SPINE(9N3KD63KWT3)
+                       Eth1/2         163    R S I s     N9K-C9300v    Eth1/1
+    SS2(9N3KD63KWT1)   Eth1/3         163    R S I s     N9K-C9300v    Eth1/3
+
+    Total entries displayed: 3
+  show ip ospf neighbors: |2
+     OSPF Process ID UNDERLAY VRF default
+     Total number of neighbors: 3
+     Neighbor ID     Pri State            Up Time  Address         Interface
+     10.0.0.11         1 FULL/ -          00:41:12 10.0.1.2        Eth1/1
+     10.0.0.21         1 FULL/ -          00:41:12 10.0.2.2        Eth1/2
+     10.0.0.2          1 FULL/BDR         00:41:12 10.0.12.2       Eth1/3
+  show ip ospf database: |2
+
+            OSPF Router with ID (10.0.0.1) (Process ID UNDERLAY VRF default)
+
+                    Router Link States (Area 0.0.0.0)
+
+    Link ID         ADV Router      Age        Seq#       Checksum Link Count
+    10.0.0.1        10.0.0.1        612        0x8000000a 0x4b1e   6
+    10.0.0.2        10.0.0.2        610        0x80000009 0x9d02   6
+    10.0.0.11       10.0.0.11       588        0x8000000c 0x1c77   5
+    10.0.0.21       10.0.0.21       590        0x8000000b 0xe2a0   5
+
+                    Network Link States (Area 0.0.0.0)
+
+    Link ID         ADV Router      Age        Seq#       Checksum
+    10.0.12.1       10.0.0.1        612        0x80000002 0x6a11
+
+                    Summary Network Link States (Area 0.0.0.0)
+
+    Link ID         ADV Router      Age        Seq#       Checksum
+    10.1.0.0        10.0.0.11       401        0x80000001 0x3f02
+    10.2.0.0        10.0.0.21       398        0x80000001 0x4e7c
+
+                    Type-5 AS External Link States
+
+    Link ID         ADV Router      Age        Seq#       Checksum Tag
+    172.31.1.0      10.0.0.11       355        0x80000001 0x8be1   0
+  show ip route 10.1.1.111: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    10.1.0.0/16, ubest/mbest: 1/0
+        *via 10.0.1.2, Eth1/1, [110/81], 00:38:41, ospf-UNDERLAY, inter
+  show ip route 10.2.1.121: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    10.2.0.0/16, ubest/mbest: 1/0
+        *via 10.0.2.2, Eth1/2, [110/81], 00:38:41, ospf-UNDERLAY, inter
+  show ip ospf database external: |2
+
+            OSPF Router with ID (10.0.0.1) (Process ID UNDERLAY VRF default)
+
+                    Type-5 AS External Link States
+
+    Link ID         ADV Router      Age        Seq#       Checksum Tag
+    172.31.1.0      10.0.0.11       355        0x80000001 0x8be1   0
+  show ip route 172.31.1.0/24: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    172.31.1.0/24, ubest/mbest: 1/0
+        *via 10.0.1.2, Eth1/1, [110/20], 00:35:12, ospf-UNDERLAY, type-2
+SS2:
+  show ip ospf neighbors: |2
+     OSPF Process ID UNDERLAY VRF default
+     Total number of neighbors: 3
+     Neighbor ID     Pri State            Up Time  Address         Interface
+     10.0.0.11         1 FULL/ -          00:41:12 10.0.3.2        Eth1/1
+     10.0.0.21         1 FULL/ -          00:41:12 10.0.4.2        Eth1/2
+     10.0.0.1        100 FULL/DR          00:41:12 10.0.12.1       Eth1/3
+P2-SPINE:
+  show ip ospf neighbors: |2
+     OSPF Process ID UNDERLAY VRF default
+     Total number of neighbors: 3
+     Neighbor ID     Pri State            Up Time  Address         Interface
+     10.0.0.1          1 FULL/ -          00:41:12 10.0.2.1        Eth1/1
+     10.0.0.2          1 FULL/ -          00:41:12 10.0.4.1        Eth1/2
+     10.2.0.121        1 FULL/ -          00:41:12 10.2.10.2       Eth1/3
+  show ip ospf: |2
+     Routing Process UNDERLAY with ID 10.0.0.21 VRF default
+     Routing Process Instance Number 1
+     Stateful High Availability enabled
+     Graceful-restart is configured
+       Grace period: 60 state: Inactive
+       Last graceful restart exit status: None
+     Supports only single TOS(TOS0) routes
+     Supports opaque LSA
+     This router is an area border router
+     Administrative distance 110
+     Reference Bandwidth is 40000 Mbps
+     SPF throttling delay time of 200.000 msecs,
+       SPF throttling hold time of 1000.000 msecs,
+       SPF throttling maximum wait time of 5000.000 msecs
+     LSA throttling start time of 0.000 msecs,
+       LSA throttling hold interval of 5000.000 msecs,
+       LSA throttling maximum wait time of 5000.000 msecs
+     Minimum LSA arrival 1000.000 msec
+     LSA group pacing timer 10 secs
+     Maximum paths to destination 8
+     Number of external LSAs 1, checksum sum 0x8be1
+     Number of opaque AS LSAs 0, checksum sum 0
+     Number of areas is 2, 1 normal, 1 stub, 0 nssa
+     Number of active areas is 2, 1 normal, 1 stub, 0 nssa
+     Install discard route for summarized external routes.
+     Install discard route for summarized internal routes.
+       Area BACKBONE(0.0.0.0)
+            Area has existed for 00:42:10
+            Interfaces in this area: 3 Active interfaces: 3
+            Passive interfaces: 0  Loopback interfaces: 1
+            No authentication available
+            SPF calculation has run 9 times
+             Last SPF ran for 0.000310s
+            Area ranges are
+            Number of LSAs: 8, checksum sum 0x3b1d0
+       Area (0.0.0.2)
+            Area has existed for 00:39:55
+            Interfaces in this area: 1 Active interfaces: 1
+            Passive interfaces: 0  Loopback interfaces: 0
+            This area is a STUB area
+            Generates stub default route with cost 1
+            No authentication available
+            SPF calculation has run 7 times
+             Last SPF ran for 0.000102s
+            Area ranges are
+              10.2.0.0/16 Passive (Num nets: 3) Advertise
+            Number of LSAs: 6, checksum sum 0x2a9f4
+P1-LEAF:
+  show ip ospf database nssa-external: |2
+
+            OSPF Router with ID (10.1.0.111) (Process ID UNDERLAY VRF default)
+
+                    Type-7 AS External Link States (Area 0.0.0.1)
+
+    Link ID         ADV Router      Age        Seq#       Checksum Tag
+    0.0.0.0         10.0.0.11       362        0x80000001 0x1a5d   0
+    172.31.1.0      10.1.0.111      360        0x80000001 0xc3f6   0
+  ping 10.2.1.121 source 10.1.1.111: |
+    PING 10.2.1.121 (10.2.1.121): 56 data bytes
+    64 bytes from 10.2.1.121: icmp_seq=0 ttl=252 time=2.000 ms
+    64 bytes from 10.2.1.121: icmp_seq=1 ttl=252 time=2.300 ms
+    64 bytes from 10.2.1.121: icmp_seq=2 ttl=252 time=2.600 ms
+    64 bytes from 10.2.1.121: icmp_seq=3 ttl=252 time=2.900 ms
+    64 bytes from 10.2.1.121: icmp_seq=4 ttl=252 time=3.200 ms
+
+    --- 10.2.1.121 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 2.000/2.600/3.200 ms
+P2-LEAF:
+  ping 10.2.10.1: |
+    PING 10.2.10.1 (10.2.10.1): 56 data bytes
+    64 bytes from 10.2.10.1: icmp_seq=0 ttl=252 time=2.000 ms
+    64 bytes from 10.2.10.1: icmp_seq=1 ttl=252 time=2.300 ms
+    64 bytes from 10.2.10.1: icmp_seq=2 ttl=252 time=2.600 ms
+    64 bytes from 10.2.10.1: icmp_seq=3 ttl=252 time=2.900 ms
+    64 bytes from 10.2.10.1: icmp_seq=4 ttl=252 time=3.200 ms
+
+    --- 10.2.10.1 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 2.000/2.600/3.200 ms
+  show ip route 10.1.1.111: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    10.1.0.0/16, ubest/mbest: 1/0
+        *via 10.2.10.1, Eth1/1, [110/161], 00:38:40, ospf-UNDERLAY, inter
+  show ip route 0.0.0.0/0: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    0.0.0.0/0, ubest/mbest: 1/0
+        *via 10.2.10.1, Eth1/1, [110/41], 00:31:02, ospf-UNDERLAY, inter
+  show ip ospf database external: ''
+  ping 172.31.1.1 source 10.2.0.121: |
+    PING 172.31.1.1 (172.31.1.1): 56 data bytes
+    64 bytes from 172.31.1.1: icmp_seq=0 ttl=252 time=2.000 ms
+    64 bytes from 172.31.1.1: icmp_seq=1 ttl=252 time=2.300 ms
+    64 bytes from 172.31.1.1: icmp_seq=2 ttl=252 time=2.600 ms
+    64 bytes from 172.31.1.1: icmp_seq=3 ttl=252 time=2.900 ms
+    64 bytes from 172.31.1.1: icmp_seq=4 ttl=252 time=3.200 ms
+
+    --- 172.31.1.1 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 2.000/2.600/3.200 ms
+  ping 10.1.0.111 source 10.2.0.121: |
+    PING 10.1.0.111 (10.1.0.111): 56 data bytes
+    64 bytes from 10.1.0.111: icmp_seq=0 ttl=252 time=2.000 ms
+    64 bytes from 10.1.0.111: icmp_seq=1 ttl=252 time=2.300 ms
+    64 bytes from 10.1.0.111: icmp_seq=2 ttl=252 time=2.600 ms
+    64 bytes from 10.1.0.111: icmp_seq=3 ttl=252 time=2.900 ms
+    64 bytes from 10.1.0.111: icmp_seq=4 ttl=252 time=3.200 ms
+
+    --- 10.1.0.111 ping statistics ---
+    5 packets transmitted, 5 packets received, 0.00% packet loss
+    round-trip min/avg/max = 2.000/2.600/3.200 ms

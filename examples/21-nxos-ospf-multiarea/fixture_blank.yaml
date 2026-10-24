@@ -1,0 +1,57 @@
+# Synthesized from Cisco Nexus 9000 NX-OS 10.x unicast routing (OSPFv2) configuration guide examples
+# (not recorded on real hardware). State: lab 21 baseline (day-0 only: links up, no IP addressing, no OSPF).
+P1-SPINE:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater,
+                      V - VoIP-Phone, D - Remotely-Managed-Device,
+                      s - Supports-STP-Dispute
+
+    Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+    SS1(9N3KD63KWT0)   Eth1/1         163    R S I s     N9K-C9300v    Eth1/1
+    SS2(9N3KD63KWT1)   Eth1/2         163    R S I s     N9K-C9300v    Eth1/1
+    P1-LEAF(9N3KD63KWT4)
+                       Eth1/3         163    R S I s     N9K-C9300v    Eth1/1
+
+    Total entries displayed: 3
+  ping 10.0.1.1: |
+    PING 10.0.1.1 (10.0.1.1): 56 data bytes
+    Request 0 timed out
+    Request 1 timed out
+    Request 2 timed out
+    Request 3 timed out
+    Request 4 timed out
+
+    --- 10.0.1.1 ping statistics ---
+    5 packets transmitted, 0 packets received, 100.00% packet loss
+  show ip ospf neighbors: ''
+  show ip route 10.0.0.21: |
+    % Route not found
+SS1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater,
+                      V - VoIP-Phone, D - Remotely-Managed-Device,
+                      s - Supports-STP-Dispute
+
+    Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+    P1-SPINE(9N3KD63KWT2)
+                       Eth1/1         163    R S I s     N9K-C9300v    Eth1/1
+    P2-SPINE(9N3KD63KWT3)
+                       Eth1/2         163    R S I s     N9K-C9300v    Eth1/1
+    SS2(9N3KD63KWT1)   Eth1/3         163    R S I s     N9K-C9300v    Eth1/3
+
+    Total entries displayed: 3
+  show ip ospf neighbors: ''
+P2-LEAF:
+  ping 10.2.10.1: |
+    PING 10.2.10.1 (10.2.10.1): 56 data bytes
+    Request 0 timed out
+    Request 1 timed out
+    Request 2 timed out
+    Request 3 timed out
+    Request 4 timed out
+
+    --- 10.2.10.1 ping statistics ---
+    5 packets transmitted, 0 packets received, 100.00% packet loss
+  show ip ospf database external: ''

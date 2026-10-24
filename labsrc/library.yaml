@@ -34,6 +34,7 @@ topics:
   18-evpn-vxlan: [evpn-vxlan, data-center, bgp]
   19-evpn-mpls: [evpn-vxlan, mpls, bgp]
   20-evpn-vxlan-superspine: [evpn-vxlan, data-center, bgp]
+  21-nxos-ospf-multiarea: [ospf, data-center]
   eigrp-basic: [eigrp]
   ospf-multiarea-stub: [ospf]
   troubleshoot-ospf-7node: [troubleshooting, ospf]

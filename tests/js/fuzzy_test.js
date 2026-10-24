@@ -25,7 +25,7 @@ top("hsrp", "06-hsrp");
 // lab ids, blueprint items, node types / platforms, courses
 top("17-mpls", "17-mpls-l3vpn");
 top("3.1.b", "02-etherchannel");
-top("nexus", "18-evpn-vxlan", 2);
+for (const id of ["18-evpn-vxlan", "20-evpn-vxlan-superspine", "21-nxos-ospf-multiarea"]) top("nexus", id, 8);   // all Nexus labs
 top("nxosv9000", "20-evpn-vxlan-superspine", 2);
 top("superspine", "20-evpn-vxlan-superspine");
 top("data center", "data-center");

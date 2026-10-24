@@ -2,6 +2,16 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+### Added
+- **New library lab `21-nxos-ospf-multiarea`: NX-OS study path 1/3: OSPF multi-area on a super-spine Clos, with deep
+  debug inspection** (walkthrough, 12 steps). Six Nexus 9000v in a 5-stage Clos (SS1/SS2, one spine and one leaf per
+  pod) plus four IOL hosts, 10 nodes, about 76 GB of CML RAM. Area 0 on the super-spine layer, one area per pod with
+  the spines as ABRs, a DR/BDR segment, `area range` summarization, an NSSA with a translated external and a stub
+  area. Each step explains what NX-OS does under the hood and lists the show, event-history and debug commands
+  (`debug logfile`, `debug-filter`, `undebug all`) to inspect it. Library only: `library/21-nxos-ospf-multiarea.cmllab`
+  (and `labs/21-nxos-ospf-multiarea.encorlab`). Expected outputs are synthesized from Cisco documentation.
+
 ## [3.2.0] - 2026-10-23
 **Library sorted by topic.** A patch for 3.0.0 and 3.1.0 (same runtime 2): they offer it by themselves and install it
 with *Install update*. ENCOR Lab Builder 1.7 - 2.1 still get the *full download* banner.

@@ -1,5 +1,5 @@
-"""Library labs: every node gets a usable day-0 config on CML (strict checks for 08-vrf-lite, 19-evpn-mpls and
-20-evpn-vxlan-superspine, the IOL trigger check for every library lab).
+"""Library labs: every node gets a usable day-0 config on CML (strict checks for 08-vrf-lite, 19-evpn-mpls,
+20-evpn-vxlan-superspine and the NX-OS study path labs 21-23, the IOL trigger check for every library lab).
 
 Cisco's iol-xe node definition: "In order to avoid entering a configuration dialog on boot, please ensure that all
 ethernet interfaces have some ip configuration present here". Without that, IOL ignores the whole day-0 config
@@ -17,7 +17,8 @@ from cmllab.platforms import get as get_platform
 from cmllab.render import to_yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-LABS = ["08-vrf-lite", "19-evpn-mpls", "20-evpn-vxlan-superspine"]
+VERSIONS = {"08-vrf-lite": "2", "19-evpn-mpls": "2", "20-evpn-vxlan-superspine": "2", "21-nxos-ospf-multiarea": "1"}
+LABS = list(VERSIONS)
 PACKS = [ROOT / "library" / f"{lab}.cmllab" for lab in LABS] + [ROOT / "labs" / f"{lab}.encorlab" for lab in LABS]
 IOL_PORTS = [f"Ethernet0/{p}" for p in range(4)]
 
@@ -37,7 +38,7 @@ def _stanza(cfg: str, ifname: str) -> str | None:
 @pytest.mark.parametrize("pack_path", PACKS, ids=lambda p: p.name)
 def test_every_node_has_a_day0_config_the_device_accepts(pack_path):
     lab, nodes = _sent(pack_path)
-    assert lab.version == "2"
+    assert lab.version == VERSIONS[lab.id]
     assert set(nodes) == {n.name for n in lab.nodes}
     cabled = {(e.node, e.port) for ln in lab.links for e in (ln.a, ln.b)}
     for n in lab.nodes:

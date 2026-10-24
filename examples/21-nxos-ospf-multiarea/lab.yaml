@@ -1,0 +1,1249 @@
+id: 21-nxos-ospf-multiarea
+type: walkthrough
+title: "NX-OS study path 1/3: OSPF multi-area on a super-spine Clos, with deep debug inspection"
+blueprint: ["3.2.b"]
+domain: "3.0 Infrastructure"
+difficulty: 4
+platforms: [iol]
+summary: "Lab 1 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Six Nexus 9000v in a 5-stage Clos (2 super spines, a spine and a leaf per pod). Build the OSPF underlay step by step: area 0 on the super-spine layer, one area per pod with the spines as ABRs, a DR/BDR segment, inter-area summarization with discard routes, an NSSA with a translated external, and a stub area. Every step explains what NX-OS does under the hood and how to inspect it with show, event-history and filtered debugs written to a debug logfile."
+author: CML Lab Builder
+version: "1"
+ram_gb: 76
+nodes:
+  - name: SS1
+    kind: router
+    definition: nxosv9000
+    x: -150
+    y: -420
+    config: |
+      ! Lab 21 baseline (the start of this lab): hostname, logins, interface descriptions and links enabled. No IP addressing, no routing. This lab is built fresh from this config.
+      interface Ethernet1/1
+        description to P1-SPINE Eth1/1
+        no shutdown
+      interface Ethernet1/2
+        description to P2-SPINE Eth1/1
+        no shutdown
+      interface Ethernet1/3
+        description to SS2 Eth1/3
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+  - name: SS2
+    kind: router
+    definition: nxosv9000
+    x: 150
+    y: -420
+    config: |
+      ! Lab 21 baseline (the start of this lab): hostname, logins, interface descriptions and links enabled. No IP addressing, no routing. This lab is built fresh from this config.
+      interface Ethernet1/1
+        description to P1-SPINE Eth1/2
+        no shutdown
+      interface Ethernet1/2
+        description to P2-SPINE Eth1/2
+        no shutdown
+      interface Ethernet1/3
+        description to SS1 Eth1/3
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+  - name: P1-SPINE
+    kind: router
+    definition: nxosv9000
+    x: -300
+    y: -220
+    config: |
+      ! Lab 21 baseline (the start of this lab): hostname, logins, interface descriptions and links enabled. No IP addressing, no routing. This lab is built fresh from this config.
+      interface Ethernet1/1
+        description to SS1 Eth1/1
+        no shutdown
+      interface Ethernet1/2
+        description to SS2 Eth1/1
+        no shutdown
+      interface Ethernet1/3
+        description to P1-LEAF Eth1/1
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+  - name: P2-SPINE
+    kind: router
+    definition: nxosv9000
+    x: 300
+    y: -220
+    config: |
+      ! Lab 21 baseline (the start of this lab): hostname, logins, interface descriptions and links enabled. No IP addressing, no routing. This lab is built fresh from this config.
+      interface Ethernet1/1
+        description to SS1 Eth1/2
+        no shutdown
+      interface Ethernet1/2
+        description to SS2 Eth1/2
+        no shutdown
+      interface Ethernet1/3
+        description to P2-LEAF Eth1/1
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+  - name: P1-LEAF
+    kind: switch
+    definition: nxosv9000
+    x: -300
+    y: 0
+    config: |
+      ! Lab 21 baseline (the start of this lab): hostname, logins, interface descriptions and links enabled. No IP addressing, no routing. This lab is built fresh from this config.
+      interface Ethernet1/1
+        description to P1-SPINE Eth1/3
+        no shutdown
+      interface Ethernet1/2
+        description to H1 (VLAN 10 in lab 23)
+        no shutdown
+      interface Ethernet1/3
+        description to H2 (VLAN 20 in lab 23)
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+  - name: P2-LEAF
+    kind: switch
+    definition: nxosv9000
+    x: 300
+    y: 0
+    config: |
+      ! Lab 21 baseline (the start of this lab): hostname, logins, interface descriptions and links enabled. No IP addressing, no routing. This lab is built fresh from this config.
+      interface Ethernet1/1
+        description to P2-SPINE Eth1/3
+        no shutdown
+      interface Ethernet1/2
+        description to H3 (VLAN 10 in lab 23)
+        no shutdown
+      interface Ethernet1/3
+        description to H4 (VLAN 20 in lab 23)
+        no shutdown
+      interface Ethernet1/4
+        description unused
+        shutdown
+  - name: H1
+    kind: router
+    x: -420
+    y: 220
+    config: |
+      ! Test host (an IOS router used as a PC) - already configured. It is idle until lab 23 (VLAN 10 on P1-LEAF).
+      interface %if0%
+       description to P1-LEAF Eth1/2 (VLAN 10)
+       mac-address 0010.0010.0011
+       ip address 192.168.10.11 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.10.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
+  - name: H2
+    kind: router
+    x: -180
+    y: 220
+    config: |
+      ! Test host (an IOS router used as a PC) - already configured. It is idle until lab 23 (VLAN 20 on P1-LEAF).
+      interface %if0%
+       description to P1-LEAF Eth1/3 (VLAN 20)
+       mac-address 0020.0020.0012
+       ip address 192.168.20.12 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.20.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
+  - name: H3
+    kind: router
+    x: 180
+    y: 220
+    config: |
+      ! Test host (an IOS router used as a PC) - already configured. It is idle until lab 23 (VLAN 10 on P2-LEAF).
+      interface %if0%
+       description to P2-LEAF Eth1/2 (VLAN 10)
+       mac-address 0010.0010.0013
+       ip address 192.168.10.13 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.10.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
+  - name: H4
+    kind: router
+    x: 420
+    y: 220
+    config: |
+      ! Test host (an IOS router used as a PC) - already configured. It is idle until lab 23 (VLAN 20 on P2-LEAF).
+      interface %if0%
+       description to P2-LEAF Eth1/3 (VLAN 20)
+       mac-address 0020.0020.0014
+       ip address 192.168.20.14 255.255.255.0
+       no shutdown
+      ip route 0.0.0.0 0.0.0.0 192.168.20.1
+      interface %if1%
+       description unused
+       no ip address
+       shutdown
+      interface %if2%
+       description unused
+       no ip address
+       shutdown
+      interface %if3%
+       description unused
+       no ip address
+       shutdown
+links:
+  - {a: {node: SS1, port: 0}, b: {node: P1-SPINE, port: 0}}
+  - {a: {node: SS1, port: 1}, b: {node: P2-SPINE, port: 0}}
+  - {a: {node: SS2, port: 0}, b: {node: P1-SPINE, port: 1}}
+  - {a: {node: SS2, port: 1}, b: {node: P2-SPINE, port: 1}}
+  - {a: {node: SS1, port: 2}, b: {node: SS2, port: 2}}
+  - {a: {node: P1-SPINE, port: 2}, b: {node: P1-LEAF, port: 0}}
+  - {a: {node: P2-SPINE, port: 2}, b: {node: P2-LEAF, port: 0}}
+  - {a: {node: P1-LEAF, port: 1}, b: {node: H1, port: 0}}
+  - {a: {node: P1-LEAF, port: 2}, b: {node: H2, port: 0}}
+  - {a: {node: P2-LEAF, port: 1}, b: {node: H3, port: 0}}
+  - {a: {node: P2-LEAF, port: 2}, b: {node: H4, port: 0}}
+task: |
+  A guided build, not a graded challenge. This is **lab 1 of 3** of the **NX-OS study path**
+  (OSPF -> BGP -> BGP EVPN VXLAN). All three labs use the same six Nexus 9000v switches, cabling and
+  addressing, and every lab is a **separate CML lab that starts from its own baseline config**: lab 22 boots with
+  this lab's finished OSPF already in its day-0, lab 23 boots with OSPF + BGP. You can stop after this lab and
+  jump straight to lab 23; nothing from this lab's running configs is ever reused.
+
+  **The topology: a 5-stage Clos with super spines**
+
+  ```
+              SS1 ------(Eth1/3, broadcast)------ SS2          <- super spines   (area 0)
+             /   \                               /   \
+       P1-SPINE   +------------ P2-SPINE -------+               <- pod spines = ABRs
+          |        (each spine has one link to SS1 and one to SS2)
+       P1-LEAF                     P2-LEAF                      <- leaves (area 1 | area 2)
+        /    \                      /    \
+      H1      H2                  H3      H4                    <- test hosts (used in lab 23)
+  ```
+
+  Any leaf reaches the other in five stages: `P1-LEAF - P1-SPINE - SS1|SS2 - P2-SPINE - P2-LEAF`.
+
+  **The OSPF design you build**
+
+  - **Area 0 (backbone)** = the super-spine layer: SS1, SS2, the four spine-to-super-spine links, the SS1-SS2
+    link and the loopbacks of the super spines and spines.
+  - **Area 1** = pod 1 (P1-SPINE Eth1/3 and P1-LEAF). It becomes an **NSSA**, so P1-LEAF can inject an external route.
+  - **Area 2** = pod 2 (P2-SPINE Eth1/3 and P2-LEAF). It becomes a **stub area**.
+  - **P1-SPINE and P2-SPINE are the ABRs**; they also **summarize** each pod to one /16.
+
+  | Device | Loopback0 (router ID) | Loopback1 (VTEP, lab 23) | Ports |
+  |---|---|---|---|
+  | SS1 | 10.0.0.1 | - | Eth1/1 P1-SPINE, Eth1/2 P2-SPINE, Eth1/3 SS2 |
+  | SS2 | 10.0.0.2 | - | Eth1/1 P1-SPINE, Eth1/2 P2-SPINE, Eth1/3 SS1 |
+  | P1-SPINE | 10.0.0.11 | - | Eth1/1 SS1, Eth1/2 SS2, Eth1/3 P1-LEAF |
+  | P2-SPINE | 10.0.0.21 | - | Eth1/1 SS1, Eth1/2 SS2, Eth1/3 P2-LEAF |
+  | P1-LEAF | 10.1.0.111 | 10.1.1.111 | Eth1/1 P1-SPINE, Eth1/2 H1, Eth1/3 H2 |
+  | P2-LEAF | 10.2.0.121 | 10.2.1.121 | Eth1/1 P2-SPINE, Eth1/2 H3, Eth1/3 H4 |
+
+  | Link | Subnet | Area | Network type |
+  |---|---|---|---|
+  | SS1 Eth1/1 - P1-SPINE Eth1/1 | 10.0.1.0/30 (SS1 .1) | 0 | point-to-point |
+  | SS1 Eth1/2 - P2-SPINE Eth1/1 | 10.0.2.0/30 (SS1 .1) | 0 | point-to-point |
+  | SS2 Eth1/1 - P1-SPINE Eth1/2 | 10.0.3.0/30 (SS2 .1) | 0 | point-to-point |
+  | SS2 Eth1/2 - P2-SPINE Eth1/2 | 10.0.4.0/30 (SS2 .1) | 0 | point-to-point |
+  | SS1 Eth1/3 - SS2 Eth1/3 | 10.0.12.0/24 (SS1 .1, SS2 .2) | 0 | broadcast (DR/BDR) |
+  | P1-SPINE Eth1/3 - P1-LEAF Eth1/1 | 10.1.10.0/30 (spine .1) | 1 | point-to-point |
+  | P2-SPINE Eth1/3 - P2-LEAF Eth1/1 | 10.2.10.0/30 (spine .1) | 2 | point-to-point |
+
+  Address plan = summarization plan: everything in area 1 lives in **10.1.0.0/16**, everything in area 2 in
+  **10.2.0.0/16**, area 0 in 10.0.0.0/16. P1-LEAF's external test prefix is **172.31.1.0/24** (loopback100).
+
+  **Resources**: 10 nodes - 6 x nxosv9000 (12 GB RAM and 2 vCPUs each) plus 4 IOL hosts (about 1 GB each) =
+  about **76 GB** of CML RAM and 16 vCPUs, inside a 20-node license. NX-OS takes 10-15 minutes to boot; log in
+  with your device username/password from Settings (default cisco/cisco).
+
+  **How every step works**: *Under the hood* explains what NX-OS does internally, then the config (paste it, or
+  use **Apply this step for me**), then *Inspect* lists the show / event-history / debug commands and what to
+  look for. **Check this step** runs the graded checks. Debug commands are typed by hand (the app only runs
+  `show` and `ping`); step 2 teaches the safe NX-OS debug routine you reuse in every lab.
+steps:
+  - id: design
+    title: "Step 0 - The design: a super-spine Clos and why OSPF gets one area per pod"
+    explain: |
+      **This lab starts from its own baseline.** CML builds it fresh from the day-0 config in this lab: hostnames,
+      logins, interface descriptions and enabled links, nothing else. No IP addresses, no OSPF.
+
+      **Why super spines?** A 3-stage Clos (leaf - spine - leaf) runs out of spine ports. Cisco scales out by
+      building **pods** (each a small leaf-spine fabric) and joining every pod spine to a **super-spine** layer.
+      Any leaf reaches any other leaf in at most five hops, every spine has two equal-cost paths to the other pod
+      (via SS1 and via SS2), and you can add pods without touching existing ones.
+
+      **Why multi-area OSPF here?** Real VXLAN fabrics usually run a single area 0 (or eBGP). Multi-area
+      becomes interesting at scale, and it maps naturally onto a pod design:
+
+      - **Smaller LSDBs and smaller SPF runs.** Router LSAs (type 1) and network LSAs (type 2) never leave their
+        area. A leaf in pod 2 never sees pod 1's topology, only *summaries* (type 3).
+      - **Fault isolation.** A flapping link in pod 1 triggers a full SPF only inside area 1. Area 0 sees a
+        type-3 change at most (and with summarization, not even that).
+      - **Summarization points.** OSPF can only summarize at area borders (ABR: `area range`) or at the
+        redistribution point (ASBR: `summary-address`). One /16 per pod keeps area 0 tiny.
+
+      **The rules you must not break**
+
+      1. Every non-backbone area must touch **area 0** through an ABR, and area 0 must be **contiguous**. Here
+         both spines sit in area 0 *and* in their pod area, and the super spines connect them, so area 0 is
+         one piece. If you ever split area 0 (e.g. by shutting both SS links of a spine) the pod behind it is cut
+         off from inter-area routes: OSPF has no fix for a partitioned backbone except a virtual link.
+      2. An NX-OS router is an **ABR** as soon as it has interfaces in area 0 and another area (`show ip ospf`
+         says so); it then originates type-3 LSAs in both directions.
+      3. All routers in an area must agree on the **area type** (normal / stub / NSSA): it is encoded in the
+         hello options (E and N bits) and a mismatch blocks the adjacency. You will see this live in step 7.
+
+      **NX-OS specifics you meet in this lab**: OSPF is a *feature* (`feature ospf`), every process has a
+      **tag** (here `UNDERLAY`), interfaces join OSPF with `ip router ospf UNDERLAY area 0.0.0.X` (NX-OS
+      shows areas in dotted form), the default **reference bandwidth is 40 Gbps** (a 1G link costs 40), and every
+      protocol keeps an always-on **event-history** ring buffer: NX-OS's equivalent of a debug that is already
+      running.
+
+      Check the cabling first: CDP is on by default on NX-OS.
+    verify:
+      - device: P1-SPINE
+        command: show cdp neighbors
+        expect: |
+          SS1 on local `Eth1/1`, SS2 on `Eth1/2` and P1-LEAF on `Eth1/3` (device IDs carry the serial in brackets,
+          e.g. `SS1(9N3KD63KWT0)`, and long ones wrap onto their own line).
+      - device: SS1
+        command: show cdp neighbors
+        expect: P1-SPINE on `Eth1/1`, P2-SPINE on `Eth1/2`, SS2 on `Eth1/3` (the port-ID column shows the far end).
+      - device: P1-LEAF
+        command: show cdp neighbors
+        expect: P1-SPINE on `Eth1/1`, H1 on `Eth1/2` and H2 on `Eth1/3` (the hosts show port `Ethernet0/0`).
+    checks:
+      - id: design-p1-spine-cdp
+        description: P1-SPINE sees SS1, SS2 and P1-LEAF over CDP
+        device: P1-SPINE
+        command: show cdp neighbors
+        match: ['SS1\S*\s+Eth1/1\b', 'SS2\S*\s+Eth1/2\b', 'P1-LEAF\S*\s+Eth1/3\b']
+        hint: Wait until all six switches are booted (10-15 minutes); CDP needs about a minute after boot.
+      - id: design-ss1-cdp
+        description: SS1 sees both pod spines and SS2 over CDP
+        device: SS1
+        command: show cdp neighbors
+        match: ['P1-SPINE\S*\s+Eth1/1\b', 'P2-SPINE\S*\s+Eth1/2\b', 'SS2\S*\s+Eth1/3\b']
+        hint: Check that every link is connected in CML.
+  - id: links
+    title: "Step 1 - Routed links, loopbacks and jumbo MTU (no OSPF yet)"
+    explain: |
+      **Under the hood.** Nexus 9000 ports are Layer 2 `switchport`s by default. `no switchport` turns a port
+      into a routed interface: it leaves every VLAN and spanning tree, gets its own IP address and its own
+      entry in the URIB (the unicast RIB) for the connected /30 and the local /32. Loopbacks never go down,
+      which is why they are used as router IDs, BGP peering addresses (lab 22) and VTEP sources (lab 23).
+
+      **MTU 9216.** VXLAN (lab 23) adds 50 bytes of outer headers. Every fabric link therefore gets jumbo
+      `mtu 9216` **now**, on both ends. OSPF cares too: during the Exchange phase each side puts its interface
+      MTU into the Database Description (DBD) packet; if the neighbor's MTU is larger, NX-OS refuses the DBD and
+      the adjacency sticks in **EXSTART/EXCHANGE** - the classic MTU-mismatch symptom (step 11 lets you try it).
+
+      **Why /30s and a /24 on SS1-SS2?** The /30s become point-to-point OSPF links (no DR, fastest adjacency).
+      The SS1-SS2 segment stays a broadcast network so you can study DR/BDR election and type-2 LSAs in step 2.
+
+      Paste the block of every switch (or use **Apply this step for me**). Loopback1 on the leaves is the future
+      VTEP address; it is created now so the OSPF design already carries it.
+    config:
+      SS1: |
+        interface Ethernet1/1
+          no switchport
+          mtu 9216
+          ip address 10.0.1.1/30
+          no shutdown
+        interface Ethernet1/2
+          no switchport
+          mtu 9216
+          ip address 10.0.2.1/30
+          no shutdown
+        interface Ethernet1/3
+          no switchport
+          mtu 9216
+          ip address 10.0.12.1/24
+          no shutdown
+        interface loopback0
+          description router ID
+          ip address 10.0.0.1/32
+      SS2: |
+        interface Ethernet1/1
+          no switchport
+          mtu 9216
+          ip address 10.0.3.1/30
+          no shutdown
+        interface Ethernet1/2
+          no switchport
+          mtu 9216
+          ip address 10.0.4.1/30
+          no shutdown
+        interface Ethernet1/3
+          no switchport
+          mtu 9216
+          ip address 10.0.12.2/24
+          no shutdown
+        interface loopback0
+          description router ID
+          ip address 10.0.0.2/32
+      P1-SPINE: |
+        interface Ethernet1/1
+          no switchport
+          mtu 9216
+          ip address 10.0.1.2/30
+          no shutdown
+        interface Ethernet1/2
+          no switchport
+          mtu 9216
+          ip address 10.0.3.2/30
+          no shutdown
+        interface Ethernet1/3
+          no switchport
+          mtu 9216
+          ip address 10.1.10.1/30
+          no shutdown
+        interface loopback0
+          description router ID
+          ip address 10.0.0.11/32
+      P2-SPINE: |
+        interface Ethernet1/1
+          no switchport
+          mtu 9216
+          ip address 10.0.2.2/30
+          no shutdown
+        interface Ethernet1/2
+          no switchport
+          mtu 9216
+          ip address 10.0.4.2/30
+          no shutdown
+        interface Ethernet1/3
+          no switchport
+          mtu 9216
+          ip address 10.2.10.1/30
+          no shutdown
+        interface loopback0
+          description router ID
+          ip address 10.0.0.21/32
+      P1-LEAF: |
+        interface Ethernet1/1
+          no switchport
+          mtu 9216
+          ip address 10.1.10.2/30
+          no shutdown
+        interface loopback0
+          description router ID
+          ip address 10.1.0.111/32
+        interface loopback1
+          description VTEP source (lab 23)
+          ip address 10.1.1.111/32
+      P2-LEAF: |
+        interface Ethernet1/1
+          no switchport
+          mtu 9216
+          ip address 10.2.10.2/30
+          no shutdown
+        interface loopback0
+          description router ID
+          ip address 10.2.0.121/32
+        interface loopback1
+          description VTEP source (lab 23)
+          ip address 10.2.1.121/32
+    verify:
+      - device: P1-SPINE
+        command: show ip interface brief
+        expect: "`Lo0 10.0.0.11`, `Eth1/1 10.0.1.2`, `Eth1/2 10.0.3.2`, `Eth1/3 10.1.10.1`, all `protocol-up/link-up/admin-up`."
+      - device: P1-SPINE
+        command: show interface Ethernet1/1
+        expect: "`Ethernet1/1 is up`, `admin state is up, Dedicated Interface`, `MTU 9216 bytes` and `Internet Address is 10.0.1.2/30`."
+      - device: P1-SPINE
+        command: ping 10.0.1.1
+        expect: "`5 packets received` - SS1 answers over the /30 (the first ping may lose one packet to ARP)."
+      - device: P1-SPINE
+        command: show ip arp
+        expect: "An entry for `10.0.1.1` on `Ethernet1/1` with SS1's MAC: ARP worked on the routed port."
+      - device: P1-SPINE
+        command: show ip route
+        expect: "Only `direct` and `local` routes (`10.0.1.0/30`, `10.0.1.2/32` ...). Nothing beyond the neighbors yet - that is OSPF's job."
+    checks:
+      - id: links-p1-spine-ping-ss1
+        description: P1-SPINE reaches SS1 over the routed /30
+        device: P1-SPINE
+        command: ping 10.0.1.1
+        match: ['\b[3-5] packets received']
+        hint: "Both ends need `no switchport` and an address in 10.0.1.0/30; check `show ip interface brief`."
+      - id: links-p2-leaf-ping-spine
+        description: P2-LEAF reaches P2-SPINE over the routed /30
+        device: P2-LEAF
+        command: ping 10.2.10.1
+        match: ['\b[3-5] packets received']
+        hint: "P2-LEAF Eth1/1 needs 10.2.10.2/30 and P2-SPINE Eth1/3 needs 10.2.10.1/30."
+      - id: links-ss1-cfg
+        description: SS1 has routed jumbo links and loopback0
+        device: SS1
+        mode: config
+        match: ['^interface Ethernet1/3\n(?:[ \t]+.*\n)*?[ \t]+ip address 10\.0\.12\.1/24', '^interface Ethernet1/1\n(?:[ \t]+.*\n)*?[ \t]+mtu 9216', '^interface loopback0\n(?:[ \t]+.*\n)*?[ \t]+ip address 10\.0\.0\.1/32']
+        hint: Paste the SS1 block of this step.
+  - id: area0
+    title: "Step 2 - OSPF area 0 on the super-spine layer (and the safe NX-OS debug routine)"
+    explain: |
+      **Under the hood: from hello to FULL.** Once an interface is in OSPF, NX-OS sends **hellos** to
+      224.0.0.5 every 10 s (dead interval 40 s). A hello carries the area ID, mask (on broadcast links), the
+      timers, the options bits (E = external routing allowed, N = NSSA) and the list of neighbors it has heard.
+      The neighbor state machine:
+
+      | State | What happened |
+      |---|---|
+      | DOWN -> INIT | a hello arrived, but my router ID is not yet in its neighbor list |
+      | INIT -> TWOWAY | my router ID is in its hello: bidirectional. On broadcast links the DR/BDR election happens here |
+      | EXSTART | the two decide master/slave (higher router ID = master) and the starting DBD sequence number |
+      | EXCHANGE | DBD packets list the LSA *headers* each has; the MTU is checked here |
+      | LOADING | Link State Requests for the LSAs I am missing, answered by Link State Updates |
+      | FULL | both LSDBs for the area are identical; SPF runs and routes go to the URIB |
+
+      On a **point-to-point** link (the four SS-spine links) there is no DR: the neighbors go straight from
+      TWOWAY to EXSTART. On the **broadcast** SS1-SS2 segment the routers first wait (the *wait timer* = dead
+      interval) and then elect a **DR** and **BDR** by priority, then router ID. The election is
+      **not preemptive**: a higher-priority router joining later does not take over. SS1 gets priority 100
+      so it normally wins; if SS2 came up first, SS2 stays DR until the adjacency resets
+      (`clear ip ospf UNDERLAY neighbor *`, run by hand).
+
+      Spine loopbacks go into area 0 too: a spine is an area-0 router that will *also* own a pod area
+      (step 5). NX-OS advertises loopbacks as /32 host routes regardless of their mask.
+
+      **The safe NX-OS debug routine** (reuse it in every lab). NX-OS debugs go to the console by default,
+      which can flood a busy box. Always send them to a **debug logfile** and narrow them with a **debug-filter**:
+
+      ```
+      debug logfile ospf-dbg size 4000000              ! write debugs to a file, not the console
+      debug-filter ip ospf UNDERLAY interface Ethernet1/3   ! only the SS1-SS2 link (optional filter)
+      debug ip ospf UNDERLAY adjacency detail          ! neighbor state changes, DR election
+      debug ip ospf UNDERLAY hello                     ! every hello sent/received (noisy)
+      clear ip ospf UNDERLAY neighbor 10.0.0.2         ! now force an adjacency to rebuild and watch it
+      show debug logfile ospf-dbg                      ! read the file
+      undebug all                                      ! ALWAYS turn every debug off again
+      no debug-filter all
+      clear debug logfile ospf-dbg                     ! (optional) empty the file
+      ```
+
+      `show debug` lists what is still on. Even without debugs you can replay history: **event-history** keeps
+      the last few thousand events per protocol in RAM, always on and cheap:
+      `show ip ospf event-history adjacency` (newest first; also `hello`, `spf`, `lsa`, `flooding`, `event`;
+      `show ip ospf event-history ?` lists the buffers of your release).
+
+      Configure SS1 and SS2 first, then the spines' area-0 side (their Eth1/1, Eth1/2 and loopback0).
+    config:
+      SS1: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.0.0.1
+          log-adjacency-changes detail
+        interface loopback0
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/1
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/2
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/3
+          ip ospf priority 100
+          ip router ospf UNDERLAY area 0.0.0.0
+      SS2: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.0.0.2
+          log-adjacency-changes detail
+        interface loopback0
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/1
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/2
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/3
+          ip router ospf UNDERLAY area 0.0.0.0
+      P1-SPINE: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.0.0.11
+          log-adjacency-changes detail
+        interface loopback0
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/1
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/2
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+      P2-SPINE: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.0.0.21
+          log-adjacency-changes detail
+        interface loopback0
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/1
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+        interface Ethernet1/2
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.0
+    verify:
+      - device: SS1
+        command: show ip ospf neighbors
+        expect: "`10.0.0.11 ... FULL/ -  ... Eth1/1`, `10.0.0.21 ... FULL/ - ... Eth1/2` (point-to-point: no DR) and `10.0.0.2 1 FULL/BDR ... Eth1/3` (broadcast: SS2 is the BDR when SS1 won)."
+      - device: SS2
+        command: show ip ospf interface Ethernet1/3
+        expect: "`Process ID UNDERLAY VRF default, area 0.0.0.0`, `State BDR, Network type BROADCAST, cost 40`, `Designated Router ID: 10.0.0.1, address: 10.0.12.1`, `Timer intervals: Hello 10, Dead 40, Wait 40, Retransmit 5`."
+      - device: SS1
+        command: show ip ospf interface brief
+        expect: "Four interfaces in area 0.0.0.0: `Lo0` (LOOPBACK), `Eth1/1` and `Eth1/2` (P2P, `Nbrs 1`) and `Eth1/3` (DR, `Nbrs 1`)."
+      - device: SS1
+        command: show ip ospf event-history adjacency
+        expect: "Newest first: the `INIT -> TWOWAY`, `EXSTART`, `EXCHANGE`, `LOADING`, `FULL` transitions per neighbor, with DR election lines for Eth1/3. This is the always-on replacement for a debug you forgot to start."
+      - device: P1-SPINE
+        command: show ip route 10.0.0.21
+        expect: "`ubest/mbest: 2/0` with two `*via` lines: `10.0.1.1, Eth1/1, [110/81] ... ospf-UNDERLAY, intra` and `10.0.3.1, Eth1/2, [110/81]`. Cost 81 = 40 + 40 + 1 (loopback). Equal-cost paths via both super spines (ECMP)."
+    checks:
+      - id: area0-ss1-neighbors
+        description: SS1 is FULL with SS2, P1-SPINE and P2-SPINE
+        device: SS1
+        command: show ip ospf neighbors
+        match: ['^\s*10\.0\.0\.2\s+\d+\s+FULL', '^\s*10\.0\.0\.11\s+\d+\s+FULL', '^\s*10\.0\.0\.21\s+\d+\s+FULL']
+        hint: "Each interface needs `ip router ospf UNDERLAY area 0.0.0.0`; the four SS-spine links must agree on `ip ospf network point-to-point`."
+      - id: area0-ss2-dr
+        description: SS2 sees SS1 as DR or BDR on the broadcast link
+        device: SS2
+        command: show ip ospf neighbors
+        match: ['^\s*10\.0\.0\.1\s+\d+\s+FULL/(DR|BDR)']
+        hint: "SS1-SS2 must stay broadcast (no `ip ospf network point-to-point` on Eth1/3) so a DR/BDR is elected."
+      - id: area0-p1-spine-ecmp
+        description: P1-SPINE has two equal-cost paths to P2-SPINE's loopback
+        device: P1-SPINE
+        command: show ip route 10.0.0.21
+        match: ['ubest/mbest: 2/0', 'via 10\.0\.1\.1, Eth1/1', 'via 10\.0\.3\.1, Eth1/2']
+        hint: Both of P1-SPINE's uplinks and both of P2-SPINE's uplinks must be in area 0 with equal costs.
+  - id: lsdb-area0
+    title: "Step 3 - Read the area 0 LSDB: router LSAs, the network LSA and SPF"
+    explain: |
+      No config in this step: you dissect what OSPF built.
+
+      **Type 1 - Router LSA.** Every router originates exactly one per area, describing its links. Link types
+      in NX-OS output:
+
+      - *point-to-point* (type 1): "Link connected to: a Router (point-to-point)", Link ID = neighbor router ID,
+        plus a *stub network* entry for the /30 itself.
+      - *transit network* (type 2): "Link connected to: a Transit Network", Link ID = the **DR's interface IP**
+        (10.0.12.1 if SS1 is DR). That link points at the type-2 LSA.
+      - *stub network* (type 3): loopbacks (/32) and the p2p subnets.
+
+      **Type 2 - Network LSA.** Only the **DR** originates it, one per broadcast segment. It lists every router
+      attached (SS1 and SS2). That is why the DR exists: N routers on a LAN do not each describe N-1 links;
+      they all point at one pseudo-node.
+
+      **SPF.** Dijkstra runs over the type-1/type-2 graph and yields the *intra-area* routes. Costs add up per
+      outgoing interface: 40 per 1G link (reference bandwidth 40 Gbps / 1 Gbps), 1 for a loopback. Every LSA
+      has an age (refreshed at 1800 s, flushed at 3600 s = MaxAge), a sequence number (higher = newer, starts at
+      0x80000001) and a checksum; `show ip ospf database` shows all three.
+
+      **Debug the flooding.** When a link changes, the owner re-originates its router LSA with seq+1 and floods
+      it; every neighbor acknowledges it. Watch it without a console debug:
+
+      ```
+      show ip ospf event-history lsa        ! LSA originate / install / flush
+      show ip ospf event-history spf        ! SPF start, duration, routes changed
+      show ip ospf event-history flooding   ! LSU/LSAck per interface (name may vary by release)
+      ! live, into a file:
+      debug logfile ospf-dbg size 4000000
+      debug ip ospf UNDERLAY lsa-generation
+      debug ip ospf UNDERLAY spf
+      ! trigger: shutdown / no shutdown of SS2 Ethernet1/2, then:
+      show debug logfile ospf-dbg
+      undebug all
+      ```
+
+      (Keywords under `debug ip ospf UNDERLAY ?` differ between releases; pick the closest ones your 9000v
+      offers.)
+    verify:
+      - device: SS1
+        command: show ip ospf database
+        expect: "Under `Router Link States (Area 0.0.0.0)` one line per router (10.0.0.1, .2, .11, .21) with `Link Count`; under `Network Link States (Area 0.0.0.0)` one line, Link ID = the DR's address (`10.0.12.1`), ADV Router = the DR."
+      - device: SS1
+        command: show ip ospf database router 10.0.0.11
+        expect: "P1-SPINE's LSA: two `a Router (point-to-point)` links (to 10.0.0.1 and 10.0.0.2), two stub /30s and the stub `10.0.0.11` /32 - its area-0 view only."
+      - device: SS1
+        command: show ip ospf database network
+        expect: "`Attached Router: 10.0.0.1` and `Attached Router: 10.0.0.2` - the pseudo-node of the SS1-SS2 LAN."
+      - device: SS1
+        command: show ip ospf event-history spf
+        expect: "SPF runs with their trigger, duration and the number of routes added/changed."
+    checks:
+      - id: lsdb-ss1-network-lsa
+        description: SS1's LSDB has a network LSA (type 2) for the SS1-SS2 segment
+        device: SS1
+        command: show ip ospf database
+        match: ['Network Link States \(Area 0\.0\.0\.0\)', '^\s*10\.0\.12\.[12]\s+10\.0\.0\.[12]\s+\d+']
+        hint: The SS1-SS2 link must be broadcast with a DR; check `show ip ospf interface Ethernet1/3` on both.
+  - id: interfaces
+    title: "Step 4 - Interface internals: network types, timers and cost"
+    explain: |
+      Still no config: learn to read the per-interface OSPF state, because most adjacency problems are here.
+
+      **What must match between two neighbors** (otherwise the hello is dropped silently, visible only in
+      event-history / debug): area ID, subnet and mask (on broadcast links), hello and dead intervals,
+      authentication, the area-type bits (stub/NSSA), and - for the Exchange phase - the MTU.
+      **What does not have to match**: the cost (each side uses its own outgoing cost), the priority, the router
+      ID (it must only be unique).
+
+      **Network types.** *broadcast* elects DR/BDR and waits 40 s before electing; *point-to-point* forms the
+      adjacency immediately and needs no type-2 LSA. Mixing p2p on one side and broadcast on the other "works"
+      (adjacency forms) but SPF fails the two-way check: routes are missing although the neighbor is FULL - a nasty
+      one to debug.
+
+      **Cost.** NX-OS: cost = reference bandwidth / interface bandwidth, reference **40 Gbps** by default
+      (IOS: 100 Mbps). Change it fabric-wide only (`auto-cost reference-bandwidth N` under `router ospf`) or set
+      `ip ospf cost` per interface. Here every 1G link costs 40.
+
+      ```
+      ! interesting knobs (do NOT need to configure them now):
+      show running-config ospf          ! only the OSPF part of the config
+      show ip ospf UNDERLAY             ! process view: reference bandwidth, SPF throttle timers, areas
+      show ip ospf interface Ethernet1/1   ! network type, cost, timers, neighbor count
+      ```
+    verify:
+      - device: P1-SPINE
+        command: show ip ospf interface Ethernet1/1
+        expect: "`State P2P, Network type P2P, cost 40`, `Index`, `Timer intervals: Hello 10, Dead 40` and `Neighbor count is 1, Adjacent neighbor count is 1`."
+      - device: P1-SPINE
+        command: show ip ospf
+        expect: "`Routing Process UNDERLAY with ID 10.0.0.11 VRF default`, `Reference Bandwidth is 40000 Mbps`, the SPF throttle timers and `Number of areas is 1, 1 normal, 0 stub, 0 nssa` (until step 5)."
+      - device: SS1
+        command: show running-config ospf
+        expect: "`feature ospf`, the `router ospf UNDERLAY` block and every `ip router ospf UNDERLAY area 0.0.0.0` line under its interface."
+    checks:
+      - id: interfaces-p1-spine-p2p
+        description: P1-SPINE runs Eth1/1 as an OSPF point-to-point link in area 0
+        device: P1-SPINE
+        command: show ip ospf interface Ethernet1/1
+        match: ['area 0\.0\.0\.0', 'P2P']
+        hint: "`ip ospf network point-to-point` on P1-SPINE Eth1/1 and SS1 Eth1/1."
+  - id: pods
+    title: "Step 5 - Pod areas: area 1 and area 2, the spines become ABRs"
+    explain: |
+      **Under the hood.** Put P1-SPINE Eth1/3 into area 0.0.0.1 and P1-SPINE becomes an **Area Border
+      Router**: it now runs one LSDB per area and one SPF per area. For every intra-area route of one area it
+      originates a **type-3 summary LSA** into the other area ("Summary Network Link States"), with its own
+      cost to reach the prefix. Inter-area routing is distance-vector-like: routers in area 2 do not know how
+      area 1 looks inside, only "P2-SPINE says it can reach 10.1.1.111 at cost X".
+
+      Two loop-prevention rules apply on ABRs: an ABR only advertises summaries of **area 0** routes into a
+      non-backbone area (plus its own intra-area routes), and it **ignores type-3 LSAs received over a
+      non-backbone area**. That is why every inter-area path goes through area 0 - and why area 0 must be
+      contiguous.
+
+      The leaves are **internal routers** of their area: their loopback0 (router ID), loopback1 (VTEP) and
+      uplink join area 1 or 2. Routes show up as `inter` (O IA) in NX-OS's routing table.
+
+      **Debug it.** On P1-SPINE before you paste:
+      `debug logfile ospf-dbg size 4000000`, `debug ip ospf UNDERLAY adjacency detail`; paste the config on both
+      ends, then `show debug logfile ospf-dbg` and `undebug all`. Afterwards
+      `show ip ospf event-history lsa` shows P1-SPINE originating the new type-3 LSAs.
+    config:
+      P1-SPINE: |
+        interface Ethernet1/3
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.1
+      P2-SPINE: |
+        interface Ethernet1/3
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.2
+      P1-LEAF: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.1.0.111
+          log-adjacency-changes detail
+        interface loopback0
+          ip router ospf UNDERLAY area 0.0.0.1
+        interface loopback1
+          ip router ospf UNDERLAY area 0.0.0.1
+        interface Ethernet1/1
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.1
+      P2-LEAF: |
+        feature ospf
+        router ospf UNDERLAY
+          router-id 10.2.0.121
+          log-adjacency-changes detail
+        interface loopback0
+          ip router ospf UNDERLAY area 0.0.0.2
+        interface loopback1
+          ip router ospf UNDERLAY area 0.0.0.2
+        interface Ethernet1/1
+          ip ospf network point-to-point
+          ip router ospf UNDERLAY area 0.0.0.2
+    verify:
+      - device: P1-SPINE
+        command: show ip ospf neighbors
+        expect: "Three FULL neighbors: 10.0.0.1 (Eth1/1), 10.0.0.2 (Eth1/2) and `10.1.0.111 ... Eth1/3` (area 1)."
+      - device: P1-SPINE
+        command: show ip ospf
+        expect: "`Area border router`, and `Number of areas is 2, 2 normal, 0 stub, 0 nssa` with `Area BACKBONE(0.0.0.0)` and `Area (0.0.0.1)` listed separately (own SPF counters each)."
+      - device: SS1
+        command: show ip ospf database summary
+        expect: "`Summary Network Link States (Area 0.0.0.0)`: 10.1.0.111, 10.1.1.111, 10.1.10.0 from ADV Router `10.0.0.11` and 10.2.0.121, 10.2.1.121, 10.2.10.0 from `10.0.0.21`."
+      - device: P2-LEAF
+        command: show ip route 10.1.1.111
+        expect: "`via 10.2.10.1, Eth1/1, [110/161] ... ospf-UNDERLAY, inter` (161 = 40 to P2-SPINE + 80 from P2-SPINE to P1-SPINE + 41 in P1-SPINE's type-3). The leaf only knows that P2-SPINE advertised it."
+      - device: P2-LEAF
+        command: show ip ospf database
+        expect: "Only `Router Link States (Area 0.0.0.2)` for 10.2.0.121 and 10.0.0.21 - pod 1's topology is invisible - plus type-3 summaries for everything else."
+    checks:
+      - id: pods-p1-spine-leaf
+        description: P1-SPINE is FULL with P1-LEAF in area 1
+        device: P1-SPINE
+        command: show ip ospf neighbors
+        match: ['^\s*10\.1\.0\.111\s+\d+\s+FULL']
+        hint: "Both ends of P1-SPINE Eth1/3 - P1-LEAF Eth1/1 must be in area 0.0.0.1 with the same network type."
+      - id: pods-p2-spine-leaf
+        description: P2-SPINE is FULL with P2-LEAF in area 2
+        device: P2-SPINE
+        command: show ip ospf neighbors
+        match: ['^\s*10\.2\.0\.121\s+\d+\s+FULL']
+        hint: "Both ends of P2-SPINE Eth1/3 - P2-LEAF Eth1/1 must be in area 0.0.0.2."
+      - id: pods-p2-leaf-inter
+        description: P2-LEAF reaches pod 1's VTEP address as an inter-area route
+        device: P2-LEAF
+        command: show ip route 10.1.1.111
+        match: ['ospf-UNDERLAY, inter']
+        hint: P1-LEAF loopback1 must be in area 0.0.0.1 and both spines must be ABRs (area 0 + pod area).
+  - id: summarize
+    title: "Step 6 - Inter-area summarization on the ABRs (and the discard route)"
+    explain: |
+      **Under the hood.** `area 0.0.0.1 range 10.1.0.0/16` on P1-SPINE says: *instead of one type-3 LSA per
+      area-1 prefix, originate a single type-3 LSA for 10.1.0.0/16 into the other areas - as long as at least
+      one area-1 intra-area route falls inside the range.* The summary's cost is the **highest** cost of the
+      component routes (RFC 2328); add `cost N` to fix it.
+
+      Effects you will see:
+
+      - Area 0 and area 2 carry **one** LSA per pod. A pod-1 leaf link flap no longer changes anything outside
+        area 1 (fault isolation for SPF *and* for the BGP next-hop tracking in lab 22).
+      - The ABR installs a **discard route** `10.1.0.0/16 -> Null0` (AD 220) so packets for unused parts of the
+        /16 are dropped at the ABR instead of looping back to the default route. `show ip ospf` says
+        "Install discard route for summarized internal routes".
+      - `not-advertise` would hide the range completely (route filtering at the ABR).
+
+      **Caveat for VXLAN.** Summarization hides individual VTEP /32s. In lab 23 that is fine (the more specific
+      lives in the pod, the summary leads there), but it means a remote leaf cannot see when one VTEP /32
+      disappears - convergence then depends on BGP. Large fabrics often avoid summarizing VTEP loopbacks for that
+      reason; we summarize to learn the mechanism.
+
+      **Debug it.** `show ip ospf event-history lsa` on P1-SPINE shows the specific type-3 LSAs being
+      **flushed** (aged to 3600) and the summary being originated. On SS1 watch the database before and after.
+    config:
+      P1-SPINE: |
+        router ospf UNDERLAY
+          area 0.0.0.1 range 10.1.0.0/16
+      P2-SPINE: |
+        router ospf UNDERLAY
+          area 0.0.0.2 range 10.2.0.0/16
+    verify:
+      - device: SS1
+        command: show ip ospf database summary
+        expect: "Only `10.1.0.0` (ADV 10.0.0.11) and `10.2.0.0` (ADV 10.0.0.21) remain; the /32s and /30s are gone (they age out as MaxAge flushes)."
+      - device: SS1
+        command: show ip route 10.1.1.111
+        expect: "The longest match is now `10.1.0.0/16, ubest/mbest: 1/0` via 10.0.1.2 (P1-SPINE) `ospf-UNDERLAY, inter`."
+      - device: P1-SPINE
+        command: show ip route 10.1.0.0/16
+        expect: "`*via Null0, [220/0] ... ospf-UNDERLAY, discard` - the discard route that prevents loops."
+      - device: P1-SPINE
+        command: show ip ospf
+        expect: "Under `Area (0.0.0.1)`: `Area ranges are 10.1.0.0/16 Passive (Num nets: 3) Advertise`."
+    checks:
+      - id: summarize-ss1-summary
+        description: SS1 reaches pod 1's VTEP through the 10.1.0.0/16 summary
+        device: SS1
+        command: show ip route 10.1.1.111
+        match: ['10\.1\.0\.0/16', 'ospf-UNDERLAY, inter']
+        hint: "P1-SPINE needs `area 0.0.0.1 range 10.1.0.0/16` under `router ospf UNDERLAY`."
+      - id: summarize-ss1-pod2
+        description: SS1 reaches pod 2's VTEP through the 10.2.0.0/16 summary
+        device: SS1
+        command: show ip route 10.2.1.121
+        match: ['10\.2\.0\.0/16', 'ospf-UNDERLAY, inter']
+        hint: "P2-SPINE needs `area 0.0.0.2 range 10.2.0.0/16`."
+      - id: summarize-cfg
+        description: Both ABRs summarize their pod
+        device: P1-SPINE
+        mode: config
+        match: ['^\s+area 0\.0\.0\.1 range 10\.1\.0\.0/16']
+        hint: Paste the P1-SPINE block of this step.
+  - id: nssa
+    title: "Step 7 - Area 1 becomes an NSSA: type-7 externals and the type-7 to type-5 translation"
+    explain: |
+      **The goal.** P1-LEAF connects an "external" network (loopback100, 172.31.1.0/24 - think of a firewall or
+      a WAN edge in the pod) and must advertise it into OSPF, so it **redistributes** it and becomes an
+      **ASBR**. At the same time pod 1 should not carry the externals of the rest of the world. That is a
+      **Not-So-Stubby Area**: no type-5 LSAs enter the area, but routers inside may originate externals as
+      **type-7** LSAs.
+
+      **Under the hood.**
+
+      1. P1-LEAF originates a **type-7 LSA** (flooded only inside area 1). Its forwarding address (FA) is set to
+         one of P1-LEAF's own area-1 addresses.
+      2. The ABR with the highest router ID in the NSSA (here the only ABR, P1-SPINE) is the **translator**:
+         it converts the type-7 into a **type-5 LSA** that floods into area 0 and every normal area,
+         ADV Router = **10.0.0.11** (P1-SPINE), keeping the FA so traffic still goes to P1-LEAF.
+      3. Routers in other areas need to reach the *ASBR* to use a type-5. Because the translator itself is the
+         advertising router and lives in area 0, no type-4 is needed in area 0. P2-SPINE **does** generate a
+         **type-4 (ASBR summary)** for 10.0.0.11 into area 2 while area 2 is still normal - look at it now,
+         it disappears in step 8.
+      4. `default-information-originate` on the ABR injects a **type-7 default** into the NSSA (NSSAs get no
+         default automatically, unlike stub areas), so P1-LEAF has a way out to externals elsewhere.
+
+      **Redistribution on NX-OS always needs a route-map**: `redistribute direct route-map RM-EXT` with the
+      route-map matching loopback100 only (otherwise loopback0/1 would become externals too).
+
+      **Watch the area-type mismatch live (deep debug).** The NSSA flag is the N-bit in every hello. Paste the
+      P1-SPINE block *first* and keep P1-LEAF unchanged for a moment:
+
+      ```
+      ! on P1-SPINE, before pasting:
+      debug logfile ospf-dbg size 4000000
+      debug-filter ip ospf UNDERLAY interface Ethernet1/3
+      debug ip ospf UNDERLAY hello
+      ! paste the P1-SPINE block; within 40 s (dead interval) the neighbor 10.1.0.111 goes DOWN
+      show debug logfile ospf-dbg          ! hellos dropped: options / area-type (N-bit) mismatch
+      show ip ospf event-history adjacency ! neighbor DOWN, reason dead timer expired
+      undebug all
+      no debug-filter all
+      ```
+
+      Then paste the P1-LEAF block: the bits match again and the adjacency comes back.
+    config:
+      P1-SPINE: |
+        router ospf UNDERLAY
+          area 0.0.0.1 nssa default-information-originate
+      P1-LEAF: |
+        interface loopback100
+          description external test prefix (redistributed as NSSA type 7)
+          ip address 172.31.1.1/24
+        route-map RM-EXT permit 10
+          match interface loopback100
+        router ospf UNDERLAY
+          area 0.0.0.1 nssa
+          redistribute direct route-map RM-EXT
+    verify:
+      - device: P1-LEAF
+        command: show ip ospf database nssa-external
+        expect: "`Type-7 AS External Link States (Area 0.0.0.1)`: `172.31.1.0` ADV `10.1.0.111` (its own, with a forwarding address and `Metric Type: 2`), and `0.0.0.0` ADV `10.0.0.11` (the default from the ABR)."
+      - device: SS1
+        command: show ip ospf database external
+        expect: "`Type-5 AS External Link States`: `172.31.1.0`, ADV Router `10.0.0.11` - the translated LSA, originated by P1-SPINE, with the forwarding address of P1-LEAF."
+      - device: SS1
+        command: show ip route 172.31.1.0/24
+        expect: "`via 10.0.1.2, Eth1/1, [110/20] ... ospf-UNDERLAY, type-2` - an E2 route, metric 20 (the default external metric, not increased along the path)."
+      - device: P2-LEAF
+        command: show ip ospf database asbr-summary
+        expect: "(Until step 8.) `Summary ASBR Link States (Area 0.0.0.2)`: Link ID `10.0.0.11` from ADV `10.0.0.21` - the type-4 telling area 2 how to reach the ASBR."
+      - device: P1-LEAF
+        command: show ip route 0.0.0.0/0
+        expect: "`via 10.1.10.1 ... ospf-UNDERLAY, nssa type-2` - the type-7 default from P1-SPINE."
+      - device: P1-SPINE
+        command: show ip ospf
+        expect: "`Number of areas is 2, 1 normal, 0 stub, 1 nssa`; under area 0.0.0.1 `This area is a NSSA area` and that it performs type-7 translation."
+    checks:
+      - id: nssa-p1-leaf-type7
+        description: P1-LEAF originates 172.31.1.0/24 as a type-7 LSA in area 1
+        device: P1-LEAF
+        command: show ip ospf database nssa-external
+        match: ['Type-7 AS External Link States \(Area 0\.0\.0\.1\)', '^\s*172\.31\.1\.0\s+10\.1\.0\.111\s+\d+']
+        hint: "P1-LEAF needs loopback100, route-map RM-EXT and `redistribute direct route-map RM-EXT`; both ends need `area 0.0.0.1 nssa`."
+      - id: nssa-ss1-type5
+        description: SS1 holds the translated type-5 LSA from P1-SPINE
+        device: SS1
+        command: show ip ospf database external
+        match: ['^\s*172\.31\.1\.0\s+10\.0\.0\.11\s+\d+']
+        hint: P1-SPINE is the translator only when area 1 is an NSSA on P1-SPINE and the adjacency to P1-LEAF is FULL again.
+      - id: nssa-ss1-route
+        description: SS1 routes to 172.31.1.0/24 as an external type-2 route
+        device: SS1
+        command: show ip route 172.31.1.0/24
+        match: ['ospf-UNDERLAY, type-2']
+        hint: Check the translation on P1-SPINE (`show ip ospf database external`).
+      - id: nssa-p1-spine-cfg
+        description: P1-SPINE runs area 1 as an NSSA with a default
+        device: P1-SPINE
+        mode: config
+        match: ['^\s+area 0\.0\.0\.1 nssa default-information-originate']
+        hint: Paste the P1-SPINE block of this step.
+  - id: stub
+    title: "Step 8 - Area 2 becomes a stub area: no externals, a default instead"
+    explain: |
+      **Under the hood.** A **stub area** refuses type-5 (and therefore type-4) LSAs. The ABR replaces them all
+      with a single **type-3 default route** (0.0.0.0/0, cost 1 by default; `area 0.0.0.2 default-cost N`
+      changes it). The stub flag is the cleared E-bit in the hellos, so again **both** ends must agree - expect
+      the adjacency to drop between the two pastes, exactly as in step 7.
+
+      After this step P2-LEAF:
+
+      - still has every **inter-area** route (type 3), including `10.1.0.0/16` - important, because in labs 22
+        and 23 P2-LEAF must reach P1-LEAF's loopbacks with a *specific* route (NX-OS BGP and NVE do not
+        resolve next hops over a default route by default);
+      - has **no** 172.31.1.0/24 any more, and reaches it via the default (`ping 172.31.1.1` still works);
+      - has no type-4 or type-5 LSAs in its database.
+
+      **Totally stubby** (`area 0.0.0.2 stub no-summary` on the ABR only) would remove the type-3 LSAs too and
+      leave just the default. Do **not** do it here: P2-LEAF would lose the /16 towards pod 1 and labs 22/23
+      would break - a nice example of why the VTEP reachability design matters. Try it, watch
+      `show ip route` on P2-LEAF shrink to the default, and remove it again with
+      `no area 0.0.0.2 stub no-summary` + `area 0.0.0.2 stub`.
+
+      **Debug it.** `show ip ospf event-history lsa` on P2-LEAF shows the type-5/type-4 LSAs being removed when
+      the area becomes stub; `show ip ospf event-history spf` shows the SPF/route recalculation.
+    config:
+      P2-SPINE: |
+        router ospf UNDERLAY
+          area 0.0.0.2 stub
+      P2-LEAF: |
+        router ospf UNDERLAY
+          area 0.0.0.2 stub
+    verify:
+      - device: P2-LEAF
+        command: show ip route 0.0.0.0/0
+        expect: "`0.0.0.0/0 ... via 10.2.10.1, Eth1/1, [110/41] ... ospf-UNDERLAY, inter` - the default injected by P2-SPINE as a type-3."
+      - device: P2-LEAF
+        command: show ip ospf database external
+        expect: Nothing - type-5 LSAs are not allowed in a stub area.
+      - device: P2-LEAF
+        command: show ip ospf database asbr-summary
+        expect: Nothing - the type-4 from step 7 is gone too.
+      - device: P2-LEAF
+        command: ping 172.31.1.1 source 10.2.0.121
+        expect: "`5 packets received`: P2-LEAF follows the default to P2-SPINE, which has the type-5 route to P1-LEAF."
+      - device: P2-SPINE
+        command: show ip ospf
+        expect: "`Number of areas is 2, 1 normal, 1 stub, 0 nssa`."
+    checks:
+      - id: stub-p2-leaf-default
+        description: P2-LEAF has the inter-area default from the stub ABR
+        device: P2-LEAF
+        command: show ip route 0.0.0.0/0
+        match: ['0\.0\.0\.0/0', 'ospf-UNDERLAY, inter']
+        hint: "Both P2-SPINE and P2-LEAF need `area 0.0.0.2 stub` under `router ospf UNDERLAY`."
+      - id: stub-p2-leaf-no-type5
+        description: P2-LEAF's database holds no type-5 LSA for 172.31.1.0
+        device: P2-LEAF
+        command: show ip ospf database external
+        absent: ['172\.31\.1\.0']
+        hint: Area 2 is not a stub area yet on P2-LEAF.
+      - id: stub-p2-leaf-ping-ext
+        description: P2-LEAF still reaches the external prefix via the default
+        device: P2-LEAF
+        command: ping 172.31.1.1 source 10.2.0.121
+        match: ['\b[3-5] packets received']
+        hint: P2-SPINE needs the type-5 route to 172.31.1.0/24 (step 7) and P1-LEAF must reach 10.2.0.0/16 back.
+      - id: stub-p2-spine-areas
+        description: P2-SPINE sees one normal and one stub area
+        device: P2-SPINE
+        command: show ip ospf
+        match: ['Number of areas is 2, 1 normal, 1 stub, 0 nssa']
+        hint: "`area 0.0.0.2 stub` is missing on P2-SPINE."
+  - id: spf
+    title: "Step 9 - SPF, LSA aging and a controlled flap: watch OSPF react"
+    explain: |
+      No config: you trigger events and watch each layer react. This is the core skill for debugging an
+      underlay that "sometimes" drops a VTEP.
+
+      **What triggers what**
+
+      | Event | LSA change | Calculation |
+      |---|---|---|
+      | a link inside area 1 flaps | P1-LEAF / P1-SPINE re-originate type 1 (seq+1) | full SPF in area 1 only |
+      | an inter-area prefix changes | the ABR re-originates / flushes a type 3 | partial (inter-area) calculation elsewhere - and with the summary, nothing changes outside area 1 |
+      | the external changes | type 7 in area 1, type 5 in area 0 | partial (external) calculation |
+
+      NX-OS throttles SPF (`timers throttle spf` start/hold/max) and LSA generation, so a burst of changes
+      produces one SPF, not ten.
+
+      **The experiment** (run by hand):
+
+      ```
+      ! P2-SPINE: start capturing
+      debug logfile ospf-dbg size 4000000
+      debug ip ospf UNDERLAY spf
+      ! P1-LEAF: flap the external
+      interface loopback100
+        shutdown
+      ! wait 10 s, then on SS1 / P2-SPINE:
+      show ip ospf database external        ! 172.31.1.0 gone (or Age 3600 while flushing)
+      show ip ospf event-history spf        ! a partial/external calculation, no full SPF
+      ! P1-LEAF:
+      interface loopback100
+        no shutdown
+      show ip ospf database external        ! back, with a higher Seq#
+      ! P2-SPINE:
+      show debug logfile ospf-dbg
+      undebug all
+      ```
+
+      Then flap something *inside* area 1 (e.g. `shutdown`/`no shutdown` on P1-LEAF loopback1) and compare:
+      area 1 runs a full SPF, while SS1 and P2-SPINE see **no change at all** - the 10.1.0.0/16 summary stays
+      as long as one component route exists. That is the fault isolation summarization buys you.
+    verify:
+      - device: P2-SPINE
+        command: show ip ospf event-history spf
+        expect: SPF runs per area with duration in microseconds and the trigger (LSA type and ID).
+      - device: SS1
+        command: show ip ospf database external
+        expect: "`172.31.1.0` from `10.0.0.11` with a fresh Seq# after the flap."
+      - device: SS1
+        command: show ip ospf neighbors
+        expect: All three neighbors still FULL with an unchanged Up Time - a prefix flap is not an adjacency flap.
+    checks:
+      - id: spf-ss1-still-full
+        description: SS1's adjacencies are all FULL after the experiments
+        device: SS1
+        command: show ip ospf neighbors
+        match: ['^\s*10\.0\.0\.11\s+\d+\s+FULL', '^\s*10\.0\.0\.21\s+\d+\s+FULL']
+        hint: Make sure every interface you shut is back up (`no shutdown`).
+  - id: vtep-path
+    title: "Step 10 - End to end: VTEP to VTEP across five stages, with ECMP"
+    explain: |
+      **Why this is the real goal.** In lab 23 the leaves tunnel VXLAN from loopback1 to loopback1. The underlay
+      has exactly one job: deliver IP packets between **10.1.1.111** and **10.2.1.121** (and between the
+      loopback0s for BGP in lab 22), on every available path.
+
+      **Trace the forwarding decision hop by hop**:
+
+      1. **P1-LEAF**: 10.2.1.121 matches `10.2.0.0/16` (inter-area, from P1-SPINE's type 3 over area 1) -> Eth1/1.
+      2. **P1-SPINE**: `10.2.0.0/16` from P2-SPINE's type 3 in area 0, **two equal-cost paths** (via SS1 and SS2,
+         cost 81 each) -> ECMP, a per-flow hash picks one.
+      3. **SS1 or SS2**: `10.2.0.0/16` -> P2-SPINE.
+      4. **P2-SPINE**: the intra-area /32 10.2.1.121 in area 2 -> Eth1/3 -> P2-LEAF.
+
+      The return path is the mirror image. Use `traceroute 10.2.1.121 source 10.1.1.111` on P1-LEAF (by
+      hand) to see the four hops; repeat it - the middle hop may switch between 10.0.1.1 and 10.0.3.1 per flow.
+
+      **The FIB, not just the RIB.** The URIB (`show ip route`) is what OSPF installed; the forwarding table is
+      what the box uses. On NX-OS: `show forwarding ipv4 route 10.2.0.0/16` (on the 9000v the software
+      forwarding table; output differs from hardware Nexus).
+    verify:
+      - device: P1-LEAF
+        command: ping 10.2.1.121 source 10.1.1.111
+        expect: "`5 packets received` - VTEP to VTEP, the exact path VXLAN uses in lab 23."
+      - device: P1-SPINE
+        command: show ip route 10.2.0.0/16
+        expect: "`ubest/mbest: 2/0`, `*via 10.0.1.1, Eth1/1` and `*via 10.0.3.1, Eth1/2`, both `ospf-UNDERLAY, inter` - ECMP over both super spines."
+      - device: P1-SPINE
+        command: show forwarding ipv4 route 10.2.0.0/16
+        expect: Both next hops programmed in the forwarding table (format differs by release; may not exist on every 9000v image).
+    checks:
+      - id: vtep-ping
+        description: P1-LEAF loopback1 reaches P2-LEAF loopback1
+        device: P1-LEAF
+        command: ping 10.2.1.121 source 10.1.1.111
+        match: ['\b[3-5] packets received']
+        hint: Check that loopback1 is in OSPF on both leaves and both summaries exist on SS1.
+      - id: vtep-p1-spine-ecmp
+        description: P1-SPINE load-shares to pod 2 over both super spines
+        device: P1-SPINE
+        command: show ip route 10.2.0.0/16
+        match: ['ubest/mbest: 2/0', 'via 10\.0\.1\.1, Eth1/1', 'via 10\.0\.3\.1, Eth1/2']
+        hint: Both super spines must have FULL adjacencies to both pod spines with equal costs.
+      - id: vtep-p2-leaf-ping
+        description: P2-LEAF loopback0 reaches P1-LEAF loopback0 (the lab 22 BGP peering path)
+        device: P2-LEAF
+        command: ping 10.1.0.111 source 10.2.0.121
+        match: ['\b[3-5] packets received']
+        hint: P2-LEAF needs the 10.1.0.0/16 inter-area route (do not make area 2 totally stubby).
+  - id: break-fix
+    title: "Step 11 (optional) - Break and fix: MTU, timers and area mismatches with debugs"
+    optional: true
+    explain: |
+      Three classic faults to cause, recognise and fix. Run each by hand, inspect, then **undo it**. This step
+      changes nothing permanently (it has no config to apply).
+
+      **1. MTU mismatch -> stuck in EXSTART/EXCHANGE.**
+
+      ```
+      ! SS2 Ethernet1/3:
+      interface Ethernet1/3
+        mtu 1500
+      ! SS1:
+      clear ip ospf UNDERLAY neighbor 10.0.0.2
+      show ip ospf neighbors                 ! 10.0.0.2 in EXSTART or EXCHANGE, never FULL
+      show ip ospf event-history adjacency   ! DBD rejected: neighbor MTU larger than ours
+      ! fix: SS2 Ethernet1/3 -> mtu 9216
+      ```
+
+      **2. Hello/dead timer mismatch -> no neighbor at all.**
+
+      ```
+      ! P1-LEAF Ethernet1/1:
+      interface Ethernet1/1
+        ip ospf hello-interval 5
+      ! P1-SPINE:
+      debug logfile ospf-dbg size 4000000
+      debug ip ospf UNDERLAY hello
+      show debug logfile ospf-dbg            ! hello dropped: hello/dead interval mismatch
+      undebug all
+      ! fix: P1-LEAF Ethernet1/1 -> no ip ospf hello-interval
+      ```
+
+      **3. Wrong area on one end -> mismatch, no adjacency.** Put P2-LEAF Eth1/1 into area 0.0.0.3 and read
+      `show ip ospf event-history hello` on P2-SPINE (area mismatch), then put it back into 0.0.0.2.
+
+      Golden rule: after every debug session run `undebug all` and `show debug` to confirm nothing is left on.
+    verify:
+      - device: SS1
+        command: show ip ospf neighbors
+        expect: After every fix all neighbors are FULL again.
+solution_summary: |
+  **What you built:** a multi-area OSPF underlay on six Nexus 9000v in a **5-stage Clos**.
+
+  - **Area 0** = SS1, SS2, the four SS-spine point-to-point links, the SS1-SS2 broadcast segment (SS1 DR by
+    priority 100) and the super-spine/spine loopbacks.
+  - **Area 1 (pod 1) = NSSA**: P1-LEAF redistributes 172.31.1.0/24 (loopback100, route-map RM-EXT) as a
+    type-7 LSA; P1-SPINE translates it to type 5 and injects a type-7 default.
+  - **Area 2 (pod 2) = stub**: no type 4/5, a type-3 default from P2-SPINE, all inter-area routes kept.
+  - **ABRs** P1-SPINE / P2-SPINE summarize each pod to **10.1.0.0/16** and **10.2.0.0/16** (discard routes to
+    Null0); every spine reaches the other pod over both super spines (ECMP).
+  - Leaves: loopback0 (router ID, BGP in lab 22) and loopback1 (VTEP, lab 23) reachable end to end.
+
+  **Inspection toolkit you used:** `show ip ospf neighbors / interface / database [router|network|summary|
+  external|nssa-external|asbr-summary]`, `show ip ospf`, `show ip route`, `show ip ospf event-history
+  adjacency|hello|lsa|spf`, and the safe debug routine: `debug logfile` + `debug-filter` + `debug ip ospf ...`
+  -> `show debug logfile` -> `undebug all`.
+
+  **Next:** lab 22 (NX-OS study path 2/3) boots with exactly this underlay in its day-0 and builds iBGP on top,
+  with SS1/SS2 as route reflectors.
