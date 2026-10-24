@@ -424,6 +424,11 @@ order, *Settings > NX-OS login* (if set), *Device console login*, `admin` with t
 and `admin`/`admin`. It then sends `terminal length 0` and `terminal width 511`, pages through `--More--` if needed,
 and copes with NX-OS's `\r\r\n` line ends, bare `\r` before prompts and escape codes. If the console server answers
 `consoles>` again after `open`, the node is not running and you get that message instead of a timeout.
+NX-OS boots have long silent phases (e.g. after *System is coming up ... Please wait*), so the app waits up to about
+5 minutes on an unchanged NX-OS console line (about 1 minute on IOS) before calling the prompt unrecognised, and
+**Test console** waits up to 10 minutes for an NX-OS node (2 minutes for IOS) and tries the same NX-OS logins as a
+check (3.3.1). A switch stuck at `loader>` (restarted without a wipe before its boot variable was saved) gets a clear
+message: wipe and start the node in CML, or **Reset** the lab.
 Use **Test console** in the lab view to see exactly where a console session stops.
 
 ## Using it

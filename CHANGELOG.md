@@ -16,6 +16,10 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
   page cache (`total - used` when that is more than *free*), and memory reported in KiB is recognised.
 - Unmanaged switches and external connectors no longer count toward licensed nodes (lab and running labs).
 - The CML resource-pool node quota is checked when CML reports it.
+- **NX-OS consoles (lab 21-23 switches boot but the console did not work):** a quiet NX-OS boot phase is no longer
+  taken for an unrecognised prompt (an unchanged last line is waited out for about 5 minutes on NX-OS, 1 minute on
+  IOS); `loader>` is recognised with a clear error (wipe and start the node, or Reset the lab); *Test console* now
+  tries the same logins as a check, including *Settings > NX-OS login*, and waits up to 10 minutes on NX-OS.
 
 ### Added
 - **Collapsible lab list** on the Labs page: *Hide lab list* / *Show lab list* gives the directions the full width.

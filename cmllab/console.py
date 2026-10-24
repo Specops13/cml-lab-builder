@@ -143,6 +143,8 @@ class _Chan:
 # what a device console can show before it is at a usable privileged prompt
 _P = {
     "consoles": CONSOLES_RE,
+    # NX-OS 9000v stopped and started WITHOUT a wipe before its first-boot EEM applet saved the boot variable
+    "loader": re.compile(r"(?:^|\n)\s*loader\s*>\s*$"),
     "poap": re.compile(r"Abort (Power On )?Auto Provisioning[^\n]*(\(yes/skip/no\))?[^\n]*:\s*$", re.I),
     "secure": re.compile(r"enforce secure password standard[^\n]*:\s*$", re.I),
     "admin_pw": re.compile(r"Enter the password for [\"']?admin[\"']?\s*:\s*$", re.I),
@@ -191,6 +193,11 @@ class DeviceSession:
                     break                     # nothing recognisable yet (booting, printing): poke again
                 k = names[i]
                 seen_any = True
+                if k == "loader":
+                    raise ConsoleError(f"{self.name or 'the node'}: NX-OS is stuck at the loader> prompt (the switch was "
+                                       "restarted without a wipe before its boot variable was saved). Wipe and start the "
+                                       "node in CML (or Reset the lab), or type 'boot bootflash:<nxos image>.bin' at "
+                                       "the loader prompt", "prompt", self.c.tail())
                 if k == "consoles":
                     raise ConsoleError(f"{self.name or 'the node'}: the console server has no console for this node "
                                        "(is the node started and BOOTED in CML?)", "not_running", self.c.tail())
@@ -247,7 +254,9 @@ class DeviceSession:
             last = next((l.strip() for l in reversed(self.c.buf.split("\n")) if l.strip()), "")
             stable = stable + 1 if last and last == last_line else 0
             last_line = last
-            if stable >= 6:      # the same unrecognised last line for about a minute: not booting, a prompt we don't know
+            # the same unrecognised last line for about a minute (NX-OS: 5 minutes - its boot has long silent phases,
+            # e.g. after "System is coming up ... Please wait", and pressing Enter echoes nothing until login)
+            if stable >= (30 if self.os == "nxos" else 6):
                 raise ConsoleError(f"{self.name or 'device'}: the console answers but its prompt was not recognised: "
                                    f"{last[-120:]!r}", "prompt", self.c.tail())
             if waited > ready_timeout:
@@ -373,6 +382,18 @@ def _tofu_policy():
     return TrustOnFirstUse()
 
 
+def login_creds(settings, os: str) -> list[tuple[str, str]]:
+    """Logins to try in order. NX-OS: Settings > NX-OS login first (the lab's day-0 creates it and gives admin the
+    same password), then the device login, then admin with the usual lab passwords."""
+    creds = [(settings.device_username, settings.device_password)]
+    if os == "nxos":
+        nu, np_ = getattr(settings, "nxos_username", ""), getattr(settings, "nxos_password", "")
+        if nu or np_:
+            creds.insert(0, (nu or settings.device_username, np_ or settings.device_password))
+        creds += [("admin", np_ or settings.device_password), ("admin", "cisco"), ("admin", "admin")]
+    return creds
+
+
 class SSHConsoleRunner:
     """Runner that opens one console session per device via the CML console server."""
 
@@ -463,12 +484,7 @@ class SSHConsoleRunner:
             if e.kind != "timeout":
                 raise
         os_ = self.node_os.get(device, "ios")
-        creds = [(self.s.device_username, self.s.device_password)]
-        if os_ == "nxos":
-            nu, np_ = getattr(self.s, "nxos_username", ""), getattr(self.s, "nxos_password", "")
-            if nu or np_:
-                creds.insert(0, (nu or self.s.device_username, np_ or self.s.device_password))
-            creds += [("admin", np_ or self.s.device_password), ("admin", "cisco"), ("admin", "admin")]
+        creds = login_creds(self.s, os_)
         sess = DeviceSession(chan, self.s.device_enable, self.s.device_username, self.s.device_password, os=os_,
                              creds=creds, status=self._status, name=device)
         sess.login(ready_timeout=self.ready_timeout.get(device, 1500 if os_ == "nxos" else 300))
@@ -526,10 +542,12 @@ class PyatsRunner:
 
 # ------------------------------------------------------------------ "Test console" (lab page): stage by stage
 def diagnose(settings, lab_title: str, device: str, os: str = "ios", client_factory=None,
-             command: str = "show clock", ready_timeout: float = 120) -> dict:
+             command: str = "show clock", ready_timeout: float | None = None) -> dict:
     """Open one node's console like a check does and report every stage: SSH to the console server, the console
     server menu, `open /<lab>/<node>/0`, what the console showed (login / password / POAP ...), the prompt, one
     command. Returns {ok, stages: [{name, ok, detail}], tail} with the last console lines (also on success)."""
+    if ready_timeout is None:          # NX-OS keeps booting for minutes after CML reports BOOTED
+        ready_timeout = 600 if os == "nxos" else 120
     stages: list[dict] = []
     add = lambda name, ok, detail="": stages.append({"name": name, "ok": bool(ok), "detail": detail})  # noqa: E731
     r = SSHConsoleRunner(settings, lab_title, client_factory, node_os={device: os}, ready_timeout={device: ready_timeout})
@@ -559,9 +577,7 @@ def diagnose(settings, lab_title: str, device: str, os: str = "ios", client_fact
             add(stage, True, "connected")
         stage = "log in and reach the privileged prompt"
         events: list[str] = []
-        creds = [(settings.device_username, settings.device_password)]
-        if os == "nxos":
-            creds += [("admin", settings.device_password), ("admin", "cisco"), ("admin", "admin")]
+        creds = login_creds(settings, os)   # same logins as a check (incl. Settings > NX-OS login)
         sess = DeviceSession(chan, settings.device_enable, settings.device_username, settings.device_password,
                              os=os, creds=creds, status=events.append, name=device, trace=events)
         sess.login(ready_timeout=ready_timeout)
