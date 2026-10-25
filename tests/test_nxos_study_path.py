@@ -73,7 +73,8 @@ def test_lab21_ospf_design():
     assert lab.step("break-fix").optional and not lab.step("break-fix").config
     sol = lab.step_solution()
     for ss in ("SS1", "SS2"):
-        assert sol[ss].count("ip router ospf UNDERLAY area 0.0.0.0") == 4 and "area 0.0.0.1" not in sol[ss]
+        assert sol[ss].count("ip router ospf UNDERLAY area 0.0.0.0") == 3 and "area 0.0.0.1" not in sol[ss]
+        assert "Ethernet1/3" not in sol[ss], ss                                     # no super-spine interconnect
     assert "ip ospf priority" not in sol["SS1"] and "ip address 10.0.12" not in sol["SS1"]
     assert "ip router ospf UNDERLAY area 0.0.0.1" in sol["P1-SPINE"] and "area 0.0.0.1 range 10.1.0.0/16" in sol["P1-SPINE"]
     assert "area 0.0.0.1 nssa default-information-originate" in sol["P1-SPINE"]
@@ -103,6 +104,76 @@ def test_lab21_ospf_design():
     for must in ("show ip ospf database nssa-external", "show ip ospf database external", "show ip ospf database summary",
                  "show ip ospf database asbr-summary", "show ip ospf event-history adjacency", "show ip ospf"):
         assert must in cmds, must
+
+
+@pytest.mark.parametrize("lab_id", SERIES)
+def test_standard_clos_no_super_spine_interconnect(lab_id):
+    """Cisco's standard Clos: links only between adjacent stages - no SS1-SS2 (or spine-spine) link, SS Eth1/3 unused."""
+    lab = _lab(lab_id)
+    stage = {"SS1": 0, "SS2": 0, "P1-SPINE": 1, "P2-SPINE": 1, "P1-LEAF": 2, "P2-LEAF": 2}
+    fabric = [(l.a.node, l.b.node) for l in lab.links if l.a.node in stage and l.b.node in stage]
+    assert len(fabric) == 6 and all(abs(stage[a] - stage[b]) == 1 for a, b in fabric), fabric
+    for ss in ("SS1", "SS2"):
+        cfg = lab.node(ss).config
+        assert re.search(r"^interface Ethernet1/3\n\s+description unused.*\n\s+shutdown$", cfg, re.M), ss
+        assert "to SS1" not in cfg and "to SS2" not in cfg, ss
+    every = lab.task + "\n".join(s.explain + str(s.config) + " ".join(v.expect + v.command for v in s.verify)
+                                  + " ".join((c.command or "") + " ".join(c.match) + (c.hint or "") for c in s.checks)
+                                  for s in lab.steps) + lab.solution_summary
+    assert "SS1-SS2 link" not in every.replace("no SS1-SS2 link", "").replace("A lateral SS1-SS2 link", "")
+    assert not re.search(r"10\.0\.0\.2\s+\S*\s*FULL.*Eth1/3|Eth1/3 SS[12]\b", every)
+    assert "no SS1-SS2 link" in every
+
+
+def test_clos_explained_and_ss_to_ss_via_spines():
+    lab21, lab22 = _lab(SERIES[0]), _lab(SERIES[1])
+    why = lab21.step("design").explain
+    for must in ("Why the super spines do not interconnect", "up-down", "Uniform hop count", "Predictable ECMP",
+                 "No extra ports"):
+        assert must in why, must
+    for lab, step in ((lab21, "area0"), (lab22, "baseline")):                       # SS1 -> SS2 over both spines
+        c = next(c for c in lab.step(step).checks if c.command == "show ip route 10.0.0.2")
+        assert c.device == "SS1" and "ubest/mbest: 2/0" in c.match and len(c.match) == 3
+    ss1 = next(c for c in lab21.step("area0").checks if c.id == "area0-ss1-neighbors")
+    assert ss1.absent and not any(r"10\.0\.0\.2\s" in m for m in ss1.match)
+    rr = lab22.step("bestpath").explain
+    assert "No RR-to-RR session here" in rr and "loopback to loopback through the spines" in rr
+    assert "SS2 -> P2-SPINE -> SS1" in lab22.step("convergence").explain
+
+
+REAL_9000V_ROUTER_LSA = """SS1# show ip ospf database router 10.0.0.11
+        OSPF Router with ID (10.0.0.1) (Process ID UNDERLAY VRF default)
+                Router Link States (Area 0.0.0.0)
+Link ID         ADV Router      Age        Seq#       Checksum Link Count
+10.0.0.11       10.0.0.11       608        0x80000003 0xc0c7   3
+"""                                                                     # captured on a real Nexus 9000v (CML)
+
+
+@pytest.mark.parametrize("lab_id", SERIES)
+def test_nxos_lsa_details_need_detail_keyword(lab_id):
+    """NX-OS `show ip ospf database <type> [id]` prints only the summary table; LSA fields need `... detail`."""
+    lab = _lab(lab_id)
+    fields = r"Neighboring Router ID|Link Data|Router Interface address|Number of links|Network Mask|Metric Type|" \
+             r"Forward(ing)? Address|TOS 0 Metric|Attached Router|LS Seq Number|Advertising Router"
+    for s in lab.steps:
+        for c in s.checks:
+            if (c.command or "").startswith("show ip ospf database") and \
+                    re.search(fields, " ".join(c.match + (c.absent or [])).replace("\\", "")):
+                assert c.command.endswith(" detail"), c.id
+        for v in s.verify:
+            if v.command.startswith("show ip ospf database") and not v.command.endswith(" detail"):
+                assert not re.search(r"a Router \(point-to-point\)|Link Data|Neighboring Router ID|Metric Type: 2|"
+                                     r"forwarding address|mask 255", v.expect), (s.id, v.command)
+
+
+def test_router_lsa_summary_check_matches_real_9000v_output():
+    lab = _lab(SERIES[0])
+    c = next(c for s in lab.steps for c in s.checks if c.id == "lsdb-p1-spine-link-count")
+    assert c.command == "show ip ospf database router 10.0.0.11"
+    assert all(re.search(m, REAL_9000V_ROUTER_LSA, re.M) for m in c.match)
+    assert "needs `detail`" in lab.step("lsdb-area0").explain and "unlike IOS" in lab.step("lsdb-area0").explain
+    detail = next(c for s in lab.steps for c in s.checks if c.id == "lsdb-p1-spine-unnumbered-links")
+    assert not any(re.search(m, REAL_9000V_ROUTER_LSA, re.M) for m in detail.match)  # why it must use detail
 
 
 def _strip(cfg):

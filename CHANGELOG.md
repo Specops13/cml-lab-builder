@@ -2,6 +2,29 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## Library update - 2026-10-25 (no app release)
+Library-only change: the apps pick up the new lab versions from the online library (*Library & courses* shows
+*update* on installed copies). No new executables.
+
+### Changed
+- **NX-OS study path labs 21-23 (now version 3): standard Clos, no SS1-SS2 link.** The super-spine interconnect
+  (SS1/SS2 Ethernet1/3) is removed from the CML topology, the day-0 configs and the lab 22/23 baselines
+  (regenerated with `packaging/nxos_study_baseline.py`): Ethernet1/3 on SS1/SS2 is now *unused* and shut. Diagrams,
+  port/link tables and the area 0 description follow Cisco's standard Clos (links only between adjacent stages).
+  Lab 21 step 0 explains why super spines never interconnect (every path up-down, uniform hop count, predictable
+  ECMP, no extra ports). Steps, checks, expected outputs, hints and the debug-filter example no longer use
+  SS1-SS2: SS1/SS2 have 2 OSPF neighbors, router LSAs have 3 links, SS1 reaches SS2 (10.0.0.2) by ECMP through
+  both spines (new check in labs 21 and 22), P1-SPINE reaches pod 2 at cost 121, the MTU fault moves to SS2
+  Ethernet1/1, and the lab 22 convergence drill now detours P1-SPINE -> SS2 -> P2-SPINE -> SS1. Labs 22/23 explain
+  that the route reflectors do not peer with each other; an optional RR-to-RR session would run loopback to
+  loopback through the spines (ECMP, survives either spine), never over a cable between the super spines.
+- **Lab 21: NX-OS OSPF database commands need `detail`.** Real 9000v output showed that
+  `show ip ospf database router 10.0.0.11` prints only the summary table (Link ID / ADV Router / Age / Seq# /
+  Checksum / Link Count), unlike IOS. The step 3 check for P1-SPINE's links and the NSSA/external verifies that
+  expect LSA fields (Link Data, metric type, forwarding address) now use `... detail`; the summary view gets its
+  own check (P1-SPINE Link Count 3 = 2 p2p links + the loopback stub) matched only on stable tokens and tested
+  against the real output, and step 3 explains the NX-OS/IOS difference (ABRs originate one router LSA per area).
+
 ## [3.3.2] - 2026-10-24
 ### Fixed
 - **"Your resource pool allows 1 nodes" on CML Personal.** 3.3.1 read `user_quota` / `user_started` from CML's

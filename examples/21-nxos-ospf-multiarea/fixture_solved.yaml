@@ -89,16 +89,24 @@ SS1:
                        Eth1/1         163    R S I s     N9K-C9300v    Eth1/1
     P2-SPINE(9N3KD63KWT3)
                        Eth1/2         163    R S I s     N9K-C9300v    Eth1/1
-    SS2(9N3KD63KWT1)   Eth1/3         163    R S I s     N9K-C9300v    Eth1/3
 
-    Total entries displayed: 3
+    Total entries displayed: 2
   show ip ospf neighbors: |2
      OSPF Process ID UNDERLAY VRF default
-     Total number of neighbors: 3
+     Total number of neighbors: 2
      Neighbor ID     Pri State            Up Time  Address         Interface
      10.0.0.11         1 FULL/ -          00:41:12 10.0.0.11       Eth1/1
      10.0.0.21         1 FULL/ -          00:41:12 10.0.0.21       Eth1/2
-     10.0.0.2          1 FULL/ -          00:41:12 10.0.0.2        Eth1/3
+  show ip route 10.0.0.2: |
+    IP Route Table for VRF "default"
+    '*' denotes best ucast next-hop
+    '**' denotes best mcast next-hop
+    '[x]/[y]' denotes [preference/metric]
+    '%<string>' in via output denotes VRF <string>
+
+    10.0.0.2/32, ubest/mbest: 2/0
+        *via 10.0.0.11, Eth1/1, [110/81], 00:41:02, ospf-UNDERLAY, intra
+        *via 10.0.0.21, Eth1/2, [110/81], 00:41:02, ospf-UNDERLAY, intra
   show ip ospf database: |2
 
             OSPF Router with ID (10.0.0.1) (Process ID UNDERLAY VRF default)
@@ -106,8 +114,8 @@ SS1:
                     Router Link States (Area 0.0.0.0)
 
     Link ID         ADV Router      Age        Seq#       Checksum Link Count
-    10.0.0.1        10.0.0.1        612        0x8000000a 0x4b1e   4
-    10.0.0.2        10.0.0.2        610        0x80000009 0x9d02   4
+    10.0.0.1        10.0.0.1        612        0x8000000a 0x4b1e   3
+    10.0.0.2        10.0.0.2        610        0x80000009 0x9d02   3
     10.0.0.11       10.0.0.11       588        0x8000000c 0x1c77   3
     10.0.0.21       10.0.0.21       590        0x8000000b 0xe2a0   3
 
@@ -122,6 +130,14 @@ SS1:
     Link ID         ADV Router      Age        Seq#       Checksum Tag
     172.31.1.0      10.0.0.11       355        0x80000001 0x8be1   0
   show ip ospf database router 10.0.0.11: |2
+
+            OSPF Router with ID (10.0.0.1) (Process ID UNDERLAY VRF default)
+
+                    Router Link States (Area 0.0.0.0)
+
+    Link ID         ADV Router      Age        Seq#       Checksum Link Count
+    10.0.0.11       10.0.0.11       608        0x80000003 0xc0c7   3
+  show ip ospf database router 10.0.0.11 detail: |2
 
             OSPF Router with ID (10.0.0.1) (Process ID UNDERLAY VRF default)
 
@@ -193,11 +209,10 @@ SS1:
 SS2:
   show ip ospf neighbors: |2
      OSPF Process ID UNDERLAY VRF default
-     Total number of neighbors: 3
+     Total number of neighbors: 2
      Neighbor ID     Pri State            Up Time  Address         Interface
      10.0.0.11         1 FULL/ -          00:41:12 10.0.0.11       Eth1/1
      10.0.0.21         1 FULL/ -          00:41:12 10.0.0.21       Eth1/2
-     10.0.0.1          1 FULL/ -          00:41:12 10.0.0.1        Eth1/3
 P2-SPINE:
   show ip ospf neighbors: |2
      OSPF Process ID UNDERLAY VRF default

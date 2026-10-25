@@ -7,7 +7,7 @@ difficulty: 5
 platforms: [iol]
 summary: "Lab 3 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with labs 21 and 22 already in its day-0: multi-area OSPF underlay and iBGP with SS1/SS2 as route reflectors. Add the L2VPN EVPN address family, map VLANs to VNIs, bring up the NVE interface with BGP ingress replication (and learn the multicast alternative), extend two VLANs between the pods, then add a tenant VRF with an L3VNI, a distributed anycast gateway and symmetric IRB, and type-5 prefixes; configure `retain route-target all` on the spines and super spines (with what it does and does not do for BGP path hunting). Every step explains what NX-OS builds internally (EVPN route types, RD/RT, l2rib/l2route, NVE peers, MAC and host routes) and inspects it with show, event-history, debug and ethanalyzer."
 author: CML Lab Builder
-version: "2"
+version: "3"
 ram_gb: 76
 nodes:
   - name: SS1
@@ -24,8 +24,8 @@ nodes:
         description to P2-SPINE Eth1/1
         no shutdown
       interface Ethernet1/3
-        description to SS2 Eth1/3
-        no shutdown
+        description unused (super spines never interconnect in a Clos)
+        shutdown
       interface Ethernet1/4
         description unused
         shutdown
@@ -44,12 +44,6 @@ nodes:
         mtu 9216
         ip unnumbered loopback0
         no shutdown
-      interface Ethernet1/3
-        no switchport
-        medium p2p
-        mtu 9216
-        ip unnumbered loopback0
-        no shutdown
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.1
@@ -60,9 +54,6 @@ nodes:
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       interface Ethernet1/2
-        ip ospf network point-to-point
-        ip router ospf UNDERLAY area 0.0.0.0
-      interface Ethernet1/3
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       feature bgp
@@ -104,8 +95,8 @@ nodes:
         description to P2-SPINE Eth1/2
         no shutdown
       interface Ethernet1/3
-        description to SS1 Eth1/3
-        no shutdown
+        description unused (super spines never interconnect in a Clos)
+        shutdown
       interface Ethernet1/4
         description unused
         shutdown
@@ -124,12 +115,6 @@ nodes:
         mtu 9216
         ip unnumbered loopback0
         no shutdown
-      interface Ethernet1/3
-        no switchport
-        medium p2p
-        mtu 9216
-        ip unnumbered loopback0
-        no shutdown
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.2
@@ -140,9 +125,6 @@ nodes:
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       interface Ethernet1/2
-        ip ospf network point-to-point
-        ip router ospf UNDERLAY area 0.0.0.0
-      interface Ethernet1/3
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       feature bgp
@@ -563,7 +545,6 @@ links:
   - {a: {node: SS1, port: 1}, b: {node: P2-SPINE, port: 0}}
   - {a: {node: SS2, port: 0}, b: {node: P1-SPINE, port: 1}}
   - {a: {node: SS2, port: 1}, b: {node: P2-SPINE, port: 1}}
-  - {a: {node: SS1, port: 2}, b: {node: SS2, port: 2}}
   - {a: {node: P1-SPINE, port: 2}, b: {node: P1-LEAF, port: 0}}
   - {a: {node: P2-SPINE, port: 2}, b: {node: P2-LEAF, port: 0}}
   - {a: {node: P1-LEAF, port: 1}, b: {node: H1, port: 0}}
@@ -580,15 +561,19 @@ task: |
   **What you build: BGP EVPN VXLAN with the leaves as VTEPs**
 
   ```
-              SS1 (EVPN RR) ------------- SS2 (EVPN RR)     L2VPN EVPN reflected to leaves (spines: step 13)
-             /   \                         /   \
-       P1-SPINE   +-------- P2-SPINE -----+                  IP transit for VXLAN (UDP 4789); retain RT (step 13)
-          |                     |
-       P1-LEAF (VTEP)        P2-LEAF (VTEP)                  nve1 sourced from loopback1
-       10.1.1.111            10.2.1.121
-        |      |              |      |
-       H1     H2             H3     H4
-     VLAN 10 VLAN 20       VLAN 10 VLAN 20
+     SS1 (EVPN RR)       SS2 (EVPN RR)     L2VPN EVPN reflected to leaves (spines: step 13)
+          |  \               /  |         no SS1-SS2 link (standard Clos)
+          |   +-----+ +-----+   |
+          |          X          |
+          |   +-----+ +-----+   |
+          |  /               \  |
+       P1-SPINE            P2-SPINE       IP transit for VXLAN (UDP 4789); retain RT (step 13)
+          |                    |
+     P1-LEAF (VTEP)      P2-LEAF (VTEP)    nve1 sourced from loopback1
+       10.1.1.111          10.2.1.121
+        |     |             |     |
+       H1    H2            H3    H4
+    VLAN 10 VLAN 20     VLAN 10 VLAN 20
   ```
 
   | Item | Value |
@@ -605,7 +590,9 @@ task: |
   The hosts H1-H4 are IOL routers used as PCs, already configured with their IP, a fixed MAC and the default
   gateway .1. The fabric links already use `mtu 9216`, so the 50-byte VXLAN overhead fits, and they are **IP
   unnumbered** (`medium p2p` + `ip unnumbered loopback0`, OSPF point-to-point, lab 21): VXLAN only needs the
-  loopbacks to be reachable, never a link address.
+  loopbacks to be reachable, never a link address. The fabric is Cisco's standard Clos: **no link between SS1
+  and SS2** (nor between the spines), so every VXLAN packet and every BGP session runs up-down through the
+  stages, and the two route reflectors reach each other only through the spines.
 
   **Resources**: 10 nodes - 6 x nxosv9000 (12 GB each) + 4 IOL hosts = about **76 GB** of CML RAM. NX-OS takes
   10-15 minutes to boot.

@@ -616,6 +616,9 @@ Three long walkthroughs in the lab library for studying BGP EVPN VXLAN on Nexus 
 underlay up. All three use the same **5-stage Clos**, all NX-OS: super spines SS1/SS2, one spine and one leaf per pod
 (P1-SPINE, P1-LEAF, P2-SPINE, P2-LEAF) and four pre-configured IOL hosts (H1/H2 on P1-LEAF, H3/H4 on P2-LEAF).
 **10 nodes, about 76 GB of CML RAM** (6 x `nxosv9000` at 12 GB + 4 x `iol-xe`), RAM heavy. Ports: Ethernet1/1-1/4.
+The fabric is Cisco's standard Clos: links only between adjacent stages, **no SS1-SS2 link** and no spine-spine link
+(SS1/SS2 Ethernet1/3 stays unused and shut). Every path is up-down with the same hop count, ECMP is predictable, and
+SS1 and SS2 reach each other through both spines; lab 21 step 0 explains why.
 
 Every step has three parts: *under the hood* (what NX-OS does internally), the config (paste it or *Apply this step
 for me*), and an inspection list of `show` / `event-history` commands with what to look for. Debugs are typed by hand
@@ -639,7 +642,7 @@ needs; labs 22 and 23 inherit it.
 | 0 | Design | 5-stage Clos, why one area per pod, area rules | `show cdp neighbors` |
 | 1 | Links | IP unnumbered links (`medium p2p`, `ip unnumbered loopback0`), loopback0/1 first, `mtu 9216` | `show ip interface brief`, `show interface`, `show ip interface` |
 | 2 | Area 0 | Super spines + spine uplinks, all links OSPF point-to-point (no DR), loopback next hops | `show ip ospf neighbors`, `event-history adjacency`, `debug ip ospf adjacency` to a logfile |
-| 3 | Area 0 LSDB | Router LSAs (Link Data = ifIndex, no /30 stubs), why there is no network LSA, SPF | `show ip ospf database router/network`, `event-history spf/lsa` |
+| 3 | Area 0 LSDB | Router LSAs (Link Data = ifIndex, no /30 stubs), why there is no network LSA, SPF; NX-OS needs `detail` for LSA contents | `show ip ospf database router [detail]`, `database network`, `event-history spf/lsa` |
 | 4 | Interface internals | What must match, network types, cost (40 Gbps reference) | `show ip ospf interface`, `show ip ospf` |
 | 5 | Pod areas | Area 1 and 2, spines become ABRs | type-3 LSAs, `inter` routes |
 | 6 | Summarization | `area range` per pod, discard route to Null0 | `show ip ospf database summary`, `show ip route` |
@@ -695,6 +698,10 @@ and the spines and super spines get `retain route-target all`.
 > captured from CML. Command keywords of `event-history`, `debug ip ospf` and `show forwarding` can differ on the
 > 9000v image, and so can the wording NX-OS uses for unnumbered interfaces (`show ip interface`, `show ip ospf
 > interface`) and the ifIndex value shown as router-LSA Link Data. If a check fails on a correctly built lab, run it in *Config* grading mode and please report the output.
+> **Verified on a real 9000v:** `show ip ospf database router 10.0.0.11` on SS1 (lab 21) prints only the summary
+> table (`Link ID / ADV Router / Age / Seq# / Checksum / Link Count`, P1-SPINE with Link Count 3); unlike IOS,
+> NX-OS shows the LSA contents only with `... detail`. The labs use `detail` wherever they expect LSA fields
+> (router, external, nssa-external) and match only stable tokens in the summary tables.
 
 ### RAM estimate and the RAM heavy tag
 Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node

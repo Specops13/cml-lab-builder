@@ -7,7 +7,7 @@ difficulty: 4
 platforms: [iol]
 summary: "Lab 2 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with lab 21's finished multi-area OSPF underlay already in its day-0. Build iBGP AS 65000 on top: SS1/SS2 as route reflectors with peer templates, loopback peering, prefix advertisement, best-path selection between two reflected copies, the BGP-free-core problem and its fix, optional policy with communities and local preference, plus eBGP and BFD design discussions. Every step explains the BGP internals and inspects them with show, event-history and filtered debugs in a debug logfile."
 author: CML Lab Builder
-version: "2"
+version: "3"
 ram_gb: 76
 nodes:
   - name: SS1
@@ -24,8 +24,8 @@ nodes:
         description to P2-SPINE Eth1/1
         no shutdown
       interface Ethernet1/3
-        description to SS2 Eth1/3
-        no shutdown
+        description unused (super spines never interconnect in a Clos)
+        shutdown
       interface Ethernet1/4
         description unused
         shutdown
@@ -44,12 +44,6 @@ nodes:
         mtu 9216
         ip unnumbered loopback0
         no shutdown
-      interface Ethernet1/3
-        no switchport
-        medium p2p
-        mtu 9216
-        ip unnumbered loopback0
-        no shutdown
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.1
@@ -60,9 +54,6 @@ nodes:
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       interface Ethernet1/2
-        ip ospf network point-to-point
-        ip router ospf UNDERLAY area 0.0.0.0
-      interface Ethernet1/3
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
   - name: SS2
@@ -79,8 +70,8 @@ nodes:
         description to P2-SPINE Eth1/2
         no shutdown
       interface Ethernet1/3
-        description to SS1 Eth1/3
-        no shutdown
+        description unused (super spines never interconnect in a Clos)
+        shutdown
       interface Ethernet1/4
         description unused
         shutdown
@@ -99,12 +90,6 @@ nodes:
         mtu 9216
         ip unnumbered loopback0
         no shutdown
-      interface Ethernet1/3
-        no switchport
-        medium p2p
-        mtu 9216
-        ip unnumbered loopback0
-        no shutdown
       feature ospf
       router ospf UNDERLAY
         router-id 10.0.0.2
@@ -115,9 +100,6 @@ nodes:
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
       interface Ethernet1/2
-        ip ospf network point-to-point
-        ip router ospf UNDERLAY area 0.0.0.0
-      interface Ethernet1/3
         ip ospf network point-to-point
         ip router ospf UNDERLAY area 0.0.0.0
   - name: P1-SPINE
@@ -433,7 +415,6 @@ links:
   - {a: {node: SS1, port: 1}, b: {node: P2-SPINE, port: 0}}
   - {a: {node: SS2, port: 0}, b: {node: P1-SPINE, port: 1}}
   - {a: {node: SS2, port: 1}, b: {node: P2-SPINE, port: 1}}
-  - {a: {node: SS1, port: 2}, b: {node: SS2, port: 2}}
   - {a: {node: P1-SPINE, port: 2}, b: {node: P1-LEAF, port: 0}}
   - {a: {node: P2-SPINE, port: 2}, b: {node: P2-LEAF, port: 0}}
   - {a: {node: P1-LEAF, port: 1}, b: {node: H1, port: 0}}
@@ -450,16 +431,23 @@ task: |
   **What you build: iBGP AS 65000 over the OSPF underlay**
 
   ```
-              SS1 (RR) ----------------- SS2 (RR)        route reflectors, cluster IDs 10.0.0.1 / 10.0.0.2
-             /   \                       /   \
-       P1-SPINE   +------- P2-SPINE ----+                 RR clients from step 6 (the BGP-free core fix)
+        SS1 (RR)            SS2 (RR)      route reflectors, cluster IDs 10.0.0.1 / 10.0.0.2
+          |  \               /  |         (no SS1-SS2 link: standard Clos, lab 21 step 0)
+          |   +-----+ +-----+   |
+          |          X          |
+          |   +-----+ +-----+   |
+          |  /               \  |
+       P1-SPINE            P2-SPINE       RR clients from step 6 (the BGP-free core fix)
           |                    |
-       P1-LEAF                P2-LEAF                     RR clients: advertise 172.16.1.0/24 / 172.16.2.0/24
+       P1-LEAF              P2-LEAF       RR clients: advertise 172.16.1.0/24 / 172.16.2.0/24
   ```
 
   - Every BGP session runs **loopback0 to loopback0** (`update-source loopback0`), carried by OSPF.
   - **SS1 and SS2 are route reflectors**, configured with a **peer template** (`template peer RR-CLIENTS`). The
-    clients only peer with the two RRs, never with each other.
+    clients only peer with the two RRs, never with each other. The two RRs do not peer with each other either
+    (step 5 explains why, and how an RR-to-RR session would run over loopbacks via the spines).
+  - The topology is Cisco's standard Clos: **no link between SS1 and SS2** (and none between the spines). All
+    traffic between the super spines - including BGP between them - goes up-down through a spine.
   - The leaves advertise a test prefix each on **loopback200**: P1-LEAF **172.16.1.0/24**, P2-LEAF
     **172.16.2.0/24**. In lab 23 the same sessions carry EVPN instead.
 
@@ -488,6 +476,9 @@ steps:
         area: it still has the inter-area summary **10.1.0.0/16**, so 10.1.0.111 is reachable - good.
       - Later, BGP **next hops** (the leaves' loopback0) are resolved through OSPF. The IGP metric to the next
         hop becomes a best-path tie-breaker, and an OSPF change triggers BGP **next-hop tracking**.
+      - The two route reflectors have **no link to each other** (standard Clos, lab 21 step 0): SS1 and SS2 are
+        not OSPF neighbors, and SS1 reaches SS2's loopback0 only through the spines - two equal-cost paths, via
+        P1-SPINE and via P2-SPINE. Any loopback session between them would take that path.
 
       **Inspect the underlay** (the same toolkit as lab 21):
 
@@ -500,7 +491,7 @@ steps:
     verify:
       - device: SS1
         command: show ip ospf neighbors
-        expect: "10.0.0.11, 10.0.0.21 and 10.0.0.2 all `FULL/ -` (point-to-point, no DR), each with its loopback0 in the Address column (unnumbered links)."
+        expect: "Two neighbors, 10.0.0.11 and 10.0.0.21, both `FULL/ -` (point-to-point, no DR), each with its loopback0 in the Address column (unnumbered links). No SS2: the super spines do not interconnect."
       - device: P2-LEAF
         command: show ip route 10.1.0.111
         expect: "`10.1.0.0/16 ... ospf-UNDERLAY, inter` - a specific route to P1-LEAF's loopback0 even in the stub area."
@@ -509,14 +500,23 @@ steps:
         expect: "`5 packets received` - loopback to loopback across five stages, the path the leaf-to-RR and next-hop traffic takes."
       - device: SS1
         command: show running-config ospf
-        expect: "`router ospf UNDERLAY` with router-id 10.0.0.1 and `ip router ospf UNDERLAY area 0.0.0.0` on loopback0, Eth1/1-1/3."
+        expect: "`router ospf UNDERLAY` with router-id 10.0.0.1 and `ip router ospf UNDERLAY area 0.0.0.0` on loopback0, Eth1/1 and Eth1/2."
+      - device: SS1
+        command: show ip route 10.0.0.2
+        expect: "`ubest/mbest: 2/0`: `*via 10.0.0.11, Eth1/1, [110/81]` and `*via 10.0.0.21, Eth1/2, [110/81]` - SS1 reaches the other RR's loopback through both spines (ECMP)."
     checks:
       - id: base-ss1-ospf
-        description: SS1 is FULL with both pod spines and SS2 (inherited underlay)
+        description: SS1 is FULL with both pod spines (inherited underlay)
         device: SS1
         command: show ip ospf neighbors
-        match: ['^\s*10\.0\.0\.11\s+\d+\s+FULL', '^\s*10\.0\.0\.21\s+\d+\s+FULL', '^\s*10\.0\.0\.2\s+\d+\s+FULL']
+        match: ['^\s*10\.0\.0\.11\s+\d+\s+FULL', '^\s*10\.0\.0\.21\s+\d+\s+FULL']
         hint: Wait until all six switches are booted; the OSPF config is in the day-0, nothing to configure.
+      - id: base-ss1-to-ss2-via-spines
+        description: SS1 reaches SS2's loopback0 over both spines (no super-spine link)
+        device: SS1
+        command: show ip route 10.0.0.2
+        match: ['ubest/mbest: 2/0', 'via 10\.0\.0\.11, Eth1/1', 'via 10\.0\.0\.21, Eth1/2']
+        hint: "Both spines must be FULL with both super spines (`show ip ospf neighbors` on P1-SPINE and P2-SPINE)."
       - id: base-leaf-loopbacks
         description: P1-LEAF loopback0 reaches P2-LEAF loopback0
         device: P1-LEAF
@@ -872,6 +872,16 @@ steps:
       best path. With a **shared cluster ID** on both RRs (`cluster-id 10.0.0.100`) each RR would drop the other's
       reflection, saving memory but losing that pre-installed backup - a design choice.
 
+      **No RR-to-RR session here.** SS1 and SS2 do not peer with each other: every client peers with both RRs,
+      so each RR already has every client route first hand. Many designs add an iBGP session between the RRs
+      anyway (a plain iBGP neighbor, not a client, `update-source loopback0`). In this Clos it would run
+      **loopback to loopback through the spines**: there is no SS1-SS2 link, so its TCP packets follow OSPF's
+      two equal-cost paths SS1 -> P1-SPINE or P2-SPINE -> SS2 (`show ip route 10.0.0.2` on SS1, step 0), and the
+      session survives the loss of either spine or any single link. Each RR would then also hold the other's
+      reflection (CLUSTER_LIST 2 entries long with separate cluster IDs) and still prefer the client's own copy
+      (step 10 of the table: shorter CLUSTER_LIST). Never cable the super spines together just to carry it - that
+      would break the up-down rule of the Clos for one control-plane session OSPF already carries.
+
       **Inspect the decision log** with `show bgp event-history detail` (best-path runs per prefix) and, if you
       want it live, `debug bgp updates` with `debug-filter bgp prefix 172.16.2.0/24` into a logfile while you
       `clear bgp ipv4 unicast 10.0.0.1 soft in` (a route refresh, no session reset).
@@ -881,7 +891,7 @@ steps:
         expect: "`Paths: (2 available, best #1)`: the path `from 10.0.0.1` is `is best path`, the path `from 10.0.0.2` says `not best reason: Neighbor Address` (until the optional step 7 changes local preference)."
       - device: SS2
         command: show bgp ipv4 unicast 172.16.2.0/24
-        expect: "One path, from the client 10.2.0.121 itself: SS1 and SS2 do not peer with each other in this design, so an RR never sees the other RR's reflection."
+        expect: "One path, from the client 10.2.0.121 itself: SS1 and SS2 do not peer with each other in this design (and have no link to each other), so an RR never sees the other RR's reflection."
     checks:
       - id: bestpath-p1-leaf
         description: P1-LEAF has a best path for 172.16.2.0/24 and names why the other lost
@@ -1180,7 +1190,10 @@ steps:
       2. **URIB** updates; BGP **next-hop tracking** on P1-SPINE re-resolves next hops - nothing becomes
          unreachable.
       3. **BGP**: P1-LEAF's session to SS1 (10.0.0.1) does **not** flap. Its TCP packets simply take P1-SPINE ->
-         SS2 -> SS1 now (over the unnumbered SS1-SS2 link, and OSPF). `show bgp sessions` shows 0 new flaps.
+         SS2 -> P2-SPINE -> SS1 now: there is no SS1-SS2 link (standard Clos), so the only surviving path goes
+         down to the other pod's spine and back up (OSPF cost 121 from P1-SPINE instead of 41). Longer, but BGP
+         only needs *a* path to the loopback. `show bgp sessions` shows 0 new flaps; P1-SPINE's own session to
+         SS1 (it is an RR client since step 6) survives the same way.
       4. `show debug logfile bgp-dbg` on P1-LEAF: no FSM changes. `show ip ospf event-history adjacency` on
          P1-SPINE: the neighbor 10.0.0.1 DOWN event.
 
@@ -1197,6 +1210,9 @@ steps:
       - device: P1-SPINE
         command: show ip route 10.2.0.0/16
         expect: "During the drill one path (via 10.0.0.2, Eth1/2 - SS2's loopback); after `no shutdown` two paths again."
+      - device: P1-SPINE
+        command: show ip route 10.0.0.1
+        expect: "During the drill `via 10.0.0.2, Eth1/2, [110/121]` - SS1 reached through SS2 and P2-SPINE (no super-spine link); after `no shutdown` `via 10.0.0.1, Eth1/1, [110/41]` again."
     checks:
       - id: conv-p1-spine-ecmp-back
         description: P1-SPINE has both paths to pod 2 again after the drill
@@ -1258,6 +1274,8 @@ solution_summary: |
     **loopback0 to loopback0** (`update-source loopback0`, template `RR`).
   - **Prefixes**: 172.16.1.0/24 (P1-LEAF) and 172.16.2.0/24 (P2-LEAF) via `network`; every client holds two
     reflected copies (ORIGINATOR_ID + CLUSTER_LIST), the one from the lowest neighbor address wins by default.
+  - **Topology**: standard Clos with no SS1-SS2 link - the RRs reach each other (and any RR-to-RR session would
+    run) loopback to loopback through the spines, with ECMP.
   - **Lessons**: next hops stay the originating leaf and resolve over OSPF (next-hop tracking); transit routers
     need the routes unless traffic is tunnelled - the motivation for VXLAN; loopback sessions survive link
     failures. Optional: community tagging and local preference; eBGP (RFC 7938) and BFD as design comparisons.

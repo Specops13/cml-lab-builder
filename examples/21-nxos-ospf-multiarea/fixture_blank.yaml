@@ -49,10 +49,11 @@ SS1:
                        Eth1/1         163    R S I s     N9K-C9300v    Eth1/1
     P2-SPINE(9N3KD63KWT3)
                        Eth1/2         163    R S I s     N9K-C9300v    Eth1/1
-    SS2(9N3KD63KWT1)   Eth1/3         163    R S I s     N9K-C9300v    Eth1/3
 
-    Total entries displayed: 3
+    Total entries displayed: 2
   show ip ospf neighbors: ''
+  show ip route 10.0.0.2: |
+    % Route not found
 P2-LEAF:
   show interface Ethernet1/1: |
     Ethernet1/1 is up
