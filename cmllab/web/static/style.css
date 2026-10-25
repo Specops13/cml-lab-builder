@@ -375,6 +375,6 @@ aside.catalog[hidden]{display:none}
 .catalog-collapsed #lab-detail{max-width:none}
 /* 3.3.3: Next / Previous move focus to the step heading (tabindex=-1, not a control): no focus ring flicker on it */
 .walk-step .walk-focus:focus,.walk-step .walk-focus:focus-visible{outline:none;box-shadow:none}
-/* 3.3.3: completed by hand (a buggy check) - subtle, distinct from a graded pass */
+/* 3.3.4: completed by hand (a buggy check) - subtle, distinct from a graded pass */
 .tag.manual{border-style:dashed;background:transparent;color:var(--muted);font-style:italic}
 .walk-steps li.man button{border-style:dashed;border-color:var(--ok);color:var(--ok)}

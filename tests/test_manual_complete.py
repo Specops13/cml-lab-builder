@@ -1,4 +1,4 @@
-"""3.3.3: marking a step / a lab done by hand when a check is buggy. Recorded as completed-manually, distinct
+"""3.3.4: marking a step / a lab done by hand when a check is buggy. Recorded as completed-manually, distinct
 from a graded pass: courses count it (the next lab follows), scores, mastery and solved labs do not."""
 import re
 from pathlib import Path

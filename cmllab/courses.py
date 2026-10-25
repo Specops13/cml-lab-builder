@@ -166,7 +166,7 @@ def list_courses(best: dict[str, float | None] | None = None, platform: str = "i
                  heavy_gb: float = 16, manual: dict[str, float] | None = None) -> list[dict]:
     """Installed courses with per-lab availability and best score (best: {lab_id: best_pct}; a completed
     walkthrough counts as 100), lab type and estimated RAM (the course's ram is its heaviest lab: labs run one
-    at a time). manual: lab id -> time for labs marked complete by hand (3.3.3): they count as solved, so the
+    at a time). manual: lab id -> time for labs marked complete by hand (3.3.4): they count as solved, so the
     course moves on to the next lab, and carry "marked_manually"."""
     from . import sizing
     best = best or {}

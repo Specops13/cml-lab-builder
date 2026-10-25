@@ -5,7 +5,7 @@ of each "Check this step", which steps were applied for them, and when the walkt
 required step that has checks passed). Walkthroughs never write grading history, so they stay out of scores,
 mastery and streaks; the progress page lists them separately.
 
-Manual marks (3.3.3, for a buggy check): "Mark step done" stores steps[id]["manual_at"] and counts the step as done
+Manual marks (3.3.4, for a buggy check): "Mark step done" stores steps[id]["manual_at"] and counts the step as done
 (not as passed); "Mark lab complete" stores "manual_completed". A walkthrough completed with any manual mark has
 "completed_manually": true (shown as *marked manually*, distinct from a graded completion); undoing the mark
 recomputes the completion from the graded results."""

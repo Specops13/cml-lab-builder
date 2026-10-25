@@ -839,7 +839,7 @@ per track. ENCOR labs are also mapped to the
   *marked manually*, with your best graded score if you checked them at all.
 
 ### Marking a lab complete by hand
-When a check is buggy (for example a regex that does not match your platform's output) you can still move on:
+When a check is buggy (for example a regex that does not match your platform's output) you can still move on (3.3.4):
 
 - **Mark lab complete** (lab toolbar of challenge labs, outside exam mode, and the progress bar of walkthroughs) asks
   for confirmation, then records the lab as *completed manually*. **Undo / mark incomplete** (with a confirmation)

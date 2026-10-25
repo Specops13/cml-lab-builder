@@ -773,7 +773,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     def wt_reset(lab_id: str):
         return walkthrough.reset(_walk(lab_id).lab)
 
-    # ------------------------------------------------------------ manual completion (3.3.3, for buggy checks)
+    # ------------------------------------------------------------ manual completion (3.3.4, for buggy checks)
     @app.post("/api/labs/{lab_id}/steps/{step_id}/mark-done")
     def wt_mark_step(lab_id: str, step_id: str, done: bool = True):
         """Count a walkthrough step as done by hand (recorded as marked manually, not as passed); done=false undoes it."""

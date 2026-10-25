@@ -1,4 +1,4 @@
-"""Manual completion (3.3.3): when a check is buggy, the student can mark a challenge lab complete by hand.
+"""Manual completion (3.3.4): when a check is buggy, the student can mark a challenge lab complete by hand.
 
 Stored in the user data folder (manual_complete.json: lab id -> unix time), never in the grading history, so a
 lab marked by hand is *completed-manually*, not a graded pass: it does not raise scores, mastery or streaks, but

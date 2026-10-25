@@ -2,7 +2,7 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
+## [3.3.4] - 2026-10-25
 ### Added
 - **Mark a lab complete by hand when a check is buggy.** Walkthroughs get **Mark step done** (next to *Check this
   step* while the step's checks have not passed; **Undo mark done** removes it), so a failing check no longer blocks

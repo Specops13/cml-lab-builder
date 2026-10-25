@@ -1,6 +1,6 @@
 "use strict";
 /* CML Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "3.3.3";  // must equal cmllab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "3.3.4";  // must equal cmllab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 /* links that come from data (CML, GitHub, lab files) are only ever http(s): never javascript: or data: URLs */
@@ -32,7 +32,7 @@ function ramTag(r) {
 const walkTag = (l) => l.type === "walkthrough" ? '<span class="tag walk">walkthrough</span>' : "";
 /* where a lab came from: library labs need no tag; labs you made or imported yourself say so */
 const srcTag = (l) => (l.library || l.source === "builtin") ? "" : '<span class="tag user">imported</span>';
-// completed by hand (3.3.3, for a buggy check): recorded apart from a graded pass, counted by courses, not by mastery
+// completed by hand (3.3.4, for a buggy check): recorded apart from a graded pass, counted by courses, not by mastery
 const manTag = (what = "lab") => `<span class="tag manual" title="This ${what} was marked done by hand, not by a graded check">marked manually</span>`;
 const doneTags = (l) => l.walkthrough
   ? (l.walkthrough.completed ? '<span class="tag ok">completed</span>' + (l.walkthrough.completed_manually ? manTag() : "") : ((l.walkthrough.required_done || l.walkthrough.required_passed) ? `<span class="tag">${l.walkthrough.required_done ?? l.walkthrough.required_passed}/${l.walkthrough.required} steps</span>` : ""))
