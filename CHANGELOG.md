@@ -2,6 +2,18 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [3.3.3] - 2026-10-25
+### Changed
+- **Walkthroughs scroll to the top of the new step.** **Next**, **Previous** and the step buttons in the progress bar
+  used to leave the page where it was, usually at the bottom of the old step, in the middle of the new one. They now
+  scroll the page (or the nearest scrolling container) so the top of the new step sits just below the sticky header
+  (no offset on narrow screens, where the header is not sticky). The scroll is smooth, or instant when the OS or
+  browser asks for reduced motion (`prefers-reduced-motion`); a nudge from the browser's scroll anchoring right after
+  an instant jump is corrected on the next frame. Keyboard focus moves to the step heading (`tabindex="-1"`,
+  `preventScroll`), so screen readers announce the step and Tab continues inside it, with no focus ring flicker on the
+  heading (it is not a control). Checking or applying a step re-renders in place without scrolling. New
+  `static/walkscroll.js` (no inline script; the CSP is unchanged), tested with node and in Chrome (axe: 0 violations).
+
 ## Library update - 2026-10-25 (no app release)
 Library-only change: the apps pick up the new lab versions from the online library (*Library & courses* shows
 *update* on installed copies). No new executables.

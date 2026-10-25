@@ -542,6 +542,11 @@ username/password from Settings (default `cisco`/`cisco`), which it also writes 
 
 Then a **summary** page lists what you built and the complete config of every device, with copy buttons.
 
+**Next**, **Previous** and the step buttons in the progress bar scroll to the top of the new step (just below the
+sticky header), so you never land in the middle of it. With *reduce motion* set in your OS or browser the jump is
+instant instead of smooth. Keyboard focus moves to the step's heading, so a screen reader reads the new step and
+**Tab** continues inside it. Checking or applying a step updates it in place without scrolling. (3.3.3)
+
 - **Check this step** runs that step's checks: live console checks (falling back to config mode as usual) plus
   config checks on the running config. **Check every step** checks them all in one pass.
 - **Apply this step for me** types the step's config into each device over the CML console (after a confirm). It

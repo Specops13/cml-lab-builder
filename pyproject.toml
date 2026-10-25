@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cml-lab-builder"   # "encorlab" up to 2.1.0
-version = "3.3.2"
+version = "3.3.3"
 description = "CML Lab Builder: build hands-on labs in Cisco Modeling Labs 2.9 and grade them (CCNP ENCOR track included)"
 license = "MIT"
 license-files = ["LICENSE"]

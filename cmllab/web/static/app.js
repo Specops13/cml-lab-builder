@@ -1,6 +1,6 @@
 "use strict";
 /* CML Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "3.3.2";  // must equal cmllab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "3.3.3";  // must equal cmllab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 /* links that come from data (CML, GitHub, lab files) are only ever http(s): never javascript: or data: URLs */
@@ -1222,6 +1222,8 @@ function renderWalkProgress() {
 async function walkGo(i) {
   const n = walk.lab.steps.length;
   walk.index = Math.max(0, Math.min(i, n)); renderWalkStep();
+  // Next / Previous / a jump: bring the top of the new step into view (below the sticky header) and focus its heading
+  if (window.WalkScroll) WalkScroll.toStep($("#walk-step h3"), window, $("#walk-step"));
   try { walk.status = await api(`/api/labs/${walk.lab.id}/walkthrough/step?index=${walk.index}`, {method: "POST"}); renderWalkProgress(); } catch (e) { /* position is a convenience */ }
 }
 function cfgBlock(dev, text, whole) {

@@ -373,3 +373,5 @@ mark{background:#ffe58a;color:#17202b}
 .catalog-collapsed .catalog-toggle .ico-show{display:inline-block}.catalog-collapsed .catalog-toggle .ico-hide{display:none}
 aside.catalog[hidden]{display:none}
 .catalog-collapsed #lab-detail{max-width:none}
+/* 3.3.3: Next / Previous move focus to the step heading (tabindex=-1, not a control): no focus ring flicker on it */
+.walk-step .walk-focus:focus,.walk-step .walk-focus:focus-visible{outline:none;box-shadow:none}
