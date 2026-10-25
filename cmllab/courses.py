@@ -163,12 +163,14 @@ def _load(path: Path) -> dict | None:
 
 
 def list_courses(best: dict[str, float | None] | None = None, platform: str = "iol",
-                 heavy_gb: float = 16) -> list[dict]:
+                 heavy_gb: float = 16, manual: dict[str, float] | None = None) -> list[dict]:
     """Installed courses with per-lab availability and best score (best: {lab_id: best_pct}; a completed
     walkthrough counts as 100), lab type and estimated RAM (the course's ram is its heaviest lab: labs run one
-    at a time)."""
+    at a time). manual: lab id -> time for labs marked complete by hand (3.3.3): they count as solved, so the
+    course moves on to the next lab, and carry "marked_manually"."""
     from . import sizing
     best = best or {}
+    manual = manual or {}
     known = catalog.entries()
     out = []
     d = courses_dir()
@@ -181,7 +183,8 @@ def list_courses(best: dict[str, float | None] | None = None, platform: str = "i
             e = known.get(lid)
             b = best.get(lid)
             labs.append({"id": lid, "title": e.lab.title if e else lid, "available": e is not None,
-                         "best": b, "solved": b is not None and b >= 100,
+                         "best": b, "solved": (b is not None and b >= 100) or lid in manual,
+                         "marked_manually": lid in manual,
                          "type": e.lab.type if e else None,
                          "ram": _ram_brief(sizing.estimate(e.lab, platform, heavy_gb)) if e else None})
         done = sum(1 for x in labs if x["solved"])

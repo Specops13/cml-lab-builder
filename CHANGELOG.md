@@ -2,6 +2,21 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+### Added
+- **Mark a lab complete by hand when a check is buggy.** Walkthroughs get **Mark step done** (next to *Check this
+  step* while the step's checks have not passed; **Undo mark done** removes it), so a failing check no longer blocks
+  the step, and a lab-level **Mark lab complete** (challenge lab toolbar, walkthrough progress bar) with a confirm
+  dialog and **Undo / mark incomplete**. Recorded as *completed manually*, distinct from a graded pass: challenge labs
+  in `manual_complete.json` (never in the grading history), walkthroughs in their progress file (`manual_at` per
+  step, `manual_completed` / `completed_manually`). A subtle dashed *marked manually* label shows on the step, the
+  step bar, the lab list, the lab header, courses and the Progress page (new *Labs marked complete by hand* table;
+  walkthroughs show *+N by hand*). Courses count it as complete (*x/y done* and *Continue* move on to the next lab);
+  scores, mastery, *labs solved* and streaks are unchanged, and a later graded pass turns it into a normal one. New
+  API `POST /api/labs/{id}/mark-complete?done=true|false` and `POST /api/labs/{id}/steps/{step}/mark-done?done=`
+  (CSRF-protected like every POST). Native confirm dialogs, labelled buttons, no inline script (CSP unchanged); axe:
+  0 violations in light and dark.
+
 ## [3.3.3] - 2026-10-25
 ### Changed
 - **Walkthroughs scroll to the top of the new step.** **Next**, **Previous** and the step buttons in the progress bar

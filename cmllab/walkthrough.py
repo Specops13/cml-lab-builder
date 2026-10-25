@@ -3,7 +3,12 @@
 Per-lab progress lives in the user data folder (walkthroughs/<lab>.json): the step the student is on, the result
 of each "Check this step", which steps were applied for them, and when the walkthrough was completed (every
 required step that has checks passed). Walkthroughs never write grading history, so they stay out of scores,
-mastery and streaks; the progress page lists them separately."""
+mastery and streaks; the progress page lists them separately.
+
+Manual marks (3.3.3, for a buggy check): "Mark step done" stores steps[id]["manual_at"] and counts the step as done
+(not as passed); "Mark lab complete" stores "manual_completed". A walkthrough completed with any manual mark has
+"completed_manually": true (shown as *marked manually*, distinct from a graded completion); undoing the mark
+recomputes the completion from the graded results."""
 from __future__ import annotations
 
 import json
@@ -34,10 +39,12 @@ def load(lab_id: str) -> dict:
             d.setdefault("current", 0)
             d.setdefault("steps", {})
             d.setdefault("completed", None)
+            d.setdefault("completed_manually", False)
+            d.setdefault("manual_completed", None)
             return d
     except (OSError, ValueError):
         pass
-    return {"current": 0, "steps": {}, "completed": None}
+    return {"current": 0, "steps": {}, "completed": None, "completed_manually": False, "manual_completed": None}
 
 
 def _save(lab_id: str, d: dict) -> None:
@@ -58,28 +65,80 @@ def checkable(step: Step) -> bool:
 
 
 def status(lab: Lab, state: dict | None = None) -> dict:
-    """{"current", "steps": [{id, title, optional, has_checks, passed, checked_at, applied_at}], "required",
-    "required_passed", "pct", "completed"}."""
+    """{"current", "steps": [{id, title, optional, has_checks, passed, manual_at, done, checked_at, applied_at}],
+    "required", "required_passed" (graded), "required_done" (graded or marked by hand), "pct", "completed",
+    "completed_manually", "manual_completed"}."""
     _require(lab)
     d = state or load(lab.id)
-    steps, req, ok = [], 0, 0
+    steps, req, ok, done = [], 0, 0, 0
     for st in lab.steps:
         r = d["steps"].get(st.id, {})
         steps.append({"id": st.id, "title": st.title, "optional": st.optional, "has_checks": checkable(st),
                       "passed": r.get("passed"), "score_pct": r.get("score_pct"), "checked_at": r.get("at"),
-                      "applied_at": r.get("applied_at"), "mode": r.get("mode")})
+                      "applied_at": r.get("applied_at"), "mode": r.get("mode"), "manual_at": r.get("manual_at"),
+                      "done": bool(r.get("passed") or r.get("manual_at"))})
         if checkable(st) and not st.optional:
             req += 1
             ok += bool(r.get("passed"))
+            done += bool(r.get("passed") or r.get("manual_at"))
     cur = min(max(int(d.get("current", 0)), 0), len(lab.steps))   # == len(steps): the summary page
-    return {"current": cur, "steps": steps, "required": req, "required_passed": ok,
-            "pct": round(100.0 * ok / req, 1) if req else 0.0, "completed": d.get("completed")}
+    return {"current": cur, "steps": steps, "required": req, "required_passed": ok, "required_done": done,
+            "pct": round(100.0 * done / req, 1) if req else 0.0, "completed": d.get("completed"),
+            "completed_manually": bool(d.get("completed") and d.get("completed_manually")),
+            "manual_completed": d.get("manual_completed")}
 
 
 def _update_completed(lab: Lab, d: dict) -> None:
+    if d.get("completed"):
+        return                            # stays completed even if a later re-check fails
     req = [st for st in lab.steps if checkable(st) and not st.optional]
-    if req and all(d["steps"].get(st.id, {}).get("passed") for st in req) and not d.get("completed"):
-        d["completed"] = time.time()      # stays completed even if a later re-check fails
+    if d.get("manual_completed"):
+        d["completed"], d["completed_manually"] = d["manual_completed"], True
+    elif req and all(d["steps"].get(st.id, {}).get("passed") or d["steps"].get(st.id, {}).get("manual_at")
+                     for st in req):
+        d["completed"] = time.time()
+        d["completed_manually"] = not all(d["steps"].get(st.id, {}).get("passed") for st in req)
+
+
+def _recompute(lab: Lab, d: dict) -> None:
+    """After a manual mark is removed: a manual completion is re-derived from what is left."""
+    if d.get("completed") and d.get("completed_manually"):
+        d["completed"], d["completed_manually"] = None, False
+    _update_completed(lab, d)
+
+
+def mark_step(lab: Lab, step_id: str, done: bool) -> dict:
+    """Mark a step done by hand (a buggy check), or undo the mark. The graded result is kept as it is."""
+    _require(lab)
+    st = next((s for s in lab.steps if s.id == step_id), None)
+    if st is None:
+        raise WalkthroughError(f"unknown step {step_id}")
+    with _lock:
+        d = load(lab.id)
+        r = d["steps"].setdefault(st.id, {})
+        if done:
+            r.setdefault("manual_at", time.time())
+            _update_completed(lab, d)
+        else:
+            r.pop("manual_at", None)
+            _recompute(lab, d)
+        _save(lab.id, d)
+        return status(lab, d)
+
+
+def mark_complete(lab: Lab, done: bool) -> dict:
+    """Mark the whole walkthrough complete by hand, or undo it (back to what the steps say)."""
+    _require(lab)
+    with _lock:
+        d = load(lab.id)
+        if done:
+            d["manual_completed"] = d.get("manual_completed") or time.time()
+            _update_completed(lab, d)
+        else:
+            d["manual_completed"] = None
+            _recompute(lab, d)
+        _save(lab.id, d)
+        return status(lab, d)
 
 
 def set_current(lab: Lab, index: int) -> dict:
@@ -94,7 +153,7 @@ def set_current(lab: Lab, index: int) -> dict:
 def reset(lab: Lab) -> dict:
     _require(lab)
     with _lock:
-        d = {"current": 0, "steps": {}, "completed": None}
+        d = {"current": 0, "steps": {}, "completed": None, "completed_manually": False, "manual_completed": None}
         _save(lab.id, d)
         return status(lab, d)
 
@@ -107,6 +166,10 @@ def record(lab: Lab, results: dict[str, dict]) -> dict:
             prev = d["steps"].get(sid, {})
             d["steps"][sid] = {**prev, **r, "at": time.time()}
         _update_completed(lab, d)
+        req = [st for st in lab.steps if checkable(st) and not st.optional]
+        if (d.get("completed_manually") and not d.get("manual_completed") and req
+                and all(d["steps"].get(st.id, {}).get("passed") for st in req)):
+            d["completed_manually"] = False     # every hand-marked step has since passed its checks: graded
         _save(lab.id, d)
         return status(lab, d)
 

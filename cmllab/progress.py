@@ -63,8 +63,13 @@ def streaks(days: set[dt.date], today: dt.date) -> dict:
 
 
 def compute(today: dt.date | None = None, entries: dict | None = None, histories: dict | None = None,
-            walkthroughs: dict | None = None) -> dict:
-    """walkthroughs: lab id -> walkthrough.status() (default: read from the data folder)."""
+            walkthroughs: dict | None = None, marked: dict | None = None) -> dict:
+    """walkthroughs: lab id -> walkthrough.status() (default: read from the data folder); marked: lab id -> time
+    for challenge labs marked complete by hand (default: manual.load()). A lab marked by hand is "completed" with
+    "marked_manually" but not "solved": manual marks never count towards scores, mastery or streaks."""
+    if marked is None:
+        from . import manual
+        marked = manual.load()
     today = today or dt.date.today()
     entries = entries if entries is not None else catalog.entries()
     histories = histories if histories is not None else {lid: history.load(lid) for lid in entries}
@@ -82,7 +87,10 @@ def compute(today: dt.date | None = None, entries: dict | None = None, histories
                           "steps": len(e.lab.steps), "required": st["required"],
                           "required_passed": st["required_passed"], "pct": st["pct"],
                           "completed": bool(st["completed"]), "completed_at": st["completed"],
-                          "started": any(x.get("passed") is not None for x in st["steps"]) or st["current"] > 0})
+                          "marked_manually": bool(st.get("completed_manually")),
+                          "steps_marked": sum(1 for x in st["steps"] if x.get("manual_at")),
+                          "started": any(x.get("passed") is not None or x.get("manual_at") for x in st["steps"])
+                          or st["current"] > 0 or bool(st["completed"])})
             continue
         h = histories.get(lid, [])
         for c in [c for st in e.lab.steps for c in st.checks] + e.lab.checks + [c for f in e.lab.faults for c in f.checks]:
@@ -98,6 +106,8 @@ def compute(today: dt.date | None = None, entries: dict | None = None, histories
         labs.append({"id": lid, "title": e.lab.title, "blueprint": e.lab.blueprint, "source": e.source,
                      "track": e.lab.track,
                      "attempts": len(h), "solved": any(x.get("passed") for x in h),
+                     "completed": any(x.get("passed") for x in h) or lid in marked,
+                     "marked_manually": lid in marked and not any(x.get("passed") for x in h),
                      "mastery_pct": max((attempt_score(x) for x in h), default=0.0),
                      "faults_fixed": sum(1 for x in h if x.get("fault") and x.get("passed")),
                      "time_s": lab_time(h), "last": h[-1]["ts"] if h else None})
@@ -143,6 +153,7 @@ def compute(today: dt.date | None = None, entries: dict | None = None, histories
         "blueprint": blueprint.VERSION,
         "overall": {"mastery_pct": overall, "labs_total": len(labs), "labs_attempted": sum(1 for l in labs if l["attempts"]),
                     "labs_solved": sum(1 for l in labs if l["solved"]), "checks_run": len(recent),
+                    "labs_marked_manually": sum(1 for l in labs if l["marked_manually"]),
                     "faults_fixed": sum(l["faults_fixed"] for l in labs), "time_spent_s": sum(l["time_s"] for l in labs),
                     "uncovered_domains": [d["id"] for d in domains if not d["labs"]],
                     "encor_mastery_pct": encor_overall, "encor_labs": len(encor)},
@@ -150,6 +161,7 @@ def compute(today: dt.date | None = None, entries: dict | None = None, histories
         "streak": streaks(days, today),
         "domains": domains, "items": items, "labs": labs, "weakest": weakest,
         "walkthroughs": {"labs": walks, "total": len(walks), "completed": sum(1 for w in walks if w["completed"]),
+                         "marked_manually": sum(1 for w in walks if w["marked_manually"]),
                          "started": sum(1 for w in walks if w["started"])},
         "failed_checks": [{"lab_id": lid, "check_id": cid, "description": check_desc.get((lid, cid), cid), "count": n}
                           for (lid, cid), n in failed.most_common(5)],

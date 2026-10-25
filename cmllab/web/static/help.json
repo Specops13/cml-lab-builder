@@ -258,5 +258,10 @@
   "res.recheck": "Read free memory and running labs from CML again.",
   "skip": "Jump past the menu to the page content (keyboard users).",
   "labs.toggleList": "Hide or show the lab list on the left, so the lab's directions can use the whole width. Remembered on this computer; \"/\" opens the list again and jumps to the search.",
-  "res.copyDiag": "Copy the raw license, memory and resource-pool data the check read from CML as JSON, with secrets, ids, host names and IPs removed, for a bug report."
+  "res.copyDiag": "Copy the raw license, memory and resource-pool data the check read from CML as JSON, with secrets, ids, host names and IPs removed, for a bug report.",
+  "lab.markComplete": "For a lab whose check is wrong: mark it complete by hand (with a confirmation). It is labelled marked manually; courses count it as done, scores and mastery do not change.",
+  "lab.unmarkComplete": "Remove your manual mark and set the lab back to incomplete. Graded results and history are kept.",
+  "w.markStep": "When a step's check is buggy, count the step as done by hand so you can move on. It is labelled marked manually, not passed.",
+  "w.unmarkStep": "Remove the manual mark from this step. Its graded check result is kept.",
+  "p.marked": "Challenge labs you marked complete by hand. Courses count them as done; they stay out of solved labs and mastery."
 }

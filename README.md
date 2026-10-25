@@ -555,6 +555,11 @@ instant instead of smooth. Keyboard focus moves to the step's heading, so a scre
 - Walkthroughs have no *Break my lab*, no exam mode and no score. They show a **walkthrough** badge, count as *completed*
   once every required step passed (the optional step 9 doesn't count), appear in their own section on the Progress page,
   and stay out of mastery and streaks. The CLI has `cmllab step 18-evpn-vxlan [N] [--check|--apply]`.
+- **Mark step done** (next to *Check this step*, on steps whose checks have not passed) is for a check that is wrong:
+  the step counts as done so you can move on, and it is labelled *marked manually* (dashed outline in the step bar)
+  instead of *checked*. Its graded result is kept; **Undo mark done** removes the mark. When every required step has
+  passed or been marked, the walkthrough is *completed* with a *marked manually* label; if the marked steps later pass
+  their checks, it becomes a normal (graded) completion. See [Marking a lab complete by hand](#marking-a-lab-complete-by-hand).
 - The **Data center** course (*Library & courses*) puts VRF-lite first, then the walkthrough; *Install all* installs both.
   The v1.9.0 release also has it as `evpn-vxlan-walkthrough.encorlab`; on 2.0.0 use the library or import
   `labs/18-evpn-vxlan.encorlab` from the repo.
@@ -828,6 +833,24 @@ per track. ENCOR labs are also mapped to the
 - **Weakest topics**, **checks you fail most**, a 30-day **activity** chart and your **streak** (days in a row with a Check).
 - **Time spent**, estimated from the lab timer value sent with each Check.
 - **Walkthroughs** are listed separately (steps passed, completed) and are not part of mastery, solved labs or streaks.
+  Steps you marked done by hand show as *+N by hand*, and a walkthrough completed with manual marks carries a
+  *marked manually* label.
+- **Labs marked complete by hand** (only shown when there are any): challenge labs you marked complete, labelled
+  *marked manually*, with your best graded score if you checked them at all.
+
+### Marking a lab complete by hand
+When a check is buggy (for example a regex that does not match your platform's output) you can still move on:
+
+- **Mark lab complete** (lab toolbar of challenge labs, outside exam mode, and the progress bar of walkthroughs) asks
+  for confirmation, then records the lab as *completed manually*. **Undo / mark incomplete** (with a confirmation)
+  removes the mark; graded results, history and walkthrough step results are kept.
+- **Mark step done** does the same for one walkthrough step (see [Walkthrough labs](#walkthrough-labs-bgp-evpn-vxlan)).
+- A manual completion is recorded apart from graded passes (`manual_complete.json` in the data folder for challenge
+  labs, the walkthrough's progress file for walkthroughs) and shown with a subtle *marked manually* label in the lab
+  list, the lab header, courses and the Progress page.
+- **Courses count it as complete**: the course's *x/y done* goes up and *Continue* moves on to the next lab. It never
+  counts as a graded pass: scores, mastery, *labs solved* and streaks do not change, and a later passing Check makes it
+  a normal *solved* lab. *Restart walkthrough* clears a walkthrough's manual marks too.
 
 How a score counts: the best attempt per lab, minus 5 points per hint used. It is capped at 50% if you revealed the answer
 first, and exam attempts use the exam result. Labs never checked count as 0. Everything is computed locally from the

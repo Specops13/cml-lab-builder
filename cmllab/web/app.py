@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import security
-from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, migrate, packs, progress, report, resources, service, sizing, snapshots, updates, walkthrough
+from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, manual, migrate, packs, progress, report, resources, service, sizing, snapshots, updates, walkthrough
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from .. import cml as _cml_mod
@@ -202,8 +202,8 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         if not l.is_walkthrough:
             return None
         st = walkthrough.status(l)
-        return {k: st[k] for k in ("current", "required", "required_passed", "pct", "completed")} | {
-            "steps": len(l.steps)}
+        return {k: st[k] for k in ("current", "required", "required_passed", "required_done", "pct", "completed",
+                                   "completed_manually")} | {"steps": len(l.steps)}
 
     def _plain(lab_id: str, what: str):
         e = _entry(lab_id)
@@ -229,11 +229,13 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
             errors["settings"] = f"{e}; showing IOL interface names"
             plat = get_platform("iol")
         s = store.get()
+        marked = manual.load()
         for lid, e in catalog.entries(errors=errors).items():
             try:
                 l = e.lab
                 h = history.load(lid)
                 wt = _wt_brief(l)
+                graded = any(x.get("passed") for x in h)
                 out.append({"id": l.id, "title": render(l.title, plat), "summary": render(l.summary, plat),
                             "blueprint": l.blueprint,
                             "domain": l.domain, "difficulty": l.difficulty, "nodes": l.node_count,
@@ -242,7 +244,8 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                             "checks": {"live": len(l.checks_for("live")), "config": len(l.checks_for("config"))},
                             "faults": len(l.faults), "fault_active": bool(faults.active(lid)), "exam_active": bool(exam.active(lid)),
                             "best": max((x.get("score_pct") or 0 for x in h), default=None) if not wt else None,
-                            "solved": bool(wt["completed"]) if wt else any(x.get("passed") for x in h),
+                            "solved": bool(wt["completed"]) if wt else (graded or lid in marked),
+                            "marked_manually": bool(wt["completed_manually"]) if wt else (lid in marked and not graded),
                             "type": l.type, "walkthrough": wt, "ram": _ram(l, s), "version": l.version,
                             "library": e.source == "builtin" or bool(library.origin(lid)),
                             "update_available": lid in library.last_index().get("updates", [])})
@@ -294,7 +297,12 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                       "checks": [{"id": c.id, "mode": c.mode, "device": c.device,
                                   "description": render(c.description, plat)} for c in st.checks]}
                      for st in l.steps]
+        graded = None if l.is_walkthrough else any(x.get("passed") for x in history.load(lab_id))
+        man_at = None if l.is_walkthrough else manual.get(lab_id)
         return {"type": l.type, "steps": steps, "ram": _ram(l),
+                "solved": None if l.is_walkthrough else bool(graded or man_at),
+                "marked_manually": None if l.is_walkthrough else bool(man_at and not graded),
+                "manual_completed": man_at,
                 "walkthrough": walkthrough.status(l) if l.is_walkthrough else None,
                 "final_summary": walkthrough.summary(l, plat) if l.is_walkthrough else None,
                 "exam": ex, "hints_total": len(hints), "default_exam_minutes": exam.default_minutes(l),
@@ -430,20 +438,28 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         return rep.to_dict()
 
     # ------------------------------------------------------------ courses + online library
-    def _best() -> dict:
-        out = {}
+    def _best() -> tuple[dict, dict]:
+        """(lab id -> best score, lab id -> how a lab without a graded pass was completed by hand)."""
+        out, man = {}, {}
+        marked = manual.load()
         for lid, e in catalog.entries().items():
             if e.lab.is_walkthrough:     # completion, not a score
-                out[lid] = 100.0 if walkthrough.status(e.lab)["completed"] else None
+                st = walkthrough.status(e.lab)
+                out[lid] = 100.0 if st["completed"] else None
+                if st["completed_manually"]:
+                    man[lid] = st["completed"]
                 continue
             h = history.load(lid)
             out[lid] = max((x.get("score_pct") or 0 for x in h), default=None)
-        return out
+            if lid in marked and not any(x.get("passed") for x in h):
+                man[lid] = marked[lid]
+        return out, man
 
     @app.get("/api/courses")
     def course_list():
         s = store.get()
-        return {"courses": courses.list_courses(_best(), platform=s.platform, heavy_gb=s.ram_heavy_gb)}
+        best, man = _best()
+        return {"courses": courses.list_courses(best, platform=s.platform, heavy_gb=s.ram_heavy_gb, manual=man)}
 
     @app.delete("/api/courses/{course_id}")
     def course_delete(course_id: str, labs: bool = False):
@@ -756,6 +772,27 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
     @app.post("/api/labs/{lab_id}/walkthrough/reset")
     def wt_reset(lab_id: str):
         return walkthrough.reset(_walk(lab_id).lab)
+
+    # ------------------------------------------------------------ manual completion (3.3.3, for buggy checks)
+    @app.post("/api/labs/{lab_id}/steps/{step_id}/mark-done")
+    def wt_mark_step(lab_id: str, step_id: str, done: bool = True):
+        """Count a walkthrough step as done by hand (recorded as marked manually, not as passed); done=false undoes it."""
+        e = _walk(lab_id)
+        try:
+            return walkthrough.mark_step(e.lab, step_id, done)
+        except walkthrough.WalkthroughError as ex:
+            raise HTTPException(404, str(ex))
+
+    @app.post("/api/labs/{lab_id}/mark-complete")
+    def mark_complete(lab_id: str, done: bool = True):
+        """Mark a lab complete by hand (completed-manually, distinct from a graded pass); done=false: incomplete."""
+        e = _entry(lab_id)
+        if e.lab.is_walkthrough:
+            return {"lab_id": lab_id, "walkthrough": walkthrough.mark_complete(e.lab, done)}
+        at = manual.set_done(lab_id, done)
+        graded = any(x.get("passed") for x in history.load(lab_id))
+        return {"lab_id": lab_id, "manual_completed": at, "solved": graded or at is not None,
+                "marked_manually": at is not None and not graded}
 
     def _wt_kw(s, lab_id):
         runner = runner_factory(s, lab_id) if (runner_factory and s.grading_mode != "config") else None

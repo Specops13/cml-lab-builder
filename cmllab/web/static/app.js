@@ -32,6 +32,11 @@ function ramTag(r) {
 const walkTag = (l) => l.type === "walkthrough" ? '<span class="tag walk">walkthrough</span>' : "";
 /* where a lab came from: library labs need no tag; labs you made or imported yourself say so */
 const srcTag = (l) => (l.library || l.source === "builtin") ? "" : '<span class="tag user">imported</span>';
+// completed by hand (3.3.3, for a buggy check): recorded apart from a graded pass, counted by courses, not by mastery
+const manTag = (what = "lab") => `<span class="tag manual" title="This ${what} was marked done by hand, not by a graded check">marked manually</span>`;
+const doneTags = (l) => l.walkthrough
+  ? (l.walkthrough.completed ? '<span class="tag ok">completed</span>' + (l.walkthrough.completed_manually ? manTag() : "") : ((l.walkthrough.required_done || l.walkthrough.required_passed) ? `<span class="tag">${l.walkthrough.required_done ?? l.walkthrough.required_passed}/${l.walkthrough.required} steps</span>` : ""))
+  : (l.marked_manually ? '<span class="tag ok">completed</span>' + manTag() : l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : ""));
 const updTag = (l) => l.update_available ? '<span data-help="lab.updateTag" class="tag warn">update available</span>' : "";
 let migration = null, libraryUrl = "", libStarter = [];
 let labRecs = [], libIdx = null, libRecs = [], libCards = [], libRaf = 0;
@@ -214,9 +219,7 @@ function renderList() {
   $("#lab-list").innerHTML = items.map((l) => `<li data-help="lab.item" data-id="${esc(l.id)}" class="${l.id === current ? "sel" : ""}">
     <b>${hl(l, "title")}</b><br>
     ${walkTag(l)}<span class="tag">${"★".repeat(l.difficulty)}</span><span class="tag">${l.nodes} nodes</span>${ramTag(l.ram)}<span class="tag">${esc(l.blueprint.join(", "))}</span>
-    ${srcTag(l)}${updTag(l)}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${l.walkthrough
-      ? (l.walkthrough.completed ? '<span class="tag ok">completed</span>' : (l.walkthrough.required_passed ? `<span class="tag">${l.walkthrough.required_passed}/${l.walkthrough.required} steps</span>` : ""))
-      : (l.solved ? '<span class="tag ok">solved</span>' : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : ""))}
+    ${srcTag(l)}${updTag(l)}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${doneTags(l)}
     <div class="muted small">${hl(l, "summary")}</div></li>`).join("") || `<li class="muted">${labs.length ? (q.trim() ? `No labs match "${esc(q.trim())}". Try fewer or shorter words, or clear the filters (Esc clears the search).` : "No labs match the filters.") : "Your labs will show up here."}</li>`;
   $$("#lab-list li[data-id]").forEach((li) => li.addEventListener("click", () => selectLab(li.dataset.id)));
 }
@@ -425,7 +428,7 @@ function renderCourses() {
     ${bar(c.pct)}
     ${c.description ? `<div class="muted small">${esc(c.description)}</div>` : ""}
     <ol>${c.labs.map((l) => `<li>${l.available ? `<a data-help="lib.courseLab" href="#" data-open="${esc(l.id)}">${esc(l.title)}</a>` : `${esc(l.id)} <span class="tag warn">missing</span>`}
-      ${l.type === "walkthrough" ? walkTag(l) : ""}${ramTag(l.ram)}${l.solved ? `<span class="tag ok">${l.type === "walkthrough" ? "completed" : "solved"}</span>` : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : "")}</li>`).join("")}</ol></div>`).join("")
+      ${l.type === "walkthrough" ? walkTag(l) : ""}${ramTag(l.ram)}${l.solved ? `<span class="tag ok">${l.type === "walkthrough" || l.marked_manually ? "completed" : "solved"}</span>${l.marked_manually ? manTag() : ""}` : (l.best != null ? `<span class="tag">best ${l.best}%</span>` : "")}</li>`).join("")}</ol></div>`).join("")
     : `<div class="muted">No courses yet. Install one from the online library below, or import a .encorcourse file.</div>`;
   $$("#lib-courses [data-open]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); selectLab(b.dataset.open); }));
   $$("#lib-courses [data-filter]").forEach((b) => b.addEventListener("click", () => { $("#f-course").value = b.dataset.filter; renderList(); }));
@@ -762,7 +765,7 @@ async function selectLab(id) {
   $("#lab-detail").innerHTML = `
     <div class="toolbar"><h2 style="margin:0">${esc(l.title)}</h2><span class="sep"></span>
       <span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
-      ${srcTag(labs.find((x) => x.id === l.id) || l)}</div>${libNote(l.id)}
+      ${srcTag(labs.find((x) => x.id === l.id) || l)}${l.marked_manually ? '<span class="tag ok">completed</span>' + manTag() : ""}</div>${libNote(l.id)}
     <div class="toolbar">
       <button data-help="lab.build" id="a-build" class="primary">Build</button>${l.exam ? '<button data-help="lab.examSubmit" id="a-check" class="primary">Submit exam</button>' : '<button data-help="lab.check" id="a-check">Check</button>'}<button data-help="lab.hintNext" id="a-hint">Hint</button>
       <label class="inline">Grading<select data-help="lab.mode" id="mode"><option value="">Mode: default</option><option value="auto">Auto</option><option value="live">Live only</option><option value="config">Config only</option></select></label>
@@ -772,6 +775,7 @@ async function selectLab(id) {
       <span class="sep"></span>
       ${l.exam ? "" : `<button data-help="lab.edit" id="a-edit">Edit / copy</button><button data-help="lab.export" id="a-export">Export pack</button>`}
       ${l.source === "user" ? '<button data-help="lab.delete" id="a-delete" class="danger">Delete lab</button>' : ""}
+      ${l.exam ? "" : markLabBtn(l)}
     </div>
     <div id="build-confirm"></div>
     <div class="statusbar"><span data-help="lab.status" class="muted"><span id="status">Status: …</span></span><div class="progress"><div id="boot-bar"></div></div>
@@ -836,6 +840,7 @@ async function selectLab(id) {
   if ($("#a-edit")) $("#a-edit").onclick = () => openInBuilder(id);
   if ($("#a-export")) $("#a-export").onclick = () => { location.href = `/api/labs/${encodeURIComponent(id)}/export`; };
   if ($("#a-delete")) $("#a-delete").onclick = () => deleteLab(id, l.title);
+  bindMarkLab(l);
   $("#t-toggle").onclick = () => (timerState(id).start ? timerPause(id) : timerStart(id));
   $("#t-reset").onclick = () => confirm("Reset the timer?") && timerSet(id, {acc: 0, start: null});
   bindHints($("#lab-detail")); bindConsoleTest(l);
@@ -1208,16 +1213,43 @@ function renderWalkthrough(l) {
 }
 function walkStepState(i) {
   const st = walk.status.steps[i] || {};
-  return st.passed === true ? "ok" : st.passed === false ? "bad" : "";
+  return st.passed === true ? "ok" : st.manual_at ? "man" : st.passed === false ? "bad" : "";
 }
 function renderWalkProgress() {
   const l = walk.lab, s = walk.status, n = l.steps.length;
+  const marked = s.steps.filter((x) => x.manual_at && !x.passed).length;
   $("#walk-progress").innerHTML = `<div class="toolbar"><b data-help="w.progress">${walk.index >= n ? `Summary (after step ${n})` : `Step ${walk.index + 1} of ${n}`}</b>
-      <span class="muted small">${s.required_passed}/${s.required} required steps checked${s.completed ? " · <span class=\"pass\">walkthrough completed</span>" : ""}</span></div>
+      <span class="muted small">${s.required_passed}/${s.required} required steps checked${marked ? `, ${marked} marked done by hand` : ""}${s.completed ? " · <span class=\"pass\">walkthrough completed</span>" : ""}</span>${s.completed_manually ? manTag("walkthrough") : ""}
+      <span class="sep"></span>${markLabBtn(l, s)}</div>
     <div class="pbar wide" role="progressbar" aria-label="Walkthrough progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(100 * walk.index / n)}"><div style="width:${Math.round(100 * Math.min(walk.index, n) / n)}%"></div></div>
-    <ol class="walk-steps">${l.steps.map((st, i) => `<li class="${i === walk.index ? "cur " : ""}${walkStepState(i)}"><button data-help="w.jump" class="hint-btn" data-step="${i}" title="${esc(st.title)}">${i + 1}${walkStepState(i) === "ok" ? " ✓" : walkStepState(i) === "bad" ? " ✗" : ""}${st.optional ? " (opt.)" : ""}</button></li>`).join("")}
+    <ol class="walk-steps">${l.steps.map((st, i) => `<li class="${i === walk.index ? "cur " : ""}${walkStepState(i)}"><button data-help="w.jump" class="hint-btn" data-step="${i}" title="${esc(st.title)}${walkStepState(i) === "man" ? " (marked done manually)" : ""}"${walkStepState(i) === "man" ? ` aria-label="${i + 1}, marked done manually"` : ""}>${i + 1}${walkStepState(i) === "ok" ? " ✓" : walkStepState(i) === "man" ? " ✓" : walkStepState(i) === "bad" ? " ✗" : ""}${st.optional ? " (opt.)" : ""}</button></li>`).join("")}
       <li class="${walk.index >= n ? "cur" : ""}"><button data-help="w.summary" class="hint-btn" data-step="${n}">Summary</button></li></ol>`;
   $$("#walk-progress [data-step]").forEach((b) => b.onclick = () => walkGo(Number(b.dataset.step)));
+  bindMarkLab(l, s);
+}
+/* "Mark lab complete" / "Undo / mark incomplete": for a lab whose check is buggy. Walkthrough s = its status. */
+function markLabBtn(l, s) {
+  if (s ? s.manual_completed : l.marked_manually)
+    return '<button data-help="lab.unmarkComplete" id="a-unmark" class="hint-btn">Undo / mark incomplete</button>';
+  if (s ? s.completed : l.solved) return "";
+  return '<button data-help="lab.markComplete" id="a-mark" class="hint-btn">Mark lab complete</button>';
+}
+function bindMarkLab(l, s) {
+  const go = async (done) => {
+    const what = s ? "walkthrough" : "lab";
+    if (!confirm(done
+      ? `Mark this ${what} complete by hand?\n\nUse this when a check is wrong. It is recorded as "marked manually" (not a graded pass): courses count it as done, scores and mastery do not change.`
+      : `Undo the manual mark and set this ${what} back to incomplete?${s ? " Step results are kept." : " Your check history is kept."}`)) return;
+    try {
+      const r = await api(`/api/labs/${encodeURIComponent(l.id)}/mark-complete?done=${done}`, {method: "POST"});
+      toast(done ? `Marked complete (manually)` : "Marked incomplete", "ok");
+      if (s) { walk.status = r.walkthrough; renderWalkStep(); } else selectLab(l.id);
+      loadLabs(); loadCourses();
+    } catch (e) { toast(`Could not update: ${e.message}`, "err", 8000); }
+  };
+  const root = s ? "#walk-progress " : "#lab-detail ";
+  if ($(root + "#a-mark")) $(root + "#a-mark").onclick = () => go(true);
+  if ($(root + "#a-unmark")) $(root + "#a-unmark").onclick = () => go(false);
 }
 async function walkGo(i) {
   const n = walk.lab.steps.length;
@@ -1239,7 +1271,7 @@ function renderWalkStep() {
   if (i >= n) {
     const fs = l.final_summary || {devices: {}, text: ""};
     box.innerHTML = `<h3 data-help="w.summaryView">Summary: the whole build</h3>
-      ${walk.status.completed ? '<p class="pass">Walkthrough completed: every required step has passed its checks.</p>' : `<p class="note">${walk.status.required - walk.status.required_passed} required step(s) not checked yet. Use <b>Check every step</b> to check them all at once.</p>`}
+      ${walk.status.completed ? (walk.status.completed_manually ? `<p class="pass">Walkthrough completed ${manTag("walkthrough")}</p>` : '<p class="pass">Walkthrough completed: every required step has passed its checks.</p>') : `<p class="note">${walk.status.required - (walk.status.required_done ?? walk.status.required_passed)} required step(s) not checked yet. Use <b>Check every step</b> to check them all at once.</p>`}
       <div class="md">${md(fs.text)}</div>
       <h4>Complete config per device</h4>
       ${Object.entries(fs.devices).map(([dev, parts]) => cfgBlock(dev, parts.map((p) => `! --- ${p.title}${p.optional ? " (optional)" : ""}\n${p.config}`).join(""), true)).join("")}
@@ -1247,16 +1279,28 @@ function renderWalkStep() {
   } else {
     const st = l.steps[i], r = walk.status.steps[i] || {};
     box.innerHTML = `<h3>${i + 1}. ${esc(st.title)} ${st.optional ? '<span class="tag">optional</span>' : ""}
-        ${r.passed === true ? '<span class="tag ok">checked ✓</span>' : r.passed === false ? '<span class="tag bad">not passing yet</span>' : ""}${r.applied_at ? '<span class="tag">applied for you</span>' : ""}</h3>
+        ${r.passed === true ? '<span class="tag ok">checked ✓</span>' : r.manual_at ? '<span class="tag ok">done</span>' + manTag("step") : r.passed === false ? '<span class="tag bad">not passing yet</span>' : ""}${r.applied_at ? '<span class="tag">applied for you</span>' : ""}</h3>
       <div class="md">${md(st.explain)}</div>
       ${Object.keys(st.config).length ? `<h4 data-help="w.config">Configuration</h4>${Object.entries(st.config).map(([d, c]) => cfgBlock(d, c, false)).join("")}` : ""}
       ${st.verify.length ? `<h4 data-help="w.verify">Verify</h4><table><tr><th>Device</th><th>Command</th><th>Good output looks like</th></tr>${st.verify.map((v) => `<tr>
         <td>${esc(v.device)}</td><td><code class="cmd">${esc(v.command)}</code> <button data-help="w.copyCmd" class="hint-btn" data-copy="${esc(v.command)}">Copy</button></td><td class="md small">${md(v.expect)}</td></tr>`).join("")}</table>` : ""}
       <div class="toolbar">${st.checks.length ? `<button data-help="w.check" id="w-check" class="primary">Check this step</button><span class="muted small">${st.checks.length} check(s): ${st.checks.filter((c) => c.mode === "live").length} live, ${st.checks.filter((c) => c.mode === "config").length} config</span>` : '<span class="muted small">Nothing to check in this step: read it and move on.</span>'}
-        ${st.apply ? '<button data-help="w.apply" id="w-apply" class="warn">Apply this step for me</button>' : ""}</div>
+        ${st.apply ? '<button data-help="w.apply" id="w-apply" class="warn">Apply this step for me</button>' : ""}
+        ${st.checks.length && r.passed !== true ? (r.manual_at ? '<button data-help="w.unmarkStep" id="w-unmark" class="hint-btn">Undo mark done</button>'
+          : '<button data-help="w.markStep" id="w-mark" class="hint-btn">Mark step done</button>') : ""}</div>
       <div id="w-results"></div>
       ${nav}`;
     if ($("#w-check")) $("#w-check").onclick = () => run("step-check", `/api/labs/${l.id}/steps/${encodeURIComponent(st.id)}/check`);
+    const mark = async (done) => {
+      try {
+        walk.status = await api(`/api/labs/${encodeURIComponent(l.id)}/steps/${encodeURIComponent(st.id)}/mark-done?done=${done}`, {method: "POST"});
+        renderWalkStep(); $(done ? "#w-unmark" : "#w-mark")?.focus();
+        toast(done ? "Step marked done by hand. Next → to continue." : "Manual mark removed", "ok");
+        loadLabs(); loadCourses();
+      } catch (e) { toast(`Could not update: ${e.message}`, "err", 8000); }
+    };
+    if ($("#w-mark")) $("#w-mark").onclick = () => mark(true);
+    if ($("#w-unmark")) $("#w-unmark").onclick = () => mark(false);
     if ($("#w-apply")) $("#w-apply").onclick = () => confirm(`Type the configuration of this step into ${Object.keys(st.config).join(", ")} over the CML console?\n\nThe lab must be built and booted. Typing it yourself teaches more; this is for catching up.`) &&
       run("step-apply", `/api/labs/${l.id}/steps/${encodeURIComponent(st.id)}/apply`);
   }
@@ -1302,8 +1346,11 @@ async function loadProgress() {
       <div class="kpi" data-help="p.faults"><b>${o.faults_fixed}</b><span>faults fixed</span></div></div>
     ${p.walkthroughs && p.walkthroughs.total ? `<h3 data-help="p.walkthroughs">Walkthroughs <span class="muted small">(${p.walkthroughs.completed}/${p.walkthroughs.total} completed, not part of mastery)</span></h3>
       <table><tr><th>Walkthrough</th><th>Steps checked</th><th></th><th>Status</th><th></th></tr>${p.walkthroughs.labs.map((w) => `<tr><td>${esc(w.title)}</td>
-        <td>${w.required_passed}/${w.required}</td><td>${bar(w.pct)}</td><td>${w.completed ? '<span class="tag ok">completed</span>' : w.started ? '<span class="tag">in progress</span>' : '<span class="muted small">not started</span>'}</td>
+        <td>${w.required_passed}/${w.required}${w.steps_marked ? ` <span class="muted small">+${w.steps_marked} by hand</span>` : ""}</td><td>${bar(w.pct)}</td><td>${w.completed ? '<span class="tag ok">completed</span>' + (w.marked_manually ? manTag("walkthrough") : "") : w.started ? '<span class="tag">in progress</span>' : '<span class="muted small">not started</span>'}</td>
         <td>${labBtns([w.id])}</td></tr>`).join("")}</table>` : ""}
+    ${p.labs.some((l) => l.marked_manually) ? `<h3 data-help="p.marked">Labs marked complete by hand <span class="muted small">(count for courses, not for solved labs or mastery)</span></h3>
+      <table><tr><th>Lab</th><th>Status</th><th>Best score</th><th></th></tr>${p.labs.filter((l) => l.marked_manually).map((l) => `<tr><td>${esc(l.title)}</td>
+        <td><span class="tag ok">completed</span>${manTag()}</td><td>${l.attempts ? `${l.mastery_pct}%` : '<span class="muted small">not checked</span>'}</td><td>${labBtns([l.id])}</td></tr>`).join("")}</table>` : ""}
     ${(p.tracks || []).length > 1 || ((p.tracks || [])[0] && !p.tracks[0].encor) ? `<h3 data-help="p.tracks">Tracks</h3>
       <table><tr><th>Track</th><th>Mastery</th><th></th><th>Solved</th><th>Labs</th></tr>${p.tracks.map((t) => `<tr><td><b>${esc(t.id)}</b></td>
         <td>${t.mastery_pct}%</td><td>${bar(t.mastery_pct)}</td><td>${t.solved}/${t.labs}</td><td>${labBtns(t.lab_ids)}</td></tr>`).join("")}</table>` : ""}
