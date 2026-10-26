@@ -2,7 +2,7 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
-## [3.3.6] - Unreleased
+## [3.3.6] - 2026-10-26
 ### Added
 - **New walkthroughs for the remaining ENCOR and ENARSI objectives** (IOL unless noted, strict day-0 config on every
   Ethernet port, `show`/`ping` checks, debug commands in the text, solution summary, exam tags on the lab and each step):
@@ -22,6 +22,16 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
     nodes, about 4 GB. ENARSI 3.4, CCIE-EI 4.2.c.i-vi.
   - `32-lisp-msmr-xtr`: LISP map-server/map-resolver, xTR registration, Map-Request/Map-Reply and the map-cache, and
     how this is the SD-Access control plane. 4 IOL nodes, about 4 GB. ENCOR 2.3.a, 1.3.a, CCIE-EI 2.1.b.i.
+  - `33-netconf-restconf-eem` (needs app 3.3.6): NETCONF over SSH with YANG and XML, RESTCONF with curl and JSON,
+    HTTP response codes, REST API security (HTTPS only, local authentication, access class), a standard-library
+    Python RESTCONF client, EEM applets (syslog-triggered self-healing, on-demand data collection), ERSPAN to tcpdump.
+    1 Cat8000v + 1 Ubuntu + 1 IOL node, about 7 GB. ENCOR 4.6, 5.3, 6.1, 6.2, 6.3, 6.5, 6.6, 6.7, 4.3, CCNA 6.5,
+    6.7, CCIE-EI 4.3.a.iii, 5.1.a/b, 5.2.a.
+- **`cat8000v` and `ubuntu` node definitions** for lab `definition:` (CML 2.9 reference platform). Cat8000v:
+  `GigabitEthernet1-4`, `platform console serial` added to the day-0 config, 15-minute boot allowance. Ubuntu:
+  `ens2-ens5`, cloud-init `#cloud-config` user-data used verbatim; never configured, graded, opened on the console or
+  snapshotted by the app (labs that try are rejected by validation). CML interface ids now account for nodes without
+  a Loopback0.
 ### Changed
 - `29-file-transfer-archive` moved to the ENARSI track (pack version 2).
 

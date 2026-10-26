@@ -964,7 +964,7 @@ hints:
       }
      ],
      "default": null,
-     "description": "Optional explicit CML node definition instead of the platform profile's router/switch, e.g. 'nxosv9000' (NX-OS 9000v, ports 0-3 = Ethernet1/1-1/4). Write literal interface names in its config, not %ifN%",
+     "description": "Optional explicit CML node definition instead of the platform profile's router/switch, e.g. 'nxosv9000' (NX-OS 9000v, ports 0-3 = Ethernet1/1-1/4), 'cat8000v' (3.3.6+, GigabitEthernet1-4) or 'ubuntu' (3.3.6+, ens2-ens5, config = cloud-init #cloud-config user-data; a host that is never graded). Write literal interface names in its config, not %ifN%",
      "title": "Definition"
     }
    },

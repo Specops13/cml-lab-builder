@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_product_name_and_version():
-    assert PRODUCT == "CML Lab Builder" and __version__ == "3.3.5"
+    assert PRODUCT == "CML Lab Builder" and __version__ == "3.3.6"
 
 
 def test_extensions_new_and_legacy_import(tmp_path, monkeypatch):

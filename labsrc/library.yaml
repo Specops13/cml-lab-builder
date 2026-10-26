@@ -46,6 +46,7 @@ topics:
   30-ospfv3-af-path-pref: [ospf, ipv6]
   31-ipv6-first-hop-security: [ipv6, security]
   32-lisp-msmr-xtr: [tunnels]
+  33-netconf-restconf-eem: [automation, assurance]
   eigrp-basic: [eigrp]
   ospf-multiarea-stub: [ospf]
   troubleshoot-ospf-7node: [troubleshooting, ospf]

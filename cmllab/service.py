@@ -12,7 +12,7 @@ from typing import Callable
 from . import catalog, render
 from .cml import CML
 from .grader import grade
-from .platforms import get as get_platform
+from .platforms import get as get_platform, is_linux
 
 
 def make_cml(settings, client_factory=None) -> CML:
@@ -204,6 +204,8 @@ def do_snapshot_save(settings, lab_id, name, progress, client_factory=None, conf
     src = config_source or make_cml(settings, client_factory).config_source(lab)
     configs = {}
     for n in lab.nodes:
+        if is_linux(n.definition):       # cloud-init hosts have no running config; restore re-uses their day-0
+            continue
         progress(f"Reading the running config of {n.name}")
         configs[n.name] = src.get_config(n.name)
     meta = snapshots.save(lab_id, name, configs, settings.platform, note, overwrite=overwrite)

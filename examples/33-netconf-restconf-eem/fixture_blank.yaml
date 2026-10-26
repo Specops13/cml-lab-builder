@@ -1,0 +1,27 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Outputs follow the IOS XE 17 programmability, EEM and ERSPAN configuration guides.
+# State: freshly booted lab (day-0 only).
+R1:
+  ping 10.33.1.10: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.33.1.10, timeout is 2 seconds:
+    .!!!!
+    Success rate is 80 percent (4/5), round-trip min/avg/max = 1/1/2 ms
+  ping 10.33.2.2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.33.2.2, timeout is 2 seconds:
+    .!!!!
+    Success rate is 80 percent (4/5), round-trip min/avg/max = 1/1/2 ms
+  show netconf-yang status: |
+    netconf-yang: disabled
+  show ip interface brief: |
+    Interface              IP-Address      OK? Method Status                Protocol
+    GigabitEthernet1       10.33.1.1       YES manual up                    up
+    GigabitEthernet2       10.33.2.1       YES manual up                    up
+    GigabitEthernet3       unassigned      YES unset  administratively down down
+    GigabitEthernet4       unassigned      YES unset  administratively down down
+  show event manager policy registered: |
+    No policies are registered
+  show monitor session 1: |2+
+
+...

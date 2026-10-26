@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .templates import expand_check
 
-from .platforms import DEFINITIONS, MAX_PORTS, PLATFORMS, placeholders
+from .platforms import DEFINITIONS, MAX_PORTS, PLATFORMS, is_linux, placeholders
 
 _NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,30}$")
 
@@ -35,7 +35,9 @@ class Node(_Strict):
     config: str = Field(description="Starting IOS config (no hostname line needed). Use %if0%..%if3% for data interfaces")
     definition: str | None = Field(default=None, description=(
         "Optional explicit CML node definition instead of the platform profile's router/switch, e.g. 'nxosv9000' "
-        "(NX-OS 9000v, ports 0-3 = Ethernet1/1-1/4). Write literal interface names in its config, not %ifN%"))
+        "(NX-OS 9000v, ports 0-3 = Ethernet1/1-1/4), 'cat8000v' (3.3.6+, GigabitEthernet1-4) or 'ubuntu' (3.3.6+, "
+        "ens2-ens5, config = cloud-init #cloud-config user-data; a host that is never graded). Write literal "
+        "interface names in its config, not %ifN%"))
 
     @field_validator("name")
     @classmethod
@@ -274,6 +276,15 @@ class Lab(_Strict):
                     errs.append(f"{n.name}: placeholder port {idx} out of range")
             if n.definition and placeholders(n.config):
                 errs.append(f"{n.name}: write literal {n.definition} interface names, not %ifN% placeholders")
+        linux = {n.name for n in self.nodes if is_linux(n.definition)}
+        for n in self.nodes:
+            if n.name in linux and not n.config.lstrip().startswith("#cloud-config"):
+                errs.append(f"{n.name}: a {n.definition} node's config is cloud-init user-data starting with #cloud-config")
+        graded = [c.device for c in self.checks] + [c.device for f in self.faults for c in f.checks] + \
+            [c.device for st in self.steps for c in st.checks] + [v.device for st in self.steps for v in st.verify] + \
+            [d for st in self.steps for d in st.config] + [d for d in (self.solution or {})]
+        for dev in sorted(set(graded) & linux):
+            errs.append(f"{dev}: Linux hosts are not configured or graded by the app; check and configure IOS devices only")
         if self.type == "walkthrough":
             errs.extend(self._walkthrough_errors(names))
         else:

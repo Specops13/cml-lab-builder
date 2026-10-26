@@ -1,0 +1,502 @@
+id: 33-netconf-restconf-eem
+type: walkthrough
+title: 'Walkthrough: NETCONF, RESTCONF, Python, EEM and ERSPAN (Cat8000v + Ubuntu)'
+track: ENCOR
+blueprint:
+- '4.6'
+- '5.3'
+- '6.1'
+- '6.2'
+- '6.3'
+- '6.5'
+- '6.6'
+- '6.7'
+domain: 6.0 Automation
+difficulty: 3
+platforms:
+- iol
+summary: Enable NETCONF and RESTCONF on a Catalyst 8000V, drive them from an Ubuntu host with ssh, curl and Python (YANG,
+  XML, JSON, response codes, API security), write EEM applets and mirror traffic to the host with ERSPAN.
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: R1
+  kind: router
+  definition: cat8000v
+  x: 0
+  y: 0
+  config: |
+    ! Cat8000v (IOS XE): the programmable router. NETCONF, RESTCONF, EEM and ERSPAN are added in the steps.
+    ip domain name lab.local
+    username admin privilege 15 secret Admin123
+    aaa new-model
+    aaa authentication login default local
+    aaa authentication login CONSOLE none
+    aaa authorization exec default local
+    crypto key generate rsa modulus 2048
+    ip ssh version 2
+    interface GigabitEthernet1
+     description to DEV ens2 (automation host)
+     ip address 10.33.1.1 255.255.255.0
+     no shutdown
+    interface GigabitEthernet2
+     description to R2 (ERSPAN source traffic)
+     ip address 10.33.2.1 255.255.255.0
+     no shutdown
+    interface GigabitEthernet3
+     description unused
+     no ip address
+     shutdown
+    interface GigabitEthernet4
+     description unused
+     no ip address
+     shutdown
+    line con 0
+     login authentication CONSOLE
+    line vty 0 4
+     transport input ssh
+- name: DEV
+  kind: router
+  definition: ubuntu
+  x: -250
+  y: 0
+  config: |
+    #cloud-config
+    hostname: DEV
+    manage_etc_hosts: true
+    system_info:
+      default_user:
+        name: cisco
+    password: cisco
+    chpasswd: { expire: False }
+    ssh_pwauth: True
+    runcmd:
+      - ip address add 10.33.1.10/24 dev ens2
+      - ip link set up dev ens2
+      - ip route add 10.33.0.0/16 via 10.33.1.1
+- name: R2
+  kind: router
+  x: 250
+  y: 0
+  config: |
+    ! IOL router that only generates traffic for the ERSPAN step.
+    interface %if0%
+     description to R1 Gi2
+     ip address 10.33.2.2 255.255.255.0
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ip route 10.33.0.0 255.255.0.0 10.33.2.1
+links:
+- a:
+    node: R1
+    port: 0
+  b:
+    node: DEV
+    port: 0
+- a:
+    node: R1
+    port: 1
+  b:
+    node: R2
+    port: 0
+task: |
+  ## Programmability on a Catalyst 8000V: NETCONF, RESTCONF, JSON, Python, EEM and ERSPAN
+
+  ENCOR section 6 (automation) and 4.6 (NETCONF/RESTCONF) need a real IOS XE device with its programmability
+  stack - IOL does not have one. This lab uses a **Catalyst 8000V** router (R1), an **Ubuntu** host (DEV) as the
+  automation workstation and capture point, and a small IOL router (R2) that generates traffic.
+
+  | Device | Role |
+  |---|---|
+  | R1 (Cat8000v) | GigabitEthernet1 10.33.1.1 (to DEV), GigabitEthernet2 10.33.2.1 (to R2); user `admin` / `Admin123` |
+  | DEV (Ubuntu) | ens2 10.33.1.10; log in on its CML console as `cisco` / `cisco`; has ssh, curl and python3 |
+  | R2 (IOL) | Et0/0 10.33.2.2 |
+
+  1. **NETCONF** over SSH (port 830): capabilities, YANG models, a `<get-config>` with a subtree filter.
+  2. **RESTCONF** over HTTPS: read interfaces as JSON with curl, create a loopback with a JSON body, read the
+     HTTP response codes, secure the API.
+  3. **Python**: a short script on DEV that calls RESTCONF and interprets the JSON.
+  4. **EEM** applets: a syslog-triggered self-healing applet and an on-demand data-collection applet.
+  5. **ERSPAN**: mirror R1's GigabitEthernet2 inside GRE to DEV and watch it with tcpdump.
+
+  **Resources:** Cat8000v (about 4 GB) + Ubuntu (about 2 GB) + 1 IOL-XE, about 7 GB RAM. The Cat8000v takes
+  5-10 minutes to boot. **Needs CML Lab Builder 3.3.6 or newer** (older versions do not know the `cat8000v`
+  and `ubuntu` node definitions) and both images on the CML server (they ship on the CML 2.9 reference platform
+  ISO). Only R1 is graded; DEV is your workstation - work on it from its CML console.
+steps:
+- id: baseline
+  title: 'Baseline: R1 reaches DEV and R2'
+  explain: |
+    Wait until R1 has finished booting (the Cat8000v is slow - its console shows `R1>` or `R1#` when ready),
+    then log in to DEV's console (`cisco` / `cisco`) and check `ip -br address` shows 10.33.1.10 on ens2.
+
+    From DEV, `ssh admin@10.33.1.1` (password `Admin123`) must work: the day-0 config already has a domain
+    name, an RSA key, a privilege-15 local user and `aaa authorization exec default local`. NETCONF reuses
+    exactly this SSH and AAA set-up; RESTCONF reuses the local user. The console uses the `CONSOLE` method
+    list (`none`) so you are not locked out of it after `aaa new-model`.
+  verify:
+  - device: R1
+    command: ping 10.33.1.10
+    expect: Success rate 80-100 percent.
+  - device: R1
+    command: show ip ssh
+    expect: SSH Enabled - version 2.0.
+  checks:
+  - id: r1-dev
+    description: R1 reaches DEV
+    device: R1
+    command: ping 10.33.1.10
+    min_success: 60
+    hint: Wait for DEV to boot; its cloud-init adds 10.33.1.10/24 to ens2.
+  - id: r1-r2
+    description: R1 reaches R2
+    device: R1
+    command: ping 10.33.2.2
+    min_success: 60
+    hint: Wait for R2 to boot.
+- id: netconf
+  title: NETCONF over SSH and YANG
+  explain: |
+    **YANG** (RFC 7950) is a *data modelling language*: it describes configuration and state as a typed tree
+    (containers, lists with keys, leaves with types and constraints), independent of the CLI. Models come
+    from the IETF (`ietf-interfaces`, `ietf-ip`), OpenConfig, and Cisco (`Cisco-IOS-XE-native` mirrors the
+    CLI). Because the device validates every request against the model, automation gets structured data and
+    clear errors instead of screen-scraping CLI text - that is the benefit of model-driven programmability.
+
+    **NETCONF** (RFC 6241) carries YANG data as **XML** over SSH port 830, with operations `<get>`,
+    `<get-config>`, `<edit-config>`, `<lock>`, `<commit>` and datastores (running, candidate). Enable it with
+    `netconf-yang` (give it a minute: `show netconf-yang status`).
+
+    From DEV:
+
+    ```
+    ssh -p 830 admin@10.33.1.1 -s netconf
+    ```
+
+    R1 immediately sends a `<hello>` listing its **capabilities** (the YANG modules it supports - search the
+    output for `ietf-interfaces`). Paste a client hello and a `<get-config>` filtered to the interfaces
+    subtree, each message ending with `]]>]]>`:
+
+    ```
+    <?xml version="1.0" encoding="UTF-8"?>
+    <hello xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+      <capabilities><capability>urn:ietf:params:netconf:base:1.0</capability></capabilities>
+    </hello>]]>]]>
+    <rpc message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+      <get-config><source><running/></source>
+        <filter><interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces"/></filter>
+      </get-config>
+    </rpc>]]>]]>
+    ```
+
+    The `<rpc-reply message-id="101">` holds `<interface><name>GigabitEthernet1</name>...` - the same data the
+    CLI shows, as a YANG-shaped XML tree. Close with
+    `<rpc message-id="102" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><close-session/></rpc>]]>]]>`.
+    While connected, `show netconf-yang sessions` on R1 lists your session.
+
+    **Agentless vs agent-based (6.7):** NETCONF, RESTCONF and SSH are *agentless* - the device already speaks
+    the protocol and a controller (Ansible, a Python script, NSO) pushes changes; nothing is installed on the
+    device. *Agent-based* tools (Puppet, Chef) run an agent on the managed node that pulls its desired state
+    from a master. Ansible is agentless and push-based, Puppet/Chef pull with agents, SaltStack supports both.
+
+    If the SSH session is refused: `netconf-yang` not yet started (`show platform software yang-management
+    process` - every process must be Running), no RSA key, or the user lacks privilege 15. `debug netconf-yang`
+    shows the session set-up.
+  config:
+    R1: |
+      netconf-yang
+  verify:
+  - device: R1
+    command: show netconf-yang status
+    expect: 'netconf-yang: enabled, ssh port 830.'
+  - device: R1
+    command: show netconf-yang sessions
+    expect: Your session from 10.33.1.10 while ssh -p 830 is open.
+  checks:
+  - id: netconf-on
+    description: NETCONF is enabled on R1
+    device: R1
+    mode: config
+    match:
+    - ^netconf-yang$
+    hint: netconf-yang
+  - id: netconf-830
+    description: NETCONF listens on SSH port 830
+    device: R1
+    command: show netconf-yang status
+    match:
+    - 'netconf-yang: enabled'
+    - 'netconf-yang ssh port: 830'
+    hint: netconf-yang - then wait about a minute for the YANG processes to start.
+- id: restconf
+  title: RESTCONF, JSON and REST API security
+  explain: |
+    **RESTCONF** (RFC 8040) exposes the same YANG data over **HTTPS** with REST verbs: `GET` (read), `POST`
+    (create), `PUT` (create or replace), `PATCH` (merge), `DELETE`. Data is **JSON**
+    (`application/yang-data+json`) or XML. It needs the HTTPS server and `restconf`. This step also
+    **secures** the API:
+
+    - HTTPS only (`ip http secure-server`, `no ip http server`): credentials and data are encrypted.
+    - `ip http authentication local`: HTTP Basic authentication against the local user database - the
+      `Authorization: Basic base64(user:pass)` header is only an encoding, which is why TLS is mandatory.
+      Other REST APIs use tokens (Catalyst Center: POST credentials once to get a token, send it in the
+      `X-Auth-Token` header) or OAuth.
+    - `ip http access-class ipv4 MGMT`: only the management subnet may reach the API.
+    - Least privilege: RESTCONF needs privilege 15, so use dedicated API accounts and AAA accounting.
+
+    From DEV (`-k` accepts R1's self-signed certificate):
+
+    ```
+    curl -k -u admin:Admin123 -H "Accept: application/yang-data+json" \
+      https://10.33.1.1/restconf/data/ietf-interfaces:interfaces/interface=GigabitEthernet1
+    ```
+
+    Read the JSON: an **object** `{}` of `"key": value` pairs, **arrays** `[]`, strings in double quotes,
+    numbers and `true`/`false`/`null` without quotes, no trailing commas, no comments. The top-level key is
+    `module:container` (`"ietf-interfaces:interface"`).
+
+    Now create Loopback33 with a valid JSON body - save it as `lo33.json`:
+
+    ```
+    {
+      "ietf-interfaces:interface": {
+        "name": "Loopback33",
+        "description": "created via RESTCONF",
+        "type": "iana-if-type:softwareLoopback",
+        "enabled": true,
+        "ietf-ip:ipv4": {
+          "address": [ { "ip": "10.33.33.1", "netmask": "255.255.255.255" } ]
+        }
+      }
+    }
+    ```
+
+    ```
+    curl -k -u admin:Admin123 -X PUT -w '%{http_code}\n' \
+      -H "Content-Type: application/yang-data+json" -H "Accept: application/yang-data+json" \
+      -d @lo33.json https://10.33.1.1/restconf/data/ietf-interfaces:interfaces/interface=Loopback33
+    ```
+
+    **Response codes:** `200 OK` (GET with data), `201 Created` (new resource), `204 No Content` (changed,
+    nothing to return), `400 Bad Request` (malformed JSON - try removing a quote), `401 Unauthorized` (wrong
+    password), `403 Forbidden` (authenticated, not allowed), `404 Not Found` (wrong URL/resource), `409
+    Conflict` (POST of something that already exists - repeat the request as a POST to
+    `.../ietf-interfaces:interfaces` to see it), `5xx` server error. Errors return an `ietf-restconf:errors`
+    JSON body explaining what failed. (The step's CLI equivalent below is what "Apply this step" uses.)
+
+    `debug ip http all` shows the HTTP requests on R1 if a call fails.
+  config:
+    R1: |
+      ip access-list standard MGMT
+       permit 10.33.1.0 0.0.0.255
+      ip http secure-server
+      ip http authentication local
+      ip http access-class ipv4 MGMT
+      no ip http server
+      restconf
+      interface Loopback33
+       description created via RESTCONF
+       ip address 10.33.33.1 255.255.255.255
+  verify:
+  - device: R1
+    command: show platform software yang-management process
+    expect: confd, nginx and the other processes Running.
+  - device: R1
+    command: show ip interface brief
+    expect: Loopback33 10.33.33.1 up/up after the PUT.
+  checks:
+  - id: restconf-on
+    description: RESTCONF runs over HTTPS only, restricted to MGMT
+    device: R1
+    mode: config
+    match:
+    - ^restconf$
+    - ^ip http secure-server
+    - ^ip http access-class ipv4 MGMT
+    absent:
+    - ^ip http server$
+    hint: ip http secure-server / ip http authentication local / ip http access-class ipv4 MGMT / no ip http server / restconf
+  - id: lo33
+    description: Loopback33 was created (via RESTCONF)
+    device: R1
+    command: show ip interface brief
+    match:
+    - Loopback33\s+10\.33\.33\.1\s+YES\s+\S+\s+up\s+up
+    hint: PUT lo33.json to https://10.33.1.1/restconf/data/ietf-interfaces:interfaces/interface=Loopback33
+- id: python
+  title: 'Python: call RESTCONF and interpret the JSON'
+  explain: |
+    Python 3 is on DEV with only the standard library - enough for a RESTCONF client. Save this as
+    `ifaces.py` and run `python3 ifaces.py`:
+
+    ```
+    import base64, json, ssl, urllib.request
+
+    R1 = "https://10.33.1.1/restconf/data/ietf-interfaces:interfaces"
+    auth = base64.b64encode(b"admin:Admin123").decode()     # HTTP Basic: base64, not encryption
+    ctx = ssl._create_unverified_context()                  # lab only: R1 has a self-signed certificate
+
+    req = urllib.request.Request(R1, headers={"Accept": "application/yang-data+json",
+                                             "Authorization": f"Basic {auth}"})
+    with urllib.request.urlopen(req, context=ctx) as resp:   # raises HTTPError for 4xx/5xx
+        print("HTTP", resp.status)
+        data = json.loads(resp.read())                       # JSON text -> dict / list
+
+    for intf in data["ietf-interfaces:interfaces"]["interface"]:   # a list of dicts
+        addrs = intf.get("ietf-ip:ipv4", {}).get("address", [])
+        ip = addrs[0]["ip"] if addrs else "-"
+        state = "up" if intf.get("enabled") else "shutdown"
+        print(f'{intf["name"]:<20} {ip:<15} {state}')
+    ```
+
+    Read it as an ENCOR candidate: `import` loads modules; the dictionary `headers`; the `with` block
+    closes the connection; `json.loads` turns the payload into **dicts and lists**; the `for` loop walks the
+    `interface` **list**; `.get(key, default)` avoids a `KeyError` when a key is missing (unaddressed
+    interfaces have no `ietf-ip:ipv4`); the f-string formats columns. Change the password to see
+    `urllib.error.HTTPError: HTTP Error 401: Unauthorized`.
+
+    Extension: use `json.dumps(data, indent=2)` to pretty-print, or `python3 -m json.tool` on curl's output.
+  verify:
+  - device: R1
+    command: show ip interface brief
+    expect: The same interfaces and addresses the script printed.
+  checks: []
+- id: eem
+  title: 'EEM applets: self-healing and data collection'
+  explain: |
+    The **Embedded Event Manager** runs *applets* on the device itself: an **event** detector (syslog
+    pattern, timer, interface counter, CLI command, SNMP, track object, `none` = run by hand) triggers
+    numbered **actions** (CLI commands, syslog, mail, set variables, if/else). Actions run in lexical order of
+    their labels, so number them `1.0`, `2.0`, ... An applet's `cli` actions start in user EXEC: begin with
+    `enable`.
+
+    - **LO33-WATCH** (automate configuration): when the syslog message for Loopback33 going
+      administratively down appears, it re-enables the interface and logs that it did.
+    - **COLLECT** (data collection): `event none` - run it on demand with `event manager run COLLECT`; it
+      captures `show ip interface brief` into `$_cli_result` and sends it to syslog (`show logging`).
+
+    Test: `configure terminal` / `interface Loopback33` / `shutdown` / `end`, wait a few seconds -
+    `show ip interface brief` shows Loopback33 up again and `show logging | include EEM` has the message.
+    `show event manager history events` lists every trigger. Troubleshoot with `debug event manager action
+    cli`: a typo in an action's command only shows up there. EEM applets are also handy for collecting
+    `show` output the moment a problem appears (`event syslog pattern "%OSPF-5-ADJCHG.*Down"`).
+  config:
+    R1: |
+      event manager applet LO33-WATCH
+       event syslog pattern "Interface Loopback33, changed state to administratively down"
+       action 1.0 cli command "enable"
+       action 2.0 cli command "configure terminal"
+       action 3.0 cli command "interface Loopback33"
+       action 4.0 cli command "no shutdown"
+       action 5.0 syslog priority notifications msg "EEM LO33-WATCH re-enabled Loopback33"
+      event manager applet COLLECT
+       event none
+       action 1.0 cli command "enable"
+       action 2.0 cli command "show ip interface brief"
+       action 3.0 syslog msg "$_cli_result"
+  verify:
+  - device: R1
+    command: show event manager policy registered
+    expect: LO33-WATCH (syslog) and COLLECT (none).
+  - device: R1
+    command: show event manager history events
+    expect: LO33-WATCH triggered after you shut Loopback33.
+  checks:
+  - id: eem-applet
+    description: The LO33-WATCH applet re-enables Loopback33
+    device: R1
+    mode: config
+    match:
+    - ^event manager applet LO33-WATCH
+    - ^ event syslog pattern "Interface Loopback33, changed state to administratively down"
+    - ^ action \S+ cli command "no shutdown"
+    hint: event manager applet LO33-WATCH / event syslog pattern ... / actions enable, configure terminal, interface Loopback33,
+      no shutdown
+  - id: eem-registered
+    description: Both applets are registered
+    device: R1
+    command: show event manager policy registered
+    match:
+    - LO33-WATCH
+    - COLLECT
+    hint: An applet with an event line registers when you leave its configuration mode.
+- id: erspan
+  title: 'ERSPAN: mirror GigabitEthernet2 to DEV over GRE'
+  explain: |
+    SPAN copies traffic to a local port, RSPAN carries it across a VLAN (lab 28). **ERSPAN** wraps the copied
+    frames in **GRE** (IP protocol 47) with an ERSPAN header, so the analyser can be anywhere reachable by IP.
+    The source switch/router is an `erspan-source` session: what to copy (`source interface ... both`), and
+    the `destination` (ERSPAN ID, the analyser's IP and the origin IP to send from). On a Catalyst switch
+    the receiving side can be an `erspan-destination` session that decapsulates to a local port; here DEV
+    receives the GRE packets directly.
+
+    1. On DEV: `sudo tcpdump -ni ens2 ip proto 47` (or `-v` to see the ERSPAN header fields).
+    2. On R2: `ping 10.33.1.1 repeat 20`.
+    3. DEV shows GRE packets from 10.33.1.1 to 10.33.1.10 carrying R2's ICMP echo requests and R1's replies.
+
+    If nothing arrives: the session is still `shutdown` (`show monitor session 1` State), the origin
+    address is not on R1, or DEV is not reachable (`ping 10.33.1.10`). ERSPAN adds about 50 bytes per
+    packet - large frames may need a bigger MTU on the path.
+  config:
+    R1: |
+      monitor session 1 type erspan-source
+       source interface GigabitEthernet2 both
+       no shutdown
+       destination
+        erspan-id 33
+        ip address 10.33.1.10
+        origin ip address 10.33.1.1
+  verify:
+  - device: R1
+    command: show monitor session 1
+    expect: Type ERSPAN Source Session, Status Admin Enabled, source Gi2, destination IP 10.33.1.10.
+  checks:
+  - id: erspan-cfg
+    description: ERSPAN session 1 copies Gi2 to DEV
+    device: R1
+    mode: config
+    match:
+    - ^monitor session 1 type erspan-source
+    - ^ source interface GigabitEthernet2
+    hint: monitor session 1 type erspan-source / source interface GigabitEthernet2 both / no shutdown / destination ...
+  - id: erspan-live
+    description: The ERSPAN session is enabled towards 10.33.1.10
+    device: R1
+    command: show monitor session 1
+    match:
+    - Type\s*:\s*ERSPAN Source Session
+    - Status\s*:\s*Admin Enabled
+    - Destination IP Address\s*:\s*10\.33\.1\.10
+    hint: no shutdown inside the session, and destination / ip address 10.33.1.10 / origin ip address 10.33.1.1
+solution_summary: |
+  **What you built**
+
+  - **NETCONF:** `netconf-yang` - XML RPCs over SSH port 830 (`ssh -p 830 admin@10.33.1.1 -s netconf`), a
+    `<hello>` exchange of capabilities and a `<get-config>` with an `ietf-interfaces` filter.
+  - **RESTCONF:** `ip http secure-server`, `ip http authentication local`, `ip http access-class ipv4 MGMT`,
+    `no ip http server`, `restconf`; curl GET/PUT with `application/yang-data+json`; Loopback33 created from a
+    JSON body; response codes 200/201/204/400/401/404/409.
+  - **Python:** urllib + json - dicts, lists, `.get()`, loops and HTTP errors.
+  - **EEM:** `LO33-WATCH` (event syslog pattern -> re-enable the interface) and `COLLECT` (`event none`,
+    `$_cli_result` to syslog).
+  - **ERSPAN:** `monitor session 1 type erspan-source`, source Gi2 both, destination erspan-id 33, ip address
+    10.33.1.10, origin 10.33.1.1; seen on DEV with `tcpdump ip proto 47`.
+
+  **Why it works:** YANG models give the device's configuration and state a validated structure; NETCONF and
+  RESTCONF are agentless transports for it (XML over SSH, JSON/XML over HTTPS). EEM automates on the box
+  itself, ERSPAN gets packets to an analyser anywhere over IP.
+
+  **Verification commands:** `show netconf-yang status`, `show netconf-yang sessions`,
+  `show platform software yang-management process`, `show event manager policy registered`,
+  `show event manager history events`, `show monitor session 1`.

@@ -1506,6 +1506,64 @@
       ]
     },
     {
+      "file": "33-netconf-restconf-eem.cmllab",
+      "sha256": "a8ac234c0eaf03d0105856c1eb9751c8af0b2d1c6007a5baad83d2c54fff8733",
+      "size": 10070,
+      "kind": "lab",
+      "id": "33-netconf-restconf-eem",
+      "title": "Walkthrough: NETCONF, RESTCONF, Python, EEM and ERSPAN (Cat8000v + Ubuntu)",
+      "version": "1",
+      "description": "Enable NETCONF and RESTCONF on a Catalyst 8000V, drive them from an Ubuntu host with ssh, curl and Python (YANG, XML, JSON, response codes, API security), write EEM applets and mirror traffic to the host with ERSPAN.",
+      "blueprint": [
+        "4.6",
+        "5.3",
+        "6.1",
+        "6.2",
+        "6.3",
+        "6.5",
+        "6.6",
+        "6.7"
+      ],
+      "nodes": 3,
+      "difficulty": 3,
+      "type": "walkthrough",
+      "ram_gb": 7.0,
+      "domain": "6.0 Automation",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "cat8000v",
+        "iol-xe",
+        "ubuntu"
+      ],
+      "exams": [
+        "ENCOR 4.6",
+        "ENCOR 5.3",
+        "ENCOR 6.1",
+        "ENCOR 6.2",
+        "ENCOR 6.3",
+        "ENCOR 6.5",
+        "ENCOR 6.6",
+        "ENCOR 6.7",
+        "ENCOR 4.3",
+        "CCNA 6.5",
+        "CCNA 6.7",
+        "CCIE-EI 4.3.a.iii",
+        "CCIE-EI 5.1.a",
+        "CCIE-EI 5.1.b",
+        "CCIE-EI 5.2.a",
+        "CCIE-EI 4.7.a.i"
+      ],
+      "topics": [
+        "automation",
+        "assurance",
+        "walkthrough",
+        "encor"
+      ]
+    },
+    {
       "file": "data-center.cmlcourse",
       "sha256": "b4b6068514fe63db3dde3629651bfa52a5e2c485bfcc88230b6b761c8f492fe8",
       "size": 477,

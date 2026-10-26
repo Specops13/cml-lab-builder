@@ -777,11 +777,25 @@ install in any 3.x app; they are published in the library as soon as they are co
 | `30-ospfv3-af-path-pref`: OSPFv3 IPv4/IPv6 address families, per-AF costs, path-type preference (intra > inter > E1 > E2) | 4 IOL, ~4 GB | ENARSI 1.10.a, 1.10.d, ENCOR 3.2.b, CCIE-EI 1.4.b |
 | `31-ipv6-first-hop-security`: rogue RA/DHCPv6 attack, RA guard, DHCPv6 guard, device-tracking binding table with ND inspection, source guard | 3 IOL + 1 IOL-L2, ~4 GB | ENARSI 3.4, CCIE-EI 4.2.c.i-vi |
 | `32-lisp-msmr-xtr`: LISP map-server/map-resolver, xTR registration, Map-Request/Reply and map-cache, SD-Access control plane | 4 IOL, ~4 GB | ENCOR 2.3.a, 1.3.a, CCIE-EI 2.1.b.i |
+| `33-netconf-restconf-eem`: NETCONF over SSH (YANG, XML), RESTCONF with curl and JSON, response codes, REST API security, a Python RESTCONF client, EEM applets, ERSPAN to tcpdump | 1 Cat8000v + 1 Ubuntu + 1 IOL, ~7 GB | ENCOR 4.6, 5.3, 6.1-6.3, 6.5-6.7, 4.3, CCNA 6.5, 6.7, CCIE-EI 4.3.a.iii, 5.1.a/b, 5.2.a |
 
 IOL has no NetFlow collector, so the NetFlow lab verifies on the exporter (cache and export counters); the SPAN
 analyser is an IOL node that counts the mirrored packets. IOS has no FTP server, so FTP is client configuration only.
 The file-transfer lab moves files device-to-device (`more tftp://`, `scp://` archive paths), so it does not depend on
 the name of IOL's local file system. Labs 29-31 use the ENARSI track.
+
+**Cat8000v and Ubuntu nodes (app 3.3.6+).** IOL has no NETCONF/RESTCONF stack, so lab 33 uses two more CML 2.9
+reference-platform node definitions, now accepted in `definition:`:
+
+- `cat8000v`: interfaces `GigabitEthernet1`-`GigabitEthernet4` (ports 0-3, literal names in its config); the app
+  puts `platform console serial` in front of its day-0 config so the console works, and allows 15 minutes to boot.
+- `ubuntu`: interfaces `ens2`-`ens5`; its `config` is cloud-init user-data starting with `#cloud-config` and is
+  used verbatim. Ubuntu nodes are workstations: the app never configures them, grades them, opens their console
+  or reads them into a snapshot (a lab that names one in a step config, check or verify entry is rejected).
+
+Older apps reject these labs with an "unknown definition" error; update to 3.3.6 first. Lab 33 keeps
+`aaa authentication login CONSOLE none` on the Cat8000v console so the app can still grade it after
+`aaa new-model`.
 
 ### RAM estimate and the RAM heavy tag
 Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node
@@ -1276,7 +1290,7 @@ After changing the schema, templates, guide or example, run `python -m cmllab do
 fact you want pinned (0 to 2 asserts). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Version and changelog
-Current version: **3.3.5**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.3.6**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License

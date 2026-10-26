@@ -66,7 +66,7 @@ def check_day0(lab, strict: bool) -> list[str]:
     cabled = {(e.node, e.port) for ln in lab.links for e in (ln.a, ln.b)}
     for n in lab.nodes:
         node, cfg = nodes[n.name], nodes[n.name]["configuration"]
-        if not (cfg.strip() and f"hostname {n.name}\n" in cfg):
+        if not (cfg.strip() and (f"hostname {n.name}\n" in cfg or f"\nhostname: {n.name}\n" in cfg)):   # IOS / cloud-init
             bad.append(f"{n.name}: no day-0 hostname")
         if "%if" in cfg:
             bad.append(f"{n.name}: unrendered placeholder")

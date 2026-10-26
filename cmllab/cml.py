@@ -253,7 +253,8 @@ class CML:
 
 
 def node_os(lab: Lab) -> dict:
-    """node name -> "nxos" / "ios" (how the console session logs in and sets up the terminal)."""
+    """node name -> "nxos" / "ios" / "linux" (how the console session logs in and sets up the terminal; linux
+    nodes are never opened by the app)."""
     from .platforms import node_def
     return {n.name: (node_def(n.definition).os if node_def(n.definition) else "ios") for n in lab.nodes}
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import yaml
 
-from .platforms import MAX_PORTS, Platform, node_def, render
+from .platforms import MAX_PORTS, Platform, is_linux, node_def, render
 from .schema import Lab
 
 SCHEMA_VERSION = "0.2.2"
@@ -67,8 +67,10 @@ def base_config(name: str) -> str:
 def node_config(lab: Lab, node_name: str, platform: Platform, creds: tuple[str, str] | None = None) -> str:
     n = lab.node(node_name)
     nd = node_def(n.definition)
+    if nd and nd.os == "linux":          # cloud-init user-data, used verbatim
+        return n.config.rstrip() + "\n"
     head = nxos_base_config(n.name, creds) if nd and nd.os == "nxos" else base_config(n.name)
-    cfg = head + render(n.config, platform).rstrip() + "\nend\n"
+    cfg = (nd.day0_prefix if nd else "") + head + render(n.config, platform).rstrip() + "\nend\n"
     return cfg
 
 
@@ -76,7 +78,7 @@ def full_config(lab: Lab, node_name: str, platform: Platform, extra: dict | None
                 creds: tuple[str, str] | None = None) -> str:
     """Day-0 config: starting config, plus extra lines (solution, fault, snapshot) when given."""
     base = node_config(lab, node_name, platform, creds)
-    if not (extra and extra.get(node_name)):
+    if not (extra and extra.get(node_name)) or is_linux(lab.node(node_name).definition):
         return base
     return base.replace("\nend\n", "\n") + render(extra[node_name], platform).rstrip() + "\nend\n"
 
@@ -87,7 +89,11 @@ def ifname(lab: Lab, node: str, port: int, platform: Platform, short: bool = Fal
 
 
 def _iface_id(lab: Lab, node: str, port: int) -> str:
-    return f"i{port + (2 if node_def(lab.node(node).definition) else 1)}"
+    """CML interface id of data port `port`: i0 is Loopback0 (if the node has one), then mgmt (if any), then data."""
+    nd = node_def(lab.node(node).definition)
+    if nd is None:
+        return f"i{port + 1}"
+    return f"i{port + int(nd.loopback) + int(bool(nd.mgmt))}"
 
 
 def to_topology(lab: Lab, platform: Platform, prefix: str, solution: dict | None = None,
@@ -101,10 +107,10 @@ def to_topology(lab: Lab, platform: Platform, prefix: str, solution: dict | None
         nid = f"n{i}"
         node_ids[n.name] = nid
         nd = node_def(n.definition)
-        ifaces = [{"id": "i0", "label": "Loopback0", "type": "loopback"}]
+        ifaces = [{"id": "i0", "label": "Loopback0", "type": "loopback"}] if not nd or nd.loopback else []
         if nd:
             if nd.mgmt:
-                ifaces.append({"id": "i1", "label": nd.mgmt, "type": "physical", "slot": 0})
+                ifaces.append({"id": f"i{len(ifaces)}", "label": nd.mgmt, "type": "physical", "slot": 0})
             for p in range(MAX_PORTS):
                 ifaces.append({"id": _iface_id(lab, n.name, p), "label": nd.ifname(p), "type": "physical",
                                "slot": p + nd.first_slot})

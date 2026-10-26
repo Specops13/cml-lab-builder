@@ -48,13 +48,15 @@ class NodeDef:
     """An explicit CML node definition a lab node can ask for (`definition:` in lab.yaml) instead of the
     platform profile's router/switch. Port index p maps to the interface at CML slot p + first_slot."""
     id: str
-    os: str                      # "nxos" | "ios"
+    os: str                      # "nxos" | "ios" | "linux" (cloud-init host: no IOS config, no console grading)
     long_prefix: str             # data port p -> f"{long_prefix}{p + first_port}"
     short_prefix: str
     first_port: int
     first_slot: int              # CML slot of data port 0 (slot 0 is mgmt0 on NX-OS)
     mgmt: str = ""               # interface at slot 0, created unconnected (keeps the slots contiguous)
     boot_s: int = 0              # minimum boot timeout for labs using this node type
+    loopback: bool = True        # CML lists Loopback0 as interface i0 (Linux nodes have none)
+    day0_prefix: str = ""        # lines that must open the day-0 config (Cat8000v: platform console serial)
 
     def ifname(self, idx: int, short: bool = False) -> str:
         if not 0 <= idx < MAX_PORTS:
@@ -63,8 +65,13 @@ class NodeDef:
 
 
 # CML 2.9 reference platform nxosv9000 (Nexus 9300v 10.5(3)F on the 2.9 refplat ISO): mgmt0, Ethernet1/1..1/64.
+# cat8000v (3.3.6): Loopback0, then GigabitEthernet1.. on slots 0..; its console needs `platform console serial`.
+# ubuntu (3.3.6): ens2.. on slots 0.., no loopback; the config is cloud-init user-data (#cloud-config).
 DEFINITIONS = {
     "nxosv9000": NodeDef("nxosv9000", "nxos", "Ethernet1/", "Eth1/", 1, 1, mgmt="mgmt0", boot_s=1500),
+    "cat8000v": NodeDef("cat8000v", "ios", "GigabitEthernet", "Gi", 1, 0, boot_s=900,
+                        day0_prefix="platform console serial\n"),
+    "ubuntu": NodeDef("ubuntu", "linux", "ens", "ens", 2, 0, loopback=False),
 }
 
 
@@ -75,6 +82,12 @@ def node_def(name: str | None) -> NodeDef | None:
         return DEFINITIONS[name]
     except KeyError:
         raise ValueError(f"unknown node definition {name!r}; supported: {sorted(DEFINITIONS)}")
+
+
+def is_linux(definition: str | None) -> bool:
+    """True for host nodes configured by cloud-init (no IOS config, never graded over the console)."""
+    nd = DEFINITIONS.get(definition or "")
+    return bool(nd and nd.os == "linux")
 
 
 def get(name: str) -> Platform:

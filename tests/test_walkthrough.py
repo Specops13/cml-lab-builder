@@ -161,6 +161,31 @@ def test_nxos_topology_and_day0_config():
     assert {n["label"]: n["node_definition"] for n in iosv["nodes"]}["H3"] == "iosv"
 
 
+def test_cat8000v_and_ubuntu_nodes_render_and_linux_hosts_are_never_graded():
+    from pathlib import Path
+
+    from cmllab import packs as pk
+    from cmllab.cml import node_os
+    from cmllab.platforms import DEFINITIONS
+    from cmllab.render import full_config
+    src = pk.read_dir(Path(__file__).resolve().parents[1] / "examples" / "33-netconf-restconf-eem")
+    lab, p = pk.pack_lab(src), platforms.get("iol")
+    nodes = {n["label"]: n for n in to_topology(lab, p, "CML-")["nodes"]}
+    r1, dev = nodes["R1"], nodes["DEV"]
+    assert r1["configuration"].startswith("platform console serial\nhostname R1\n") and r1["configuration"].endswith("end\n")
+    assert {i["label"]: (i["id"], i.get("slot")) for i in r1["interfaces"]}["GigabitEthernet1"] == ("i1", 0)
+    assert dev["configuration"].startswith("#cloud-config\n")
+    assert [(i["id"], i["label"], i["slot"]) for i in dev["interfaces"]][:2] == [("i0", "ens2", 0), ("i1", "ens3", 1)]
+    assert DEFINITIONS["nxosv9000"].mgmt and "i2" in {i["id"] for i in nodes["R2"]["interfaces"]}
+    assert node_os(lab)["DEV"] == "linux" and full_config(lab, "DEV", p, {"DEV": "x"}) == dev["configuration"]
+    d = yaml.safe_load(src.lab_yaml)
+    d["steps"][1]["checks"].append({"id": "x", "description": "x", "device": "DEV", "command": "show x", "match": ["x"]})
+    d["nodes"][1]["config"] = "hostname DEV\n"
+    with pytest.raises(ValidationError) as ei:
+        Lab.model_validate(d)
+    assert "#cloud-config" in str(ei.value) and "DEV: Linux hosts are not configured or graded" in str(ei.value)
+
+
 def test_build_needs_the_node_definition_and_waits_longer():
     from cmllab.cml import CML, CMLError
     s = config.Settings(cml_url="https://cml.x", username="u", password="p")

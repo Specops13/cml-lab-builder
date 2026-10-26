@@ -1,6 +1,6 @@
 "use strict";
 /* CML Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "3.3.5";  // must equal cmllab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "3.3.6";  // must equal cmllab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 /* links that come from data (CML, GitHub, lab files) are only ever http(s): never javascript: or data: URLs */
