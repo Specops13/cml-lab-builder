@@ -1,0 +1,28 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Outputs follow the IOS XE file-management, SSH/SCP and configuration-archive guides.
+# State: every step done (final state of the walkthrough).
+R1:
+  ping 10.29.1.10: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.29.1.10, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show archive: "The maximum archive configurations allowed is 10.\nThe next archive file will be named scp://backup:Backup123@10.29.1.10/R1-archive-2\n\
+    \ Archive #  Name\n   1        scp://backup:Backup123@10.29.1.10/R1-archive-1 <- Most Recent\n   2       \n   3      \
+    \ \n"
+  show archive log config all: |
+    idx   sess           user@line      Logged command
+       1     1        console@console  |  interface Loopback99
+       2     1        console@console  |   description change tracked by archive log config
+       3     1        console@console  |   ip address 10.29.99.1 255.255.255.255
+SRV:
+  show ip ssh: |
+    SSH Enabled - version 2.0
+    Authentication methods:publickey,keyboard-interactive,password
+    Authentication Publickey Algorithms:rsa-sha2-256,rsa-sha2-512
+    Hostkey Algorithms:rsa-sha2-256,rsa-sha2-512
+    Encryption Algorithms:aes128-ctr,aes192-ctr,aes256-ctr
+    MAC Algorithms:hmac-sha2-256,hmac-sha2-512
+    Authentication timeout: 120 secs; Authentication retries: 3
+    Minimum expected Diffie Hellman key size : 2048 bits
+    IOS Keys in SECSH format(ssh-rsa, base64 encoded): SRV.lab.local

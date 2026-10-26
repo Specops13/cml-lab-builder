@@ -1,0 +1,48 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Flexible NetFlow and SPAN outputs follow the IOS XE NetFlow and Catalyst SPAN configuration guides.
+# State: freshly booted lab (day-0 only).
+PC1:
+  ping 10.28.9.10: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.28.9.10, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+R1:
+  show flow interface Ethernet0/0: ''
+  show flow interface Ethernet0/1: ''
+  show flow monitor FM-APP cache format table: |
+    % Flow Monitor: Flow Monitor 'FM-APP' does not exist
+  show flow exporter FE-V9 statistics: |
+    % Flow Exporter: Flow Exporter 'FE-V9' does not exist
+  show flow exporter FE-V5: |
+    % Flow Exporter: Flow Exporter 'FE-V5' does not exist
+SW1:
+  show vlan remote-span: |2+
+
+    Remote SPAN VLANs
+    ------------------------------------------------------------------------------
+
+  show monitor session 2: |
+    % No such session
+SW2:
+  show monitor session 1: |
+    % No such session
+  show monitor session 2: |
+    % No such session
+SNIFFER:
+  show interfaces Ethernet0/0: "Ethernet0/0 is up, line protocol is up \n  Hardware is AmdP2, address is aabb.cc00.0600 (bia\
+    \ aabb.cc00.0600)\n  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec, \n     reliability 255/255, txload 1/255, rxload\
+    \ 1/255\n  Encapsulation ARPA, loopback not set\n  Keepalive set (10 sec)\n  ARP type: ARPA, ARP Timeout 04:00:00\n  Last\
+    \ input 00:00:01, output 00:00:03, output hang never\n  Last clearing of \"show interface\" counters never\n  Input queue:\
+    \ 0/375/0/0 (size/max/drops/flushes); Total output drops: 0\n  Queueing strategy: fifo\n  5 minute input rate 0 bits/sec,\
+    \ 0 packets/sec\n  5 minute output rate 0 bits/sec, 0 packets/sec\n     0 packets input, 0 bytes, 0 no buffer\n     Received\
+    \ 12 broadcasts (0 IP multicasts)\n     0 runts, 0 giants, 0 throttles \n     0 input errors, 0 CRC, 0 frame, 0 overrun,\
+    \ 0 ignored\n     0 input packets with dribble condition detected\n     38 packets output, 4370 bytes, 0 underruns\n"
+  show interfaces Ethernet0/1: "Ethernet0/1 is up, line protocol is up \n  Hardware is AmdP2, address is aabb.cc00.0600 (bia\
+    \ aabb.cc00.0600)\n  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec, \n     reliability 255/255, txload 1/255, rxload\
+    \ 1/255\n  Encapsulation ARPA, loopback not set\n  Keepalive set (10 sec)\n  ARP type: ARPA, ARP Timeout 04:00:00\n  Last\
+    \ input 00:00:01, output 00:00:03, output hang never\n  Last clearing of \"show interface\" counters never\n  Input queue:\
+    \ 0/375/0/0 (size/max/drops/flushes); Total output drops: 0\n  Queueing strategy: fifo\n  5 minute input rate 0 bits/sec,\
+    \ 0 packets/sec\n  5 minute output rate 0 bits/sec, 0 packets/sec\n     0 packets input, 0 bytes, 0 no buffer\n     Received\
+    \ 12 broadcasts (0 IP multicasts)\n     0 runts, 0 giants, 0 throttles \n     0 input errors, 0 CRC, 0 frame, 0 overrun,\
+    \ 0 ignored\n     0 input packets with dribble condition detected\n     38 packets output, 4370 bytes, 0 underruns\n"

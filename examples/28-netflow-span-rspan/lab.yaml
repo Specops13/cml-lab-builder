@@ -1,0 +1,579 @@
+id: 28-netflow-span-rspan
+type: walkthrough
+title: 'Walkthrough: Flexible NetFlow (v9/v5) and SPAN / RSPAN (IOL, IOL-L2)'
+blueprint:
+- '4.2'
+- '4.3'
+domain: 4.0 Network Assurance
+difficulty: 3
+platforms:
+- iol
+summary: Build Flexible NetFlow on IOS XE (custom record, v9 and v5 exporters, monitors), troubleshoot exports, then mirror
+  traffic to an analyser with local SPAN and RSPAN over a remote-span VLAN; ERSPAN and Embedded Packet Capture explained.
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: PC1
+  kind: router
+  x: -350
+  y: 120
+  config: |
+    ! User PC (IOL as a host) in VLAN 10. Fully configured - do not change it.
+    interface %if0%
+     description NIC to SW2 Et0/1 (VLAN 10)
+     ip address 10.28.10.10 255.255.255.0
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    no ip routing
+    ip default-gateway 10.28.10.1
+- name: SW2
+  kind: switch
+  x: -150
+  y: 120
+  config: |
+    ! Access switch. VLAN 10, trunk to SW1 and two ports to the SNIFFER are pre-built.
+    vlan 10
+     name USERS
+    interface %if0%
+     description trunk to SW1 Et0/1
+     switchport trunk encapsulation dot1q
+     switchport mode trunk
+    interface %if1%
+     description PC1 (VLAN 10)
+     switchport mode access
+     switchport access vlan 10
+    interface %if2%
+     description to SNIFFER Et0/0 (local SPAN destination)
+     switchport mode access
+     switchport access vlan 10
+    interface %if3%
+     description to SNIFFER Et0/1 (RSPAN destination)
+     switchport mode access
+     switchport access vlan 10
+- name: SW1
+  kind: switch
+  x: -150
+  y: -60
+  config: |
+    ! Distribution switch. VLAN 10, the router port and the trunk to SW2 are pre-built.
+    vlan 10
+     name USERS
+    interface %if0%
+     description to R1 Et0/0 (VLAN 10 gateway)
+     switchport mode access
+     switchport access vlan 10
+    interface %if1%
+     description trunk to SW2 Et0/0
+     switchport trunk encapsulation dot1q
+     switchport mode trunk
+    interface %if2%
+     description unused
+     shutdown
+    interface %if3%
+     description unused
+     shutdown
+- name: R1
+  kind: router
+  x: 100
+  y: -60
+  config: |
+    ! Branch router: VLAN 10 gateway and link to the server farm. Addressing is pre-built; you add Flexible NetFlow.
+    interface %if0%
+     description to SW1 Et0/0 (VLAN 10 users)
+     ip address 10.28.10.1 255.255.255.0
+     no shutdown
+    interface %if1%
+     description to SRV Et0/0 (server farm / NetFlow collector)
+     ip address 10.28.9.1 255.255.255.0
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description NetFlow export source
+     ip address 10.28.0.1 255.255.255.255
+- name: SRV
+  kind: router
+  x: 330
+  y: -60
+  config: |
+    ! Server farm and NetFlow collector address 10.28.9.10 (IOL as a host). Fully configured - do not change it. It answers pings; exports to it are counted on R1.
+    interface %if0%
+     description to R1 Et0/1
+     ip address 10.28.9.10 255.255.255.0
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ip route 0.0.0.0 0.0.0.0 10.28.9.1
+- name: SNIFFER
+  kind: router
+  x: -350
+  y: 300
+  config: |
+    ! Traffic analyser stand-in (IOL). Its ports have no IP address: it only counts the mirrored packets it receives.
+    interface %if0%
+     description from SW2 Et0/2 (local SPAN copy)
+     no ip address
+     no shutdown
+    interface %if1%
+     description from SW2 Et0/3 (RSPAN copy)
+     no ip address
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+links:
+- a:
+    node: PC1
+    port: 0
+  b:
+    node: SW2
+    port: 1
+- a:
+    node: SW2
+    port: 0
+  b:
+    node: SW1
+    port: 1
+- a:
+    node: SW2
+    port: 2
+  b:
+    node: SNIFFER
+    port: 0
+- a:
+    node: SW2
+    port: 3
+  b:
+    node: SNIFFER
+    port: 1
+- a:
+    node: SW1
+    port: 0
+  b:
+    node: R1
+    port: 0
+- a:
+    node: R1
+    port: 1
+  b:
+    node: SRV
+    port: 0
+task: |
+  ## Network monitoring: Flexible NetFlow (v9 and v5) and SPAN / RSPAN (IOL and IOL-L2)
+
+  Find out **who talks to whom** (NetFlow) and get a **copy of the packets** to an analyser (SPAN, RSPAN). Both are
+  day-to-day operations tools and both are on the ENCOR (4.2, 4.3) and ENARSI (4.6) blueprints.
+
+  | Device | Role |
+  |---|---|
+  | PC1 | user host 10.28.10.10/24 in VLAN 10 (pre-built) |
+  | SW2 | access switch (IOL-L2): PC1, two ports to SNIFFER |
+  | SW1 | distribution switch (IOL-L2): R1 and the trunk to SW2 |
+  | R1 | VLAN 10 gateway 10.28.10.1, server link 10.28.9.1, Loopback0 10.28.0.1 - **Flexible NetFlow exporter** |
+  | SRV | server and NetFlow collector address 10.28.9.10 |
+  | SNIFFER | packet analyser stand-in with two capture ports (no IP) |
+
+  What you will configure:
+
+  1. **Flexible NetFlow** on R1: a custom *record* (key and non-key fields), an *exporter* (NetFlow v9 to
+     10.28.9.10 UDP 2055) and a *monitor* applied inbound on the user VLAN.
+  2. A second exporter in **NetFlow v5** format with the predefined *original* record on the server link, and
+     troubleshooting the typical NetFlow faults.
+  3. **Local SPAN** on SW2 (PC1's port mirrored to SNIFFER Et0/0).
+  4. **RSPAN** from SW1 to SW2 over a *remote-span* VLAN 999 (R1's port mirrored to SNIFFER Et0/1).
+  5. **ERSPAN** and **Embedded Packet Capture** - what they add and how they are configured.
+
+  **Resources:** 4 IOL-XE + 2 IOL-L2 nodes, about 6 GB RAM.
+
+  **Platform notes:** IOL has no NetFlow collector, so you verify on the *exporter* side (cache and export
+  counters). ERSPAN needs a platform with ERSPAN support (Catalyst 8000V/9000); the Cat8000V automation lab
+  (`33-netconf-restconf-eem`) contains an ERSPAN step.
+steps:
+- id: baseline
+  title: 'Baseline: the user reaches the server farm'
+  explain: |
+    PC1 (VLAN 10) reaches the server SRV through SW2, the trunk, SW1 and R1. Confirm it before adding any
+    monitoring - the tools you build will observe exactly this traffic.
+
+    Path of a packet from PC1 to SRV: PC1 Et0/0 -> SW2 Et0/1 (access VLAN 10) -> SW2 Et0/0 (trunk) ->
+    SW1 Et0/1 -> SW1 Et0/0 -> R1 Et0/0 (routed) -> R1 Et0/1 -> SRV.
+  verify:
+  - device: PC1
+    command: ping 10.28.9.10
+    expect: Success rate 100 percent.
+  - device: SW1
+    command: show interfaces trunk
+    expect: Et0/1 trunking with VLAN 10 allowed and forwarding.
+  checks:
+  - id: pc-srv
+    description: PC1 reaches SRV
+    device: PC1
+    command: ping 10.28.9.10
+    min_success: 60
+    hint: Wait for all nodes to boot and STP to converge (about 30 s).
+- id: fnf-v9
+  title: 'R1: Flexible NetFlow record, exporter (v9) and monitor'
+  explain: |
+    **Flexible NetFlow (FNF)** has three building blocks, configured bottom-up and *referenced* top-down:
+
+    - **flow record** - which fields define a flow. `match` fields are **key** fields: a packet with a different
+      value creates a new flow (5-tuple, DSCP, input interface here). `collect` fields are **non-key**:
+      information gathered for each flow (byte/packet counters, timestamps, output interface).
+    - **flow exporter** - where and how to send expired flows: collector address, source interface, UDP port,
+      version (`netflow-v9` here, or `ipfix`), and how often to resend the **template** (v9/IPFIX are
+      template-based: the collector cannot decode records until it receives the template).
+    - **flow monitor** - ties a record to exporter(s) and holds the **cache**. It is applied to an interface
+      with `ip flow monitor NAME input|output` (and `ipv6 flow monitor` for IPv6).
+
+    Flows leave the cache when they are inactive (default 15 s), when they have been active too long (default
+    1800 s) or when a TCP FIN/RST is seen; only then are they exported. That is why a brand-new flow shows in
+    the cache but not yet in the exporter statistics. (On many platforms you can tune this with
+    `cache timeout active|inactive` under the monitor; IOL may reject some cache options.)
+
+    Generate traffic from PC1 to SRV, then read the cache. Troubleshooting order when a collector sees nothing:
+    1) is the monitor applied in the right direction (`show flow interface`)? 2) does the cache fill
+    (`show flow monitor ... cache`)? 3) is the exporter sending (`show flow exporter statistics`)? 4) can the
+    exporter **source** reach the collector, and is UDP 2055 allowed? `debug flow exporter` shows each export.
+  config:
+    R1: |
+      flow record FR-APP
+       description 5-tuple + DSCP + interfaces, with counters and timestamps
+       match ipv4 source address
+       match ipv4 destination address
+       match ipv4 protocol
+       match transport source-port
+       match transport destination-port
+       match ipv4 dscp
+       match interface input
+       collect interface output
+       collect counter bytes long
+       collect counter packets long
+       collect timestamp absolute first
+       collect timestamp absolute last
+      flow exporter FE-V9
+       description NetFlow v9 export to the collector
+       destination 10.28.9.10
+       source Loopback0
+       transport udp 2055
+       export-protocol netflow-v9
+       template data timeout 60
+      flow monitor FM-APP
+       description user traffic entering from VLAN 10
+       exporter FE-V9
+       record FR-APP
+      interface %if0%
+       ip flow monitor FM-APP input
+  verify:
+  - device: PC1
+    command: ping 10.28.9.10 repeat 50
+    expect: Traffic for the cache.
+  - device: R1
+    command: show flow monitor FM-APP cache format table
+    expect: A flow 10.28.10.10 -> 10.28.9.10, protocol 1, input Et0/0, output Et0/1 with packet counters.
+  - device: R1
+    command: show flow exporter FE-V9 statistics
+    expect: 'Packets successfully sent and Client: Flow Monitor FM-APP.'
+  checks:
+  - id: fnf-record
+    description: FR-APP keys on the 5-tuple and DSCP and collects counters
+    device: R1
+    mode: config
+    match:
+    - ^flow record FR-APP
+    - ^ match ipv4 source address
+    - ^ match transport destination-port
+    - ^ match ipv4 dscp
+    - ^ collect counter bytes long
+    - ^flow exporter FE-V9(\n .*)*\n export-protocol netflow-v9
+    hint: flow record FR-APP with match/collect fields; flow exporter FE-V9 / export-protocol netflow-v9
+  - id: fnf-applied
+    description: FM-APP is applied inbound on Ethernet0/0
+    device: R1
+    command: show flow interface Ethernet0/0
+    match:
+    - monitor:\s+FM-APP
+    - direction:\s+Input
+    hint: interface Ethernet0/0 / ip flow monitor FM-APP input
+  - id: fnf-cache
+    description: The FM-APP cache holds the PC1 -> SRV flow
+    device: R1
+    command: show flow monitor FM-APP cache format table
+    match:
+    - 10\.28\.10\.10\s+10\.28\.9\.10
+    hint: Ping SRV from PC1 first. Check the record's match fields and the monitor's record.
+  - id: fnf-export
+    description: FE-V9 exports FM-APP records
+    device: R1
+    command: show flow exporter FE-V9 statistics
+    match:
+    - 'Client: Flow Monitor FM-APP'
+    - Successfully sent:\s+[1-9]
+    hint: Flows are exported when they expire (15 s inactive). Check destination 10.28.9.10 and source Loopback0.
+- id: fnf-v5
+  title: NetFlow v5 vs v9 and troubleshooting an exporter
+  explain: |
+    **Versions you must know (ENARSI 4.6):**
+
+    | Version | Format | Fields | Notes |
+    |---|---|---|---|
+    | v5 | fixed | IPv4 only, fixed 7-tuple key | no templates, no IPv6, no MPLS |
+    | v9 | template-based | any fields (record defined by you) | IPv6, MPLS, BGP next hop... |
+    | IPFIX (v10) | template-based, IETF standard | like v9 + variable-length fields | `export-protocol ipfix` |
+
+    On IOS XE, "traditional" NetFlow (`ip flow ingress`, `ip flow-export version 5`) is gone; you get v5 by
+    combining an exporter with `export-protocol netflow-v5` and one of the predefined v5-compatible records
+    (`record netflow ipv4 original-input`). A v5 exporter **cannot** carry a custom record - try adding
+    `exporter FE-V5` to FM-APP and read the error.
+
+    Typical NetFlow faults to troubleshoot: the monitor applied in the wrong direction or on the wrong interface;
+    the exporter's `source` interface down or unreachable from the collector; a wrong UDP port; templates sent
+    too rarely (collector shows "no template"); an ACL dropping UDP to the collector; a v5 exporter with a
+    custom record.
+  config:
+    R1: |
+      flow exporter FE-V5
+       description NetFlow v5 export to the collector
+       destination 10.28.9.10
+       source Loopback0
+       transport udp 9996
+       export-protocol netflow-v5
+      flow monitor FM-V5
+       description traffic returning from the server farm (v5-compatible record)
+       exporter FE-V5
+       record netflow ipv4 original-input
+      interface %if1%
+       ip flow monitor FM-V5 input
+  verify:
+  - device: R1
+    command: show flow exporter FE-V5
+    expect: 'Export protocol: NetFlow Version 5, destination 10.28.9.10, port 9996.'
+  - device: R1
+    command: show flow monitor FM-V5
+    expect: Record netflow ipv4 original-input, exporter FE-V5.
+  checks:
+  - id: v5-exporter
+    description: FE-V5 exports in NetFlow v5 format
+    device: R1
+    command: show flow exporter FE-V5
+    match:
+    - Export protocol:\s+NetFlow Version 5
+    - Destination IP address:\s+10\.28\.9\.10
+    hint: flow exporter FE-V5 / export-protocol netflow-v5 / destination 10.28.9.10
+  - id: v5-applied
+    description: FM-V5 is applied inbound on Ethernet0/1
+    device: R1
+    command: show flow interface Ethernet0/1
+    match:
+    - monitor:\s+FM-V5
+    hint: interface Ethernet0/1 / ip flow monitor FM-V5 input
+- id: span
+  title: 'SW2: local SPAN to the analyser'
+  explain: |
+    **SPAN** (Switched Port Analyzer) copies the frames of a *source* (ports or VLANs, in `rx`, `tx` or `both`
+    directions) to a *destination* port on the **same switch**. The destination port stops being a normal
+    switchport: it does not learn MACs, does not run STP and (by default) drops traffic it receives, so the
+    analyser cannot accidentally inject traffic.
+
+    Rules worth remembering: a destination port cannot also be a source; a SPAN session can oversubscribe the
+    destination (mirroring a busy 10G uplink to a 1G port drops frames); use `filter vlan` to narrow a VLAN
+    source; `encapsulation replicate` keeps CDP/STP/tags in the copy.
+
+    SNIFFER is an IOL router with no IP address on Et0/0; it can only *count* what it receives. Ping from PC1
+    and watch its input counter climb.
+  config:
+    SW2: |
+      monitor session 1 source interface %if1% both
+      monitor session 1 destination interface %if2%
+  verify:
+  - device: SW2
+    command: show monitor session 1
+    expect: 'Local Session, Both: Et0/1, Destination: Et0/2.'
+  - device: SNIFFER
+    command: show interfaces Ethernet0/0
+    expect: The packets input counter rises while PC1 pings.
+  checks:
+  - id: span-session
+    description: SW2 mirrors PC1's port (both directions) to Et0/2
+    device: SW2
+    command: show monitor session 1
+    match:
+    - Type\s+:\s+Local Session
+    - Both\s+:\s+Et0/1
+    - Destination Ports\s+:\s+Et0/2
+    hint: monitor session 1 source interface Ethernet0/1 both / monitor session 1 destination interface Ethernet0/2
+  - id: span-sniffer
+    description: SNIFFER receives the mirrored packets
+    device: SNIFFER
+    command: show interfaces Ethernet0/0
+    match:
+    - '[1-9]\d* packets input'
+    hint: Ping SRV from PC1 while the session is up.
+- id: rspan
+  title: 'SW1 -> SW2: RSPAN over a remote-span VLAN'
+  explain: |
+    When the source and the analyser are on **different switches**, use **RSPAN**: the source switch sends the
+    copies into a dedicated **remote-span VLAN** (999), which is carried over the trunks like any other VLAN,
+    and the destination switch delivers that VLAN to its analyser port.
+
+    - Create the VLAN with `remote-span` on **every** switch in the path (MAC learning is disabled in it).
+    - Source switch (SW1): `monitor session 2 source interface Ethernet0/0 both` and
+      `monitor session 2 destination remote vlan 999`.
+    - Destination switch (SW2): `monitor session 2 source remote vlan 999` and
+      `monitor session 2 destination interface Ethernet0/3`.
+    - The trunk must allow VLAN 999 (here all VLANs are allowed).
+
+    **ERSPAN** (Encapsulated Remote SPAN) goes one step further: the copies are encapsulated in **GRE** and
+    routed over an IP network, so source and analyser need no common Layer-2 VLAN. Configuration on a
+    Catalyst/IOS XE router:
+
+    ```
+    monitor session 3 type erspan-source
+     source interface GigabitEthernet1 both
+     destination
+      erspan-id 100
+      ip address 192.0.2.50
+      origin ip address 192.0.2.1
+    ```
+
+    Troubleshooting: `show monitor session all`, `show vlan remote-span`; the RSPAN VLAN missing (or not
+    `remote-span`) on a transit switch is the classic fault.
+  config:
+    SW1: |
+      vlan 999
+       name RSPAN
+       remote-span
+      monitor session 2 source interface %if0% both
+      monitor session 2 destination remote vlan 999
+    SW2: |
+      vlan 999
+       name RSPAN
+       remote-span
+      monitor session 2 source remote vlan 999
+      monitor session 2 destination interface %if3%
+  verify:
+  - device: SW1
+    command: show monitor session 2
+    expect: 'Remote Source Session, Both: Et0/0, Dest RSPAN VLAN 999.'
+  - device: SW2
+    command: show monitor session 2
+    expect: Remote Destination Session, Source RSPAN VLAN 999, Destination Et0/3.
+  - device: SNIFFER
+    command: show interfaces Ethernet0/1
+    expect: Packets input rising while R1 routes PC1's traffic.
+  checks:
+  - id: rspan-vlan
+    description: VLAN 999 is a remote-span VLAN on SW1
+    device: SW1
+    command: show vlan remote-span
+    match:
+    - ^\s*999\b
+    hint: vlan 999 / remote-span
+  - id: rspan-vlan-sw2
+    description: VLAN 999 is a remote-span VLAN on SW2 too
+    device: SW2
+    mode: config
+    match:
+    - ^vlan 999\n name RSPAN\n remote-span
+    hint: vlan 999 / remote-span on every switch in the path
+  - id: rspan-src
+    description: SW1 sends R1's port into RSPAN VLAN 999
+    device: SW1
+    command: show monitor session 2
+    match:
+    - Remote Source Session
+    - Dest RSPAN VLAN\s+:\s+999
+    hint: monitor session 2 source interface Ethernet0/0 both / monitor session 2 destination remote vlan 999
+  - id: rspan-dst
+    description: SW2 delivers RSPAN VLAN 999 to Et0/3
+    device: SW2
+    command: show monitor session 2
+    match:
+    - Remote Destination Session
+    - Source RSPAN VLAN\s+:\s+999
+    - Destination Ports\s+:\s+Et0/3
+    hint: vlan 999 / remote-span; monitor session 2 source remote vlan 999 / monitor session 2 destination interface Ethernet0/3
+  - id: rspan-sniffer
+    description: SNIFFER receives the RSPAN copies on Et0/1
+    device: SNIFFER
+    command: show interfaces Ethernet0/1
+    match:
+    - '[1-9]\d* packets input'
+    hint: Ping SRV from PC1; check VLAN 999 exists as remote-span on both switches and the trunk allows it.
+- id: epc
+  title: 'Optional: Embedded Packet Capture on R1'
+  optional: true
+  explain: |
+    When there is no analyser at all, IOS XE can capture packets **on the device** with Embedded Packet
+    Capture (EPC). It is configured from privileged EXEC mode (not configuration mode):
+
+    ```
+    monitor capture CAP interface Ethernet0/0 both
+    monitor capture CAP match ipv4 host 10.28.10.10 any
+    monitor capture CAP buffer size 1
+    monitor capture CAP start
+    ! ... ping from PC1 ...
+    monitor capture CAP stop
+    show monitor capture CAP buffer brief
+    monitor capture CAP export tftp://192.0.2.50/cap.pcap
+    no monitor capture CAP
+    ```
+
+    The exported `.pcap` opens in Wireshark. Use a tight `match` filter and a small buffer: the capture runs in
+    the control plane. Support for EPC on IOL can vary by image - if `monitor capture` is rejected, try it on a
+    Cat8000V.
+  verify:
+  - device: R1
+    command: show monitor capture CAP buffer brief
+    expect: ICMP echo request/reply between 10.28.10.10 and 10.28.9.10 (after you start the capture and ping).
+solution_summary: |
+  **What you built**
+
+  - **R1 Flexible NetFlow (v9):** `flow record FR-APP` (key: IPv4 src/dst, protocol, L4 ports, DSCP, input
+    interface; non-key: output interface, bytes, packets, first/last timestamps), `flow exporter FE-V9`
+    (destination 10.28.9.10, source Loopback0, UDP 2055, `export-protocol netflow-v9`, template timeout 60) and
+    `flow monitor FM-APP` applied with `ip flow monitor FM-APP input` on Et0/0.
+  - **R1 NetFlow v5:** `flow exporter FE-V5` (`export-protocol netflow-v5`, UDP 9996) and `flow monitor FM-V5`
+    with `record netflow ipv4 original-input`, applied input on Et0/1.
+  - **SW2 local SPAN:** `monitor session 1 source interface Ethernet0/1 both`,
+    `monitor session 1 destination interface Ethernet0/2`.
+  - **RSPAN:** `vlan 999` + `remote-span` on SW1 and SW2; SW1 session 2 source Et0/0 both -> `destination remote vlan 999`;
+    SW2 session 2 `source remote vlan 999` -> destination Et0/3.
+
+  **Why it works:** NetFlow summarises traffic into flows in a cache and exports expired flows (with templates
+  for v9/IPFIX); SPAN copies frames locally; RSPAN carries the copies in a dedicated VLAN across trunks; ERSPAN
+  carries them in GRE across a routed network.
+
+  **Verification commands:** `show flow interface`, `show flow monitor NAME cache format table`,
+  `show flow exporter NAME statistics`, `show monitor session all`, `show vlan remote-span`.

@@ -1,0 +1,97 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Flexible NetFlow and SPAN outputs follow the IOS XE NetFlow and Catalyst SPAN configuration guides.
+# State: every step done (final state of the walkthrough).
+PC1:
+  ping 10.28.9.10: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.28.9.10, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+R1:
+  show flow interface Ethernet0/0: |
+    Interface Ethernet0/0
+      FNF:  monitor:         FM-APP
+            direction:       Input
+            traffic(ip):     on
+  show flow interface Ethernet0/1: |
+    Interface Ethernet0/1
+      FNF:  monitor:         FM-V5
+            direction:       Input
+            traffic(ip):     on
+  show flow monitor FM-APP cache format table: |2
+      Cache type:                               Normal (Platform cache)
+      Cache size:                                 4096
+      Current entries:                               1
+      High Watermark:                                2
+
+      Flows added:                                   3
+      Flows aged:                                    2
+        - Active timeout      (  1800 secs)          0
+        - Inactive timeout    (    15 secs)          2
+
+    IPV4 SRC ADDR    IPV4 DST ADDR    TRNS SRC PORT  TRNS DST PORT  IP PROT  IP DSCP  intf input   intf output  bytes long  pkts long  time abs first  time abs last
+    ===============  ===============  =============  =============  =======  =======  ===========  ===========  ==========  =========  ==============  =============
+    10.28.10.10      10.28.9.10                   0           2048        1  0x00     Et0/0        Et0/1              5000         50  10:21:04.123    10:21:13.456
+  show flow exporter FE-V9 statistics: |
+    Flow Exporter FE-V9:
+      Packet send statistics (last cleared 00:12:05 ago):
+        Successfully sent:         14                    (1680 bytes)
+
+      Client send statistics:
+        Client: Flow Monitor FM-APP
+          Records added:           6
+            - sent:                6
+          Bytes added:             312
+            - sent:                312
+  show flow exporter FE-V5: |
+    Flow Exporter FE-V5:
+      Description:              NetFlow v5 export to the collector
+      Export protocol:          NetFlow Version 5
+      Transport Configuration:
+        Destination type:       IP
+        Destination IP address: 10.28.9.10
+        Source IP address:      10.28.0.1
+        Source Interface:       Loopback0
+        Transport Protocol:     UDP
+        Destination Port:       9996
+        Source Port:            52331
+        DSCP:                   0x0
+        TTL:                    255
+        Output Features:        Not Used
+SW1:
+  show vlan remote-span: |2
+
+    Remote SPAN VLANs
+    ------------------------------------------------------------------------------
+    999
+  show monitor session 2: "Session 2\n---------\nType                     : Remote Source Session\nSource Ports          \
+    \   : \n    Both                 : Et0/0\nDest RSPAN VLAN          : 999\n"
+SW2:
+  show monitor session 1: "Session 1\n---------\nType                     : Local Session\nSource Ports             : \n \
+    \   Both                 : Et0/1\nDestination Ports        : Et0/2\n    Encapsulation        : Native\n          Ingress\
+    \        : Disabled\n"
+  show monitor session 2: |
+    Session 2
+    ---------
+    Type                     : Remote Destination Session
+    Source RSPAN VLAN        : 999
+    Destination Ports        : Et0/3
+        Encapsulation        : Native
+              Ingress        : Disabled
+SNIFFER:
+  show interfaces Ethernet0/0: "Ethernet0/0 is up, line protocol is up \n  Hardware is AmdP2, address is aabb.cc00.0600 (bia\
+    \ aabb.cc00.0600)\n  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec, \n     reliability 255/255, txload 1/255, rxload\
+    \ 1/255\n  Encapsulation ARPA, loopback not set\n  Keepalive set (10 sec)\n  ARP type: ARPA, ARP Timeout 04:00:00\n  Last\
+    \ input 00:00:01, output 00:00:03, output hang never\n  Last clearing of \"show interface\" counters never\n  Input queue:\
+    \ 0/375/0/0 (size/max/drops/flushes); Total output drops: 0\n  Queueing strategy: fifo\n  5 minute input rate 0 bits/sec,\
+    \ 0 packets/sec\n  5 minute output rate 0 bits/sec, 0 packets/sec\n     214 packets input, 20972 bytes, 0 no buffer\n\
+    \     Received 12 broadcasts (0 IP multicasts)\n     0 runts, 0 giants, 0 throttles \n     0 input errors, 0 CRC, 0 frame,\
+    \ 0 overrun, 0 ignored\n     0 input packets with dribble condition detected\n     38 packets output, 4370 bytes, 0 underruns\n"
+  show interfaces Ethernet0/1: "Ethernet0/1 is up, line protocol is up \n  Hardware is AmdP2, address is aabb.cc00.0600 (bia\
+    \ aabb.cc00.0600)\n  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec, \n     reliability 255/255, txload 1/255, rxload\
+    \ 1/255\n  Encapsulation ARPA, loopback not set\n  Keepalive set (10 sec)\n  ARP type: ARPA, ARP Timeout 04:00:00\n  Last\
+    \ input 00:00:01, output 00:00:03, output hang never\n  Last clearing of \"show interface\" counters never\n  Input queue:\
+    \ 0/375/0/0 (size/max/drops/flushes); Total output drops: 0\n  Queueing strategy: fifo\n  5 minute input rate 0 bits/sec,\
+    \ 0 packets/sec\n  5 minute output rate 0 bits/sec, 0 packets/sec\n     188 packets input, 18424 bytes, 0 no buffer\n\
+    \     Received 12 broadcasts (0 IP multicasts)\n     0 runts, 0 giants, 0 throttles \n     0 input errors, 0 CRC, 0 frame,\
+    \ 0 overrun, 0 ignored\n     0 input packets with dribble condition detected\n     38 packets output, 4370 bytes, 0 underruns\n"

@@ -1,0 +1,36 @@
+# Cisco exam objectives this lab covers: '<EXAM> <objective>' from cmllab/exams/*.yaml
+lab:
+- ENCOR 1.4
+- CCNA 4.7
+- CCIE-EI 4.4
+- CCIE-EI 4.4.a
+- CCIE-EI 4.4.b
+- CCIE-EI 4.4.d
+- CCIE-EI 4.4.e
+- CCIE-EI 4.4.f
+- CCIE-EI 4.4.g
+- CCIE-EI 4.4.h
+steps:
+  baseline:
+  - CCIE-EI 4.4.a
+  - CCNA 4.7
+  classify-mark:
+  - ENCOR 1.4
+  - CCIE-EI 4.4.b
+  - CCIE-EI 4.4.d
+  - CCNA 4.7
+  police:
+  - ENCOR 1.4
+  - CCIE-EI 4.4.e
+  hqos:
+  - ENCOR 1.4
+  - CCIE-EI 4.4.e
+  - CCIE-EI 4.4.f
+  - CCIE-EI 4.4.g
+  - CCIE-EI 4.4.h
+  verify-e2e:
+  - ENCOR 1.4
+  - CCIE-EI 4.4.h
+  interpret:
+  - ENCOR 1.4
+  - CCNA 4.7

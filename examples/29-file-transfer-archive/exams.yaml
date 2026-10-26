@@ -1,0 +1,24 @@
+# Cisco exam objectives this lab covers: '<EXAM> <objective>' from cmllab/exams/*.yaml
+lab:
+- ENARSI 4.1
+- ENARSI 4.1.b
+- ENARSI 4.1.c
+- CCNA 4.9
+- CCIE-EI 4.3.a.ii
+- CCIE-EI 4.3.c.ii
+steps:
+  baseline:
+  - ENARSI 4.1
+  tftp:
+  - ENARSI 4.1.c
+  - CCNA 4.9
+  ftp:
+  - ENARSI 4.1.c
+  - CCNA 4.9
+  scp:
+  - ENARSI 4.1.b
+  - CCIE-EI 4.3.a.ii
+  archive:
+  - ENARSI 4.1.b
+  - CCIE-EI 4.3.a.ii
+  - CCIE-EI 4.3.c.ii

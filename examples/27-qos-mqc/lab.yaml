@@ -1,0 +1,520 @@
+id: 27-qos-mqc
+type: walkthrough
+title: 'Walkthrough: QoS with MQC - marking, policing, HQoS shaping and LLQ (IOL)'
+blueprint:
+- '1.4'
+domain: 1.0 Architecture
+difficulty: 3
+platforms:
+- iol
+summary: 'Build and interpret an end-to-end DiffServ design: classify and mark at the trust boundary, police bulk traffic,
+  shape a 10 Mbps WAN with a hierarchical policy (LLQ, CBWFQ, WRED) and prove the DSCP marking end to end.'
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: HOSTS
+  kind: router
+  x: -300
+  y: 0
+  config: |
+    ! Traffic source. Loopback1 = IP phones (voice), Loopback2 = business app clients, Loopback3 = backup/bulk clients. Fully configured - do not change it.
+    interface %if0%
+     description to EDGE Et0/0 (access port, untrusted)
+     ip address 10.27.1.2 255.255.255.252
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback1
+     description voice VLAN (IP phones)
+     ip address 10.27.10.1 255.255.255.0
+    interface Loopback2
+     description data VLAN (business apps)
+     ip address 10.27.20.1 255.255.255.0
+    interface Loopback3
+     description bulk VLAN (backups)
+     ip address 10.27.30.1 255.255.255.0
+    router ospf 1
+     router-id 10.27.0.1
+     network 10.27.1.0 0.0.0.3 area 0
+     network 10.27.10.0 0.0.0.255 area 0
+     network 10.27.20.0 0.0.0.255 area 0
+     network 10.27.30.0 0.0.0.255 area 0
+- name: EDGE
+  kind: router
+  x: -100
+  y: 0
+  config: |
+    ! Branch access router = the QoS trust boundary. Addressing and OSPF are pre-built; you add the classification, marking and policing.
+    interface %if0%
+     description to HOSTS Et0/0 (access side, untrusted)
+     ip address 10.27.1.1 255.255.255.252
+     no shutdown
+    interface %if1%
+     description to WAN Et0/0
+     ip address 10.27.2.1 255.255.255.252
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    router ospf 1
+     router-id 10.27.0.2
+     network 10.27.1.0 0.0.0.3 area 0
+     network 10.27.2.0 0.0.0.3 area 0
+- name: WAN
+  kind: router
+  x: 100
+  y: 0
+  config: |
+    ! Branch WAN router. The WAN circuit to HQ is sold as 10 Mbps on a 100 Mbps Ethernet hand-off. Addressing and OSPF are pre-built; you add the queuing and shaping.
+    interface %if0%
+     description to EDGE Et0/1
+     ip address 10.27.2.2 255.255.255.252
+     no shutdown
+    interface %if1%
+     description WAN circuit to HQ Et0/0 (10 Mbps CIR)
+     ip address 10.27.3.1 255.255.255.252
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    router ospf 1
+     router-id 10.27.0.3
+     network 10.27.2.0 0.0.0.3 area 0
+     network 10.27.3.0 0.0.0.3 area 0
+- name: HQ
+  kind: router
+  x: 300
+  y: 0
+  config: |
+    ! HQ data centre router. Loopback0 = the servers. Addressing and OSPF are pre-built; you add a policy that only counts DSCP values (to prove the marking survives the WAN).
+    interface %if0%
+     description WAN circuit to WAN Et0/1
+     ip address 10.27.3.2 255.255.255.252
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description HQ servers
+     ip address 10.27.100.1 255.255.255.0
+    router ospf 1
+     router-id 10.27.0.4
+     network 10.27.3.0 0.0.0.3 area 0
+     network 10.27.100.0 0.0.0.255 area 0
+links:
+- a:
+    node: HOSTS
+    port: 0
+  b:
+    node: EDGE
+    port: 0
+- a:
+    node: EDGE
+    port: 1
+  b:
+    node: WAN
+    port: 0
+- a:
+    node: WAN
+    port: 1
+  b:
+    node: HQ
+    port: 0
+task: |
+  ## QoS with MQC: classify, mark, police, queue and shape (IOL)
+
+  A branch sends voice, business-application and backup traffic to HQ over a **10 Mbps** WAN circuit that is
+  delivered on a 100 Mbps Ethernet port. Build an end-to-end **Modular QoS CLI (MQC)** design and learn to *read*
+  QoS configurations and `show policy-map interface` output - the ENCOR 1.4 skill.
+
+  | Device | Role | QoS you configure |
+  |---|---|---|
+  | HOSTS | IP phones (Lo1 10.27.10.0/24), apps (Lo2 10.27.20.0/24), backups (Lo3 10.27.30.0/24) | none (untrusted endpoints) |
+  | EDGE | trust boundary | ingress classification + DSCP marking + policer for backups on Et0/0 |
+  | WAN | WAN edge | egress **hierarchical** policy on Et0/1: shape to 10 Mbps, LLQ for voice, CBWFQ, WRED |
+  | HQ | receiver | ingress *counting* policy by DSCP on Et0/0 (verification only) |
+
+  Marking plan (DiffServ, RFC 4594 style):
+
+  | Traffic | Source | DSCP | Per-hop behaviour on the WAN |
+  |---|---|---|---|
+  | Voice | 10.27.10.0/24 | EF (46) | priority queue (LLQ), 20 % of the shaped rate |
+  | Business apps | 10.27.20.0/24 | AF21 (18) | 40 % of the remaining bandwidth |
+  | Backups | 10.27.30.0/24 | CS1 (8) | policed to 256 kbps at the edge, 5 % remaining on the WAN |
+  | Everything else | - | default (0) | fair-queue + WRED |
+
+  Addressing and OSPF area 0 are pre-built on all four routers (day-0), so you start with working routing.
+
+  **Resources:** 4 IOL-XE nodes, about 4 GB RAM.
+
+  **IOL note:** IOL forwards in software and is rate-limited, so you will not see real congestion. You verify that
+  traffic lands in the right **class** (packet counters), carries the right **DSCP**, and that each action
+  (policer, priority, shaper) is attached with the right parameters - exactly what the exam asks you to interpret.
+steps:
+- id: baseline
+  title: 'Baseline: routing works, nothing is marked yet'
+  explain: |
+    QoS never fixes a broken network, so first confirm the pre-built baseline: OSPF area 0 on all four routers and
+    reachability from each HOSTS loopback (voice, apps, backups) to the HQ servers (10.27.100.1).
+
+    The **DiffServ model** you will build has three ideas:
+
+    1. **Classify** traffic once, as close to the source as you can trust (the *trust boundary*).
+    2. **Mark** it in the IP header - the 6-bit **DSCP** field (the upper six bits of the old ToS byte; the same
+       field exists in IPv6 as *Traffic Class*). EF = 46 for voice, AF*xy* for data classes (*x* = class,
+       *y* = drop precedence), CS1 = 8 for "less than best effort".
+    3. Every later hop applies a **per-hop behaviour** (PHB) by matching only the DSCP: queue, drop, police, shape.
+
+    MQC always uses three building blocks: `class-map` (what), `policy-map` (which action per class) and
+    `service-policy input|output` (where). Remember this order when you *interpret* a configuration: start at the
+    interface, follow the policy-map name, then the class-map names inside it.
+  verify:
+  - device: HQ
+    command: show ip route ospf
+    expect: 10.27.10.0/24, 10.27.20.0/24 and 10.27.30.0/24 via 10.27.3.1.
+  - device: HOSTS
+    command: ping 10.27.100.1 source Loopback1
+    expect: Success rate 100 percent.
+  checks:
+  - id: voice-reach
+    description: Voice loopback reaches the HQ servers
+    device: HOSTS
+    command: ping 10.27.100.1 source Loopback1
+    min_success: 60
+    hint: Wait for OSPF to converge (show ip ospf neighbor on every router).
+  - id: bulk-reach
+    description: Backup loopback reaches the HQ servers
+    device: HOSTS
+    command: ping 10.27.100.1 source Loopback3
+    min_success: 60
+    hint: Wait for OSPF to converge.
+- id: classify-mark
+  title: 'EDGE: classify and mark at the trust boundary'
+  explain: |
+    End devices are **untrusted**: a PC could mark its own traffic EF and steal the priority queue. So EDGE
+    re-classifies everything arriving from HOSTS on Et0/0 and **re-marks** it. Classification here uses
+    extended ACLs on the source subnet (in a real network you might use NBAR2 `match protocol`, the voice VLAN, or
+    trust the DSCP of a Cisco phone via `trust device cisco-phone` on a switch).
+
+    - `class-map match-all` = every `match` line must be true; `match-any` = one is enough.
+    - `class class-default` catches everything else; here it resets DSCP to 0 so nothing can sneak in with a
+      forged marking.
+    - The policy is applied **inbound** so the marking is there before routing and before any egress queuing.
+
+    Then generate some traffic and read the counters. `show policy-map interface Ethernet0/0 input` shows, per
+    class, packets matched, the `Match:` criteria and the `QoS Set` action.
+
+    Troubleshooting tips: `show class-map` and `show policy-map MARK-IN` show the definitions without counters;
+    `debug ip packet detail` with an ACL can show the ToS byte of individual packets (0xB8 = EF) - use with care.
+  config:
+    EDGE: |
+      ip access-list extended QOS-VOICE
+       permit ip 10.27.10.0 0.0.0.255 any
+      ip access-list extended QOS-APPS
+       permit ip 10.27.20.0 0.0.0.255 any
+      ip access-list extended QOS-BULK
+       permit ip 10.27.30.0 0.0.0.255 any
+      class-map match-all VOICE
+       match access-group name QOS-VOICE
+      class-map match-all APPS
+       match access-group name QOS-APPS
+      class-map match-all BULK
+       match access-group name QOS-BULK
+      policy-map MARK-IN
+       class VOICE
+        set dscp ef
+       class APPS
+        set dscp af21
+       class BULK
+        set dscp cs1
+       class class-default
+        set dscp default
+      interface %if0%
+       service-policy input MARK-IN
+  verify:
+  - device: HOSTS
+    command: ping 10.27.100.1 source Loopback1 repeat 20
+    expect: 20 replies - generates voice-class traffic.
+  - device: EDGE
+    command: show policy-map interface Ethernet0/0 input
+    expect: Class VOICE with packets counted and `QoS Set dscp ef`; APPS `dscp af21`; BULK `dscp cs1`.
+  checks:
+  - id: mark-policy
+    description: MARK-IN marks voice EF, apps AF21 and backups CS1
+    device: EDGE
+    mode: config
+    match:
+    - ^policy-map MARK-IN
+    - ^ class VOICE\n  set dscp ef
+    - ^ class APPS\n  set dscp af21
+    - ^ class BULK\n  set dscp cs1
+    hint: policy-map MARK-IN / class VOICE / set dscp ef (and af21, cs1 for APPS and BULK)
+  - id: mark-applied
+    description: MARK-IN is attached inbound on Ethernet0/0
+    device: EDGE
+    command: show policy-map interface Ethernet0/0 input
+    match:
+    - 'Service-policy input: MARK-IN'
+    - 'Class-map: VOICE \(match-all\)'
+    - dscp ef
+    hint: interface Ethernet0/0 / service-policy input MARK-IN
+- id: police
+  title: 'EDGE: police the backup class (single-rate two-colour policer)'
+  explain: |
+    A **policer** measures a class against a rate and takes an action per packet: here **conform** (within
+    256 kbps plus a burst of 8000 bytes) = transmit, **exceed** = drop. Policers never delay traffic - they drop
+    or re-mark immediately (no queue), which is why they are used at the edge of the network on *inbound*
+    traffic you want to limit. A **shaper** (next step) instead buffers excess traffic and sends it later.
+
+    Variants you should recognise when interpreting a configuration:
+
+    - single-rate two-colour: `police cir X conform-action transmit exceed-action drop`
+    - single-rate three-colour: add `bc`/`be` and `violate-action`
+    - two-rate three-colour (RFC 2698): `police cir X pir Y`
+    - re-mark instead of drop: `exceed-action set-dscp-transmit cs1` (a "soft" policer)
+
+    After adding the policer, send a burst of large pings from Loopback3 and look for the `police:` block with
+    **conformed** / **exceeded** counters.
+  config:
+    EDGE: |
+      policy-map MARK-IN
+       class BULK
+        police cir 256000 bc 8000 conform-action transmit exceed-action drop
+  verify:
+  - device: HOSTS
+    command: ping 10.27.100.1 source Loopback3 size 1400 repeat 200 timeout 0
+    expect: Many replies lost - the excess is dropped by the policer.
+  - device: EDGE
+    command: show policy-map interface Ethernet0/0 input class BULK
+    expect: '`police: cir 256000 bps, bc 8000 bytes` with conformed and exceeded counters.'
+  checks:
+  - id: policer
+    description: BULK is policed at 256 kbps on EDGE
+    device: EDGE
+    command: show policy-map interface Ethernet0/0 input class BULK
+    match:
+    - 'police:'
+    - cir 256000 bps
+    - exceeded \d+ packets
+    hint: policy-map MARK-IN / class BULK / police cir 256000 bc 8000 conform-action transmit exceed-action drop
+  - id: bulk-still-works
+    description: Small backup pings still pass (within the policed rate)
+    device: HOSTS
+    command: ping 10.27.100.1 source Loopback3
+    min_success: 60
+    hint: A policer only drops traffic above the CIR.
+- id: hqos
+  title: 'WAN: hierarchical QoS - shape to 10 Mbps, LLQ, CBWFQ and WRED'
+  explain: |
+    The WAN circuit is 10 Mbps but the Ethernet hand-off runs at 100 Mbps. Without a shaper the router never sees
+    congestion (its interface is not full), sends at line rate, and the provider **polices** the excess -
+    randomly dropping voice. The fix is **hierarchical QoS (HQoS)**:
+
+    - **Parent** policy `WAN-SHAPE`: `shape average 10000000` in `class-default` creates *artificial* congestion
+      at 10 Mbps, so the router's own queues fill instead of the provider's policer dropping.
+    - **Child** policy `WAN-QUEUING` (attached with `service-policy` *inside* the parent class) decides who goes
+      first inside those 10 Mbps:
+      - `priority percent 20` = **LLQ**: a strict-priority queue for EF with an *implicit policer* at 20 %
+        (2 Mbps) so voice can never starve the other classes.
+      - `bandwidth remaining percent` = **CBWFQ**: a minimum share of what is left after the priority queue.
+      - `fair-queue` + `random-detect dscp-based` in `class-default` = flow-based fairness and **WRED**, which
+        drops early and randomly (higher drop probability for higher drop precedence) to avoid TCP global
+        synchronisation and tail drop.
+
+    The WAN router classifies only on **DSCP** - it trusts EDGE's marking. Note the class-map names (VOICE,
+    APPS, BULK) are local to each router: the same name on EDGE and WAN can match completely different things.
+  config:
+    WAN: |
+      class-map match-all VOICE
+       match dscp ef
+      class-map match-all APPS
+       match dscp af21
+      class-map match-all BULK
+       match dscp cs1
+      policy-map WAN-QUEUING
+       class VOICE
+        priority percent 20
+       class APPS
+        bandwidth remaining percent 40
+       class BULK
+        bandwidth remaining percent 5
+       class class-default
+        fair-queue
+        random-detect dscp-based
+      policy-map WAN-SHAPE
+       class class-default
+        shape average 10000000
+        service-policy WAN-QUEUING
+      interface %if1%
+       service-policy output WAN-SHAPE
+  verify:
+  - device: WAN
+    command: show policy-map interface Ethernet0/1 output
+    expect: 'Parent WAN-SHAPE with `shape (average) cir 10000000`, child WAN-QUEUING with `Priority: 20%`, `bandwidth remaining
+      40%` and the WRED table in class-default.'
+  - device: WAN
+    command: show policy-map WAN-SHAPE
+    expect: The hierarchy without counters (`service-policy WAN-QUEUING`).
+  checks:
+  - id: shaper
+    description: WAN-SHAPE shapes to 10 Mbps on Ethernet0/1 output
+    device: WAN
+    command: show policy-map interface Ethernet0/1 output
+    match:
+    - 'Service-policy output: WAN-SHAPE'
+    - shape \(average\) cir 10000000
+    - 'Service-policy : WAN-QUEUING'
+    hint: policy-map WAN-SHAPE / class class-default / shape average 10000000 / service-policy WAN-QUEUING; then interface
+      Ethernet0/1 / service-policy output WAN-SHAPE
+  - id: llq
+    description: Voice (EF) gets a 20% priority queue
+    device: WAN
+    command: show policy-map interface Ethernet0/1 output
+    match:
+    - 'Match: +dscp ef \(46\)'
+    - 'Priority: 20%'
+    hint: class VOICE / priority percent 20
+  - id: cbwfq-wred
+    description: Apps get 40% remaining; class-default uses fair-queue and WRED
+    device: WAN
+    mode: config
+    match:
+    - ^ class APPS\n  bandwidth remaining percent 40
+    - ^  random-detect dscp-based
+    hint: class APPS / bandwidth remaining percent 40; class class-default / fair-queue / random-detect dscp-based
+- id: verify-e2e
+  title: 'HQ: prove the DSCP marking survives end to end'
+  explain: |
+    A classic exam (and real-life) question is "where was the marking lost?". DSCP is carried hop by hop unless
+    a device re-marks it, so the receiver can prove what arrived. HQ gets a policy with class-maps that only
+    **match** (no action) - a *counting* policy. Each class shows how many packets arrived with that DSCP.
+
+    Send traffic from each HOSTS loopback, then check the counters of each class on HQ. If DSCP-EF stays at 0 while
+    voice pings succeed, the marking was lost (or never applied) on the way: check MARK-IN on EDGE first, then
+    whether any device in between re-marks.
+
+    Tip: `show platform hardware qfp ...` does not exist on IOL; on IOL and other software platforms the
+    `show policy-map interface` counters are the tool.
+  config:
+    HQ: |
+      class-map match-all DSCP-EF
+       match dscp ef
+      class-map match-all DSCP-AF21
+       match dscp af21
+      class-map match-all DSCP-CS1
+       match dscp cs1
+      policy-map COUNT-DSCP
+       class DSCP-EF
+       class DSCP-AF21
+       class DSCP-CS1
+      interface %if0%
+       service-policy input COUNT-DSCP
+  verify:
+  - device: HOSTS
+    command: ping 10.27.100.1 source Loopback1 repeat 20
+    expect: Voice-class traffic.
+  - device: HOSTS
+    command: ping 10.27.100.1 source Loopback2 repeat 20
+    expect: App-class traffic.
+  - device: HQ
+    command: show policy-map interface Ethernet0/0 input
+    expect: DSCP-EF and DSCP-AF21 both count packets.
+  checks:
+  - id: gen-voice
+    description: Voice traffic sent to HQ
+    device: HOSTS
+    command: ping 10.27.100.1 source Loopback1 repeat 20
+    min_success: 60
+    hint: Routing must work (baseline step).
+  - id: ef-arrives
+    description: HQ receives packets marked EF
+    device: HQ
+    command: show policy-map interface Ethernet0/0 input class DSCP-EF
+    match:
+    - 'Class-map: DSCP-EF'
+    - ^\s+[1-9]\d* packets, \d+ bytes
+    hint: Apply COUNT-DSCP inbound on HQ Ethernet0/0, ping from HOSTS Loopback1, and check MARK-IN on EDGE.
+- id: interpret
+  title: Interpret QoS configurations (exam practice)
+  explain: |
+    No new configuration - practise *reading* QoS. Answer each question from `show running-config` and
+    `show policy-map interface` on your routers, then compare with the answers below.
+
+    1. On WAN, how much bandwidth can voice use when the link is congested, and what happens to voice above that?
+       *(20 % of the 10 Mbps shaped rate = 2 Mbps; above that the LLQ's implicit policer drops it - only during
+       congestion.)*
+    2. On WAN, what is the minimum bandwidth APPS gets? *(40 % of what remains after the priority queue: 40 % of
+       8 Mbps = 3.2 Mbps; unused bandwidth is shared, it is a minimum, not a limit.)*
+    3. A user marks their PC traffic EF. What DSCP does it have on the WAN? *(default/0 - EDGE re-marks everything
+       that does not match an ACL in class-default.)*
+    4. What would change if WAN-QUEUING were attached directly to Ethernet0/1 without the shaper? *(Queuing would
+       only engage at 100 Mbps congestion that never happens; the provider would police at 10 Mbps.)*
+    5. Read this output line: `police: cir 256000 bps, bc 8000 bytes` with `exceeded 120 packets` -
+       *(120 backup packets were above 256 kbps and were dropped at the edge.)*
+
+    Other forms you should recognise: `priority level 1` / `priority level 2` (two priority queues),
+    `bandwidth percent` (of the interface / parent) vs `bandwidth remaining percent`, `shape peak`,
+    `random-detect` with `ecn`, and `trust` / `qos trust dscp` on switches.
+  verify:
+  - device: WAN
+    command: show policy-map WAN-QUEUING
+    expect: The child policy definition.
+  - device: EDGE
+    command: show policy-map MARK-IN
+    expect: The marking policy with the policer.
+  checks:
+  - id: interpret-wan
+    description: WAN still has the complete HQoS policy
+    device: WAN
+    command: show policy-map interface Ethernet0/1 output
+    match:
+    - 'Service-policy : WAN-QUEUING'
+    - 'Priority: 20%'
+    hint: Re-do the hqos step if the policy was removed.
+solution_summary: |
+  **What you built:** an end-to-end DiffServ QoS design with MQC.
+
+  - **EDGE (trust boundary)** - `policy-map MARK-IN` inbound on Et0/0: ACL-based classes VOICE/APPS/BULK set
+    DSCP **EF / AF21 / CS1**, `class-default` re-marks to 0, and BULK is policed
+    (`police cir 256000 bc 8000 conform-action transmit exceed-action drop`).
+  - **WAN (HQoS)** - parent `WAN-SHAPE` (`shape average 10000000` in class-default) with child `WAN-QUEUING`:
+    VOICE `priority percent 20` (LLQ with implicit policer), APPS `bandwidth remaining percent 40`, BULK
+    `bandwidth remaining percent 5`, class-default `fair-queue` + `random-detect dscp-based` (WRED); attached
+    `service-policy output WAN-SHAPE` on Et0/1.
+  - **HQ** - counting policy `COUNT-DSCP` inbound (match-only classes) proves EF and AF21 survive the WAN.
+
+  **Why it works:** classification happens once at the trust boundary; every other hop acts only on DSCP. The
+  shaper makes the router - not the provider - the congestion point, so the child policy decides what is
+  dropped: never voice (LLQ), rarely apps (CBWFQ minimum), first bulk and best effort (small share, WRED).
+
+  **Commands to remember:** `show policy-map interface <if> [input|output] [class X]`, `show policy-map <name>`,
+  `show class-map`.

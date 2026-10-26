@@ -1,0 +1,17 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Outputs follow the IOS XE file-management, SSH/SCP and configuration-archive guides.
+# State: freshly booted lab (day-0 only).
+R1:
+  ping 10.29.1.10: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.29.1.10, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show archive: |
+    Archive feature not enabled
+  show archive log config all: |
+    %Archive logging is not enabled.
+SRV:
+  show ip ssh: |
+    SSH Disabled - version 1.99
+    %Please create RSA keys to enable SSH (and of atleast 768 bits for SSH v2).

@@ -1264,6 +1264,129 @@
       ]
     },
     {
+      "file": "27-qos-mqc.encorlab",
+      "sha256": "dcb814b1c6d56f0085cef43f1b499f06dca5308363118be5e3efbed9697f4cc6",
+      "size": 9878,
+      "kind": "lab",
+      "id": "27-qos-mqc",
+      "title": "Walkthrough: QoS with MQC - marking, policing, HQoS shaping and LLQ (IOL)",
+      "version": "1",
+      "description": "Build and interpret an end-to-end DiffServ design: classify and mark at the trust boundary, police bulk traffic, shape a 10 Mbps WAN with a hierarchical policy (LLQ, CBWFQ, WRED) and prove the DSCP marking end to end.",
+      "blueprint": [
+        "1.4"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "walkthrough",
+      "ram_gb": 4.0,
+      "domain": "1.0 Architecture",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ],
+      "exams": [
+        "ENCOR 1.4",
+        "CCNA 4.7",
+        "CCIE-EI 4.4",
+        "CCIE-EI 4.4.a",
+        "CCIE-EI 4.4.b",
+        "CCIE-EI 4.4.d",
+        "CCIE-EI 4.4.e",
+        "CCIE-EI 4.4.f",
+        "CCIE-EI 4.4.g",
+        "CCIE-EI 4.4.h"
+      ],
+      "topics": [
+        "qos",
+        "walkthrough",
+        "encor"
+      ]
+    },
+    {
+      "file": "28-netflow-span-rspan.encorlab",
+      "sha256": "b082f74c230b90bff0a6ed7fb2d0525a910595eaf333c04a9b4e42d75b491e53",
+      "size": 9934,
+      "kind": "lab",
+      "id": "28-netflow-span-rspan",
+      "title": "Walkthrough: Flexible NetFlow (v9/v5) and SPAN / RSPAN (IOL, IOL-L2)",
+      "version": "1",
+      "description": "Build Flexible NetFlow on IOS XE (custom record, v9 and v5 exporters, monitors), troubleshoot exports, then mirror traffic to an analyser with local SPAN and RSPAN over a remote-span VLAN; ERSPAN and Embedded Packet Capture explained.",
+      "blueprint": [
+        "4.2",
+        "4.3"
+      ],
+      "nodes": 6,
+      "difficulty": 3,
+      "type": "walkthrough",
+      "ram_gb": 6.0,
+      "domain": "4.0 Network Assurance",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe",
+        "ioll2-xe"
+      ],
+      "exams": [
+        "ENCOR 4.2",
+        "ENCOR 4.3",
+        "ENARSI 4.6",
+        "CCIE-EI 4.6.c",
+        "CCIE-EI 4.7.a.i",
+        "CCIE-EI 4.7.a.ii",
+        "CCNA 2.2"
+      ],
+      "topics": [
+        "assurance",
+        "switching",
+        "walkthrough",
+        "encor"
+      ]
+    },
+    {
+      "file": "29-file-transfer-archive.encorlab",
+      "sha256": "dd46ad22068808f3f525dc6a8929870347e2bd3ccceff23da296075063dfbc4b",
+      "size": 6298,
+      "kind": "lab",
+      "id": "29-file-transfer-archive",
+      "title": "Walkthrough: TFTP, FTP, SCP and the configuration archive (IOL)",
+      "version": "1",
+      "description": "Serve and fetch files with TFTP, set up the FTP client, build an IOS SCP server (SSH + AAA exec authorization) and archive the configuration off-box over SCP with change logging and configure replace.",
+      "blueprint": [
+        "4.1"
+      ],
+      "nodes": 2,
+      "difficulty": 2,
+      "type": "walkthrough",
+      "ram_gb": 2.0,
+      "domain": "4.0 Infrastructure Services",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ],
+      "exams": [
+        "ENARSI 4.1",
+        "ENARSI 4.1.b",
+        "ENARSI 4.1.c",
+        "CCNA 4.9",
+        "CCIE-EI 4.3.a.ii",
+        "CCIE-EI 4.3.c.ii"
+      ],
+      "topics": [
+        "assurance",
+        "security",
+        "walkthrough",
+        "encor"
+      ]
+    },
+    {
       "file": "data-center.encorcourse",
       "sha256": "b4b6068514fe63db3dde3629651bfa52a5e2c485bfcc88230b6b761c8f492fe8",
       "size": 477,

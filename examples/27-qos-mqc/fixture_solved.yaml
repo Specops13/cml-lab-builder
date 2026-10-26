@@ -1,0 +1,68 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# MQC outputs follow the IOS XE QoS configuration guide and show policy-map interface examples.
+# State: every step done (final state of the walkthrough).
+HOSTS:
+  ping 10.27.100.1 source Loopback1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.27.100.1, timeout is 2 seconds:
+    Packet sent with a source address of 10.27.10.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 10.27.100.1 source Loopback3: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.27.100.1, timeout is 2 seconds:
+    Packet sent with a source address of 10.27.30.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 10.27.100.1 source Loopback1 repeat 20: "Type escape sequence to abort.\nSending 20, 100-byte ICMP Echos to 10.27.100.1,\
+    \ timeout is 2 seconds:\nPacket sent with a source address of 10.27.10.1 \n!!!!!!!!!!!!!!!!!!!!\nSuccess rate is 100 percent\
+    \ (20/20), round-trip min/avg/max = 1/1/3 ms\n"
+EDGE:
+  show policy-map interface Ethernet0/0 input: "Ethernet0/0 \n\n Service-policy input: MARK-IN\n\n   Class-map: VOICE (match-all)\
+    \  \n     25 packets, 2850 bytes\n     5 minute offered rate 0000 bps, drop rate 0000 bps\n     Match: access-group name\
+    \ QOS-VOICE\n     QoS Set\n       dscp ef\n         Marker statistics: Disabled\n\n   Class-map: APPS (match-all)  \n\
+    \     5 packets, 570 bytes\n     5 minute offered rate 0000 bps, drop rate 0000 bps\n     Match: access-group name QOS-APPS\n\
+    \     QoS Set\n       dscp af21\n         Marker statistics: Disabled\n\n   Class-map: BULK (match-all)  \n     205 packets,\
+    \ 284290 bytes\n     5 minute offered rate 9000 bps, drop rate 4000 bps\n     Match: access-group name QOS-BULK\n    \
+    \ QoS Set\n       dscp cs1\n         Marker statistics: Disabled\n     police:\n         cir 256000 bps, bc 8000 bytes\n\
+    \       conformed 85 packets, 116290 bytes; actions:\n         transmit \n       exceeded 120 packets, 168000 bytes; actions:\n\
+    \         drop \n       conformed 3000 bps, exceeded 4000 bps\n\n   Class-map: class-default (match-any)  \n     42 packets,\
+    \ 3960 bytes\n     5 minute offered rate 0000 bps, drop rate 0000 bps\n     Match: any \n     QoS Set\n       dscp default\n\
+    \         Marker statistics: Disabled\n"
+  show policy-map interface Ethernet0/0 input class BULK: "Ethernet0/0 \n\n Service-policy input: MARK-IN\n\n   Class-map:\
+    \ BULK (match-all)  \n     205 packets, 284290 bytes\n     5 minute offered rate 9000 bps, drop rate 4000 bps\n     Match:\
+    \ access-group name QOS-BULK\n     QoS Set\n       dscp cs1\n         Marker statistics: Disabled\n     police:\n    \
+    \     cir 256000 bps, bc 8000 bytes\n       conformed 85 packets, 116290 bytes; actions:\n         transmit \n       exceeded\
+    \ 120 packets, 168000 bytes; actions:\n         drop \n       conformed 3000 bps, exceeded 4000 bps\n"
+WAN:
+  show policy-map interface Ethernet0/1 output: "Ethernet0/1 \n\n Service-policy output: WAN-SHAPE\n\n   Class-map: class-default\
+    \ (match-any)  \n     372 packets, 156840 bytes\n     5 minute offered rate 4000 bps, drop rate 0000 bps\n     Match:\
+    \ any \n     Queueing\n     queue limit 64 packets\n     (queue depth/total drops/no-buffer drops) 0/0/0\n     (pkts output/bytes\
+    \ output) 372/156840\n     shape (average) cir 10000000, bc 40000, be 40000\n     target shape rate 10000000\n\n     Service-policy\
+    \ : WAN-QUEUING\n\n       queue stats for all priority classes:\n         Queueing\n         queue limit 512 packets\n\
+    \         (queue depth/total drops/no-buffer drops) 0/0/0\n         (pkts output/bytes output) 45/5130\n\n       Class-map:\
+    \ VOICE (match-all)  \n         45 packets, 5130 bytes\n         5 minute offered rate 0000 bps, drop rate 0000 bps\n\
+    \         Match:  dscp ef (46)\n         Priority: 20% (2000 kbps), burst bytes 50000, b/w exceed drops: 0\n\n\n     \
+    \  Class-map: APPS (match-all)  \n         25 packets, 2850 bytes\n         5 minute offered rate 0000 bps, drop rate\
+    \ 0000 bps\n         Match:  dscp af21 (18)\n         Queueing\n         queue limit 64 packets\n         (queue depth/total\
+    \ drops/no-buffer drops) 0/0/0\n         (pkts output/bytes output) 25/2850\n         bandwidth remaining 40%\n\n    \
+    \   Class-map: BULK (match-all)  \n         85 packets, 116290 bytes\n         5 minute offered rate 3000 bps, drop rate\
+    \ 0000 bps\n         Match:  dscp cs1 (8)\n         Queueing\n         queue limit 64 packets\n         (queue depth/total\
+    \ drops/no-buffer drops) 0/0/0\n         (pkts output/bytes output) 85/116290\n         bandwidth remaining 5%\n\n   \
+    \    Class-map: class-default (match-any)  \n         217 packets, 32570 bytes\n         5 minute offered rate 1000 bps,\
+    \ drop rate 0000 bps\n         Match: any \n         Queueing\n         queue limit 64 packets\n         (queue depth/total\
+    \ drops/no-buffer drops/flowdrops) 0/0/0/0\n         (pkts output/bytes output) 217/32570\n         Fair-queue: per-flow\
+    \ queue limit 16 packets\n           Exp-weight-constant: 9 (1/512)\n           Mean queue depth: 0 packets\n        \
+    \   dscp       Transmitted         Random drop      Tail/Flow drop Minimum Maximum Mark\n                       pkts/bytes\
+    \            pkts/bytes       pkts/bytes    thresh  thresh  prob\n\n           default      217/32570            0/0 \
+    \             0/0                 16            32  1/10\n"
+HQ:
+  show ip route ospf: "Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP\n       D - EIGRP, EX - EIGRP\
+    \ external, O - OSPF, IA - OSPF inter area \n\nGateway of last resort is not set\n\n      10.0.0.0/8 is variably subnetted,\
+    \ 9 subnets, 3 masks\nO        10.27.1.0/30 [110/30] via 10.27.3.1, 00:21:07, Ethernet0/0\nO        10.27.2.0/30 [110/20]\
+    \ via 10.27.3.1, 00:21:07, Ethernet0/0\nO        10.27.10.1/32 [110/31] via 10.27.3.1, 00:21:07, Ethernet0/0\nO      \
+    \  10.27.20.1/32 [110/31] via 10.27.3.1, 00:21:07, Ethernet0/0\nO        10.27.30.1/32 [110/31] via 10.27.3.1, 00:21:07,\
+    \ Ethernet0/0\n"
+  show policy-map interface Ethernet0/0 input class DSCP-EF: "Ethernet0/0 \n\n Service-policy input: COUNT-DSCP\n\n   Class-map:\
+    \ DSCP-EF (match-all)  \n     20 packets, 2280 bytes\n     5 minute offered rate 0000 bps, drop rate 0000 bps\n     Match:\
+    \  dscp ef (46)\n"

@@ -2,6 +2,19 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [3.3.6] - Unreleased
+### Added
+- **New walkthroughs for the remaining ENCOR and ENARSI objectives** (IOL unless noted, strict day-0 config on every
+  Ethernet port, `show`/`ping` checks, debug commands in the text, solution summary, exam tags on the lab and each step):
+  - `27-qos-mqc`: MQC classification and DSCP marking, policing, hierarchical shaping with LLQ, CBWFQ, fair-queue and
+    DSCP-based WRED, end-to-end verification. 4 IOL nodes, about 4 GB. ENCOR 1.4, CCNA 4.7, CCIE-EI 4.4.
+  - `28-netflow-span-rspan`: Flexible NetFlow (custom record, NetFlow v9 and v5 exporters, monitors, troubleshooting),
+    local SPAN and RSPAN to an analyser node; ERSPAN and Embedded Packet Capture explained. 4 IOL + 2 IOL-L2 nodes,
+    about 6 GB. ENCOR 4.2, 4.3, ENARSI 4.6, CCIE-EI 4.6.c, 4.7.a.
+  - `29-file-transfer-archive`: IOS TFTP server and client, FTP client settings, SCP server (SSH + AAA exec
+    authorization), configuration archive over SCP with change logging and `configure replace`. 2 IOL nodes, about
+    2 GB. ENARSI 4.1.b/c, CCNA 4.9, CCIE-EI 4.3.a.ii, 4.3.c.ii.
+
 ## [3.3.5] - 2026-10-25
 ### Added
 - **Cisco exam-objective map.** New data-driven exam registry `cmllab/exams/*.yaml`, transcribed from Cisco's

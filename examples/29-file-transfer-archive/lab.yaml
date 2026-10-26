@@ -1,0 +1,319 @@
+id: 29-file-transfer-archive
+type: walkthrough
+title: 'Walkthrough: TFTP, FTP, SCP and the configuration archive (IOL)'
+blueprint:
+- '4.1'
+domain: 4.0 Infrastructure Services
+difficulty: 2
+platforms:
+- iol
+summary: Serve and fetch files with TFTP, set up the FTP client, build an IOS SCP server (SSH + AAA exec authorization) and
+  archive the configuration off-box over SCP with change logging and configure replace.
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: R1
+  kind: router
+  x: -150
+  y: 0
+  config: |
+    ! Managed router. Addressing and routing are pre-built; you add file-transfer clients and the configuration archive.
+    interface %if0%
+     description to SRV Et0/0 (management / file server)
+     ip address 10.29.1.1 255.255.255.0
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description management source address
+     ip address 10.29.0.1 255.255.255.255
+- name: SRV
+  kind: router
+  x: 150
+  y: 0
+  config: |
+    ! File server (IOL). You turn it into a TFTP and SCP server.
+    interface %if0%
+     description to R1 Et0/0
+     ip address 10.29.1.10 255.255.255.0
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ip route 10.29.0.0 255.255.255.0 10.29.1.1
+links:
+- a:
+    node: R1
+    port: 0
+  b:
+    node: SRV
+    port: 0
+task: |
+  ## Device management: TFTP, FTP, SCP and the configuration archive (IOL)
+
+  Moving files - configurations, images, captures - to and from network devices is daily operations work and an
+  ENARSI troubleshooting topic (4.1.b SCP, 4.1.c (T)FTP). In this lab:
+
+  | Device | Role |
+  |---|---|
+  | R1 | managed router: Et0/0 10.29.1.1, Loopback0 10.29.0.1 (management source) |
+  | SRV | file server 10.29.1.10: TFTP server and SCP (SSH) server |
+
+  1. SRV serves a file over **TFTP**; R1 reads it, sourcing from Loopback0.
+  2. **FTP** client settings on R1 and why IOS has no FTP server.
+  3. SRV becomes an **SCP server** (SSH, AAA, privilege) - and the classic SCP failures.
+  4. R1 **archives its configuration** to SRV over SCP on every `write memory`, and logs every configuration change
+     (`archive log config`); `configure replace` rolls back to an archive.
+
+  **Resources:** 2 IOL-XE nodes, about 2 GB RAM.
+
+  **File systems:** IOS names its local storage differently per platform (`flash:`, `bootflash:`, `disk0:`, `unix:`
+  on IOL). Run `show file systems` to see yours; the starred (`*`) one is the default for `dir` and `copy`. This lab
+  avoids local file names where it can by transferring straight between devices (`more tftp://...`,
+  `copy running-config scp://...`).
+steps:
+- id: baseline
+  title: 'Baseline: R1 reaches SRV from its management loopback'
+  explain: |
+    All transfers in this lab are sourced from R1's **Loopback0** (10.29.0.1) - the usual practice, so the
+    server's ACLs and logs see one stable address no matter which interface the packets leave through.
+    SRV has a static route back to 10.29.0.0/24.
+  verify:
+  - device: R1
+    command: ping 10.29.1.10 source Loopback0
+    expect: Success rate 100 percent.
+  - device: R1
+    command: show file systems
+    expect: The local file systems; the default one is marked with *.
+  checks:
+  - id: r1-srv
+    description: R1 reaches SRV
+    device: R1
+    command: ping 10.29.1.10
+    min_success: 60
+    hint: Wait for both nodes to boot.
+- id: tftp
+  title: 'TFTP: SRV serves a file, R1 reads it from Loopback0'
+  explain: |
+    **TFTP** (UDP 69) has no authentication, no directory listing and lock-step 512-byte blocks: simple, slow,
+    and still everywhere (PXE/ZTP, phones, emergency image loads). IOS can act as a **read-only TFTP server**
+    for a named file: `tftp-server <filesystem>:<file> [alias NAME]`. SRV serves its own saved configuration.
+
+    1. On SRV, run `write memory` (so `nvram:startup-config` exists), then add the `tftp-server` line below.
+    2. On R1, set `ip tftp source-interface Loopback0` so the transfer is sourced from 10.29.0.1.
+    3. On R1, read the file without storing it: `more tftp://10.29.1.10/SRV-CONFIG`. (To store it you would use
+       `copy tftp://10.29.1.10/SRV-CONFIG <your-filesystem>:srv.cfg`.)
+
+    Troubleshooting TFTP: "Error opening ... (No such file or directory)" means the server has no
+    `tftp-server` line for that name (or alias); "Timed out" means no reply - routing back to the client's
+    *source* address, an ACL dropping UDP 69 or the ephemeral data ports, or the wrong source interface. Use
+    `debug tftp events` on the server to see each request.
+  config:
+    SRV: |
+      tftp-server nvram:startup-config alias SRV-CONFIG
+    R1: |
+      ip tftp source-interface Loopback0
+  verify:
+  - device: SRV
+    command: show running-config | include tftp-server
+    expect: 'The tftp-server line with alias SRV-CONFIG. Then run more tftp://10.29.1.10/SRV-CONFIG on R1: SRV''s configuration
+      is printed.'
+  checks:
+  - id: tftp-server
+    description: SRV serves its startup-config as SRV-CONFIG
+    device: SRV
+    mode: config
+    match:
+    - ^tftp-server nvram:startup-config alias SRV-CONFIG
+    hint: tftp-server nvram:startup-config alias SRV-CONFIG
+  - id: tftp-source
+    description: R1 sources TFTP from Loopback0
+    device: R1
+    mode: config
+    match:
+    - ^ip tftp source-interface Loopback0
+    hint: ip tftp source-interface Loopback0
+- id: ftp
+  title: FTP client settings on R1
+  explain: |
+    **FTP** (TCP 21 control + a data connection) adds a username/password and is much faster than TFTP for
+    large images. IOS is an FTP **client** only: it has no FTP server, so there is nothing to connect to in this
+    lab - you configure the client side and learn the failure modes.
+
+    - `ip ftp username` / `ip ftp password` set the default credentials (or put them in the URL:
+      `copy ftp://user:pass@server/file flash:`).
+    - `ip ftp source-interface Loopback0` sources the control and data connections from the loopback.
+    - `ip ftp passive` makes the client open the data connection (PASV) - needed when a firewall or NAT sits
+      between client and server; in **active** mode the server connects back to the client, which firewalls
+      often block (the transfer starts, then hangs on "Opening data connection").
+
+    Credentials are sent in clear text - prefer SCP (next step) or HTTPS for anything sensitive.
+  config:
+    R1: |
+      ip ftp source-interface Loopback0
+      ip ftp username backup
+      ip ftp password 0 Backup123
+      ip ftp passive
+  verify:
+  - device: R1
+    command: show running-config | include ip ftp
+    expect: Source interface, username, password and passive mode.
+  checks:
+  - id: ftp-client
+    description: R1's FTP client uses Loopback0 and passive mode
+    device: R1
+    mode: config
+    match:
+    - ^ip ftp source-interface Loopback0
+    - ^ip ftp passive
+    - ^ip ftp username backup
+    hint: ip ftp source-interface Loopback0 / ip ftp username backup / ip ftp password Backup123 / ip ftp passive
+- id: scp
+  title: 'SRV: SSH and SCP server'
+  explain: |
+    **SCP** copies files over **SSH** (TCP 22): encrypted and authenticated. An IOS SCP server needs:
+
+    1. SSH itself: a hostname, `ip domain name` and an **RSA key** (`crypto key generate rsa modulus 2048`),
+       `ip ssh version 2`.
+    2. **AAA with exec authorization**: SCP runs a command on the server, so the user must be authorised for
+       exec at privilege 15 - `aaa new-model`, `aaa authentication login default local`,
+       `aaa authorization exec default local` and `username backup privilege 15 secret ...`.
+    3. `ip scp server enable`.
+
+    The `CONSOLE` method list with `none` keeps the console usable without a login after `aaa new-model`.
+
+    Test interactively from R1 first: `ssh -l backup 10.29.1.10`. Classic SCP failures:
+    "% Privilege denied" or "Permission denied" -> missing `aaa authorization exec` or the user is not
+    privilege 15; "Connection refused" -> no RSA key/SSH disabled or `transport input` excludes ssh;
+    an ACL on the vty lines (`access-class`) not permitting R1's source address.
+  config:
+    SRV: |
+      ip domain name lab.local
+      username backup privilege 15 secret Backup123
+      aaa new-model
+      aaa authentication login default local
+      aaa authentication login CONSOLE none
+      aaa authorization exec default local
+      crypto key generate rsa modulus 2048
+      ip ssh version 2
+      ip scp server enable
+      line con 0
+       login authentication CONSOLE
+      line vty 0 4
+       transport input ssh
+  verify:
+  - device: SRV
+    command: show ip ssh
+    expect: SSH Enabled - version 2.0.
+  checks:
+  - id: ssh-on
+    description: SSH version 2 is enabled on SRV
+    device: SRV
+    command: show ip ssh
+    match:
+    - SSH Enabled - version 2\.0
+    hint: ip domain name lab.local / crypto key generate rsa modulus 2048 / ip ssh version 2
+  - id: scp-on
+    description: The SCP server is enabled on SRV
+    device: SRV
+    mode: config
+    match:
+    - ^ip scp server enable
+    - ^aaa authorization exec default local
+    hint: aaa new-model / aaa authorization exec default local / ip scp server enable
+- id: archive
+  title: 'R1: configuration archive over SCP and change logging'
+  explain: |
+    The **archive** feature keeps numbered copies of the configuration, here directly on SRV over SCP
+    (`$h` expands to the hostname, a `-N` suffix is added). `write-memory` archives on every save,
+    `time-period 1440` once a day as well; `archive config` archives on demand.
+
+    `archive log config` keeps a log of every configuration command entered (who, from which line), and
+    `notify syslog` also sends each change as a syslog message - the "configuration change notification"
+    auditors ask for. `hidekeys` masks passwords in the log.
+
+    Then:
+    1. `write memory` (or `archive config`) on R1 -> the first archive `R1-archive-1` is copied to SRV.
+    2. `show archive` lists the archives; `show archive log config all` shows the commands you typed,
+       including the Loopback99 change.
+    3. **Rollback:** `configure replace scp://backup:Backup123@10.29.1.10/R1-archive-1 list` replaces the
+       running configuration with the archive and lists exactly which lines it removed or added
+       (`show archive config differences <url>` previews the differences first).
+
+    The credentials in the archive path are stored in the running configuration - in production, restrict who
+    can read it or use a server with key-based authentication.
+  config:
+    R1: |
+      ip ssh source-interface Loopback0
+      archive
+       path scp://backup:Backup123@10.29.1.10/$h-archive
+       write-memory
+       time-period 1440
+       maximum 10
+       log config
+        logging enable
+        logging size 200
+        notify syslog contenttype plaintext
+        hidekeys
+      interface Loopback99
+       description change tracked by archive log config
+       ip address 10.29.99.1 255.255.255.255
+  verify:
+  - device: R1
+    command: show archive
+    expect: 'Archive 1: scp://...10.29.1.10/R1-archive-1 <- Most Recent.'
+  - device: R1
+    command: show archive log config all
+    expect: The interface Loopback99 commands with user and line.
+  checks:
+  - id: archive-copy
+    description: R1 has archived its configuration to SRV over SCP
+    device: R1
+    command: show archive
+    match:
+    - scp://\S*10\.29\.1\.10/R1-archive-1
+    hint: Configure the archive path, then write memory or archive config. If the copy fails, test ssh -l backup 10.29.1.10
+      from R1.
+  - id: archive-log
+    description: Configuration changes are logged
+    device: R1
+    command: show archive log config all
+    match:
+    - interface Loopback99
+    hint: archive / log config / logging enable - then make a change (interface Loopback99).
+solution_summary: |
+  **What you built**
+
+  - **TFTP:** SRV `tftp-server nvram:startup-config alias SRV-CONFIG`; R1 `ip tftp source-interface Loopback0`;
+    `more tftp://10.29.1.10/SRV-CONFIG` reads it.
+  - **FTP client:** `ip ftp source-interface Loopback0`, `ip ftp username/password`, `ip ftp passive` (IOS has no
+    FTP server).
+  - **SCP server on SRV:** domain name + RSA key + `ip ssh version 2`, `aaa new-model` with local login and
+    **exec authorization**, a privilege-15 user, `ip scp server enable`, vty `transport input ssh`.
+  - **Archive on R1:** `archive` / `path scp://backup:...@10.29.1.10/$h-archive` / `write-memory` /
+    `time-period 1440`, plus `log config` / `logging enable` / `notify syslog` / `hidekeys`.
+
+  **Why it works:** TFTP/FTP/SCP move files between devices; the archive turns every save into an off-box,
+  numbered backup, and `configure replace` rolls back to any of them.
+
+  **Verification commands:** `show file systems`, `more tftp://...`, `show ip ssh`, `show archive`,
+  `show archive log config all`, `show archive config differences`.

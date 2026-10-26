@@ -764,6 +764,22 @@ The DMVPN lab builds the overlay without IPsec: CML users report that IOL-XE has
 shows the IKEv2/IPsec profile to add on a Cat8000v. The security lab keeps the console on its own `CONSOLE` method list
 (`none`), so the app can still grade over the console.
 
+### Walkthroughs added in 3.3.6 (rest of ENCOR and ENARSI)
+The remaining ENCOR 350-401 and ENARSI 300-410 objectives that CML 2.9.1 can run are covered by these walkthroughs (same
+rules as 3.3.5: strict IOL day-0 configs, `show`/`ping` checks only, debugs in the text, solution summary). The IOL labs
+install in any 3.x app; they are published in the library as soon as they are committed.
+
+| Lab | Nodes / RAM | Covers (examples) |
+|---|---|---|
+| `27-qos-mqc`: MQC classification, marking, policing, HQoS shaping with LLQ/CBWFQ/WRED | 4 IOL, ~4 GB | ENCOR 1.4, CCNA 4.7, CCIE-EI 4.4.a/b/d-h |
+| `28-netflow-span-rspan`: Flexible NetFlow (v9 and v5 exporters), local SPAN, RSPAN; ERSPAN and EPC explained | 4 IOL + 2 IOL-L2, ~6 GB | ENCOR 4.2, 4.3, ENARSI 4.6, CCIE-EI 4.6.c, 4.7.a.i/ii |
+| `29-file-transfer-archive`: TFTP server/client, FTP client, SCP server, configuration archive over SCP | 2 IOL, ~2 GB | ENARSI 4.1.b/c, CCNA 4.9, CCIE-EI 4.3.a.ii, 4.3.c.ii |
+
+IOL has no NetFlow collector, so the NetFlow lab verifies on the exporter (cache and export counters); the SPAN
+analyser is an IOL node that counts the mirrored packets. IOS has no FTP server, so FTP is client configuration only.
+The file-transfer lab moves files device-to-device (`more tftp://`, `scp://` archive paths), so it does not depend on
+the name of IOL's local file system.
+
 ### RAM estimate and the RAM heavy tag
 Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node
 definition: `iol-xe`/`ioll2-xe` 1 GB, `iosv` 0.5 GB, `iosvl2` 0.75 GB, `csr1000v` 3 GB, `cat8000v` 4 GB, `nxosv9000`
