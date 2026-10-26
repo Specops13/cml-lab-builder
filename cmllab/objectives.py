@@ -135,14 +135,16 @@ def problem(tag: str, reg: dict[str, Exam] | None = None) -> str | None:
     return None
 
 
-def normalize(tags) -> list[str]:
-    out = []
+def normalize(tags, limit: int | None = MAX_TAGS) -> list[str]:
+    """Canonical, de-duplicated tags (at most `limit` for one lab or step; None = no cap, e.g. a whole library)."""
+    out, seen = [], set()
     for t in tags or []:
         sp = split(t)
         s = f"{sp[0]} {sp[1]}" if sp else str(t).strip()
-        if s and s not in out:
+        if s and s not in seen:
+            seen.add(s)
             out.append(s)
-    return out[:MAX_TAGS]
+    return out if limit is None else out[:limit]
 
 
 def describe(tag: str, reg: dict[str, Exam] | None = None) -> dict:
@@ -284,7 +286,7 @@ def vocabulary(used, reg: dict[str, Exam] | None = None) -> list[dict]:
     """The exams (in registry order) with the objectives that `used` tags name, for the library filters."""
     reg = registry() if reg is None else reg
     by: dict[str, list[str]] = {}
-    for t in normalize(used):
+    for t in normalize(used, limit=None):    # the whole library: no per-lab cap
         sp = split(t)
         if sp and sp[0] in reg and sp[1] in reg[sp[0]].objectives:
             by.setdefault(sp[0], []).append(sp[1])

@@ -1,6 +1,7 @@
 """Exam-objective map (3.3.5): the exam registry (cmllab/exams/*.yaml), tags on labs and steps (exams.yaml sidecar
 or inline `exams:`), validation in lint and build_library.py, the API, CLI and library UI. Per-lab tag checks for
 the library are in test_lab_content.py."""
+import json
 import re
 import shutil
 import sys
@@ -105,6 +106,10 @@ def test_coverage_suggest_and_vocabulary():
     voc = objectives.vocabulary(["ENCOR 3.2.b", "ENCOR 3.2.a", "CCNA 3.4", "BAD 1.1"])
     assert [e["id"] for e in voc] == ["CCNA", "ENCOR"]
     assert [o["id"] for o in voc[1]["objectives"]] == ["3.2.a", "3.2.b"]                   # blueprint order
+    # the library filter lists every objective any lab names (no per-lab tag cap over the whole index)
+    idx = json.loads((ROOT / "library" / "index.json").read_text(encoding="utf-8"))
+    voc = {e["id"]: {o["id"] for o in e["objectives"]} for e in objectives.vocabulary([t for it in idx["items"] for t in it.get("exams", [])])}
+    assert {"2.3", "2.3.a", "1.9"} <= voc["ENARSI"] and {"1.8", "4.6"} <= voc["CCNA"] and len(voc["ENARSI"]) > 20
 
 
 def test_api_exams_suggest_and_lab_chips():

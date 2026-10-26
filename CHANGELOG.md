@@ -46,6 +46,12 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
   superseded branch runs are cancelled. The release path is unchanged (11 signed assets).
 - The lab lint's short objective labels use word boundaries (no more *CoPP* for "copper").
 
+### Fixed
+- Library topic chips with no matches (for example after choosing an exam) were dimmed with opacity, which failed
+  WCAG AA contrast. They now use the muted text token with a dashed border (axe: 0 violations in light and dark).
+- The library's objective filter lists every objective that any lab names. The list was capped at 60 tags across
+  the whole index, so objectives like ENARSI 2.3 were missing.
+
 ## [3.3.4] - 2026-10-25
 ### Added
 - **Mark a lab complete by hand when a check is buggy.** Walkthroughs get **Mark step done** (next to *Check this

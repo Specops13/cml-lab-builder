@@ -185,7 +185,7 @@ mark{background:#ffe58a;color:inherit;border-radius:2px;padding:0}
 .chip:hover{border-color:var(--accent);color:var(--accent)}
 .chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
 .chip[aria-pressed=true] .n{color:var(--accent-fg);opacity:.85}
-.chip.zero{opacity:.45}
+.chip.zero{color:var(--muted);border-style:dashed}   /* no matches: dimmed with the AA muted token, not opacity */
 .chip.sm{font-size:.72rem;padding:.08rem .5rem;background:var(--bg)}
 .chip.sm[aria-pressed=true]{background:var(--accent)}
 .chip:focus-visible,.lib-group-h button:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
