@@ -1226,8 +1226,8 @@ run.bat, run.ps1, run.sh  from-source launchers (create .venv, install, start)
 ## Development / tests
 ```bash
 .venv/bin/pip install -e ".[dev]"                   # pytest, pytest-xdist, httpx
-.venv/bin/python -m pytest -q -n auto -m "not slow"  # fast set, about 35 s on 8 cores
-.venv/bin/python -m pytest -q -n auto                # everything incl. slow end-to-end tests
+.venv/bin/python -m pytest -q -n auto -m "not slow"  # fast set, about 35 s on 8 cores (what CI runs on every push)
+.venv/bin/python -m pytest -q -n auto                # everything incl. slow end-to-end tests (CI on release tags)
 .venv/bin/python -m cmllab validate
 ```
 Lab sources live in `labsrc/<id>/` and `examples/<id>/` (same format as packs). The package itself has no labs. The test
@@ -1248,7 +1248,7 @@ After changing the schema, templates, guide or example, run `python -m cmllab do
   compatibility with old app versions, the IOL/NX-OS day-0 rules, challenge faults and hints, and every walkthrough
   step's checks in the simulator. `SPECS[<id>]` holds optional lab-specific facts.
 - `tests/tables.py`: `run_table(fn, rows)` runs one assertion function over many rows and reports every failing row.
-- `@pytest.mark.slow` marks long end-to-end tests. They run when you leave out `-m "not slow"`.
+- `@pytest.mark.slow` marks long end-to-end tests. They run on release tags in CI and locally without `-m "not slow"`.
 - Security, update/signing, day-0 and resource-check tests are kept in full.
 
 **Adding a lab needs no new test:** put it in `examples/<id>/` (or `labsrc/<id>/`) with `fixture_solved.yaml` /

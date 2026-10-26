@@ -3,8 +3,8 @@
 ## Setup
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-.venv/bin/python -m pytest -q -n auto -m "not slow"   # fast set
-.venv/bin/python -m pytest -q -n auto                 # full suite incl. @slow end-to-end tests
+.venv/bin/python -m pytest -q -n auto -m "not slow"   # fast set (CI runs this on every push / PR)
+.venv/bin/python -m pytest -q -n auto                 # full suite incl. @slow end-to-end tests (CI on release tags)
 ruff check cmllab cmlboot.py cmllab_launcher.py tests && python packaging/build_patch.py --check-lock
 ```
 
@@ -33,7 +33,7 @@ The suite is table-driven. A new lab needs **no new test**:
   "the hub has no static NHRP maps").
 - `tests/tables.py` has `run_table(fn, rows)` for any other repeated check: one test, every failing row reported.
 - Mark a test `@pytest.mark.slow` if it takes more than a second or two (real sockets, threads, timeouts, pack
-  rebuilds). Slow tests still run in the full suite.
+  rebuilds). Slow tests still run for every release tag.
 - Do not trim the security, update/signing, day-0 or resource-check tests.
 
 ## Adding an exam

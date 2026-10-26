@@ -6,6 +6,8 @@ import threading
 import urllib.request
 from pathlib import Path
 
+import yaml
+
 from cmllab import __version__, launcher
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,6 +84,11 @@ def test_build_files_present_and_consistent():
     assert "wait_up http://127.0.0.1:8765/api/health" in inner and "DEB TEST FAILED" in inner and "Acquire::Retries" in inner
     assert "sha256sum CMLLabBuilder-* cml-lab-builder_*.deb cml-lab-builder-patch-*.zip ENCORLab-* encorlab_*.deb encorlab-patch-*.zip" in wf
     assert wf.count("dist/cml-lab-builder_*.deb") >= 3 and "build_compat.py --dist dist" in wf
+    # 3.3.5: fast tests + lint on push/PR, full suite and bundles only for releases (or PRs touching packaging)
+    jobs = yaml.safe_load(wf)["jobs"]
+    assert '-m "not slow"' in wf and "-n auto" in wf and "cache: pip" in wf
+    assert "needs" not in jobs["test"] and jobs["bundle"]["needs"] == "changes" and "refs/tags/v" in jobs["bundle"]["if"]
+    assert set(jobs["release"]["needs"]) == {"lint", "test", "bundle", "patch", "deb-test"}
 
 
 def test_frozen_paths_are_package_relative():

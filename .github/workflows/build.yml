@@ -1,21 +1,25 @@
-# Builds and smoke-tests the ready-to-run Windows and Linux bundles.
-#  - push of a tag "v*": build + test only; bundles are kept as workflow artifacts (nothing is published, so
-#    assets uploaded to an existing release by hand are never overwritten).
-#  - Actions > build > Run workflow: same, and with "publish" ticked it creates/updates the GitHub Release for
+# CI for CML Lab Builder (3.3.5: fast checks on every push/PR, full suite + bundles only for releases).
+#  - push to main / pull request: lint (ruff incl. security rules, runtime lock, app.js syntax) and the fast tests
+#    (pytest -n auto -m "not slow") in parallel. Bundles and the .deb test run on PRs only when packaging changes.
+#  - push of a tag "v*": the full test suite (slow end-to-end tests included), the patch zip, the Windows/Linux
+#    bundles + .deb (lintian, desktop-file-validate) and deb-test, all started in parallel; bundles are kept as
+#    workflow artifacts (nothing is published, so assets uploaded to an existing release by hand are never overwritten).
+#  - Actions > build > Run workflow: same as a tag, and with "publish" ticked it creates/updates the GitHub Release for
 #    the given tag. Existing assets with the same name are NOT replaced (overwrite_files: false).
-#  - every run also builds cml-lab-builder-patch-<version>.zip (app code only, used by the in-app "Install update")
+#  - the patch job builds cml-lab-builder-patch-<version>.zip (app code only, used by the in-app "Install update")
 #    and checks packaging/runtime.lock.json, so a runtime change cannot ship as a patch by accident.
-#  - the Linux job also wraps the smoke-tested Linux build into cml-lab-builder_<version>_amd64.deb (lintian +
-#    desktop-file-validate), and deb-test runs packaging/deb_docker_test.sh on it (pinned debian:12 container).
-#  - the release also carries the transition files for ENCOR Lab Builder 1.7 - 2.1 (packaging/build_compat.py:
-#    old-name copies and a manifest-only encorlab-patch-<version>.zip that makes old apps offer the full download).
+#  - the release also carries the transition files for ENCOR Lab Builder 1.7 - 2.1 (packaging/build_compat.py).
 #  - 3.3.0+: the app only installs updates whose SHA256SUMS.txt (and patch zip) carry an Ed25519 signature
 #    (*.sig, see SECURITY.md). The release key is NOT in this repository; the maintainer signs the published
-#    SHA256SUMS.txt and patch locally and uploads the .sig files (or a RELEASE_SIGNING_KEY secret, if configured).
+#    SHA256SUMS.txt and patch locally and uploads the .sig files.
+#  - caches: pip (setup-python), uv (Linux bundle) and the PyInstaller bin cache, keyed on pyproject.toml and the
+#    runtime lock.
 name: CML Lab Builder build
 on:
   push:
+    branches: [main]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
     inputs:
       publish:
@@ -28,23 +32,61 @@ on:
         default: ""
 permissions:
   contents: write
+concurrency:
+  # a newer push to the same branch/PR cancels the older run; tag and manual runs are never cancelled
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
+env:
+  # tags and manual runs build releases; pushes and PRs only lint and run the fast tests
+  RELEASE_RUN: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
 jobs:
-  test:
+  changes:
+    # does this PR touch packaging? (then the bundles and the .deb test run for it too)
+    runs-on: ubuntu-22.04
+    outputs:
+      packaging: ${{ steps.f.outputs.packaging }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - id: f
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && git diff --name-only "$BASE" HEAD \
+               | grep -qE '^(packaging/|pyproject\.toml|cmlboot\.py|cmllab_launcher\.py|\.github/workflows/)'; then
+            echo packaging=true >> "$GITHUB_OUTPUT"
+          else
+            echo packaging=false >> "$GITHUB_OUTPUT"
+          fi
+  lint:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
-      - run: pip install -e ".[dev]" && python -m pytest -q
-      # security gates: flake8-bandit rules (ruff "S", configured in pyproject.toml) and known-vulnerable dependencies
-      - name: Security lint (ruff S rules)
-        run: pip install "ruff>=0.6" && ruff check cmllab cmlboot.py cmllab_launcher.py
-      - name: Dependency audit (pip-audit)
-        run: python -m pip install -q -U pip "pip-audit>=2.7" && pip-audit --skip-editable --progress-spinner off
+        with: {python-version: "3.12", cache: pip, cache-dependency-path: pyproject.toml}
+      # security gates: flake8-bandit rules (ruff "S", configured in pyproject.toml); tests are linted too
+      - name: ruff (incl. security rules)
+        run: pip install -q "ruff>=0.6" && ruff check cmllab cmlboot.py cmllab_launcher.py tests
       # the runtime (Python, libraries, boot loader, spec) must not change without bumping RUNTIME_VERSION
       - run: python packaging/build_patch.py --check-lock
+      - run: node --check cmllab/web/static/app.js
+      - name: Dependency audit (pip-audit)
+        run: pip install -q -e . "pip-audit>=2.7" && pip-audit --skip-editable --progress-spinner off
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip, cache-dependency-path: pyproject.toml}
+      - run: pip install -q -e ".[dev]"
+      # parallel (pytest-xdist); the slow end-to-end tests (@pytest.mark.slow) only run for releases
+      - name: tests (fast set on push/PR, full suite on tags)
+        run: |
+          if [ "$RELEASE_RUN" = "true" ]; then python -m pytest -q -n auto --durations=15
+          else python -m pytest -q -n auto -m "not slow" --durations=10; fi
   patch:
-    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +100,9 @@ jobs:
           path: dist/cml-lab-builder-patch-*.zip
           if-no-files-found: error
   bundle:
-    needs: test
+    # starts together with lint/test (no "needs: test"); the release job waits for everything
+    needs: changes
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || needs.changes.outputs.packaging == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -68,8 +112,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pyinstaller
+            ~/AppData/Local/pyinstaller
+          key: pyinstaller-${{ runner.os }}-${{ hashFiles('packaging/runtime.lock.json', 'pyproject.toml') }}
       - uses: astral-sh/setup-uv@v6
         if: runner.os == 'Linux'
+        with: {enable-cache: true, cache-dependency-glob: "pyproject.toml"}
       - name: Build + smoke test (Linux, glibc 2.28 baseline)
         if: runner.os == 'Linux'
         run: packaging/build_linux.sh --smoke
@@ -83,7 +134,7 @@ jobs:
           desktop-file-validate /tmp/debroot/usr/share/applications/cml-lab-builder.desktop
       - uses: actions/setup-python@v5
         if: runner.os == 'Windows'
-        with: {python-version: "3.12"}
+        with: {python-version: "3.12", cache: pip, cache-dependency-path: pyproject.toml}
       - name: Build + smoke test (Windows)
         if: runner.os == 'Windows'
         shell: cmd
@@ -111,7 +162,7 @@ jobs:
         run: packaging/deb_docker_test.sh dist/cml-lab-builder_*_amd64.deb
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.publish && inputs.tag != ''
-    needs: [bundle, patch, deb-test]
+    needs: [lint, test, bundle, patch, deb-test]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

@@ -40,6 +40,10 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
   update/signing, day-0 and resource-check tests are kept. pytest-xdist (`-n auto`) and a `slow` marker were added.
   Locally: 364.7 s serial before, about 88 s for the full suite and about 35 s for the fast set (`-m "not slow"`) now,
   on 8 cores. A new lab needs 0 to 2 new tests.
+- **CI:** lint (ruff incl. tests, runtime lock, `node --check`, pip-audit) and the fast tests run in parallel on every
+  push and PR. The full suite, patch, Windows/Linux bundles, .deb and deb-test run on `v*` tags and manual runs (bundles
+  also on PRs that touch packaging). Bundles no longer wait for the tests. pip, uv and PyInstaller caches were added, and
+  superseded branch runs are cancelled. The release path is unchanged (11 signed assets).
 - The lab lint's short objective labels use word boundaries (no more *CoPP* for "copper").
 
 ## [3.3.4] - 2026-10-25
