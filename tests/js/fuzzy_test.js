@@ -36,6 +36,14 @@ top("troubleshooting ospf", "troubleshoot-ospf-7node", 2);
 top("walkthrough data center", "18-evpn-vxlan", 3);
 top("gre ipsec", "09-gre-ipsec");
 expect(ids("monitoring").includes("11-ipsla-tracking"), "monitoring topic -> 11: " + ids("monitoring").slice(0, 5));
+// exam-objective tags (3.3.5): exam code + objective number, and the objective's topic when the page sets it
+for (const id of ["03-ospf-multiarea", "ospf-multiarea-stub"]) top("encor 3.2.b", id, 8);
+{ const r = ids("encor 3.2.b"); expect(r.indexOf("06-hsrp") > r.indexOf("ospf-multiarea-stub"), "tagged labs rank first: " + r.slice(0, 8)); }
+// words are scored separately, so a lab with "ENARSI 4.4" and "CCNA 1.9" can also rank high
+for (const id of ["04-eigrp-named", "24-dmvpn-phase3"]) top("enarsi 1.9", id, 4);
+F.library.exams = {"ENARSI 1.9": {label: "ENARSI", id: "1.9", topic: "EIGRP", code: "300-410"}};
+expect(F.library.text({exams: ["ENARSI 1.9"]}, "exams") === "ENARSI 1.9 EIGRP, 300-410", "exam text: " + F.library.text({exams: ["ENARSI 1.9"]}, "exams"));
+F.library.exams = {};
 // ANDed words; nonsense finds nothing; case/punctuation-insensitive
 expect(ids("xyzzy").length === 0, "xyzzy should match nothing: " + ids("xyzzy"));
 expect(ids("evpn xyzzy").length === 0, "every word must match");

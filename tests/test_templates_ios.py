@@ -4,6 +4,7 @@ import pytest
 from cmllab import platforms
 from cmllab.grader import evaluate
 from cmllab.schema import Check
+from tables import run_table
 
 IOL = platforms.get("iol")
 IOSV = platforms.get("iosv")
@@ -59,7 +60,7 @@ router bgp 65001
 """
 
 
-@pytest.mark.parametrize("check,out,plat,want", [
+TEMPLATE_VS_IOS_ROWS = [
     (chk("ospf_neighbor", neighbor_id="2.2.2.2"), OSPF_NBR, IOL, True),
     (chk("ospf_neighbor", neighbor_id="3.3.3.3"), OSPF_NBR, IOL, False),
     (chk("eigrp_neighbor", address="10.0.12.2"), EIGRP_NBR, IOL, True),
@@ -91,10 +92,16 @@ router bgp 65001
     (chk("config_lines", lines="router-id 1.1.1.1\narea 1 stub no-summary"), RUN, IOL, True),
     (chk("config_lines", lines="area 1 stub"), RUN, IOL, False),
     (chk("config_regex", pattern=r"^ area 1 stub"), RUN, IOL, True),
-])
-def test_template_vs_ios(check, out, plat, want):
+]
+
+
+def _template_vs_ios(check, out, plat, want):
     ok, details = evaluate(check, out, plat)
     assert ok is want, details
+
+
+def test_template_vs_ios():
+    run_table(_template_vs_ios, TEMPLATE_VS_IOS_ROWS)
 
 
 def test_template_param_errors():

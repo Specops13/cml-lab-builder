@@ -41,11 +41,18 @@ server**, so your PC only needs to reach the CML controller, not the lab devices
 - [Troubleshooting and diagnostics](#troubleshooting-and-diagnostics)
 - [Building the executables](#building-the-executables)
 - [Project layout](#project-layout)
-- [Development / tests](#development--tests)
+- [Development / tests](#development--tests) (and [CONTRIBUTING.md](CONTRIBUTING.md))
 - [Version and changelog](#version-and-changelog)
 - [License](#license)
 
 ## Features
+- **Cisco exam-objective map (new in 3.3.5):** every library lab, and every walkthrough step that teaches something,
+  is tagged with the official Cisco exam objectives it practises: CCNA 200-301, ENCOR 350-401, ENARSI 300-410,
+  DCCOR 350-601, CCIE Enterprise Infrastructure and CCIE Data Center. Tags show on lab cards, the lab header and each step as
+  *exam objective topic* chips (e.g. `ENCOR 3.2.b · OSPF`, tooltip = the official objective text). The library filters by
+  exam and objective, and the search box finds labs by `encor 3.2.b` or `enarsi dmvpn`. The blueprints are data files
+  (`cmllab/exams/*.yaml`, source URL and version in each), so adding an exam is one file. See
+  [Exam objectives](#exam-objectives-335).
 - **Small download, labs from the library (new in 2.0.0):** the app no longer ships with labs. On the first start the
   Labs page offers **Install recommended starter set** (one click), **Browse library** and **Import a lab file** (`.cmllab`, or `.encorlab` from older versions).
   Every lab (all 19 former built-in labs, including the EVPN walkthrough) is a pack in the online
@@ -713,6 +720,50 @@ and the spines and super spines get `retain route-target all`.
 > NX-OS shows the LSA contents only with `... detail`. The labs use `detail` wherever they expect LSA fields
 > (router, external, nssa-external) and match only stable tokens in the summary tables.
 
+### Exam objectives (3.3.5)
+The exam blueprints live in `cmllab/exams/<id>.yaml`, one file per exam, taken from Cisco's published exam topics
+(learningcontent.cisco.com exam-topics PDFs; the source URL, blueprint version and the date it was fetched are in each file):
+
+| id | Exam | Blueprint | Objectives |
+|---|---|---|---|
+| CCNA | 200-301 CCNA | v1.1 | 111 |
+| ENCOR | 350-401 ENCOR | v1.2 | 59 |
+| ENARSI | 300-410 ENARSI | v1.1 | 55 |
+| DCCOR | 350-601 DCCOR | v1.2 | 72 |
+| CCIE-EI | CCIE Enterprise Infrastructure (lab) | v1.1 | 272 |
+| CCIE-DC | CCIE Data Center (lab) | v3.1 | 145 |
+
+- **Where you see them:** lab cards (library and lab list), the lab header and every walkthrough step show chips like
+  `ENCOR 3.2.b · OSPF`; hover or focus one for the full objective text. Long lists collapse into *+N more*.
+- **Filter and search:** *Library & courses* has an **Exam** filter (any exam or one exam) and an **Objective** filter
+  (that exam's numbered objectives), combined with the topic tags and the fuzzy search. Searching `encor 3.2.b`,
+  `ccna 4.6` or `dmvpn` works too.
+- **CLI:** `python -m cmllab exams` lists the exams, `python -m cmllab exams ENARSI` the objectives, `--coverage`
+  which labs in your catalog cover each one (and which none), and `--suggest 3.2.b --track ENCOR` proposes tags.
+- **API:** `GET /api/exams` (the registry) and `GET /api/exams/suggest?blueprint=&track=&text=`.
+- **Library labs** keep their tags in `exams.yaml` next to `lab.yaml` (a lab-level list and per-step lists). Older
+  app versions ignore that file, so the 3.3.5 library still installs in 2.x and 3.x apps. New labs may use an inline
+  `exams:` key instead (3.3.5+ only). Unknown exams or objective numbers are validation errors. A lab with no tags
+  gets a warning that lists suggested tags, and `packaging/build_library.py` refuses to publish it.
+- **Adding an exam:** add `cmllab/exams/<id>.yaml` with `id`, `code`, `name`, `version`, `level`, `source` (the official
+  exam-topics URL), `published`, `fetched`, `domains` and the numbered `objectives` copied from Cisco's exam-topics document. Never invent numbers: if a blueprint
+  cannot be fetched, leave the exam out. `tests/test_exams.py` checks every file.
+
+### Walkthroughs added in 3.3.5 (from the coverage gaps)
+After the 26 existing labs were tagged, `cmllab exams --coverage` showed which objectives had no lab. Three IOL-only
+walkthroughs fill the most valuable gaps that CML 2.9.1 can run (strict IOL day-0 configs, checks only `show`/`ping`,
+debug commands in the explanations, and a solution summary at the end):
+
+| Lab | Nodes / RAM | Covers (examples) |
+|---|---|---|
+| `24-dmvpn-phase3`: DMVPN Phase 3 with NHRP and EIGRP | 5 IOL, ~5 GB | ENARSI 2.3.a/b/d/e (mGRE, NHRP, dynamic neighbors, spoke-to-spoke), ENCOR 2.2.b, CCIE-EI 3.3.a.i, EIGRP stub query boundaries |
+| `25-infra-security`: AAA, SSH, CoPP, uRPF and IPv6 filters | 4 IOL, ~4 GB | ENCOR 5.1.a/b, 5.2.a/b, ENARSI 3.1, 3.2.b/c, 3.3, 4.1.a/b, CCNA 4.8, 5.3, CCIE-EI 4.1.a/b, 4.2.b.i/iii, 4.3.a |
+| `26-ipv6-dhcp-services`: IPv6 addressing, static routing and DHCP services (CCNA track) | 5 IOL, ~5 GB | CCNA 1.8, 1.9.a-d, 3.3.a-d, 4.6, ENARSI 4.4, CCIE-EI 4.5.c.i-v (DHCPv4 relay, SLAAC, stateless and stateful DHCPv6, prefix delegation) |
+
+The DMVPN lab builds the overlay without IPsec: CML users report that IOL-XE has no IPsec data plane. Its last step
+shows the IKEv2/IPsec profile to add on a Cat8000v. The security lab keeps the console on its own `CONSOLE` method list
+(`none`), so the app can still grade over the console.
+
 ### RAM estimate and the RAM heavy tag
 Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node
 definition: `iol-xe`/`ioll2-xe` 1 GB, `iosv` 0.5 GB, `iosvl2` 0.75 GB, `csr1000v` 3 GB, `cat8000v` 4 GB, `nxosv9000`
@@ -1174,23 +1225,39 @@ run.bat, run.ps1, run.sh  from-source launchers (create .venv, install, start)
 
 ## Development / tests
 ```bash
-.venv/bin/pip install -e ".[dev]"
-.venv/bin/python -m pytest -q        # unit + simulated end-to-end tests (no CML needed)
+.venv/bin/pip install -e ".[dev]"                   # pytest, pytest-xdist, httpx
+.venv/bin/python -m pytest -q -n auto -m "not slow"  # fast set, about 35 s on 8 cores
+.venv/bin/python -m pytest -q -n auto                # everything incl. slow end-to-end tests
 .venv/bin/python -m cmllab validate
 ```
-Lab sources live in `labsrc/<id>/` (same format as packs); the package itself has no labs. The test suite uses them in place
-via `CMLLAB_BUILTIN_LABS_DIR=labsrc` (set by `tests/conftest.py`); set it yourself to run a source checkout with every lab
-(`CMLLAB_BUILTIN_LABS_DIR=labsrc python -m cmllab web`) or validate them with `python -m cmllab validate labsrc/*`.
-In configs, checks and fixtures, `%if0%` / `%if0s%`
-become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` / `Gi0/0` on IOSv.
+Lab sources live in `labsrc/<id>/` and `examples/<id>/` (same format as packs). The package itself has no labs. The test
+suite uses them in place via `CMLLAB_BUILTIN_LABS_DIR=labsrc` (set by `tests/conftest.py`). Set it yourself to run a
+source checkout with every lab (`CMLLAB_BUILTIN_LABS_DIR=labsrc python -m cmllab web`), or validate them with
+`python -m cmllab validate labsrc/*`.
+In configs, checks and fixtures, `%if0%` / `%if0s%` become `Ethernet0/0` / `Et0/0` on IOL and `GigabitEthernet0/0` /
+`Gi0/0` on IOSv.
 Every `iol-xe` router needs IP configuration (`ip address` or `no ip address`) on at least one Ethernet port in its
 starting config, or IOL ignores the whole config and starts the setup dialog (Cisco's node definition asks for all
-ports); the library labs list all four ports where it matters, and `tests/test_library_walkthrough_day0.py` checks
-every library lab. IOL L2 switches (`ioll2-xe`) have no such requirement.
+ports). The library labs list all four ports, and `tests/test_lab_content.py` checks every library lab (strictly for
+all labs except a short legacy list). IOL L2 switches (`ioll2-xe`) have no such requirement.
 After changing the schema, templates, guide or example, run `python -m cmllab docs` (a test checks `docs/` is current).
 
+**Test layout (3.3.5):** about 480 tests (861 in 3.3.4) with the same coverage. Repeated per-lab files became table-driven tests:
+- `tests/test_lab_content.py`: **one generic validator for every library lab** (`test_library_lab[<id>]`). It covers
+  strict lint (solution 100 %, blank < 100 %, both grading modes), exam tags, the published pack and both indexes,
+  compatibility with old app versions, the IOL/NX-OS day-0 rules, challenge faults and hints, and every walkthrough
+  step's checks in the simulator. `SPECS[<id>]` holds optional lab-specific facts.
+- `tests/tables.py`: `run_table(fn, rows)` runs one assertion function over many rows and reports every failing row.
+- `@pytest.mark.slow` marks long end-to-end tests. They run when you leave out `-m "not slow"`.
+- Security, update/signing, day-0 and resource-check tests are kept in full.
+
+**Adding a lab needs no new test:** put it in `examples/<id>/` (or `labsrc/<id>/`) with `fixture_solved.yaml` /
+`fixture_blank.yaml` and `exams.yaml`, add its topics in `labsrc/library.yaml`, then run
+`python packaging/build_library.py`. `test_library_lab[<id>]` picks it up automatically. Add a `SPECS` entry only for a
+fact you want pinned (0 to 2 asserts). See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Version and changelog
-Current version: **3.3.2**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.3.5**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License

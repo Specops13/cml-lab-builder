@@ -230,3 +230,4 @@ faults:
     absent:
     - ^ip access-list standard NAT-INSIDE\s*\n(?:[ \t].*\n)*?[ \t]+(\d+\s+)?permit 192\.168\.10\.0
     hint: NAT-INSIDE must permit 192.168.1.0 0.0.0.255
+version: "2"

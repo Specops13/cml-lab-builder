@@ -163,40 +163,41 @@ def fast(monkeypatch):
     monkeypatch.setattr(console, "POKE_WAIT", 0.3)
 
 
-def test_nxos_login_prompt_quirks_and_command():
-    ch = FakeNX()
-    r = runner(ch)
-    out = r.run("LEAF1", "show clock")
-    assert out.strip() == "14:02:01.123 UTC Tue Oct 20 2026"       # no escapes, no \r, no prompt
-    assert ch.sent[0] == "open /CML-18-evpn-vxlan/LEAF1/0"
-    assert "cisco" in ch.sent and "terminal length 0" in ch.sent and "terminal width 511" in ch.sent
-    assert "terminal width 0" not in ch.sent                        # NX-OS rejects width 0
-    assert r._sessions["LEAF1"].hostname == "LEAF1"
+def test_nxos_login_and_credentials():
+    def _nxos_login_prompt_quirks_and_command():
+        ch = FakeNX()
+        r = runner(ch)
+        out = r.run("LEAF1", "show clock")
+        assert out.strip() == "14:02:01.123 UTC Tue Oct 20 2026"       # no escapes, no \r, no prompt
+        assert ch.sent[0] == "open /CML-18-evpn-vxlan/LEAF1/0"
+        assert "cisco" in ch.sent and "terminal length 0" in ch.sent and "terminal width 511" in ch.sent
+        assert "terminal width 0" not in ch.sent                        # NX-OS rejects width 0
+        assert r._sessions["LEAF1"].hostname == "LEAF1"
 
+    def _nxos_falls_back_to_admin_with_the_device_password():
+        ch = FakeNX(users=(("admin", "cisco"),))
+        r = runner(ch)
+        assert "UTC" in r.run("LEAF1", "show clock")
+        assert ch.sent.count("cisco") >= 2 and "admin" in ch.sent      # tried cisco, refused, then admin
 
-def test_nxos_falls_back_to_admin_with_the_device_password():
-    ch = FakeNX(users=(("admin", "cisco"),))
-    r = runner(ch)
-    assert "UTC" in r.run("LEAF1", "show clock")
-    assert ch.sent.count("cisco") >= 2 and "admin" in ch.sent      # tried cisco, refused, then admin
+    def _nxos_credentials_from_settings_win():
+        ch = FakeNX(users=(("netops", "Ev3n!"),))
+        r = runner(ch, settings={"nxos_username": "netops", "nxos_password": "Ev3n!"})
+        assert "UTC" in r.run("LEAF1", "show clock")
+        assert ch.sent[2:4] == ["netops", "Ev3n!"] or ("netops" in ch.sent and ch.sent.index("netops") < (ch.sent + ["cisco"]).index("cisco"))
 
+    def _nxos_auth_failure_is_reported_with_the_console_tail():
+        ch = FakeNX(users=(("someone", "else"),))
+        r = runner(ch)
+        with pytest.raises(ConsoleError) as e:
+            r.run("LEAF1", "show clock")
+        assert e.value.kind == "auth" and "login failed" in str(e.value)
+        assert "Last console output:" in str(e.value) and "Login incorrect" in e.value.tail
+        with pytest.raises(ConsoleError):                                # cached: no second long wait per check
+            r.run("LEAF1", "show version")
 
-def test_nxos_credentials_from_settings_win():
-    ch = FakeNX(users=(("netops", "Ev3n!"),))
-    r = runner(ch, settings={"nxos_username": "netops", "nxos_password": "Ev3n!"})
-    assert "UTC" in r.run("LEAF1", "show clock")
-    assert ch.sent[2:4] == ["netops", "Ev3n!"] or ("netops" in ch.sent and ch.sent.index("netops") < (ch.sent + ["cisco"]).index("cisco"))
-
-
-def test_nxos_auth_failure_is_reported_with_the_console_tail():
-    ch = FakeNX(users=(("someone", "else"),))
-    r = runner(ch)
-    with pytest.raises(ConsoleError) as e:
-        r.run("LEAF1", "show clock")
-    assert e.value.kind == "auth" and "login failed" in str(e.value)
-    assert "Last console output:" in str(e.value) and "Login incorrect" in e.value.tail
-    with pytest.raises(ConsoleError):                                # cached: no second long wait per check
-        r.run("LEAF1", "show version")
+    for case in (_nxos_login_prompt_quirks_and_command, _nxos_falls_back_to_admin_with_the_device_password, _nxos_credentials_from_settings_win, _nxos_auth_failure_is_reported_with_the_console_tail):
+        case()
 
 
 def test_nxos_first_boot_poap_and_admin_setup_dialog():
@@ -216,6 +217,7 @@ def test_paging_more_is_handled():
     assert len(lines) == 60 and "--More--" not in out
 
 
+@pytest.mark.slow
 def test_slow_large_output_waits_while_data_keeps_coming():
     ch = FakeNX(slow=True)
     s = runner(ch)._session("LEAF1")
@@ -231,6 +233,7 @@ def test_node_not_running_is_a_clear_error():
     assert e.value.kind == "not_running" and "Node not found or not running" in str(e.value)
 
 
+@pytest.mark.slow
 def test_unrecognised_prompt_fails_fast_with_the_tail():
     ch = FakeNX(weird_prompt=True, users=(("cisco", "cisco"),))
     r = runner(ch)

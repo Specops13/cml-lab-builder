@@ -209,17 +209,20 @@ def patch_bytes(tmp_path):
     return build_patch.build_patch(make_src(tmp_path, "9.9.9"), tmp_path / "out").read_bytes()
 
 
-@pytest.mark.parametrize("edit,msg", [
+BAD_PATCHES = [
     (lambda e: e.__setitem__("cmllab/cli.py", e["cmllab/cli.py"] + b"\n# tampered"), "checksum mismatch"),
     (lambda e: e.__setitem__("cmllab/extra.py", b"x = 1"), "do not match its manifest"),
     (lambda e: e.__setitem__("../evil.py", b"x = 1"), "outside cmllab"),
     (lambda e: e.__setitem__("cmllab/../../evil.py", b"x = 1"), "outside cmllab"),
     (lambda e: e.pop("manifest.json"), "no manifest"),
     (lambda e: e.__setitem__("manifest.json", b"{nope"), "not valid JSON"),
-])
-def test_verify_rejects_bad_patches(patch_bytes, edit, msg):
-    with pytest.raises(updates.UpdateError, match=msg):
-        updates.verify_patch(rezip(patch_bytes, edit), "9.9.9", RT)
+]
+
+
+def test_verify_rejects_bad_patches(patch_bytes):
+    for edit, msg in BAD_PATCHES:
+        with pytest.raises(updates.UpdateError, match=msg):
+            updates.verify_patch(rezip(patch_bytes, edit), "9.9.9", RT)
 
 
 def test_verify_rejects_non_zip():

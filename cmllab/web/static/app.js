@@ -45,8 +45,22 @@ const LIB_PREFS = "cmllab.library";
 const libPrefs = (() => { try { const p = JSON.parse(localStorage.getItem(LIB_PREFS) || "{}");
   return {view: p.view === "list" ? "list" : "grouped", topics: Array.isArray(p.topics) ? p.topics.map(String) : [], collapsed: Array.isArray(p.collapsed) ? p.collapsed.map(String) : []};
 } catch (e) { return {view: "grouped", topics: [], collapsed: []}; } })();
-let libQuery = {q: "", kind: "", status: "", course: "", noheavy: false, topics: libPrefs.topics.slice()};
-let libTopicMeta = new Map(), libGroups = [];
+let libQuery = {q: "", kind: "", status: "", course: "", noheavy: false, exam: "", obj: "", topics: libPrefs.topics.slice()};
+let libTopicMeta = new Map(), libGroups = [], libExams = [], libExamMeta = new Map();
+/* exam-objective tags (3.3.5): "ENCOR 3.2.b · OSPF", the objective text as the tooltip. e = {tag, label, id, topic, text, code, version} */
+const examName = (e) => `${e.label}${e.code && e.code !== (e.exam || e.id) ? " " + e.code : ""} ${e.version}`;   // "ENCOR 350-401 v1.2", "CCIE DC v3.1"
+const examTip = (e) => `${examName(e)}, ${e.id}: ${e.text}`;
+const examText = (e) => `${e.label} ${e.id} · ${e.topic}`;
+function examTag(e) { return `<span class="tag exam" title="${esc(examTip(e))}">${esc(examText(e))}</span>`; }
+const EXAM_MORE = (n) => `<summary data-help-text="Show the other exam objectives this lab or step covers.">+${n} more</summary>`;
+function examTags(list, max = 6, step = false) {
+  if (!list || !list.length) return "";
+  const head = list.slice(0, max).map(examTag).join(""), rest = list.slice(max);
+  return `<div class="exam-tags" ${step ? 'data-help="w.exams"' : 'data-help="lab.exams"'} role="group" aria-label="Exam objectives">${head}${rest.length
+    ? `<details class="exam-more">${EXAM_MORE(rest.length)}${rest.map(examTag).join("")}</details>` : ""}</div>`;
+}
+// a lab carries an objective when it names it or one of its sub-items ("ENCOR 3.2" matches "ENCOR 3.2.b")
+const examHas = (tags, t) => (tags || []).some((x) => x === t || x.startsWith(t + "."));
 function libSavePrefs() { try { localStorage.setItem(LIB_PREFS, JSON.stringify({view: libPrefs.view, topics: libQuery.topics, collapsed: libPrefs.collapsed})); } catch (e) { /* private mode */ } }
 
 /* ---------------------------------------------------------------- error banner */
@@ -192,6 +206,7 @@ async function loadLabs() {
   labs = data.labs;
   labRecs = labs.map((l) => Fuzzy.prepare({title: [l.title, 3], id: [l.id, 2.5], blueprint: [l.blueprint.join(", "), 2], domain: [l.domain, 2],
     tags: [[l.type, l.track, Fuzzy.nodeTags(l.node_types), (l.platforms || []).join(" "), (l.ram && l.ram.heavy) ? "ram heavy" : ""].join(" "), 1.5],
+    exams: [(l.exams || []).map((e) => `${e.label} ${e.id} ${e.topic}`).join(", "), 1.5],
     summary: [l.summary, 1]}));
   migration = data.migration || null;
   renderMigration();
@@ -220,7 +235,7 @@ function renderList() {
     <b>${hl(l, "title")}</b><br>
     ${walkTag(l)}<span class="tag">${"★".repeat(l.difficulty)}</span><span class="tag">${l.nodes} nodes</span>${ramTag(l.ram)}<span class="tag">${esc(l.blueprint.join(", "))}</span>
     ${srcTag(l)}${updTag(l)}${l.fault_active ? '<span class="tag warn">fault active</span>' : ""}${doneTags(l)}
-    <div class="muted small">${hl(l, "summary")}</div></li>`).join("") || `<li class="muted">${labs.length ? (q.trim() ? `No labs match "${esc(q.trim())}". Try fewer or shorter words, or clear the filters (Esc clears the search).` : "No labs match the filters.") : "Your labs will show up here."}</li>`;
+    <div class="muted small">${hl(l, "summary")}</div>${examTags(l.exams, 3)}</li>`).join("") || `<li class="muted">${labs.length ? (q.trim() ? `No labs match "${esc(q.trim())}". Try fewer or shorter words, or clear the filters (Esc clears the search).` : "No labs match the filters.") : "Your labs will show up here."}</li>`;
   $$("#lab-list li[data-id]").forEach((li) => li.addEventListener("click", () => selectLab(li.dataset.id)));
 }
 ["#f-search", "#f-domain", "#f-diff", "#f-source", "#f-course"].forEach((s) => $(s).addEventListener("input", renderList));
@@ -398,10 +413,12 @@ async function openLibrary(fetchIndex) {
     <div class="muted small">The address is saved in Settings &gt; Library URL; changing it here only applies until you reload the page.</div>
     <div id="lib-search-bar" class="toolbar lib-search-bar" hidden>
       <input data-help="lib.search" id="lib-search" type="search" autocomplete="off" spellcheck="false" aria-label="Search the library"
-        placeholder="Search the library: title, id, topic, platform, node type…  ( / or Ctrl+K )">
+        placeholder="Search the library: title, id, topic, exam objective, platform, node type…  ( / or Ctrl+K )">
       <select data-help="lib.fKind" id="lib-kind" aria-label="Kind"><option value="">Labs and courses</option><option value="lab">Labs</option><option value="course">Courses</option></select>
       <select data-help="lib.fStatus" id="lib-status" aria-label="Status"><option value="">Any status</option><option value="installed">Installed</option><option value="new">Not installed</option><option value="update">Update available</option></select>
       <select data-help="lib.fCourse" id="lib-course" aria-label="Course"><option value="">Any course</option></select>
+      <select data-help="lib.fExam" id="lib-exam" aria-label="Exam"><option value="">Any exam</option></select>
+      <select data-help="lib.fObj" id="lib-obj" aria-label="Exam objective" disabled><option value="">Any objective</option></select>
       <label class="small"><input data-help="lib.fHeavy" type="checkbox" id="lib-noheavy"> Hide RAM heavy</label>
       <span class="sep"></span><span id="lib-count" class="muted small" aria-live="polite"></span>
       <span class="seg" role="group" aria-label="Layout"><button data-help="lib.viewGrouped" id="lib-view-grouped" type="button" aria-pressed="true">Grouped by topic</button><button data-help="lib.viewList" id="lib-view-list" type="button" aria-pressed="false">List</button></span></div>
@@ -514,6 +531,12 @@ function libPrepare(idx) {
   libTopicMeta = new Map((idx.topics || []).map((t) => [t.id, t]));
   for (const it of idx.items) for (const t of it.topics || []) if (!libTopicMeta.has(t)) libTopicMeta.set(t, {id: t, label: t, area: "Other"});
   Fuzzy.library.labels = Object.fromEntries([...libTopicMeta].map(([k, v]) => [k, v.label]));
+  // exam objectives the labs cover (index.exams from the app; an older app or index has none and the filters hide)
+  libExams = idx.exams || [];
+  libExamMeta = new Map(libExams.flatMap((x) => x.objectives.map((o) => [o.tag, {...o, label: x.label, code: x.code, version: x.version, exam: x.id}])));
+  Fuzzy.library.exams = Object.fromEntries(libExamMeta);
+  if (!libExams.some((x) => x.id === libQuery.exam)) libQuery.exam = libQuery.obj = "";
+  if (libQuery.obj && !libExamMeta.has(libQuery.obj)) libQuery.obj = "";
   const order = [...libTopicMeta.keys()];
   const gids = [...new Set(idx.items.flatMap((it) => it.kind === "course" ? ["_courses"] : (libSubjects(it).length ? libSubjects(it) : ["other"])))].sort((a, b) => (a === "_courses") - (b === "_courses") || order.indexOf(a) - order.indexOf(b));
   libGroups = gids.map((g) => ({id: g, label: g === "_courses" ? "Courses" : libTopicLabel(g)}));
@@ -523,7 +546,28 @@ function libPrepare(idx) {
   const sel = $("#lib-course");
   if (sel) sel.innerHTML = `<option value="">Any course</option>` + idx.items.filter((c) => c.kind === "course")
     .map((c) => `<option value="${esc(c.id)}" ${c.id === libQuery.course ? "selected" : ""}>Course: ${esc(c.title)}</option>`).join("");
+  const ex = $("#lib-exam");
+  if (ex) { ex.innerHTML = `<option value="">Any exam</option>` + libExams.map((x) => `<option value="${esc(x.id)}">${esc(examName({...x, exam: x.id}))}</option>`).join("");
+    ex.hidden = !libExams.length; libExamOptions(); }
   libPrepare.ms = performance.now() - t0;
+}
+// objective list for the chosen exam, with the number of items that would show (search and other filters applied)
+function libExamOptions(counts = {}) {
+  const sel = $("#lib-obj"); if (!sel) return;
+  const x = libExams.find((e) => e.id === libQuery.exam);
+  sel.hidden = !libExams.length; sel.disabled = !x;
+  sel.innerHTML = `<option value="">${x ? `Any ${esc(x.label)} objective` : "Any objective"}</option>` + (x ? x.objectives.map((o) =>
+    `<option value="${esc(o.tag)}" title="${esc(o.text)}">${esc(o.id)} · ${esc(o.topic)} (${counts[o.tag] || 0})</option>`).join("") : "");
+  sel.value = libQuery.obj;
+}
+function libExamChips(it) {
+  const tags = (it.exams || []).filter((t) => libExamMeta.has(t));
+  const chip = (t) => { const e = libExamMeta.get(t);
+    return `<button data-help="lib.cardExam" type="button" class="chip sm exam" data-exam-tag="${esc(t)}" aria-pressed="false" title="${esc(examTip(e))}">${esc(examText(e))}</button>`; };
+  if (!tags.length) return "";
+  const head = tags.slice(0, 4), rest = tags.slice(4);
+  return `<div class="lib-chips exam-tags" role="group" aria-label="Exam objectives">${head.map(chip).join("")}${rest.length
+    ? `<details class="exam-more">${EXAM_MORE(rest.length)}${rest.map(chip).join("")}</details>` : ""}</div>`;
 }
 function libRamTag(it) {
   return it.ram_gb ? ramTag({heavy: it.ram_heavy, label: `~${Math.round(it.ram_gb)} GB`,
@@ -545,7 +589,7 @@ function libCardHtml(it, i, action) {
     <div class="muted small c-id"></div>
     ${it.kind === "course" ? `<div class="muted small">Labs: <span class="c-labs">${libCell(it, "labs")}</span></div>` : ""}
     <div class="lib-hit muted small" hidden><span class="c-domain"></span> <span class="c-nodes"></span></div>
-    <div class="lib-chips">${chips}</div>
+    <div class="lib-chips">${chips}</div>${libExamChips(it)}
     <div class="lib-card-foot"><span class="muted small lib-where"><span class="c-blueprint">${libCell(it, "blueprint")}</span><span class="c-courses">${it.in_courses && it.in_courses.length ? " · " + libCell(it, "courses") : ""}</span></span>
       <span class="muted small lib-size">${(it.size / 1024).toFixed(1)} KB</span>${action}</div></article>`;
 }
@@ -590,15 +634,22 @@ function libStatusOk(it, st) {
 function libBindFilters() {
   const q = $("#lib-search");
   libBindValues();
-  const upd = () => { libQuery = {...libQuery, q: q.value, kind: $("#lib-kind").value, status: $("#lib-status").value, course: $("#lib-course").value, noheavy: $("#lib-noheavy").checked};
+  const upd = (e) => { const exam = $("#lib-exam").value;
+    libQuery = {...libQuery, q: q.value, kind: $("#lib-kind").value, status: $("#lib-status").value, course: $("#lib-course").value, noheavy: $("#lib-noheavy").checked,
+      exam, obj: e && e.target.id === "lib-exam" ? "" : $("#lib-obj").value};
+    if (e && e.target.id === "lib-exam") libExamOptions();
     if (!libRaf) libRaf = requestAnimationFrame(() => { libRaf = 0; libApply(); }); };
-  ["#lib-search", "#lib-kind", "#lib-status", "#lib-course", "#lib-noheavy"].forEach((s) => $(s).addEventListener("input", upd));
+  ["#lib-search", "#lib-kind", "#lib-status", "#lib-course", "#lib-noheavy", "#lib-exam", "#lib-obj"].forEach((s) => $(s).addEventListener("input", upd));
   const view = (v) => { libPrefs.view = v; libSavePrefs(); libApply(); };
   $("#lib-view-grouped").onclick = () => view("grouped"); $("#lib-view-list").onclick = () => view("list");
   // topic chips (row and cards) and group headings, by delegation: the cards are moved around, not re-rendered
   $("#library").addEventListener("click", (e) => {
     const chip = e.target.closest("[data-topic]");
     if (chip) { libToggleTopic(chip.dataset.topic); return; }
+    const xc = e.target.closest("[data-exam-tag]");    // an exam chip on a card filters by that objective (again: clears it)
+    if (xc) { const t = xc.dataset.examTag, on = libQuery.obj === t;
+      libQuery = {...libQuery, exam: on ? libQuery.exam : (libExamMeta.get(t) || {}).exam || "", obj: on ? "" : t};
+      libBindValues(); libApply(); return; }
     const h = e.target.closest(".lib-group-h button");
     if (h) { const g = h.closest(".lib-group").dataset.g;
       libPrefs.collapsed = libPrefs.collapsed.includes(g) ? libPrefs.collapsed.filter((x) => x !== g) : [...libPrefs.collapsed, g];
@@ -616,15 +667,21 @@ function libBindFilters() {
 function libApply() {
   const box = $("#lib-cards"); if (!libIdx || !box) return;
   const t0 = performance.now();
-  const items = libIdx.items, {q, kind, status, course, noheavy, topics} = libQuery;
+  const items = libIdx.items, {q, kind, status, course, noheavy, topics, exam, obj} = libQuery;
   const crs = course && items.find((c) => c.kind === "course" && c.id === course);
-  const keep = (it) => (!kind || it.kind === kind) && libStatusOk(it, status) && !(noheavy && it.ram_heavy) &&
+  const examOk = (it) => !exam || (obj ? examHas(it.exams, obj) : (it.exams || []).some((t) => t.startsWith(exam + " ")));
+  const keepBase = (it) => (!kind || it.kind === kind) && libStatusOk(it, status) && !(noheavy && it.ram_heavy) &&
     (!crs || it === crs || (it.kind === "lab" && (crs.labs || []).includes(it.id)));
+  const keep = (it) => keepBase(it) && examOk(it);
   const searching = Fuzzy.tokens(q).length > 0;
   let base = searching ? Fuzzy.search(q, libRecs) : items.map((it, i) => ({i, hits: null}));
   base = base.filter((r) => keep(items[r.i]));
   const order = base.filter((r) => libTopicsOk(items[r.i], topics));
   const tMatch = performance.now() - t0;
+  if (exam) { const oc = {}, x = libExams.find((e) => e.id === exam);       // objective counts for the chosen exam
+    const pool = (searching ? Fuzzy.search(q, libRecs) : items.map((it, i) => ({i}))).filter((r) => keepBase(items[r.i]) && libTopicsOk(items[r.i], topics));
+    for (const o of x ? x.objectives : []) oc[o.tag] = pool.filter((r) => examHas(items[r.i].exams, o.tag)).length;
+    libExamOptions(oc); }
   // chip counts: what each topic would show with the search and the other filters (ignoring the topic selection)
   const counts = {};
   for (const r of base) for (const t of items[r.i].topics || []) counts[t] = (counts[t] || 0) + 1;
@@ -652,7 +709,7 @@ function libApply() {
       card.querySelector(".c-id").innerHTML = r.hits && r.hits.id ? "id: " + libCell(it, "id", r.hits) : "";
       card._hl = !!r.hits;
     }
-    for (const c of card.querySelectorAll(".chip")) c.setAttribute("aria-pressed", topics.includes(c.dataset.topic));
+    for (const c of card.querySelectorAll(".chip")) c.setAttribute("aria-pressed", c.dataset.examTag ? c.dataset.examTag === obj : topics.includes(c.dataset.topic));
     card.hidden = false; shown.add(r.i);
     if (grouped) { const g = libGroupOf(it); (sets[g] = sets[g] || []).push(card); } else flat.appendChild(card);
   }
@@ -672,20 +729,23 @@ function libApply() {
   else for (const g of libGroups) box.insertBefore(box.querySelector(`.lib-group[data-g="${CSS.escape(g.id)}"]`), $("#lib-flat"));
   const fl = $("#lib-flat"); fl.hidden = grouped; fl.appendChild(flat);
   libCards.forEach((c, i) => { if (!shown.has(i)) { c.hidden = true; if (c.parentNode) c.remove(); } });
-  const filtered = q.trim() || kind || status || course || noheavy || topics.length;
+  const filtered = q.trim() || kind || status || course || noheavy || exam || topics.length;
   $("#lib-count").textContent = filtered ? `${order.length} of ${items.length}` : `${items.length} items`;
   $("#lib-expand").hidden = $("#lib-collapse").hidden = !grouped;
   const empty = $("#lib-empty");
   empty.hidden = order.length > 0; box.hidden = !order.length;
   if (!order.length) {
-    const what = [q.trim() ? `"<b>${esc(q.trim())}</b>"` : "", topics.length ? "topics " + topics.map((t) => `<b>${esc(libTopicLabel(t))}</b>`).join(" + ") : ""].filter(Boolean).join(" and ");
+    const xo = obj && libExamMeta.get(obj), xe = libExams.find((e) => e.id === exam);
+    const what = [q.trim() ? `"<b>${esc(q.trim())}</b>"` : "", topics.length ? "topics " + topics.map((t) => `<b>${esc(libTopicLabel(t))}</b>`).join(" + ") : "",
+      xo ? `exam objective <b>${esc(examText(xo))}</b>` : xe ? `exam <b>${esc(xe.label)}</b>` : ""].filter(Boolean).join(" and ");
     empty.innerHTML = `No labs or courses match${what ? " " + what : ""}${kind || status || course || noheavy ? " with these filters" : ""}.
       Try fewer words or topics (typos and abbreviations like "mcast" or "ospf stb" are fine). <button data-help-text="Empty the search box and reset the filters and topics." id="lib-clear" class="hint-btn">Clear search and filters</button>`;
-    $("#lib-clear").onclick = () => { libQuery = {q: "", kind: "", status: "", course: "", noheavy: false, topics: []}; libSavePrefs(); libBindValues(); libApply(); $("#lib-search").focus(); };
+    $("#lib-clear").onclick = () => { libQuery = {q: "", kind: "", status: "", course: "", noheavy: false, exam: "", obj: "", topics: []}; libSavePrefs(); libBindValues(); libApply(); $("#lib-search").focus(); };
   }
   libApply.ms = {match: tMatch, total: performance.now() - t0};
 }
-function libBindValues() { $("#lib-search").value = libQuery.q; $("#lib-kind").value = libQuery.kind; $("#lib-status").value = libQuery.status; $("#lib-course").value = libQuery.course; $("#lib-noheavy").checked = libQuery.noheavy; }
+function libBindValues() { $("#lib-search").value = libQuery.q; $("#lib-kind").value = libQuery.kind; $("#lib-status").value = libQuery.status; $("#lib-course").value = libQuery.course; $("#lib-noheavy").checked = libQuery.noheavy;
+  $("#lib-exam").value = libQuery.exam; libExamOptions(); }
 // "/" or Ctrl+K focuses the search (library page if open, else the lab list); Esc clears it
 document.addEventListener("keydown", (e) => {
   const t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
@@ -765,7 +825,7 @@ async function selectLab(id) {
   $("#lab-detail").innerHTML = `
     <div class="toolbar"><h2 style="margin:0">${esc(l.title)}</h2><span class="sep"></span>
       <span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
-      ${srcTag(labs.find((x) => x.id === l.id) || l)}${l.marked_manually ? '<span class="tag ok">completed</span>' + manTag() : ""}</div>${libNote(l.id)}
+      ${srcTag(labs.find((x) => x.id === l.id) || l)}${l.marked_manually ? '<span class="tag ok">completed</span>' + manTag() : ""}</div>${examTags(l.exams, 8)}${libNote(l.id)}
     <div class="toolbar">
       <button data-help="lab.build" id="a-build" class="primary">Build</button>${l.exam ? '<button data-help="lab.examSubmit" id="a-check" class="primary">Submit exam</button>' : '<button data-help="lab.check" id="a-check">Check</button>'}<button data-help="lab.hintNext" id="a-hint">Hint</button>
       <label class="inline">Grading<select data-help="lab.mode" id="mode"><option value="">Mode: default</option><option value="auto">Auto</option><option value="live">Live only</option><option value="config">Config only</option></select></label>
@@ -1180,7 +1240,7 @@ function renderWalkthrough(l) {
   $("#lab-detail").innerHTML = `
     <div class="toolbar"><h2 style="margin:0">${esc(l.title)}</h2><span class="sep"></span>
       ${walkTag(l)}<span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
-      ${srcTag(labs.find((x) => x.id === l.id) || l)}</div>${libNote(l.id)}
+      ${srcTag(labs.find((x) => x.id === l.id) || l)}</div>${examTags(l.exams, 8)}${libNote(l.id)}
     <div class="toolbar">
       <button data-help="lab.build" id="a-build" class="primary">Build</button>
       <button data-help="w.checkAll" id="w-check-all">Check every step</button>
@@ -1280,7 +1340,7 @@ function renderWalkStep() {
     const st = l.steps[i], r = walk.status.steps[i] || {};
     box.innerHTML = `<h3>${i + 1}. ${esc(st.title)} ${st.optional ? '<span class="tag">optional</span>' : ""}
         ${r.passed === true ? '<span class="tag ok">checked ✓</span>' : r.manual_at ? '<span class="tag ok">done</span>' + manTag("step") : r.passed === false ? '<span class="tag bad">not passing yet</span>' : ""}${r.applied_at ? '<span class="tag">applied for you</span>' : ""}</h3>
-      <div class="md">${md(st.explain)}</div>
+      ${examTags(st.exams, 8, true)}<div class="md">${md(st.explain)}</div>
       ${Object.keys(st.config).length ? `<h4 data-help="w.config">Configuration</h4>${Object.entries(st.config).map(([d, c]) => cfgBlock(d, c, false)).join("")}` : ""}
       ${st.verify.length ? `<h4 data-help="w.verify">Verify</h4><table><tr><th>Device</th><th>Command</th><th>Good output looks like</th></tr>${st.verify.map((v) => `<tr>
         <td>${esc(v.device)}</td><td><code class="cmd">${esc(v.command)}</code> <button data-help="w.copyCmd" class="hint-btn" data-copy="${esc(v.command)}">Copy</button></td><td class="md small">${md(v.expect)}</td></tr>`).join("")}</table>` : ""}
@@ -1374,7 +1434,7 @@ $("#p-refresh").onclick = loadProgress;
 
 /* ---------------------------------------------------------------- builder */
 function emptyDraft() {
-  return {id: "my-new-lab", title: "My new lab", blueprint: ["3.2.b"], domain: "3.0 Infrastructure - Layer 3", difficulty: 2,
+  return {id: "my-new-lab", title: "My new lab", blueprint: ["3.2.b"], exams: ["ENCOR 3.2.b"], domain: "3.0 Infrastructure - Layer 3", difficulty: 2,
     platforms: ["iol", "iosv"], summary: "", author: "", version: "1",
     nodes: [{name: "R1", kind: "router", x: -150, y: 0, config: "interface %if0%\n ip address 10.0.12.1 255.255.255.0\n no shutdown\n"},
             {name: "R2", kind: "router", x: 150, y: 0, config: "interface %if0%\n ip address 10.0.12.2 255.255.255.0\n no shutdown\n"}],
@@ -1413,6 +1473,8 @@ function renderForm() {
     <label>Track<input data-help="f.track" data-path="track" data-type="track" placeholder="ENCOR" value="${esc(d.track || "")}"></label>
     <label>Domain<input data-help="f.domain" data-path="domain" list="domains" value="${esc(d.domain)}"><datalist id="domains">${DOMAINS.map((x) => `<option>${esc(x)}</option>`).join("")}</datalist></label>
     <label>Blueprint items<input data-help="f.blueprint" data-path="blueprint" data-type="csv" value="${esc((d.blueprint || []).join(", "))}"></label>
+    <label>Exam objectives<span class="inline-row"><input data-help="f.exams" id="f-exams" data-path="exams" data-type="csv" placeholder="ENCOR 3.2.b, CCNA 3.4" value="${esc((d.exams || []).join(", "))}">
+      <button data-help="f.examsSuggest" type="button" id="f-exams-suggest" class="hint-btn">Suggest</button></span></label>
     <label>Difficulty<select data-help="f.difficulty" data-path="difficulty" data-type="int">${[1, 2, 3, 4, 5].map((i) => `<option ${i === d.difficulty ? "selected" : ""}>${i}</option>`).join("")}</select></label>
     <label>Platforms<select data-help="f.platforms" data-path="platforms" data-type="plat"><option value="iol,iosv" ${(d.platforms || []).length > 1 ? "selected" : ""}>IOL + IOSv</option>
       <option value="iol" ${(d.platforms || []).join() === "iol" ? "selected" : ""}>IOL only</option><option value="iosv" ${(d.platforms || []).join() === "iosv" ? "selected" : ""}>IOSv only</option></select></label>
@@ -1447,6 +1509,17 @@ function renderForm() {
   pp.onchange = () => { localStorage.setItem("previewPlat", pp.value); upd(); };
   $("#task-src").addEventListener("input", upd); upd();
   $$("#tab-form [data-del]").forEach((b) => b.onclick = () => { const [k, i] = b.dataset.del.split("."); draft[k].splice(+i, 1); renderForm(); scheduleValidate(); });
+  // exam objectives: suggestions from the blueprint items, track and title (merged into what is there)
+  $("#f-exams-suggest").onclick = async () => {
+    try {
+      const q = new URLSearchParams({blueprint: (draft.blueprint || []).join(","), track: draft.track || "ENCOR", text: `${draft.title || ""} ${draft.summary || ""}`});
+      const r = await api(`/api/exams/suggest?${q}`);
+      const tags = [...new Set([...(draft.exams || []), ...r.tags])];
+      if (!r.tags.length) { toast("No suggestions: add blueprint items or name the protocol in the title"); return; }
+      const el = $("#f-exams"); el.value = tags.join(", "); el.dispatchEvent(new Event("change"));
+      toast(`Suggested ${r.tags.length} objective(s): keep only what the lab really practises`, "ok");
+    } catch (e) { toast(`Could not suggest: ${e.message}`, "err"); }
+  };
   $("#add-node").onclick = () => { let i = draft.nodes.length + 1; while (names.includes("R" + i)) i++; draft.nodes.push({name: "R" + i, kind: "router", x: 0, y: 150, config: ""}); renderForm(); scheduleValidate(); };
   $("#add-link").onclick = () => { draft.links.push({a: {node: names[0], port: 0}, b: {node: names[1] || names[0], port: 0}}); renderForm(); scheduleValidate(); };
   $("#add-check-tpl").onchange = (e) => {
@@ -1504,6 +1577,7 @@ function cleanDraft() {
   for (const k of ["author", "summary"]) if (d[k] === undefined) d[k] = "";
   if (!String(d.solution_summary || "").trim()) delete d.solution_summary;
   if (!(d.hints || []).length) delete d.hints;
+  if (!(d.exams || []).length) delete d.exams;     // the key needs 3.3.5+: leave it out when empty
   return d;
 }
 async function syncYaml() { const {yaml} = await api("/api/yaml/dump", {method: "POST", body: JSON.stringify({obj: cleanDraft()})}); $("#b-yaml").value = yaml; }

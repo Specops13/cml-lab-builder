@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 from cmllab import catalog, courses, history, library, packs
 from cmllab.cli import app as cli_app
 from test_web import make
+from tables import run_table
 
 ROOT = Path(__file__).resolve().parents[1]
 LIB = ROOT / "labs"
@@ -49,6 +50,7 @@ def lab_files(lab_dir: Path, prefix: str) -> dict:
 
 
 # ---------------------------------------------------------------- repo library folder
+@pytest.mark.slow
 def test_repo_library_is_up_to_date_and_consistent():
     r = subprocess.run([sys.executable, str(ROOT / "packaging" / "build_library.py"), "--check"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
@@ -96,18 +98,24 @@ def test_course_only_builtin_labs():
     assert courses.delete("encor-routing", remove_labs=True) == []
 
 
-@pytest.mark.parametrize("files,msg", [
+COURSE_ERRORS_ROWS = [
     ({"labs/x/lab.yaml": b"x"}, "no course.yaml"),
     ({"course.yaml": b"id: [\n"}, "YAML error"),
     ({"course.yaml": b"id: Bad Id\ntitle: Something\nlabs: [eigrp-basic]\n"}, "id"),
     ({"course.yaml": b"id: dup\ntitle: Something\nlabs: [eigrp-basic, eigrp-basic]\n"}, "listed twice"),
     ({"course.yaml": b"id: miss\ntitle: Something\nlabs: [no-such-lab]\n"}, "neither bundled nor installed"),
     ({"course.yaml": b"id: evil\ntitle: Something\nlabs: [eigrp-basic]\n", "../evil.txt": b"x"}, "unsafe path"),
-])
-def test_course_errors(files, msg):
+]
+
+
+def _course_errors(files, msg):
     with pytest.raises(packs.LabError, match=msg):
         courses.install(zipped(files))
     assert courses.list_courses() == []
+
+
+def test_course_errors():
+    run_table(_course_errors, COURSE_ERRORS_ROWS)
 
 
 def test_course_install_is_all_or_nothing():

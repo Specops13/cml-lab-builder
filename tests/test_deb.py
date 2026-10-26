@@ -16,6 +16,7 @@ from test_patching import mkbundle
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "packaging"))
 import build_deb  # noqa: E402
+from tables import run_table
 
 ASSETS = [{"name": n, "url": f"https://github.com/x/releases/download/v2.0.0/{n}", "size": 1}
           for n in ("CMLLabBuilder-2.0.0-windows-x64.zip", "CMLLabBuilder-2.0.0-linux-x64.tar.gz", "cml-lab-builder_2.0.0_amd64.deb",
@@ -33,14 +34,20 @@ def test_install_type_detection(tmp_path):
     assert install.install_type(tmp_path, "posix") == "linux-tar" and install.install_type(tmp_path, "nt") == "windows-zip"
 
 
-@pytest.mark.parametrize("kind,name", [("deb", "cml-lab-builder_2.0.0_amd64.deb"), ("linux-tar", "CMLLabBuilder-2.0.0-linux-x64.tar.gz"),
-                                       ("windows-zip", "CMLLabBuilder-2.0.0-windows-x64.zip")])
-def test_full_download_picks_the_asset_for_the_install_type(kind, name):
+FULL_DOWNLOAD_PICKS_THE_ASSET_FOR_THE_INSTALL_TYPE_ROWS = [("deb", "cml-lab-builder_2.0.0_amd64.deb"), ("linux-tar", "CMLLabBuilder-2.0.0-linux-x64.tar.gz"),
+                                       ("windows-zip", "CMLLabBuilder-2.0.0-windows-x64.zip")]
+
+
+def _full_download_picks_the_asset_for_the_install_type(kind, name):
     d = install.full_download(ASSETS, "2.0.0", kind)
     assert d["name"] == name and d["url"].endswith(name) and d["kind"] == kind
     assert install.full_download([a for a in ASSETS if a["name"] != name], "2.0.0", kind) is None
     assert install.full_download(ASSETS, "2.0.0", "source") is None
     assert "sudo apt install ./cml-lab-builder_2.0.0_amd64.deb" in install.how_to_install("deb", "cml-lab-builder_2.0.0_amd64.deb")
+
+
+def test_full_download_picks_the_asset_for_the_install_type():
+    run_table(_full_download_picks_the_asset_for_the_install_type, FULL_DOWNLOAD_PICKS_THE_ASSET_FOR_THE_INSTALL_TYPE_ROWS)
 
 
 def test_check_reports_the_download_for_this_install(monkeypatch):

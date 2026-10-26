@@ -45,6 +45,8 @@ OUTPUT RULES
 - Keep to 2-6 nodes; use only kind router/switch; platforms [iol, iosv] unless a feature needs one.
 - id: lowercase-with-dashes, unique and descriptive (never the id of a lab in the online library, e.g. 03-ospf-multiarea).
   Leave `version:` out for a new lab (it defaults to "1"); raise it only when revising a published lab.
+- Tag the lab with `exams:` (Cisco exam objectives it really practises, e.g. ["ENCOR 3.2.b", "CCNA 3.4"]; walkthrough
+  steps can carry their own `exams:`). Use only objective numbers from the exams listed under "Exam objectives".
 - Default to a challenge lab (`type` omitted). Only when the request asks for a guided, step-by-step build, write
   `type: walkthrough` with ordered `steps` (explain, config per device, verify with expected output, checks) and no
   lab-level checks, solution or faults (see "Walkthrough labs" in the guide).

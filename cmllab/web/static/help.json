@@ -50,6 +50,8 @@
   "f.title": "Title shown in the catalog.",
   "f.domain": "Domain or area, used for filtering (ENCOR exam domain for ENCOR labs).",
   "f.blueprint": "Topics, comma separated: ENCOR 350-401 blueprint items such as 3.2.b, or other topic names.",
+  "f.exams": "Cisco exam objectives the lab covers, comma separated, e.g. ENCOR 3.2.b, CCNA 3.4 (ids from the official exam topics).",
+  "f.examsSuggest": "Suggest objectives from the blueprint items, track and title. Keep only what the lab really practises.",
   "f.difficulty": "1 (easy) to 5 (hard).",
   "f.platforms": "Device images this lab supports. Use both unless a feature needs one.",
   "f.author": "Optional author name.",
@@ -241,8 +243,11 @@
   "lib.fStatus": "Show what is installed, not installed yet, or has an update in the library.",
   "lib.fCourse": "Show one course and the labs it contains.",
   "lib.fHeavy": "Hide labs and courses that need more CML server RAM than the RAM-heavy threshold in Settings.",
+  "lib.fExam": "Show only labs that cover objectives of this Cisco exam blueprint (CCNA, ENCOR, ENARSI, DCCOR, CCIE).",
+  "lib.fObj": "Narrow to one exam objective. The number is how many labs cover it; hover an objective for its blueprint text.",
   "lib.topic": "Show only items with this topic; the number is how many match. Picks in one area mean any of them (OSPF or BGP), across areas all of them (OSPF and Walkthrough).",
   "lib.cardTopic": "Filter the library by this topic (click again to remove it).",
+  "lib.cardExam": "Exam objective this lab covers (exam, objective number, topic). Hover for the blueprint text; click to filter by it.",
   "lib.clearTopics": "Remove all topic filters.",
   "lib.group": "Show or hide the labs of this topic. Labs are listed under their main topic; the chips filter by any of their topics.",
   "lib.viewGrouped": "Show the labs grouped under topic headings (each lab under its main topic).",
@@ -263,5 +268,7 @@
   "lab.unmarkComplete": "Remove your manual mark and set the lab back to incomplete. Graded results and history are kept.",
   "w.markStep": "When a step's check is buggy, count the step as done by hand so you can move on. It is labelled marked manually, not passed.",
   "w.unmarkStep": "Remove the manual mark from this step. Its graded check result is kept.",
-  "p.marked": "Challenge labs you marked complete by hand. Courses count them as done; they stay out of solved labs and mastery."
+  "p.marked": "Challenge labs you marked complete by hand. Courses count them as done; they stay out of solved labs and mastery.",
+  "lab.exams": "Cisco exam objectives this lab covers, from the official exam topics. Hover a tag for the objective text.",
+  "w.exams": "Exam objectives this step practises. Hover a tag for the objective text from the Cisco exam topics."
 }

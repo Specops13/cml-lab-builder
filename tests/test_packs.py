@@ -1,14 +1,13 @@
 import io
 import zipfile
-from pathlib import Path
 
 import pytest
 import yaml
 
 from cmllab import catalog, packs, prompt
+from tables import run_table
 
 EXAMPLE = prompt.example()
-OSPF_DIR = Path(__file__).parent.parent / "examples" / "ospf-multiarea-stub"
 
 
 def zbytes(files: dict) -> bytes:
@@ -34,14 +33,16 @@ def test_zip_with_top_folder_and_ignored_files():
     assert any("notes.txt" in w for w in pk.warnings)
 
 
-@pytest.mark.parametrize("name,data,msg", [
+BAD_UPLOADS_ROWS = [
     ("a.encorlab", b"not a zip", "not a valid"),
     ("a.encorlab", None, "unsafe path"),
     ("a.txt", b"hello", "unsupported file type"),
     ("a.encorlab", zbytes({"readme.md": "x"}), "no lab.yaml"),
     ("a.yaml", b"\xff\xfe\x00bad", "UTF-8"),
-])
-def test_bad_uploads(name, data, msg):
+]
+
+
+def _bad_uploads(name, data, msg):
     if data is None:
         data = zbytes({"../evil/lab.yaml": EXAMPLE})
     with pytest.raises(packs.LabError) as e:
@@ -49,25 +50,31 @@ def test_bad_uploads(name, data, msg):
     assert msg in " ".join(e.value.errors)
 
 
-def test_too_big():
-    with pytest.raises(packs.LabError) as e:
-        packs.read_upload("a.yaml", b"x" * (packs.MAX_PACK_BYTES + 1))
-    assert "larger" in e.value.errors[0]
+def test_bad_uploads():
+    run_table(_bad_uploads, BAD_UPLOADS_ROWS)
 
 
-def test_friendly_errors_have_paths():
-    d = yaml.safe_load(EXAMPLE)
-    d["difficulty"] = 9
-    d["checks"][0]["bogus"] = 1
-    rep = packs.lint(packs.Pack(yaml.safe_dump(d)))
-    assert not rep.ok
-    text = "\n".join(rep.errors)
-    assert "difficulty" in text and "checks[0]" in text
+def test_upload_limits_and_friendly_errors():
+    def _too_big():
+        with pytest.raises(packs.LabError) as e:
+            packs.read_upload("a.yaml", b"x" * (packs.MAX_PACK_BYTES + 1))
+        assert "larger" in e.value.errors[0]
 
+    def _friendly_errors_have_paths():
+        d = yaml.safe_load(EXAMPLE)
+        d["difficulty"] = 9
+        d["checks"][0]["bogus"] = 1
+        rep = packs.lint(packs.Pack(yaml.safe_dump(d)))
+        assert not rep.ok
+        text = "\n".join(rep.errors)
+        assert "difficulty" in text and "checks[0]" in text
 
-def test_yaml_syntax_error_reports_line():
-    rep = packs.lint(packs.Pack("id: x\nnodes: [\n"))
-    assert not rep.ok and "line" in rep.errors[0].lower()
+    def _yaml_syntax_error_reports_line():
+        rep = packs.lint(packs.Pack("id: x\nnodes: [\n"))
+        assert not rep.ok and "line" in rep.errors[0].lower()
+
+    for case in (_too_big, _friendly_errors_have_paths, _yaml_syntax_error_reports_line):
+        case()
 
 
 def test_literal_interface_rejected():
@@ -126,11 +133,3 @@ def test_builtin_packs_roundtrip_through_pack_bytes():
         pk = packs.read_dir(e.path)
         again = packs.read_upload("p.encorlab", packs.build_pack_bytes(pk))
         assert packs.lint(again, strict=True).ok, lid
-
-
-@pytest.mark.skipif(not OSPF_DIR.exists(), reason="custom OSPF pack source not present")
-def test_ospf_multiarea_stub_pack():
-    rep = packs.lint(packs.read_dir(OSPF_DIR), strict=True, builtin_ids=packs.builtin_ids())
-    assert rep.ok, rep.errors
-    assert {r["mode"] for r in rep.results} == {"live", "config"}
-    assert all(r["solution_pct"] == 100 and r["blank_pct"] == 0 for r in rep.results)

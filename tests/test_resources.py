@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from cmllab import config, resources
 from cmllab.web.app import create_app
 from fakes import GIB, FakeClient, FakeLicensing
+from tables import run_table
 
 
 def _running(fc, title, n, definition="iol-xe", ram_mib=None):
@@ -37,13 +38,19 @@ def test_stopped_labs_are_not_listed():
     assert resources.snapshot(fc)["labs"] == []
 
 
-@pytest.mark.parametrize("need,level", [(10, "fits"), (30, "fits"), (31, "tight"), (40, "nofit")])
-def test_verdict_levels(need, level):
+VERDICT_LEVELS_ROWS = [(10, "fits"), (30, "fits"), (31, "tight"), (40, "nofit")]
+
+
+def _verdict_levels(need, level):
     snap = {"available_gb": 34.0, "labs": [], "running_nodes": 0}
     v = resources.verdict(snap, need, 4, headroom_gb=4)
     assert v["level"] == level
     assert v["margin_gb"] == round(34 - need, 1)
     assert bool(v["reasons"]) == (level != "fits")
+
+
+def test_verdict_levels():
+    run_table(_verdict_levels, VERDICT_LEVELS_ROWS)
 
 
 def test_headroom_is_configurable():
@@ -91,25 +98,89 @@ def test_failures_make_unknown_never_raise():
     assert s["available_gb"] is None and len(s["errors"]) == 2
 
 
-def test_license_parsing():
-    fc = FakeClient()
-    fc.licensing = FakeLicensing({"features": [{"name": "CML - Personal Edition", "description": "20 nodes",
-                                                "in_use": 1, "max": 1}]})
-    lic = resources.snapshot(fc)["license"]
-    assert (lic["max"], lic["in_use"], lic["known"]) == (20, 0, True)
+def test_license_parsing_cases():
+    def _license_parsing():
+        fc = FakeClient()
+        fc.licensing = FakeLicensing({"features": [{"name": "CML - Personal Edition", "description": "20 nodes",
+                                                    "in_use": 1, "max": 1}]})
+        lic = resources.snapshot(fc)["license"]
+        assert (lic["max"], lic["in_use"], lic["known"]) == (20, 0, True)
+
+    def _dylans_server_20_node_license_is_not_1_of_1():
+        """The 3.3.0 bug: features summed -> "1 of 1 licensed nodes in use" and "won't fit" for every lab."""
+        fc = FakeClient()
+        fc.stats = cml29_system_stats(total_gib=90, memfree_gib=70, used_gib=12)
+        fc.licensing = FakeLicensing(cml29_licensing())
+        _running(fc, "colleague", 4, "iol-xe")
+        sw = _running(fc, "switchy", 1, "unmanaged_switch")      # never uses a license
+        assert sw
+        s = resources.snapshot(fc)
+        lic = s["license"]
+        assert (lic["max"], lic["in_use"], lic["known"]) == (20, 4, True)
+        assert lic["source"] == "licensing+labs" and lic["product"] == "CML_Enterprise"
+        v = resources.verdict(s, 76, 10, headroom_gb=4)
+        assert v["node_check"]["level"] == "fits" and v["failed"] == []
+        assert not any("1 of 1" in r for r in v["reasons"])
+
+    def _license_status_without_min_max_still_gives_20():
+        fc = FakeClient()
+        fc.licensing = FakeLicensing(cml29_licensing(with_minmax=False))
+        assert resources.snapshot(fc)["license"]["max"] == 20
+
+    def _expansion_nodes_add_their_chosen_count_not_the_300_maximum():
+        fc = FakeClient()
+        fc.licensing = FakeLicensing(cml29_licensing(expansion=50))
+        assert resources.snapshot(fc)["license"]["max"] == 70
+
+    def _capacity_from_product_when_features_do_not_say():
+        run_table(_capacity_from_product_when_features_do_not_say_row, CAPACITY_FROM_PRODUCT_WHEN_FEATURES_DO_NOT_SAY_ROWS)
+
+    def _screenshot_personal_user_quota_1_is_not_a_node_limit():
+        """3.3.1 said "Won't fit ... your resource pool allows 1 nodes and 0 are running" for lab 21 (10 nodes, 76 GB)."""
+        s = resources.snapshot(_dylan())
+        assert (s["license"]["max"], s["license"]["in_use"], s["license"]["product"]) == (20, 0, "CML_Personal")
+        assert s["pool"]["assigned"] is False and s["pool"]["max"] is None
+        v = resources.verdict(s, 76, 10, headroom_gb=4)
+        assert v["level"] == "fits" and v["failed"] == [] and v["reasons"] == []
+        assert v["node_check"] == {"level": "fits", "reason": "", "note": "", "in_use": 0, "max": 20, "need": 10}
+        assert "user_max" not in s["license"]
+
+    def _personal_without_diagnostics_is_20_and_personal_plus_40():
+        fc = _dylan()
+        fc.diagnostics = None
+        assert resources.snapshot(fc)["license"]["max"] == 20
+        st = cml29_personal()
+        st["product_license"]["active"] = "CML_PersonalPlus"
+        assert resources._license_capacity(st)[0] == 40
+
+    for case in (_license_parsing, _dylans_server_20_node_license_is_not_1_of_1, _license_status_without_min_max_still_gives_20, _expansion_nodes_add_their_chosen_count_not_the_300_maximum, _capacity_from_product_when_features_do_not_say, _screenshot_personal_user_quota_1_is_not_a_node_limit, _personal_without_diagnostics_is_20_and_personal_plus_40):
+        case()
 
 
-def test_memory_from_computes_when_no_all():
-    stats = {"computes": {"a": {"stats": {"memory": {"total": 32 * GIB, "free": 10 * GIB}}},
-                          "b": {"stats": {"memory": {"total": 32 * GIB, "free": 20 * GIB}}}}}
-    assert resources._memory(stats) == (64.0, 30.0)
-    assert resources._memory({}) == (None, None)
+def test_memory_parsing():
+    def _memory_from_computes_when_no_all():
+        stats = {"computes": {"a": {"stats": {"memory": {"total": 32 * GIB, "free": 10 * GIB}}},
+                              "b": {"stats": {"memory": {"total": 32 * GIB, "free": 20 * GIB}}}}}
+        assert resources._memory(stats) == (64.0, 30.0)
+        assert resources._memory({}) == (None, None)
 
+    def _node_ram_units():
+        assert resources._gb(2048, "mib") == 2.0
+        assert resources._gb(2 * GIB, "mib") == 2.0      # some client versions report bytes
+        assert resources._gb(None) is None
 
-def test_node_ram_units():
-    assert resources._gb(2048, "mib") == 2.0
-    assert resources._gb(2 * GIB, "mib") == 2.0      # some client versions report bytes
-    assert resources._gb(None) is None
+    def _page_cache_counts_as_free_memory():
+        """MemFree leaves out the page cache; CML reclaims it when a node starts. 3.3.0 read only MemFree."""
+        assert resources._memory(cml29_system_stats(total_gib=90, memfree_gib=6, used_gib=10)) == (90.0, 80.0)
+
+    def _memory_in_kib_is_recognised():
+        assert resources._memory(cml29_system_stats(total_gib=90, memfree_gib=60, used_gib=20, unit=1024 ** 2)) == (90.0, 70.0)
+
+    def _memory_without_used_keeps_free():
+        assert resources._memory({"all": {"memory": {"total": 64 * GIB, "free": 20 * GIB}}}) == (64.0, 20.0)
+
+    for case in (_memory_from_computes_when_no_all, _node_ram_units, _page_cache_counts_as_free_memory, _memory_in_kib_is_recognised, _memory_without_used_keeps_free):
+        case()
 
 
 def test_cache():
@@ -279,35 +350,6 @@ def cml29_system_stats(total_gib=90, memfree_gib=6, used_gib=10, unit=GIB):
             "all": host, "controller": {"disk": {"used": 120 * GIB, "free": 380 * GIB, "total": 500 * GIB}}}
 
 
-def test_dylans_server_20_node_license_is_not_1_of_1():
-    """The 3.3.0 bug: features summed -> "1 of 1 licensed nodes in use" and "won't fit" for every lab."""
-    fc = FakeClient()
-    fc.stats = cml29_system_stats(total_gib=90, memfree_gib=70, used_gib=12)
-    fc.licensing = FakeLicensing(cml29_licensing())
-    _running(fc, "colleague", 4, "iol-xe")
-    sw = _running(fc, "switchy", 1, "unmanaged_switch")      # never uses a license
-    assert sw
-    s = resources.snapshot(fc)
-    lic = s["license"]
-    assert (lic["max"], lic["in_use"], lic["known"]) == (20, 4, True)
-    assert lic["source"] == "licensing+labs" and lic["product"] == "CML_Enterprise"
-    v = resources.verdict(s, 76, 10, headroom_gb=4)
-    assert v["node_check"]["level"] == "fits" and v["failed"] == []
-    assert not any("1 of 1" in r for r in v["reasons"])
-
-
-def test_license_status_without_min_max_still_gives_20():
-    fc = FakeClient()
-    fc.licensing = FakeLicensing(cml29_licensing(with_minmax=False))
-    assert resources.snapshot(fc)["license"]["max"] == 20
-
-
-def test_expansion_nodes_add_their_chosen_count_not_the_300_maximum():
-    fc = FakeClient()
-    fc.licensing = FakeLicensing(cml29_licensing(expansion=50))
-    assert resources.snapshot(fc)["license"]["max"] == 70
-
-
 def test_diagnostics_licensing_wins_for_nodes_in_use():
     fc = FakeClient()
     fc.licensing = FakeLicensing(cml29_licensing())
@@ -327,16 +369,45 @@ def test_diagnostics_error_body_falls_back():
     assert resources.snapshot(fc)["license"]["source"] == "licensing+labs"
 
 
-def test_resource_pool_node_limit():
-    lic = {"max": 100, "in_use": 10, "known": True}
-    pool = {"assigned": True, "label": "students", "max": 12, "in_use": 10}
-    v = resources.verdict({"available_gb": 80.0, "labs": [], "running_nodes": 10, "license": lic, "pool": pool}, 4, 3)
-    assert v["failed"] == ["nodes"] and "resource pool 'students' allows 12 nodes" in v["reasons"][0]
-    assert v["node_check"]["pool"] == {"label": "students", "max": 12, "in_use": 10}
+def test_resource_pools():
+    def _resource_pool_node_limit():
+        lic = {"max": 100, "in_use": 10, "known": True}
+        pool = {"assigned": True, "label": "students", "max": 12, "in_use": 10}
+        v = resources.verdict({"available_gb": 80.0, "labs": [], "running_nodes": 10, "license": lic, "pool": pool}, 4, 3)
+        assert v["failed"] == ["nodes"] and "resource pool 'students' allows 12 nodes" in v["reasons"][0]
+        assert v["node_check"]["pool"] == {"label": "students", "max": 12, "in_use": 10}
+
+    def _assigned_pool_with_null_licenses_is_unlimited():
+        fc = _dylan({"admin": False, "resource_pool": "pool-1"},
+                    {"id": "pool-1", "label": "lab users", "limit": {"licenses": None, "ram": None, "cpus": None,
+                                                                    "disk_space": None, "external_connectors": None},
+                     "usage": {"licenses": 4, "ram": 8192, "cpus": 400, "disk_space": 0, "external_connectors": []}})
+        s = resources.snapshot(fc)
+        assert s["pool"]["assigned"] is True and s["pool"]["max"] is None
+        assert resources.verdict(s, 10, 10)["node_check"]["level"] == "fits"
+
+    def _assigned_pool_with_a_node_limit_blocks():
+        fc = _dylan({"admin": False, "resource_pool": "pool-1"},
+                    {"id": "pool-1", "label": "lab users", "limit": {"licenses": 8}, "usage": {"licenses": 2}})
+        s = resources.snapshot(fc)
+        assert (s["pool"]["max"], s["pool"]["in_use"]) == (8, 2)
+        v = resources.verdict(s, 10, 10)
+        assert v["failed"] == ["nodes"] and "allows 8 nodes and 2 are in use; this lab needs 10" in v["reasons"][0]
+
+    def _pool_that_cannot_be_read_never_blocks():
+        fc = _dylan({"admin": False, "resource_pool": "pool-9"})     # usage GET fails
+        s = resources.snapshot(fc)
+        assert s["pool"]["assigned"] is True and s["pool"]["max"] is None and s["pool"]["error"]
+        assert resources.verdict(s, 10, 10)["level"] == "fits"
+
+    for case in (_resource_pool_node_limit, _assigned_pool_with_null_licenses_is_unlimited, _assigned_pool_with_a_node_limit_blocks, _pool_that_cannot_be_read_never_blocks):
+        case()
 
 
-@pytest.mark.parametrize("product,cap", [("CML_Personal", 20), ("CML_Personal40", 40), ("CML_Enterprise", 20)])
-def test_capacity_from_product_when_features_do_not_say(product, cap):
+CAPACITY_FROM_PRODUCT_WHEN_FEATURES_DO_NOT_SAY_ROWS = [("CML_Personal", 20), ("CML_Personal40", 40), ("CML_Enterprise", 20)]
+
+
+def _capacity_from_product_when_features_do_not_say_row(product, cap):
     status = {"features": [{"id": "regid.x,1.0_y", "name": "CML - License", "in_use": 1, "max": 1}],
               "product_license": {"active": product}}
     assert resources._license_capacity(status)[0] == cap
@@ -365,19 +436,6 @@ def test_ram_failure_is_named_as_memory():
     v = resources.verdict({"available_gb": 50.0, "labs": [], "running_nodes": 0,
                            "license": {"max": 20, "in_use": 0, "known": True}}, 76, 10)
     assert v["failed"] == ["memory"] and v["node_check"]["level"] == "fits" and v["reasons"][0].startswith("Memory:")
-
-
-def test_page_cache_counts_as_free_memory():
-    """MemFree leaves out the page cache; CML reclaims it when a node starts. 3.3.0 read only MemFree."""
-    assert resources._memory(cml29_system_stats(total_gib=90, memfree_gib=6, used_gib=10)) == (90.0, 80.0)
-
-
-def test_memory_in_kib_is_recognised():
-    assert resources._memory(cml29_system_stats(total_gib=90, memfree_gib=60, used_gib=20, unit=1024 ** 2)) == (90.0, 70.0)
-
-
-def test_memory_without_used_keeps_free():
-    assert resources._memory({"all": {"memory": {"total": 64 * GIB, "free": 20 * GIB}}}) == (64.0, 20.0)
 
 
 def test_dylans_lab21_fits_on_90_gb():
@@ -450,52 +508,6 @@ def _dylan(user=None, pool_usage=None):
     fc.user_management = _Users(user if user is not None else {"username": "admin", "admin": True, "resource_pool": None})
     fc._session = _Session({"resource_pool_usage/pool-1": pool_usage} if pool_usage else {})
     return fc
-
-
-def test_screenshot_personal_user_quota_1_is_not_a_node_limit():
-    """3.3.1 said "Won't fit ... your resource pool allows 1 nodes and 0 are running" for lab 21 (10 nodes, 76 GB)."""
-    s = resources.snapshot(_dylan())
-    assert (s["license"]["max"], s["license"]["in_use"], s["license"]["product"]) == (20, 0, "CML_Personal")
-    assert s["pool"]["assigned"] is False and s["pool"]["max"] is None
-    v = resources.verdict(s, 76, 10, headroom_gb=4)
-    assert v["level"] == "fits" and v["failed"] == [] and v["reasons"] == []
-    assert v["node_check"] == {"level": "fits", "reason": "", "note": "", "in_use": 0, "max": 20, "need": 10}
-    assert "user_max" not in s["license"]
-
-
-def test_personal_without_diagnostics_is_20_and_personal_plus_40():
-    fc = _dylan()
-    fc.diagnostics = None
-    assert resources.snapshot(fc)["license"]["max"] == 20
-    st = cml29_personal()
-    st["product_license"]["active"] = "CML_PersonalPlus"
-    assert resources._license_capacity(st)[0] == 40
-
-
-def test_assigned_pool_with_null_licenses_is_unlimited():
-    fc = _dylan({"admin": False, "resource_pool": "pool-1"},
-                {"id": "pool-1", "label": "lab users", "limit": {"licenses": None, "ram": None, "cpus": None,
-                                                                "disk_space": None, "external_connectors": None},
-                 "usage": {"licenses": 4, "ram": 8192, "cpus": 400, "disk_space": 0, "external_connectors": []}})
-    s = resources.snapshot(fc)
-    assert s["pool"]["assigned"] is True and s["pool"]["max"] is None
-    assert resources.verdict(s, 10, 10)["node_check"]["level"] == "fits"
-
-
-def test_assigned_pool_with_a_node_limit_blocks():
-    fc = _dylan({"admin": False, "resource_pool": "pool-1"},
-                {"id": "pool-1", "label": "lab users", "limit": {"licenses": 8}, "usage": {"licenses": 2}})
-    s = resources.snapshot(fc)
-    assert (s["pool"]["max"], s["pool"]["in_use"]) == (8, 2)
-    v = resources.verdict(s, 10, 10)
-    assert v["failed"] == ["nodes"] and "allows 8 nodes and 2 are in use; this lab needs 10" in v["reasons"][0]
-
-
-def test_pool_that_cannot_be_read_never_blocks():
-    fc = _dylan({"admin": False, "resource_pool": "pool-9"})     # usage GET fails
-    s = resources.snapshot(fc)
-    assert s["pool"]["assigned"] is True and s["pool"]["max"] is None and s["pool"]["error"]
-    assert resources.verdict(s, 10, 10)["level"] == "fits"
 
 
 def test_debug_dump_is_redacted_and_has_the_raw_data():

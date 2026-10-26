@@ -7,7 +7,7 @@ difficulty: 5
 platforms: [iol]
 summary: "Lab 3 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with labs 21 and 22 already in its day-0: multi-area OSPF underlay and iBGP with SS1/SS2 as route reflectors. Add the L2VPN EVPN address family, map VLANs to VNIs, bring up the NVE interface with BGP ingress replication (and learn the multicast alternative), extend two VLANs between the pods, then add a tenant VRF with an L3VNI, a distributed anycast gateway and symmetric IRB, and type-5 prefixes; configure `retain route-target all` on the spines and super spines (with what it does and does not do for BGP path hunting). Every step explains what NX-OS builds internally (EVPN route types, RD/RT, l2rib/l2route, NVE peers, MAC and host routes) and inspects it with show, event-history, debug and ethanalyzer."
 author: CML Lab Builder
-version: "3"
+version: "4"
 ram_gb: 76
 nodes:
   - name: SS1

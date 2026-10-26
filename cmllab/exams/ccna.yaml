@@ -1,0 +1,256 @@
+# CCNA 200-301 v1.1 exam topics, transcribed from Cisco's published blueprint.
+# Source: https://learningcontent.cisco.com/documents/marketing/exam-topics/200-301-CCNA-v1.1.pdf
+# Do not add or renumber objectives by hand: re-transcribe from the source.
+id: CCNA
+code: 200-301
+name: Implementing and Administering Cisco Solutions (CCNA)
+version: v1.1
+track: enterprise
+level: associate
+source: https://learningcontent.cisco.com/documents/marketing/exam-topics/200-301-CCNA-v1.1.pdf
+source_page: https://learningnetwork.cisco.com/s/ccna-exam-topics
+published: '2024-04-16'
+fetched: '2026-10-25'
+label: CCNA
+domains:
+- id: '1.0'
+  name: Network Fundamentals
+  weight: 20
+- id: '2.0'
+  name: Network Access
+  weight: 20
+- id: '3.0'
+  name: IP Connectivity
+  weight: 25
+- id: '4.0'
+  name: IP Services
+  weight: 10
+- id: '5.0'
+  name: Security Fundamentals
+  weight: 15
+- id: '6.0'
+  name: Automation and Programmability
+  weight: 10
+objectives:
+- id: '1.1'
+  text: Explain the role and function of network components
+- id: 1.1.a
+  text: Routers
+- id: 1.1.b
+  text: Layer 2 and Layer 3 switches
+- id: 1.1.c
+  text: Next-generation firewalls and IPS
+- id: 1.1.d
+  text: Access points
+- id: 1.1.e
+  text: Controllers
+- id: 1.1.f
+  text: Endpoints
+- id: 1.1.g
+  text: Servers
+- id: 1.1.h
+  text: PoE
+- id: '1.2'
+  text: Describe characteristics of network topology architectures
+- id: 1.2.a
+  text: Two-tier
+- id: 1.2.b
+  text: Three-tier
+- id: 1.2.c
+  text: Spine-leaf
+- id: 1.2.d
+  text: WAN
+- id: 1.2.e
+  text: Small office/home office (SOHO)
+- id: 1.2.f
+  text: On-premises and cloud
+- id: '1.3'
+  text: Compare physical interface and cabling types
+- id: 1.3.a
+  text: Single-mode fiber, multimode fiber, copper
+- id: 1.3.b
+  text: Connections (Ethernet shared media and point-to-point)
+- id: '1.4'
+  text: Identify interface and cable issues (collisions, errors, mismatch duplex, and/or speed)
+- id: '1.5'
+  text: Compare TCP to UDP
+- id: '1.6'
+  text: Configure and verify IPv4 addressing and subnetting
+- id: '1.7'
+  text: Describe private IPv4 addressing
+- id: '1.8'
+  text: Configure and verify IPv6 addressing and prefix
+- id: '1.9'
+  text: Describe IPv6 address types
+- id: 1.9.a
+  text: Unicast (global, unique local, and link local)
+- id: 1.9.b
+  text: Anycast
+- id: 1.9.c
+  text: Multicast
+- id: 1.9.d
+  text: Modified EUI 64
+- id: '1.10'
+  text: Verify IP parameters for Client OS (Windows, Mac OS, Linux)
+- id: '1.11'
+  text: Describe wireless principles
+- id: 1.11.a
+  text: Nonoverlapping Wi-Fi channels
+- id: 1.11.b
+  text: SSID
+- id: 1.11.c
+  text: RF
+- id: 1.11.d
+  text: Encryption
+- id: '1.12'
+  text: Explain virtualization fundamentals (server virtualization, containers, and VRFs)
+- id: '1.13'
+  text: Describe switching concepts
+- id: 1.13.a
+  text: MAC learning and aging
+- id: 1.13.b
+  text: Frame switching
+- id: 1.13.c
+  text: Frame flooding
+- id: 1.13.d
+  text: MAC address table
+- id: '2.1'
+  text: Configure and verify VLANs (normal range) spanning multiple switches
+- id: 2.1.a
+  text: Access ports (data and voice)
+- id: 2.1.b
+  text: Default VLAN
+- id: 2.1.c
+  text: InterVLAN connectivity
+- id: '2.2'
+  text: Configure and verify interswitch connectivity
+- id: 2.2.a
+  text: Trunk ports
+- id: 2.2.b
+  text: 802.1Q
+- id: 2.2.c
+  text: Native VLAN
+- id: '2.3'
+  text: Configure and verify Layer 2 discovery protocols (Cisco Discovery Protocol and LLDP)
+- id: '2.4'
+  text: Configure and verify (Layer 2/Layer 3) EtherChannel (LACP)
+- id: '2.5'
+  text: Interpret basic operations of Rapid PVST+ Spanning Tree Protocol
+- id: 2.5.a
+  text: Root port, root bridge (primary/secondary), and other port names
+- id: 2.5.b
+  text: Port states and roles
+- id: 2.5.c
+  text: PortFast
+- id: 2.5.d
+  text: Root guard, loop guard, BPDU filter, and BPDU guard
+- id: '2.6'
+  text: Describe Cisco Wireless Architectures and AP modes
+- id: '2.7'
+  text: Describe physical infrastructure connections of WLAN components (AP, WLC, access/trunk ports, and LAG)
+- id: '2.8'
+  text: Describe network device management access (Telnet, SSH, HTTP, HTTPS, console, TACACS+/RADIUS, and cloud managed)
+- id: '2.9'
+  text: Interpret the wireless LAN GUI configuration for client connectivity, such as WLAN creation, security settings, QoS profiles, and advanced settings
+- id: '3.1'
+  text: Interpret the components of routing table
+- id: 3.1.a
+  text: Routing protocol code
+- id: 3.1.b
+  text: Prefix
+- id: 3.1.c
+  text: Network mask
+- id: 3.1.d
+  text: Next hop
+- id: 3.1.e
+  text: Administrative distance
+- id: 3.1.f
+  text: Metric
+- id: 3.1.g
+  text: Gateway of last resort
+- id: '3.2'
+  text: Determine how a router makes a forwarding decision by default
+- id: 3.2.a
+  text: Longest prefix match
+- id: 3.2.b
+  text: Administrative distance
+- id: 3.2.c
+  text: Routing protocol metric
+- id: '3.3'
+  text: Configure and verify IPv4 and IPv6 static routing
+- id: 3.3.a
+  text: Default route
+- id: 3.3.b
+  text: Network route
+- id: 3.3.c
+  text: Host route
+- id: 3.3.d
+  text: Floating static
+- id: '3.4'
+  text: Configure and verify single area OSPFv2
+- id: 3.4.a
+  text: Neighbor adjacencies
+- id: 3.4.b
+  text: Point-to-point
+- id: 3.4.c
+  text: Broadcast (DR/BDR selection)
+- id: 3.4.d
+  text: Router ID
+- id: '3.5'
+  text: Describe the purpose, functions, and concepts of first hop redundancy protocols
+- id: '4.1'
+  text: Configure and verify inside source NAT using static and pools
+- id: '4.2'
+  text: Configure and verify NTP operating in a client and server mode
+- id: '4.3'
+  text: Explain the role of DHCP and DNS within the network
+- id: '4.4'
+  text: Explain the function of SNMP in network operations
+- id: '4.5'
+  text: Describe the use of syslog features, including facilities and severity levels
+- id: '4.6'
+  text: Configure and verify DHCP client and relay
+- id: '4.7'
+  text: Explain the forwarding per-hop behavior (PHB) for QoS such as classification, marking, queuing, congestion, policing, and shaping
+- id: '4.8'
+  text: Configure network devices for remote access using SSH
+- id: '4.9'
+  text: Describe the capabilities and functions of TFTP/FTP in the network
+- id: '5.1'
+  text: Define key security concepts (threats, vulnerabilities, exploits, and mitigation techniques)
+- id: '5.2'
+  text: Describe security program elements (user awareness, training, and physical access control)
+- id: '5.3'
+  text: Configure and verify device access control using local passwords
+- id: '5.4'
+  text: Describe security password policy elements, such as management, complexity, and password alternatives (multifactor authentication, certificates, and biometrics)
+- id: '5.5'
+  text: Describe IPsec remote access and site-to-site VPNs
+- id: '5.6'
+  text: Configure and verify access control lists
+- id: '5.7'
+  text: Configure and verify Layer 2 security features (DHCP snooping, dynamic ARP inspection, and port security)
+- id: '5.8'
+  text: Compare authentication, authorization, and accounting concepts
+- id: '5.9'
+  text: Describe wireless security protocols (WPA, WPA2, and WPA3)
+- id: '5.10'
+  text: Configure and verify WLAN within the GUI using WPA2 PSK
+- id: '6.1'
+  text: Explain how automation impacts network management
+- id: '6.2'
+  text: Compare traditional networks with controller-based networking
+- id: '6.3'
+  text: Describe controller-based, software defined architecture (overlay, underlay, and fabric)
+- id: 6.3.a
+  text: Separation of control plane and data plane
+- id: 6.3.b
+  text: Northbound and Southbound APIs
+- id: '6.4'
+  text: Explain AI (generative and predictive) and machine learning in network operations
+- id: '6.5'
+  text: Describe characteristics of REST-based APIs (authentication types, CRUD, HTTP verbs, and data encoding)
+- id: '6.6'
+  text: Recognize the capabilities of configuration management mechanisms such as Ansible and Terraform
+- id: '6.7'
+  text: Recognize components of JSON-encoded data

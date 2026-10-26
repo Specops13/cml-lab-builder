@@ -7,7 +7,7 @@ difficulty: 5
 platforms: [iol]
 summary: Step-by-step build of one VXLAN EVPN fabric spanning two data centers (two spine-and-leaf pods) joined by a super-spine layer - Cisco's 5-stage Clos. OSPF underlay through leaf-spine-super spine-spine-leaf, iBGP EVPN with the super spines as route reflectors, NX-OS VTEPs, VLANs 10 and 20 stretched across both DCs (optional L3VNI VRF with a distributed anycast gateway).
 author: CML Lab Builder
-version: "2"
+version: "3"
 nodes:
   - name: SS1
     kind: router

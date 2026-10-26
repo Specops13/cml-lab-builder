@@ -2,6 +2,7 @@
 id: example-eigrp-pair
 title: "Example: EIGRP between two routers"
 blueprint: ["3.2.a"]
+exams: ["ENCOR 3.2.a", "ENARSI 1.9", "CCIE-EI 1.3.a"]   # Cisco exam objectives covered (3.3.5+; see "Exam objectives")
 domain: "3.0 Infrastructure - Layer 3"
 difficulty: 1
 platforms: [iol, iosv]

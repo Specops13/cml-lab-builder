@@ -1,0 +1,175 @@
+# DCCOR 350-601 v1.2 exam topics, transcribed from Cisco's published blueprint.
+# Source: https://learningcontent.cisco.com/documents/marketing/exam-topics/350-601-DCCOR-v1.2.pdf
+# Do not add or renumber objectives by hand: re-transcribe from the source.
+id: DCCOR
+code: 350-601
+name: Implementing Cisco Data Center Core Technologies
+version: v1.2
+track: datacenter
+level: professional
+source: https://learningcontent.cisco.com/documents/marketing/exam-topics/350-601-DCCOR-v1.2.pdf
+source_page: https://learningnetwork.cisco.com/s/certification-exam-topics
+published: '2025-01-13'
+fetched: '2026-10-25'
+label: DCCOR
+domains:
+- id: '1.0'
+  name: Network
+  weight: 25
+- id: '2.0'
+  name: Compute
+  weight: 25
+- id: '3.0'
+  name: Storage Network
+  weight: 20
+- id: '4.0'
+  name: Automation and Artificial Intelligence
+  weight: 15
+- id: '5.0'
+  name: Security
+  weight: 15
+objectives:
+- id: '1.1'
+  text: Apply routing protocols
+- id: 1.1.a
+  text: OSPFv2 and OSPFv3
+- id: 1.1.b
+  text: MP-BGP
+- id: 1.1.c
+  text: PIM
+- id: 1.1.d
+  text: FHRP
+- id: '1.2'
+  text: Apply switching protocols such as RSTP+, LACP and vPC
+- id: '1.3'
+  text: Apply overlay protocols such as VXLAN EVPN
+- id: '1.4'
+  text: Apply ACI concepts
+- id: 1.4.a
+  text: Fabric setup
+- id: 1.4.b
+  text: Access policies
+- id: 1.4.c
+  text: VMM
+- id: '1.5'
+  text: Analyze packet flow (unicast, multicast, and broadcast)
+- id: '1.6'
+  text: Describe Cloud service and deployment models (NIST 800-145)
+- id: '1.7'
+  text: Describe software updates and their impacts
+- id: 1.7.a
+  text: Disruptive / nondisruptive
+- id: 1.7.b
+  text: EPLD
+- id: 1.7.c
+  text: Patches
+- id: '1.8'
+  text: Implement network configuration management
+- id: '1.9'
+  text: Implement infrastructure monitoring using traditional and AI-powered tools such as NetFlow, SPAN, and Cisco Nexus Dashboard
+- id: '1.10'
+  text: Explain network assurance concepts such as streaming telemetry
+- id: '1.11'
+  text: Describe the capabilities and features of Nexus Dashboard
+- id: '2.1'
+  text: Implement Cisco Unified Compute System Rack Servers
+- id: '2.2'
+  text: Implement Cisco Unified Compute System Blade Chassis
+- id: 2.2.a
+  text: Initial setup
+- id: 2.2.b
+  text: Infrastructure management
+- id: 2.2.c
+  text: Network management (VLANs, pools and policies, templates, QoS)
+- id: 2.2.d
+  text: Storage management (SAN connectivity, Fibre Channel zoning, VSANs, WWN pools, SAN policies, templates)
+- id: 2.2.e
+  text: Server management (Server pools and boot policies)
+- id: '2.3'
+  text: Explain UCS-X in Intersight Managed Mode
+- id: '2.4'
+  text: Describe firmware and software updates and their impacts on Blade and Rack servers
+- id: '2.5'
+  text: Implement compute configuration management (Backup and restore)
+- id: '2.6'
+  text: Implement infrastructure monitoring such as SPAN and Cisco Intersight
+- id: '3.1'
+  text: Implement Fibre Channel
+- id: 3.1.a
+  text: Switch fabric initialization
+- id: 3.1.b
+  text: Port channels
+- id: 3.1.c
+  text: FCID
+- id: 3.1.d
+  text: CFS
+- id: 3.1.e
+  text: Zoning
+- id: 3.1.f
+  text: FCNS
+- id: 3.1.g
+  text: Device alias
+- id: 3.1.h
+  text: NPV and NPIV
+- id: 3.1.i
+  text: VSAN
+- id: '3.2'
+  text: Describe network storage systems and concepts such as NFS and iSCSI
+- id: '3.3'
+  text: Describe software updates and their impacts (Disruptive/nondisruptive and EPLD)
+- id: '3.4'
+  text: Implement infrastructure monitoring using traditional and AI-powered tools such as SPAN and Cisco Nexus Dashboard
+- id: '4.1'
+  text: Implement automation and scripting tools
+- id: 4.1.a
+  text: EEM
+- id: 4.1.b
+  text: Scheduler
+- id: 4.1.c
+  text: Bash Shell and Guest Shell for NX-OS
+- id: 4.1.d
+  text: REST API (NX-API, JSON and XML encodings)
+- id: 4.1.e
+  text: On-box Python
+- id: '4.2'
+  text: Evaluate automation and orchestration technologies
+- id: 4.2.a
+  text: Ansible
+- id: 4.2.b
+  text: Python
+- id: 4.2.c
+  text: POAP
+- id: 4.2.d
+  text: Cisco Nexus Dashboard
+- id: 4.2.e
+  text: PowerShell
+- id: 4.2.f
+  text: Terraform CLI
+- id: 4.2.g
+  text: Intersight
+- id: '4.3'
+  text: Describe high-performance network enabling technologies for AI in data center infrastructure
+- id: '5.1'
+  text: Apply network security
+- id: 5.1.a
+  text: AAA and RBAC
+- id: 5.1.b
+  text: ACI contracts and microsegmentation
+- id: 5.1.c
+  text: First-hop security features
+- id: 5.1.d
+  text: Keychain authentication
+- id: 5.1.e
+  text: MACsec
+- id: '5.2'
+  text: Apply compute security
+- id: 5.2.a
+  text: AAA and RBAC
+- id: '5.3'
+  text: Apply storage security
+- id: 5.3.a
+  text: AAA and RBAC
+- id: 5.3.b
+  text: Port security
+- id: 5.3.c
+  text: Fabric binding

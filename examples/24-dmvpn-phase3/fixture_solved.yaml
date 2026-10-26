@@ -1,0 +1,114 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# DMVPN Phase 3 outputs follow the IOS XE DMVPN configuration guide and show dmvpn / show ip nhrp examples.
+# State: every step done (final state of the walkthrough).
+INET:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    HUB              Eth 0/0             165              R B   Linux Uni Eth 0/0
+    SPOKE1           Eth 0/1             162              R B   Linux Uni Eth 0/0
+    SPOKE2           Eth 0/2             159              R B   Linux Uni Eth 0/0
+    SPOKE3           Eth 0/3             156              R B   Linux Uni Eth 0/0
+
+    Total cdp entries displayed : 4
+HUB:
+  ping 198.51.100.2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 198.51.100.2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 198.51.100.6: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 198.51.100.6, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 198.51.100.10: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 198.51.100.10, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show interfaces Tunnel0: "Tunnel0 is up, line protocol is up \n  Hardware is Tunnel\n  Description: DMVPN hub (mGRE)\n \
+    \ Internet address is 172.16.0.1/24\n  MTU 9972 bytes, BW 100 Kbit/sec, DLY 50000 usec, \n     reliability 255/255, txload\
+    \ 1/255, rxload 1/255\n  Encapsulation TUNNEL, loopback not set\n  Keepalive not set\n  Tunnel linestate evaluation up\n\
+    \  Tunnel source 203.0.113.2 (Ethernet0/0)\n   Tunnel Subblocks:\n      src-track:\n         Tunnel0 source tracking subblock\
+    \ associated with Ethernet0/0\n          Set of tunnels with source Ethernet0/0, 1 member (includes iterators), on interface\
+    \ <OK>\n  Tunnel protocol/transport multi-GRE/IP\n    Key 0x18, sequencing disabled\n    Checksumming of packets disabled\n\
+    \  Tunnel TTL 255, Fast tunneling enabled\n  Tunnel transport MTU 1472 bytes\n  Tunnel transmit bandwidth 8000 (kbps)\n\
+    \  Tunnel receive bandwidth 8000 (kbps)\n  Last input 00:00:01, output never, output hang never\n"
+  show dmvpn: "Legend: Attrb --> S - Static, D - Dynamic, I - Incomplete\n        N - NATed, L - Local, X - No Socket\n  \
+    \      T1 - Route Installed, T2 - Nexthop-override, B - BGP\n        C - CTS Capable, I2 - Temporary\n        # Ent -->\
+    \ Number of NHRP entries with same NBMA peer\n        NHS Status: E --> Expecting Replies, R --> Responding, W --> Waiting\n\
+    \        UpDn Time --> Up or Down Time for a Tunnel\n==========================================================================\n\
+    Interface: Tunnel0, IPv4 NHRP Details \nType:Hub, NHRP Peers:3, \n\n # Ent  Peer NBMA Addr Peer Tunnel Add State  UpDn\
+    \ Tm Attrb\n ----- --------------- --------------- ----- -------- -----\n     1 198.51.100.2        172.16.0.11    UP\
+    \ 00:14:31     D\n     1 198.51.100.6        172.16.0.12    UP 00:14:31     D\n     1 198.51.100.10       172.16.0.13\
+    \    UP 00:14:31     D\n"
+  show ip eigrp neighbors: |
+    EIGRP-IPv4 Neighbors for AS(100)
+    H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                       (sec)         (ms)       Cnt Num
+    2   172.16.0.13             Tu0                      13 00:12:01    9  1470  0  6
+    1   172.16.0.12             Tu0                      12 00:12:04   10  1470  0  6
+    0   172.16.0.11             Tu0                      14 00:12:08    8  1470  0  7
+  show ip eigrp neighbors detail: "EIGRP-IPv4 Neighbors for AS(100)\nH   Address                 Interface              Hold\
+    \ Uptime   SRTT   RTO  Q  Seq\n                                                       (sec)         (ms)       Cnt Num\n\
+    2   172.16.0.13             Tu0                      13 00:12:00    9  1470  0  6\n   Version 23.0/2.0, Retrans: 0, Retries:\
+    \ 0, Prefixes: 1\n   Topology-ids from peer - 0 \n   Stub Peer Advertising (CONNECTED ) Routes\n   Suppressing queries\n\
+    1   172.16.0.12             Tu0                      13 00:12:01    9  1470  0  6\n   Version 23.0/2.0, Retrans: 0, Retries:\
+    \ 0, Prefixes: 1\n   Topology-ids from peer - 0 \n   Stub Peer Advertising (CONNECTED ) Routes\n   Suppressing queries\n\
+    0   172.16.0.11             Tu0                      13 00:12:02    9  1470  0  6\n   Version 23.0/2.0, Retrans: 0, Retries:\
+    \ 0, Prefixes: 1\n   Topology-ids from peer - 0 \n   Stub Peer Advertising (CONNECTED ) Routes\n   Suppressing queries\n"
+  show ip route eigrp: "Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP\n       D - EIGRP, EX -\
+    \ EIGRP external, O - OSPF, IA - OSPF inter area \n       H - NHRP, G - NHRP registered, g - NHRP registration summary\n\
+    Gateway of last resort is 203.0.113.1 to network 0.0.0.0\n\n      10.0.0.0/8 is variably subnetted, 6 subnets, 3 masks\n\
+    D        10.1.0.0/16 is a summary, 00:05:12, Null0\nD        10.1.1.0/24 [90/27008000] via 172.16.0.11, 00:12:08, Tunnel0\n\
+    D        10.1.2.0/24 [90/27008000] via 172.16.0.12, 00:12:04, Tunnel0\nD        10.1.3.0/24 [90/27008000] via 172.16.0.13,\
+    \ 00:12:01, Tunnel0\n"
+SPOKE1:
+  show dmvpn: "Legend: Attrb --> S - Static, D - Dynamic, I - Incomplete\n        N - NATed, L - Local, X - No Socket\n  \
+    \      T1 - Route Installed, T2 - Nexthop-override, B - BGP\n        C - CTS Capable, I2 - Temporary\n        # Ent -->\
+    \ Number of NHRP entries with same NBMA peer\n        NHS Status: E --> Expecting Replies, R --> Responding, W --> Waiting\n\
+    \        UpDn Time --> Up or Down Time for a Tunnel\n==========================================================================\n\
+    Interface: Tunnel0, IPv4 NHRP Details \nType:Spoke, NHRP Peers:2, \n\n # Ent  Peer NBMA Addr Peer Tunnel Add State  UpDn\
+    \ Tm Attrb\n ----- --------------- --------------- ----- -------- -----\n     1 203.0.113.2          172.16.0.1    UP\
+    \ 00:14:31     S\n     1 198.51.100.6        172.16.0.12    UP 00:14:33   DT1\n"
+  ping 10.1.3.1 source Loopback1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.1.3.1, timeout is 2 seconds:
+    Packet sent with a source address of 10.1.1.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 10.1.2.1 source Loopback1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.1.2.1, timeout is 2 seconds:
+    Packet sent with a source address of 10.1.1.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ip route nhrp: "Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP\n       D - EIGRP, EX - EIGRP\
+    \ external, O - OSPF, IA - OSPF inter area \n       H - NHRP, G - NHRP registered, g - NHRP registration summary\nGateway\
+    \ of last resort is not set\n\n      10.0.0.0/8 is variably subnetted, 5 subnets, 3 masks\nH        10.1.2.0/24 [250/1]\
+    \ via 172.16.0.12, 00:00:41, Tunnel0\n"
+SPOKE2:
+  show ip route eigrp: "Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP\n       D - EIGRP, EX -\
+    \ EIGRP external, O - OSPF, IA - OSPF inter area \n       H - NHRP, G - NHRP registered, g - NHRP registration summary\n\
+    Gateway of last resort is 198.51.100.5 to network 0.0.0.0\n\n      10.0.0.0/8 is variably subnetted, 4 subnets, 3 masks\n\
+    D        10.1.0.0/16 [90/27008000] via 172.16.0.1, 00:05:12, Tunnel0\n"
+  ping 10.1.3.1 source Loopback1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.1.3.1, timeout is 2 seconds:
+    Packet sent with a source address of 10.1.2.1
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ip route nhrp: "Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP\n       D - EIGRP, EX - EIGRP\
+    \ external, O - OSPF, IA - OSPF inter area \n       H - NHRP, G - NHRP registered, g - NHRP registration summary\nGateway\
+    \ of last resort is not set\n\n      10.0.0.0/8 is variably subnetted, 5 subnets, 3 masks\nH        10.1.3.0/24 [250/1]\
+    \ via 172.16.0.13, 00:00:41, Tunnel0\n"
+SPOKE3:
+  ping 172.16.0.1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 172.16.0.1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms

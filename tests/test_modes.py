@@ -8,6 +8,7 @@ from cmllab import catalog, config, grader, platforms, service
 from cmllab.cml import probe_console
 from cmllab.schema import Check, Lab
 from cmllab.sim import SimRunner
+from tables import run_table
 
 LAB = catalog.get("eigrp-basic")
 P = platforms.get("iol")
@@ -42,7 +43,7 @@ def test_bad_mode():
         grader.grade(LAB, SimRunner(LAB, P, True), P, mode="x")
 
 
-@pytest.mark.parametrize("cfg,ok", [
+R1_CONFIG_REGEXES_ROWS = [
     ("router eigrp 100\n network 1.1.1.1 0.0.0.0\n network 10.0.12.0 0.0.0.255\n", True),
     ("router eigrp 100\n network 1.0.0.0\n network 10.0.0.0\n", True),            # classful (IOS rewrites)
     ("router eigrp 100\n network 10.0.12.1 0.0.0.0\n network 1.1.1.1 0.0.0.0\n", True),
@@ -50,8 +51,10 @@ def test_bad_mode():
     ("router eigrp 10\n network 10.0.12.0 0.0.0.255\n network 1.1.1.1 0.0.0.0\n", False),  # wrong AS
     ("router eigrp 100\n network 10.0.13.0 0.0.0.255\n network 1.1.1.1 0.0.0.0\n", False),  # wrong subnet
     ("router eigrp 100\n network 10.0.12.0 0.0.0.255\n", False),                      # loopback missing
-])
-def test_r1_config_regexes(cfg, ok):
+]
+
+
+def _r1_config_regexes(cfg, ok):
     class Src:
         def get_config(self, d):
             return cfg
@@ -59,6 +62,10 @@ def test_r1_config_regexes(cfg, ok):
     lab.checks[:] = [c for c in lab.checks if c.mode == "live" or c.device == "R1"]
     rep = grader.grade(lab, Src(), P, mode="config")
     assert rep.passed is ok, [r.details for r in rep.results]
+
+
+def test_r1_config_regexes():
+    run_table(_r1_config_regexes, R1_CONFIG_REGEXES_ROWS)
 
 
 def test_config_check_schema():
@@ -132,29 +139,30 @@ def _server(payload: bytes):
     return srv.getsockname()[1]
 
 
-def test_probe_ssh_banner():
-    port = _server(b"SSH-2.0-OpenSSH_9.6\r\n")
-    r = probe_console("127.0.0.1", port)
-    assert r["ok"] and "SSH-2.0" in r["detail"]
+def test_probe():
+    def _probe_ssh_banner():
+        port = _server(b"SSH-2.0-OpenSSH_9.6\r\n")
+        r = probe_console("127.0.0.1", port)
+        assert r["ok"] and "SSH-2.0" in r["detail"]
 
+    def _probe_http_proxy_detected():
+        port = _server(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+        r = probe_console("127.0.0.1", port)
+        assert not r["ok"] and "TCP passthrough" in r["detail"]
 
-def test_probe_http_proxy_detected():
-    port = _server(b"HTTP/1.1 400 Bad Request\r\n\r\n")
-    r = probe_console("127.0.0.1", port)
-    assert not r["ok"] and "TCP passthrough" in r["detail"]
+    def _probe_closed_port():
+        srv = socket.socket()
+        srv.bind(("127.0.0.1", 0))
+        port = srv.getsockname()[1]
+        srv.close()
+        r = probe_console("127.0.0.1", port, timeout=1)
+        assert not r["ok"] and "failed" in r["detail"]
 
+    def _probe_no_host():
+        assert probe_console("", 22)["ok"] is False
 
-def test_probe_closed_port():
-    srv = socket.socket()
-    srv.bind(("127.0.0.1", 0))
-    port = srv.getsockname()[1]
-    srv.close()
-    r = probe_console("127.0.0.1", port, timeout=1)
-    assert not r["ok"] and "failed" in r["detail"]
-
-
-def test_probe_no_host():
-    assert probe_console("", 22)["ok"] is False
+    for case in (_probe_ssh_banner, _probe_http_proxy_detected, _probe_closed_port, _probe_no_host):
+        case()
 
 
 def test_settings_persistence(tmp_path):

@@ -42,6 +42,7 @@ def cases(entries):
             yield e, platforms.get(p)
 
 
+@pytest.mark.slow
 def test_api_task_hints_checks_and_titles(with_pack):
     for e, plat in cases(with_pack):
         s = config.Settings(cml_url="https://cml.x", username="u", password="pw", platform=plat.name)
@@ -52,6 +53,7 @@ def test_api_task_hints_checks_and_titles(with_pack):
         assert plat.long_prefix + "0/" in d["task"] or "%if" not in e.lab.task
 
 
+@pytest.mark.slow
 def test_grade_reports_rendered(with_pack):
     for e, plat in cases(with_pack):
         sol = catalog.load_solution(e.lab.id)
@@ -66,6 +68,7 @@ def test_cml_topology_rendered(with_pack):
         no_tokens(to_yaml(e.lab, plat, "CML-"), f"topology {e.lab.id} {plat.name}")
 
 
+@pytest.mark.slow
 def test_cli_task_and_list(with_pack):
     r = CliRunner()
     for e, plat in cases(with_pack):

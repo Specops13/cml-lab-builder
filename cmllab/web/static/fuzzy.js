@@ -267,10 +267,11 @@
   function nodeTags(defs) { return (defs || []).map((d) => d + " " + (NODE_ALIASES[d] || "")).join(" "); }
 
   // the library page's searchable fields (weights) for an index item (/api/library), shared with the tests
-  const LIB_FIELDS = {title: 3, id: 2.5, topics: 2.2, blueprint: 2, domain: 2, nodes: 2, aliases: 1.5, kind: 2, courses: 2, labs: 1.5, description: 1};
+  const LIB_FIELDS = {title: 3, id: 2.5, topics: 2.2, exams: 1.8, blueprint: 2, domain: 2, nodes: 2, aliases: 1.5, kind: 2, courses: 2, labs: 1.5, description: 1};
   const library = {
     FIELDS: LIB_FIELDS,
     labels: {},           // topic id -> label (the vocabulary from /api/library), set by the page
+    exams: {},            // exam-objective tag -> {label, id, topic, code} (index.exams), set by the page
 
     text(it, key) {
       switch (key) {
@@ -281,6 +282,10 @@
         case "courses": return (it.in_courses || []).length ? "In: " + it.in_courses.join(", ") : "";
         case "labs": return (it.labs || []).join(", ");
         case "topics": return (it.topics || []).map((t) => library.labels[t] || t).join(", ");
+        case "exams": {     // "ENCOR 3.2.b OSPF, CCNA 3.4 OSPF, ... 350-401": exam, objective number, topic, exam code
+          const m = (it.exams || []).map((t) => library.exams[t] || {label: t, id: "", topic: ""});
+          return m.map((e) => `${e.label} ${e.id} ${e.topic}`.trim()).concat([...new Set(m.map((e) => e.code).filter(Boolean))]).join(", ");
+        }
         default: return it[key] == null ? "" : String(it[key]);
       }
     },

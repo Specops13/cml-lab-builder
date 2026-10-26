@@ -5,6 +5,7 @@ from cmllab import catalog, grader, platforms
 from cmllab.config import Settings
 from cmllab.console import ConsoleError, SSHConsoleRunner
 from cmllab.sim import SimRunner
+from tables import run_table
 
 
 class FakeIOSChannel:
@@ -120,20 +121,26 @@ def runner_with(**chan_kw):
     return r, chans
 
 
-@pytest.mark.parametrize("kw", [
+END_TO_END_GRADING_OVER_CONSOLE_ROWS = [
     {"start_mode": "user"},
     {"start_mode": "priv"},
     {"start_mode": "config"},
     {"start_mode": "priv", "banner_dialog": True},
     {"start_mode": "priv", "require_login": True},
-])
-def test_end_to_end_grading_over_console(kw):
+]
+
+
+def _end_to_end_grading_over_console(kw):
     r, chans = runner_with(**kw)
     rep = grader.grade(LAB, r, P)
     assert rep.passed, [x.details for x in rep.results if not x.passed]
     assert {c.opened for c in chans} == {("CML-eigrp-basic", "R1", "0"), ("CML-eigrp-basic", "R2", "0")}
     assert len(chans) == 2  # one session per device, reused across checks
     r.close()
+
+
+def test_end_to_end_grading_over_console():
+    run_table(_end_to_end_grading_over_console, END_TO_END_GRADING_OVER_CONSOLE_ROWS, single=True)
 
 
 def test_output_strips_echo_and_prompt():

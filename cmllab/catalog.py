@@ -52,7 +52,15 @@ def lab_dirs(root: Path | None = None) -> list[Path]:
 def load_lab_file(path: Path) -> Lab:
     with open(path, encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
-    return Lab.model_validate(data)
+    lab = Lab.model_validate(data)
+    side = Path(path).with_name("exams.yaml")
+    if side.is_file():            # exam-objective tags (3.3.5), kept next to lab.yaml for older-app compatibility
+        from . import objectives
+        try:
+            objectives.apply(lab, objectives.read_sidecar(side.read_text(encoding="utf-8")))
+        except (ValueError, yaml.YAMLError):
+            pass                  # a broken sidecar never hides the lab; `cml-lab-builder validate` reports it
+    return lab
 
 
 def _scan(root: Path, source: str, errors: dict | None) -> dict[str, Entry]:

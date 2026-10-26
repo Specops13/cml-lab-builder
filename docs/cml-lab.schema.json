@@ -330,6 +330,15 @@
           "description": "Offer 'Apply this step for me' (push the config over the console)",
           "title": "Apply",
           "type": "boolean"
+        },
+        "exams": {
+          "default": [],
+          "description": "Exam objectives this step covers, e.g. ['ENCOR 3.2.b'] (3.3.5+; or exams.yaml `steps:`)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Exams",
+          "type": "array"
         }
       },
       "required": [
@@ -404,6 +413,15 @@
         "type": "string"
       },
       "title": "Blueprint",
+      "type": "array"
+    },
+    "exams": {
+      "default": [],
+      "description": "Cisco exam objectives covered, as '<EXAM> <objective>' from cmllab/exams/*.yaml, e.g. ['ENCOR 3.2.b', 'CCNA 3.4']. 3.3.5+ only: for packs that older apps must import, put them in exams.yaml next to lab.yaml instead",
+      "items": {
+        "type": "string"
+      },
+      "title": "Exams",
       "type": "array"
     },
     "domain": {

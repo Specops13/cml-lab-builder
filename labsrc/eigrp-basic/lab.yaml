@@ -201,3 +201,4 @@ faults:
     - ^\s+passive-interface %if0%\s*$
     hint: no passive-interface on the link to R2
     match: []
+version: "2"

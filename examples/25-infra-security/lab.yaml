@@ -1,0 +1,646 @@
+id: 25-infra-security
+type: walkthrough
+title: 'Walkthrough: Device and infrastructure security - AAA, SSH, CoPP, uRPF, IPv6 filters (IOS-XE, IOL)'
+blueprint:
+- '5.1'
+- 5.1.a
+- 5.1.b
+- '5.2'
+- 5.2.a
+- 5.2.b
+domain: 5.0 Security
+difficulty: 3
+platforms:
+- iol
+summary: Harden an edge router plane by plane - scrypt local accounts and login lockout, AAA method lists with local authorization,
+  SSH v2-only VTYs restricted by an access class, control plane policing, strict uRPF anti-spoofing and an IPv6 traffic filter,
+  each tested from a management and an untrusted user host.
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: R1
+  kind: router
+  x: 0
+  y: 0
+  config: |
+    ! Edge router you harden. Day-0: addressing, OSPF and static IPv6 routing are done; nothing is secured yet.
+    interface %if0%
+     description to R2 (core)
+     ip address 10.0.12.1 255.255.255.252
+     ipv6 address 2001:DB8:12::1/64
+     no shutdown
+    interface %if1%
+     description to ADMIN (management LAN)
+     ip address 10.0.100.1 255.255.255.0
+     no shutdown
+    interface %if2%
+     description to USER (user LAN)
+     ip address 10.0.20.1 255.255.255.0
+     ipv6 address 2001:DB8:20::1/64
+     no shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ipv6 unicast-routing
+    interface Loopback0
+     ip address 10.1.1.1 255.255.255.255
+    router ospf 1
+     router-id 1.1.1.1
+     passive-interface %if1%
+     passive-interface %if2%
+     network 10.0.12.0 0.0.0.3 area 0
+     network 10.0.100.0 0.0.0.255 area 0
+     network 10.0.20.0 0.0.0.255 area 0
+     network 10.1.1.1 0.0.0.0 area 0
+    ipv6 route 2001:DB8:2::2/128 2001:DB8:12::2
+- name: R2
+  kind: router
+  x: 250
+  y: 0
+  config: |
+    ! Core router with a protected server address on Loopback0. Fully configured at day-0 - do not change it.
+    interface %if0%
+     description to R1 (edge)
+     ip address 10.0.12.2 255.255.255.252
+     ipv6 address 2001:DB8:12::2/64
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ipv6 unicast-routing
+    interface Loopback0
+     description protected server
+     ip address 10.2.2.2 255.255.255.255
+     ipv6 address 2001:DB8:2::2/128
+    router ospf 1
+     router-id 2.2.2.2
+     network 10.0.12.0 0.0.0.3 area 0
+     network 10.2.2.2 0.0.0.0 area 0
+    ipv6 route 2001:DB8:20::/64 2001:DB8:12::1
+- name: ADMIN
+  kind: router
+  x: -250
+  y: -120
+  config: |
+    ! Network admin workstation (an IOL router used as an SSH client). Fully configured at day-0.
+    interface %if0%
+     description to R1 (management LAN)
+     ip address 10.0.100.10 255.255.255.0
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ip route 0.0.0.0 0.0.0.0 10.0.100.1
+- name: USER
+  kind: router
+  x: -250
+  y: 120
+  config: |
+    ! Untrusted user LAN host (an IOL router). Loopback66 holds a spoofed address used to test uRPF. Fully configured at day-0.
+    interface %if0%
+     description to R1 (user LAN)
+     ip address 10.0.20.10 255.255.255.0
+     ipv6 address 2001:DB8:20::10/64
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ipv6 unicast-routing
+    interface Loopback66
+     description spoofed source for the uRPF test
+     ip address 192.0.2.66 255.255.255.255
+    ip route 0.0.0.0 0.0.0.0 10.0.20.1
+    ipv6 route ::/0 2001:DB8:20::1
+links:
+- a:
+    node: R1
+    port: 0
+  b:
+    node: R2
+    port: 0
+- a:
+    node: R1
+    port: 1
+  b:
+    node: ADMIN
+    port: 0
+- a:
+    node: R1
+    port: 2
+  b:
+    node: USER
+    port: 0
+task: |
+  ## Device and infrastructure security on IOS-XE (IOL)
+
+  Harden **R1**, the edge router between an untrusted user LAN, the management LAN and the core:
+
+  | Area | What you configure on R1 |
+  |---|---|
+  | Local accounts | `admin` (privilege 15) and `helpdesk` (privilege 1), scrypt hashed secrets, password policy, login lockout |
+  | AAA | `aaa new-model`, named method lists for VTY and console, local exec authorization |
+  | Management access | SSH v2 only (2048-bit RSA), VTY limited to the management LAN 10.0.100.0/24 |
+  | CoPP | control-plane policy: routing, SSH from management, ICMP rate-limited, everything else policed |
+  | uRPF | strict unicast RPF on the user LAN interface (anti-spoofing) |
+  | IPv6 traffic filter | the user LAN may not reach the protected server 2001:DB8:2::2 |
+
+  | Device | Address |
+  |---|---|
+  | R1 | Et0/0 10.0.12.1/30, 2001:DB8:12::1/64 - Et0/1 10.0.100.1/24 - Et0/2 10.0.20.1/24, 2001:DB8:20::1/64 - Lo0 10.1.1.1 |
+  | R2 | Et0/0 10.0.12.2/30, 2001:DB8:12::2/64 - Lo0 (server) 10.2.2.2, 2001:DB8:2::2 |
+  | ADMIN | 10.0.100.10/24 (SSH client) |
+  | USER | 10.0.20.10/24, 2001:DB8:20::10/64 - Lo66 192.0.2.66 (spoofed source) |
+
+  Credentials used in this lab: `admin` / `CMLlab-Adm1n`, `helpdesk` / `CMLlab-Help1` (lab only - never reuse).
+
+  **Console safety:** the app grades over the CML console, so the console line gets its own method list
+  (`CONSOLE`, no login) - in production you would use `local` there too. Do not set an enable secret other than
+  the device enable password in the app's Settings, or grading cannot enter privileged mode.
+
+  **Resources:** 4 IOL-XE nodes, about 4 GB RAM.
+steps:
+- id: baseline
+  title: 'Baseline: what is exposed today'
+  explain: |
+    A router has three planes, and each needs its own protection:
+
+    - **Management plane** - how humans and tools log in (console, VTY/SSH, HTTP, SNMP): protected by
+      local accounts, **AAA**, SSH-only VTYs and VTY access classes.
+    - **Control plane** - packets *to* the router's CPU (OSPF hellos, SSH, pings to the router, ARP):
+      protected by **CoPP** (control plane policing) so a flood cannot starve routing.
+    - **Data plane** - transit traffic: protected by ACLs/traffic filters and anti-spoofing (**uRPF**).
+
+    Right now R1 has none of this: any VTY session is accepted over Telnet with no login configured, the CPU
+    takes any amount of ICMP, and USER can send packets with any source address. Confirm the cabling and that
+    USER reaches the server 10.2.2.2 - that must still work at the end.
+
+    Try from USER: `telnet 10.0.20.1` - with no `login`/password on the VTYs IOS refuses
+    ("Password required, but none set"), but the TCP port is open to everyone.
+  verify:
+  - device: R1
+    command: show cdp neighbors
+    expect: R2, ADMIN and USER.
+  - device: R1
+    command: show line vty 0
+    expect: Allowed input transports are telnet ssh (or all) - no restriction yet.
+  checks:
+  - id: cabling
+    description: R1 sees R2, ADMIN and USER over CDP
+    device: R1
+    command: show cdp neighbors
+    match:
+    - ^R2\s
+    - ^ADMIN\s
+    - ^USER\s
+    hint: Start the lab and wait for the nodes to boot.
+  - id: user-server-v4
+    description: USER reaches the server 10.2.2.2 (must keep working)
+    device: USER
+    command: ping 10.2.2.2
+    min_success: 60
+    hint: OSPF between R1 and R2 is pre-configured - check it is FULL.
+- id: local-users
+  title: Local accounts and password policy
+  explain: |
+    Local accounts are the fallback for every AAA design (when the TACACS+/RADIUS servers are unreachable).
+
+    - `username admin privilege 15 algorithm-type scrypt secret ...` - **type 9 (scrypt)** hash, the strongest
+      IOS option. Avoid `password` (type 7, reversible) and plain `secret` without algorithm on old releases
+      (type 5, MD5). The running config shows `secret 9 $9$...`.
+    - `helpdesk` gets privilege **1** (user EXEC: show commands only, no configuration).
+    - `security passwords min-length 10` rejects short new passwords; `service password-encryption`
+      obfuscates any remaining type-7 passwords in the config (it is *not* encryption).
+    - `login block-for 120 attempts 3 within 60` - after 3 failures in 60 s, logins are blocked for 120 s
+      ("quiet mode"); `login on-failure log` / `on-success log` send syslog messages
+      (`%SEC_LOGIN-4-LOGIN_FAILED`, `%SEC_LOGIN-5-LOGIN_SUCCESS`).
+
+    Password policy in practice (CCNA 5.4): length over complexity, no shared accounts, per-user accounts
+    with the least privilege, and MFA through a central AAA server for production.
+
+    Verify with `show running-config | include username|login` and `show login` (the lockout policy).
+  config:
+    R1: |
+      service password-encryption
+      security passwords min-length 10
+      username admin privilege 15 algorithm-type scrypt secret CMLlab-Adm1n
+      username helpdesk privilege 1 algorithm-type scrypt secret CMLlab-Help1
+      login block-for 120 attempts 3 within 60
+      login on-failure log
+      login on-success log
+  verify:
+  - device: R1
+    command: show login
+    expect: 'Router enabled to watch for login Attacks: 3 failures in 60 seconds, 120 s quiet period.'
+  checks:
+  - id: admin-scrypt
+    description: R1 has user admin (privilege 15) with a scrypt secret
+    device: R1
+    mode: config
+    match:
+    - '^username admin privilege 15 (algorithm-type scrypt secret|secret 9) '
+    hint: username admin privilege 15 algorithm-type scrypt secret CMLlab-Adm1n
+  - id: helpdesk-priv1
+    description: R1 has user helpdesk with privilege 1
+    device: R1
+    mode: config
+    match:
+    - '^username helpdesk (privilege 1 )?(algorithm-type scrypt secret|secret 9) '
+    hint: username helpdesk privilege 1 algorithm-type scrypt secret CMLlab-Help1
+  - id: login-block
+    description: R1 locks out logins after 3 failures
+    device: R1
+    mode: config
+    match:
+    - ^login block-for 120 attempts 3 within 60
+    - ^security passwords min-length 10
+    hint: login block-for 120 attempts 3 within 60 and security passwords min-length 10
+- id: aaa
+  title: AAA with named method lists
+  explain: |
+    `aaa new-model` switches the router from per-line `login`/`password` to AAA **method lists**.
+    A method list is an ordered list of sources tried until one *answers* (a reject is final; only an
+    unreachable server falls through to the next method):
+
+    ```
+    aaa authentication login VTY group ISE local   ! production: TACACS+/RADIUS first, local as fallback
+    aaa authentication login VTY local             ! this lab: no AAA server
+    ```
+
+    - **Authentication** (`aaa authentication login`) - who are you. `default` applies to every line
+      without an explicit list; named lists (`VTY`, `CONSOLE`) are applied per line with
+      `login authentication <list>`.
+    - **Authorization** (`aaa authorization exec VTY local`) - what you get: the privilege level stored with
+      the user (admin lands in `#`, helpdesk in `>`). Applied with `authorization exec VTY` on the VTYs.
+    - **Accounting** (`aaa accounting exec ... start-stop group ...`) - what you did; needs a server.
+
+    Order matters on a live router: define the `CONSOLE` list (method `none` - see the task note) and apply it
+    to `line con 0` **before** creating `default local`, otherwise the console falls under the default list.
+
+    With TACACS+ you would add `tacacs server ISE` / `address ipv4 ...` / `key ...` and
+    `aaa group server tacacs+ ISE`; RADIUS is similar (`radius server`). TACACS+ (TCP 49) encrypts the whole
+    payload and separates authorization per command; RADIUS (UDP 1812/1813) only hides the password.
+
+    Troubleshooting: `debug aaa authentication` and `debug aaa authorization` show which list and method
+    were used and the result; `show aaa sessions` and `show aaa method-lists all`.
+  config:
+    R1: |
+      aaa new-model
+      aaa authentication login CONSOLE none
+      line con 0
+       login authentication CONSOLE
+      aaa authentication login default local
+      aaa authentication login VTY local
+      aaa authorization exec VTY local
+      aaa session-id common
+  verify:
+  - device: R1
+    command: show aaa method-lists authentication
+    expect: Lists default (LOCAL), CONSOLE (NONE) and VTY (LOCAL).
+  checks:
+  - id: aaa-lists
+    description: R1 has the VTY, CONSOLE and default login method lists
+    device: R1
+    command: show aaa method-lists authentication
+    match:
+    - name=VTY valid=TRUE .*LOCAL
+    - name=CONSOLE valid=TRUE .*NONE
+    - name=default valid=TRUE .*LOCAL
+    hint: aaa new-model, then aaa authentication login CONSOLE none / default local / VTY local.
+  - id: aaa-cfg
+    description: R1 runs AAA with local exec authorization for the VTYs
+    device: R1
+    mode: config
+    match:
+    - ^aaa new-model
+    - ^aaa authorization exec VTY local
+    - ^line con 0(\n[ \t].*)*\n[ \t]+login authentication CONSOLE
+    hint: aaa authorization exec VTY local, and login authentication CONSOLE under line con 0.
+- id: ssh-vty
+  title: SSH v2 only, from the management LAN only
+  explain: |
+    SSH needs a hostname, a domain name and an RSA key pair (the key is named `<hostname>.<domain>`):
+
+    - `ip domain name lab.local` + `crypto key generate rsa general-keys modulus 2048` (at least 2048 bits;
+      the key generation enables the SSH server).
+    - `ip ssh version 2` - refuse SSH v1; `time-out 60` and `authentication-retries 3` limit idle handshakes.
+    - VTY lines: `transport input ssh` (no Telnet), `login authentication VTY`, `authorization exec VTY`,
+      `exec-timeout 10 0`, and `access-class MGMT-ONLY in` - a **standard ACL** on the line that checks the
+      *source* of incoming sessions (only 10.0.100.0/24). `deny any log` records refused attempts.
+
+    Test it:
+    - from ADMIN: `ssh -l admin 10.0.100.1` (password `CMLlab-Adm1n`) - you land at `R1#`; log in as `helpdesk`
+      and you land at `R1>`.
+    - from USER: `ssh -l admin 10.0.20.1` - the connection is refused by the access-class; `telnet 10.0.20.1`
+      is refused because Telnet is no longer a VTY transport.
+    - three wrong passwords in a minute trigger the `login block-for` quiet period (`show login`).
+
+    While logged in from ADMIN, `show users` and `show ssh` on R1 list the session (version 2.0, cipher).
+    Troubleshooting: `debug ip ssh` shows the key exchange and authentication; `show access-lists MGMT-ONLY`
+    counts matches.
+  config:
+    R1: |
+      ip domain name lab.local
+      crypto key generate rsa general-keys modulus 2048
+      ip ssh version 2
+      ip ssh time-out 60
+      ip ssh authentication-retries 3
+      ip access-list standard MGMT-ONLY
+       remark VTY access from the management LAN only
+       permit 10.0.100.0 0.0.0.255
+       deny any log
+      line vty 0 4
+       access-class MGMT-ONLY in
+       login authentication VTY
+       authorization exec VTY
+       transport input ssh
+       exec-timeout 10 0
+  verify:
+  - device: R1
+    command: show ip ssh
+    expect: SSH Enabled - version 2.0, modulus 2048 bits.
+  - device: R1
+    command: show access-lists MGMT-ONLY
+    expect: permit 10.0.100.0, wildcard bits 0.0.0.255 (matches after the ADMIN login).
+  checks:
+  - id: ssh-v2
+    description: R1 runs SSH version 2 with a 2048-bit key
+    device: R1
+    command: show ip ssh
+    match:
+    - SSH Enabled - version 2\.0
+    - 'Modulus Size ?: 2048 bits'
+    hint: ip domain name lab.local, crypto key generate rsa general-keys modulus 2048, ip ssh version 2.
+  - id: vty-ssh-only
+    description: R1 VTYs accept only SSH from the management LAN with the VTY lists
+    device: R1
+    mode: config
+    match:
+    - ^line vty 0 4(\n[ \t].*)*\n[ \t]+access-class MGMT-ONLY in
+    - ^line vty 0 4(\n[ \t].*)*\n[ \t]+transport input ssh
+    - ^line vty 0 4(\n[ \t].*)*\n[ \t]+login authentication VTY
+    hint: 'Under line vty 0 4: access-class MGMT-ONLY in, login authentication VTY, authorization exec VTY, transport input
+      ssh.'
+  - id: mgmt-acl
+    description: MGMT-ONLY permits only the management LAN
+    device: R1
+    command: show access-lists MGMT-ONLY
+    match:
+    - permit 10\.0\.100\.0, wildcard bits 0\.0\.0\.255
+    hint: ip access-list standard MGMT-ONLY / permit 10.0.100.0 0.0.0.255 / deny any log
+- id: copp
+  title: Control plane policing (CoPP)
+  explain: |
+    CoPP is an MQC policy attached to the **control-plane** (the CPU's "interface"). Everything punted to the
+    CPU is classified and policed; transit traffic is never affected.
+
+    Build it in three layers:
+
+    1. **ACLs** describe the traffic: `COPP-ROUTING` (OSPF), `COPP-MGMT` (SSH from the management LAN),
+       `COPP-ICMP` (pings to the router).
+    2. **class-maps** match the ACLs; `class-default` catches everything else.
+    3. **policy-map COPP** polices each class: routing is never dropped (`exceed-action transmit` - just
+       measured), SSH 128 kbps, ICMP 32 kbps, anything else 64 kbps. `control-plane` /
+       `service-policy input COPP` applies it.
+
+    Design rules: classify routing and management first and generously, keep unknown traffic small, and
+    **monitor before you drop** (start with `exceed-action transmit` everywhere and watch the counters).
+    Note an ACL `deny` in a CoPP class means "not in this class", not "drop".
+
+    Test: from USER, `ping 10.0.20.1 repeat 2000 size 1400 timeout 0` - then
+    `show policy-map control-plane class COPP-ICMP` shows *exceeded* packets (dropped), while OSPF stays FULL.
+
+    Troubleshooting: if OSPF or SSH breaks after CoPP, `show policy-map control-plane` shows which class
+    the packets fell into (wrong ACL -> class-default drops).
+  config:
+    R1: |
+      ip access-list extended COPP-ROUTING
+       permit ospf any any
+      ip access-list extended COPP-MGMT
+       permit tcp 10.0.100.0 0.0.0.255 any eq 22
+      ip access-list extended COPP-ICMP
+       permit icmp any any
+      class-map match-all COPP-ROUTING
+       match access-group name COPP-ROUTING
+      class-map match-all COPP-MGMT
+       match access-group name COPP-MGMT
+      class-map match-all COPP-ICMP
+       match access-group name COPP-ICMP
+      policy-map COPP
+       class COPP-ROUTING
+        police 256000 conform-action transmit exceed-action transmit
+       class COPP-MGMT
+        police 128000 conform-action transmit exceed-action drop
+       class COPP-ICMP
+        police 32000 conform-action transmit exceed-action drop
+       class class-default
+        police 64000 conform-action transmit exceed-action drop
+      control-plane
+       service-policy input COPP
+  verify:
+  - device: R1
+    command: show policy-map control-plane
+    expect: 'Service-policy input: COPP with the four classes and their police counters.'
+  - device: R1
+    command: show ip ospf neighbor
+    expect: 2.2.2.2 still FULL.
+  checks:
+  - id: copp-applied
+    description: R1 has the COPP policy on the control plane
+    device: R1
+    command: show policy-map control-plane
+    match:
+    - 'Service-policy input: COPP'
+    - 'Class-map: COPP-ROUTING'
+    - 'Class-map: COPP-MGMT'
+    - 'Class-map: COPP-ICMP'
+    - cir 32000 bps
+    hint: control-plane / service-policy input COPP, with the three classes and class-default policed.
+  - id: copp-ospf-ok
+    description: OSPF with R2 is still FULL under CoPP
+    device: R1
+    command: show ip ospf neighbor
+    match:
+    - 2\.2\.2\.2\s+\d+\s+FULL
+    hint: OSPF (protocol 89) must be in COPP-ROUTING and transmitted on exceed.
+  - id: copp-cfg
+    description: ICMP to the CPU is policed at 32 kbps and dropped above
+    device: R1
+    mode: config
+    match:
+    - ^policy-map COPP(\n[ \t].*)*\n[ \t]+class COPP-ICMP\n[ \t]+police (cir )?32000 conform-action transmit\s+exceed-action
+      drop
+    hint: class COPP-ICMP / police 32000 conform-action transmit exceed-action drop
+- id: urpf
+  title: Anti-spoofing with unicast RPF
+  explain: |
+    **Unicast Reverse Path Forwarding** checks the *source* address of every packet received on an
+    interface against the routing table (CEF FIB):
+
+    - **strict** (`reachable-via rx`) - the best route back to the source must point out of the *same*
+      interface. Right for single-homed edges such as a user LAN.
+    - **loose** (`reachable-via any`) - any route to the source is enough (only drops unroutable/bogon
+      sources). Use it with asymmetric routing (multihomed ISP edges).
+
+    Enable strict uRPF on R1's user LAN interface, then spoof from USER:
+
+    `ping 10.2.2.2 source Loopback66` (source 192.0.2.66 - R1 has no route to it via Et0/2)
+
+    The ping fails either way (R2 cannot answer 192.0.2.66), but now R1 drops the packets at ingress
+    instead of forwarding spoofed traffic: `show ip interface %if2%` counts **verification drops** and
+    `show ip traffic` shows *unicast RPF* drops. A normal `ping 10.2.2.2` from USER still works.
+
+    Optional: `ip verify unicast source reachable-via rx 100` lets an ACL (100) permit or log exceptions;
+    IPv6 has the same feature (`ipv6 verify unicast source reachable-via rx`).
+    Troubleshooting: `debug ip cef drops rpf` shows each dropped packet (use with care).
+  config:
+    R1: |
+      interface %if2%
+       ip verify unicast source reachable-via rx
+  verify:
+  - device: USER
+    command: ping 10.2.2.2 source Loopback66
+    expect: Fails - and R1 counts verification drops.
+  - device: R1
+    command: show ip interface %if2%
+    expect: IP verify source reachable-via RX, N verification drops.
+  checks:
+  - id: urpf-on
+    description: Strict uRPF is enabled on R1's user LAN interface
+    device: R1
+    command: show ip interface %if2%
+    match:
+    - IP verify source reachable-via RX
+    hint: interface %if2% / ip verify unicast source reachable-via rx
+  - id: urpf-legit-ok
+    description: Legitimate USER traffic still reaches the server
+    device: USER
+    command: ping 10.2.2.2
+    min_success: 60
+    hint: Strict uRPF only drops sources not routed back out of Et0/2.
+- id: ipv6-filter
+  title: IPv6 traffic filter
+  explain: |
+    IPv6 ACLs are always **named** and are applied to an interface with `ipv6 traffic-filter <name> in|out`
+    (not `ip access-group`). Two differences from IPv4 matter:
+
+    - The implicit end of every IPv6 ACL is: `permit icmp any any nd-na`, `permit icmp any any nd-ns`,
+      `deny ipv6 any any`. Neighbor Discovery is allowed *unless you add your own `deny ipv6 any any`* -
+      then add the ND permits explicitly or neighbors break.
+    - Prefixes use `/len` and `host`, no wildcard masks.
+
+    Here the user LAN may reach everything except the protected server 2001:DB8:2::2. Apply the filter
+    inbound on R1's user LAN interface (closest to the source).
+
+    Test from USER: `ping 2001:DB8:2::2` fails (R1 answers with ICMPv6 "administratively prohibited" -
+    the ping shows `A`), while `ping 2001:DB8:12::2` still works. `show ipv6 access-list USER-V6-IN`
+    counts the matches; the `log` keyword produces `%IPV6_ACL-6-ACCESSLOGP` messages.
+
+    Troubleshooting: `debug ipv6 packet access-list USER-V6-IN detail` (with an ACL!) or a conditional debug
+    (`debug condition interface %if2%`) keeps the output small.
+  config:
+    R1: |
+      ipv6 access-list USER-V6-IN
+       remark the user LAN may not reach the protected server
+       deny ipv6 2001:DB8:20::/64 host 2001:DB8:2::2 log
+       permit ipv6 any any
+      interface %if2%
+       ipv6 traffic-filter USER-V6-IN in
+  verify:
+  - device: USER
+    command: ping 2001:DB8:2::2
+    expect: Fails (AAAAA).
+  - device: R1
+    command: show ipv6 access-list USER-V6-IN
+    expect: The deny line with matches.
+  checks:
+  - id: v6-server-blocked
+    description: USER can no longer reach the protected IPv6 server
+    device: USER
+    command: ping 2001:DB8:2::2
+    match:
+    - Success rate is 0 percent
+    hint: ipv6 traffic-filter USER-V6-IN in on R1 %if2%, with the deny line for host 2001:DB8:2::2.
+  - id: v6-other-ok
+    description: USER still reaches other IPv6 destinations (R2 link address)
+    device: USER
+    command: ping 2001:DB8:12::2
+    min_success: 60
+    hint: The ACL must end with permit ipv6 any any.
+  - id: v6-acl-hits
+    description: The USER-V6-IN deny entry has matches
+    device: R1
+    command: show ipv6 access-list USER-V6-IN
+    match:
+    - deny ipv6 2001:DB8:20::/64 host 2001:DB8:2::2 log \(\d+ match
+    - permit ipv6 any any
+    hint: Ping 2001:DB8:2::2 from USER first so the deny entry counts matches.
+- id: audit
+  title: 'Optional: audit and troubleshoot the hardening'
+  explain: |
+    Walk the three planes again and prove each control works:
+
+    | Plane | Test | Evidence on R1 |
+    |---|---|---|
+    | Management | SSH from ADMIN as admin and helpdesk; SSH/Telnet from USER | `show users`, `show ssh`, `show logging` (LOGIN_SUCCESS / FAILED), `show access-lists MGMT-ONLY` |
+    | Management | 3 bad passwords from ADMIN | `show login` - quiet mode, `show login failures` |
+    | Control | ICMP flood from USER | `show policy-map control-plane class COPP-ICMP` - exceeded counter |
+    | Data | spoofed ping from USER Lo66 | `show ip interface %if2%` verification drops |
+    | Data | IPv6 ping to the server | `show ipv6 access-list USER-V6-IN` |
+
+    Debugs for each (always narrow them and `undebug all` afterwards): `debug aaa authentication`,
+    `debug ip ssh`, `debug ip cef drops rpf`, `debug ipv6 packet access-list USER-V6-IN`; with
+    `debug condition` you can restrict output to one interface or peer.
+
+    Further hardening on a production box: `no ip http server`, `no service pad`, `no cdp run` on edge
+    interfaces, SNMPv3 with authPriv, `ntp authenticate`, and a management VRF.
+  verify:
+  - device: R1
+    command: show logging
+    expect: '%SEC_LOGIN-5-LOGIN_SUCCESS / -4-LOGIN_FAILED entries from your SSH tests.'
+solution_summary: |
+  **What you built:** a hardened edge router, layer by layer.
+
+  - **Accounts**: `admin` (priv 15) and `helpdesk` (priv 1) with scrypt (type 9) secrets,
+    `security passwords min-length 10`, `login block-for 120 attempts 3 within 60`, login success/failure logging.
+  - **AAA**: `aaa new-model`; login lists `default` and `VTY` = local, `CONSOLE` = none (applied to `line con 0`
+    first, so grading keeps working); `aaa authorization exec VTY local` gives each user their privilege level.
+  - **Management access**: RSA 2048 key, `ip ssh version 2`; VTYs `transport input ssh`,
+    `access-class MGMT-ONLY in` (only 10.0.100.0/24), `login authentication VTY`, `authorization exec VTY`.
+  - **CoPP**: `policy-map COPP` on the `control-plane` - OSPF measured but never dropped, SSH from management
+    128 kbps, ICMP 32 kbps, class-default 64 kbps.
+  - **uRPF**: `ip verify unicast source reachable-via rx` on the user LAN - spoofed sources (192.0.2.66) are
+    dropped at ingress, legitimate traffic passes.
+  - **IPv6 traffic filter**: `USER-V6-IN` inbound on the user LAN blocks 2001:DB8:2::2 and permits the rest
+    (remember the implicit ND permits before the implicit deny).
+
+  **Where to go next**: a TACACS+/RADIUS server group with local fallback and command authorization,
+  SNMPv3 and syslog to a collector (the *NTP / syslog / SNMP* lab), IPv6 first-hop security (RA guard,
+  DHCPv6 guard) on a switch, and management-plane protection (`management-interface ... allow ssh`).

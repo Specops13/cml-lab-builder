@@ -1,0 +1,43 @@
+# Cisco exam objectives this lab covers: '<EXAM> <objective>' from cmllab/exams/*.yaml
+lab:
+- ENCOR 2.3.b
+- ENCOR 1.1.a
+- CCNA 1.2.c
+- DCCOR 1.3
+- DCCOR 1.1.a
+- DCCOR 1.1.b
+- CCIE-DC 3.1.b
+steps:
+  fabric:
+  - ENCOR 1.1.a
+  - CCNA 1.2.c
+  - DCCOR 1.3
+  underlay-links:
+  - CCNA 1.6
+  - CCIE-EI 1.2.k
+  underlay-ospf:
+  - ENCOR 3.2.b
+  - DCCOR 1.1.a
+  - CCIE-DC 1.2.a.ii
+  - CCIE-DC 1.2.a.iii
+  features:
+  - DCCOR 1.3
+  bgp-evpn:
+  - DCCOR 1.1.b
+  - CCIE-DC 1.2.c.ii
+  - CCIE-DC 1.2.c.iii
+  vlan-vni:
+  - ENCOR 2.3.b
+  - DCCOR 1.3
+  - CCIE-DC 3.1.b
+  nve:
+  - ENCOR 2.3.b
+  - DCCOR 1.3
+  - CCIE-DC 3.1.b
+  extend-vlans:
+  - DCCOR 1.5
+  - CCIE-DC 3.1.b
+  l3vni-irb:
+  - DCCOR 1.3
+  - CCIE-DC 3.1.b
+  - CCIE-DC 6.3.c

@@ -212,6 +212,33 @@ def prompt(description: str = typer.Argument("", help="what lab you want; empty 
 
 
 @app.command()
+def exams(exam: str = typer.Argument("", help="exam id (CCNA, ENCOR, ENARSI, DCCOR, CCIE-EI, CCIE-DC); empty = list the exams"),
+          coverage: bool = typer.Option(False, "--coverage", help="per objective, the labs in your catalog that cover it"),
+          suggest: str = typer.Option("", "--suggest", help="suggest tags for blueprint items, e.g. '3.2.b,3.3.c'"),
+          track: str = typer.Option("ENCOR", help="track of the blueprint items for --suggest")):
+    """Exam blueprints (Cisco exam topics) for tagging labs: list exams/objectives, coverage, tag suggestions."""
+    from . import objectives
+    reg = objectives.registry()
+    if suggest:
+        for t in objectives.suggest(suggest.split(","), track, limit=40):
+            d = objectives.describe(t, reg)
+            typer.echo(f"{t:20} {d['topic']:24} {d['text'][:90]}")
+        return
+    if not exam:
+        for e in reg.values():
+            typer.echo(f"{e.id:8} {e.code:10} {e.version:6} {len(e.objectives):4} objectives  {e.name}  ({e.source})")
+        return
+    e = reg.get(exam.upper())
+    if not e:
+        raise typer.BadParameter(f"unknown exam {exam!r}; one of {', '.join(reg)}")
+    cov = objectives.coverage([en.lab for en in catalog.entries().values()], reg)[e.id] if coverage else {}
+    for oid, text in e.objectives.items():
+        labs = cov.get(oid)
+        extra = "" if not coverage or labs is None else ("  <- " + ", ".join(labs) if labs else "  (no lab)")
+        typer.echo(f"{oid:12} {objectives.short_topic(e, oid):24} {text[:80]}{extra}")
+
+
+@app.command()
 def docs(out: Path = typer.Option(Path("docs"), "-o", "--out", help="output folder")):
     """Write docs/: AI-PROMPT.md, cml-lab.schema.json, LAB-AUTHORING.md, example-lab.yaml."""
     from .prompt import docs_files

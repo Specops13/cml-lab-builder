@@ -7,7 +7,7 @@ difficulty: 4
 platforms: [iol]
 summary: "Lab 1 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Six Nexus 9000v in Cisco's standard 5-stage Clos (2 super spines with no link between them, a spine and a leaf per pod). Build the OSPF underlay step by step: area 0 on the super-spine layer, one area per pod with the spines as ABRs, IP-unnumbered point-to-point fabric links that borrow loopback0, inter-area summarization with discard routes, an NSSA with a translated external, and a stub area. Every step explains what NX-OS does under the hood and how to inspect it with show, event-history and filtered debugs written to a debug logfile."
 author: CML Lab Builder
-version: "3"
+version: "4"
 ram_gb: 76
 nodes:
   - name: SS1

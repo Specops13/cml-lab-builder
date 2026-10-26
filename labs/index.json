@@ -3,12 +3,12 @@
   "items": [
     {
       "file": "01-vlan-trunk-stp.encorlab",
-      "sha256": "7496f7eb3b75075301f4af9b81c55fb73f874103388488255cdc120348aee1c3",
-      "size": 4526,
+      "sha256": "47c327efdc706af6976e3140bbdf44a093950ccccc085886cfed93158e74e504",
+      "size": 4796,
       "kind": "lab",
       "id": "01-vlan-trunk-stp",
       "title": "VLANs, 802.1Q Trunks and Rapid PVST+",
-      "version": "1",
+      "version": "2",
       "description": "Build VLANs, static 802.1Q trunks with a native VLAN, and control the Rapid PVST+ root bridge.",
       "blueprint": [
         "3.1.a",
@@ -28,6 +28,25 @@
         "ioll2-xe",
         "iosvl2"
       ],
+      "exams": [
+        "ENCOR 3.1.a",
+        "ENCOR 3.1.c",
+        "CCNA 2.1",
+        "CCNA 2.1.c",
+        "CCNA 2.2.a",
+        "CCNA 2.2.b",
+        "CCNA 2.2.c",
+        "CCNA 2.5",
+        "CCNA 2.5.a",
+        "CCNA 2.5.b",
+        "CCIE-EI 1.1.c.ii",
+        "CCIE-EI 1.1.c.iii",
+        "CCIE-EI 1.1.e.i",
+        "CCIE-EI 1.1.e.ii",
+        "DCCOR 1.2",
+        "CCIE-DC 1.1.b",
+        "CCIE-DC 1.1.d.i"
+      ],
       "topics": [
         "switching",
         "challenge",
@@ -36,12 +55,12 @@
     },
     {
       "file": "02-etherchannel.encorlab",
-      "sha256": "984d3d970a4386db617555d0c07cbec8590c0b2f8ae6761f054598fdcc1152ea",
-      "size": 4200,
+      "sha256": "c9de6cc77c2dd484dbb4f4c7af14ed8941dc3d892cd066b5f4754e6e4657d42a",
+      "size": 4456,
       "kind": "lab",
       "id": "02-etherchannel",
       "title": "EtherChannel with LACP and PAgP",
-      "version": "1",
+      "version": "2",
       "description": "Bundle parallel links into an LACP trunk port-channel and a PAgP access port-channel.",
       "blueprint": [
         "3.1.b"
@@ -60,6 +79,19 @@
         "ioll2-xe",
         "iosvl2"
       ],
+      "exams": [
+        "ENCOR 3.1.b",
+        "ENCOR 3.1.a",
+        "CCNA 2.4",
+        "CCNA 2.1.a",
+        "CCNA 2.2.a",
+        "CCIE-EI 1.1.d.i",
+        "CCIE-EI 1.1.c.i",
+        "CCIE-EI 1.1.c.ii",
+        "DCCOR 1.2",
+        "CCIE-DC 1.1.a.ii",
+        "CCIE-DC 1.1.b"
+      ],
       "topics": [
         "switching",
         "challenge",
@@ -68,12 +100,12 @@
     },
     {
       "file": "03-ospf-multiarea.encorlab",
-      "sha256": "b053c79895b13892903e4374d61423d35b962d1badb99d0b8f33afeb55343d1c",
-      "size": 4396,
+      "sha256": "a0b2beccc785093fb43b3dd63bacdea76ae782bffb6262cccbaf53170edebd23",
+      "size": 4670,
       "kind": "lab",
       "id": "03-ospf-multiarea",
       "title": "OSPFv2 Multi-Area, Stub Area and Summarization",
-      "version": "1",
+      "version": "2",
       "description": "Build a three-area OSPFv2 design with point-to-point links, a stub area and inter-area summarization.",
       "blueprint": [
         "3.2.b"
@@ -92,6 +124,23 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 3.2.b",
+        "CCNA 3.4",
+        "CCNA 3.4.a",
+        "CCNA 3.4.b",
+        "ENARSI 1.5",
+        "ENARSI 1.10.b",
+        "ENARSI 1.10.c.i",
+        "ENARSI 1.10.c.ii",
+        "ENARSI 1.10.c.iii",
+        "CCIE-EI 1.4.a",
+        "CCIE-EI 1.4.c",
+        "DCCOR 1.1.a",
+        "CCIE-DC 1.2.a.ii",
+        "CCIE-DC 1.2.a.iii",
+        "CCIE-DC 1.2.a.v"
+      ],
       "topics": [
         "ospf",
         "challenge",
@@ -100,12 +149,12 @@
     },
     {
       "file": "04-eigrp-named.encorlab",
-      "sha256": "8e8718d423c5d0dda1b398d9e7408cbfb72dccaf726b79460b5aa1133990e1e4",
-      "size": 3795,
+      "sha256": "36e31c28e1dc31eff7b30e8a149faf3c06ba06bc87fe067bd34042a9917e047e",
+      "size": 4038,
       "kind": "lab",
       "id": "04-eigrp-named",
       "title": "EIGRP Named Mode, Authentication and Stub",
-      "version": "1",
+      "version": "2",
       "description": "Configure EIGRP named mode with MD5 authentication, a stub router and passive loopbacks.",
       "blueprint": [
         "3.2.a"
@@ -124,6 +173,16 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 3.2.a",
+        "ENARSI 1.9",
+        "ENARSI 1.9.b",
+        "ENARSI 1.9.d",
+        "CCIE-EI 1.3.a",
+        "CCIE-EI 1.3.d",
+        "CCIE-EI 1.3.e.iii",
+        "CCIE-EI 1.2.i"
+      ],
       "topics": [
         "eigrp",
         "challenge",
@@ -132,12 +191,12 @@
     },
     {
       "file": "05-bgp-ebgp-ibgp.encorlab",
-      "sha256": "7364ba7205c98ad8b40df5303c7e3019196a941ec0a6a75035ce0d1dd14488c4",
-      "size": 4046,
+      "sha256": "49bf9f9092784569390058fd478f3cdb598145b19ceed31b98619acc7a4fc872",
+      "size": 4301,
       "kind": "lab",
       "id": "05-bgp-ebgp-ibgp",
       "title": "BGP - eBGP and iBGP with next-hop-self",
-      "version": "1",
+      "version": "2",
       "description": "Peer three autonomous systems, run iBGP between loopbacks over OSPF, fix the next-hop problem and advertise prefixes.",
       "blueprint": [
         "3.2.c"
@@ -156,6 +215,17 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 3.2.c",
+        "ENARSI 1.11",
+        "ENARSI 1.11.b",
+        "ENARSI 1.11.c",
+        "CCIE-EI 1.5.a",
+        "CCIE-EI 1.5.b.ii",
+        "DCCOR 1.1.b",
+        "CCIE-DC 1.2.c.i",
+        "CCIE-DC 1.2.c.ii"
+      ],
       "topics": [
         "bgp",
         "ospf",
@@ -165,12 +235,12 @@
     },
     {
       "file": "06-hsrp.encorlab",
-      "sha256": "3def19d3206adf807a67fca6f5e29e03f97569fbfcb72ef689a17153411ce14c",
-      "size": 3788,
+      "sha256": "ded061e1241bcd6d3a3d0adc3e75ce038f7373fba9a5115a646069aa64a6b7ab",
+      "size": 4036,
       "kind": "lab",
       "id": "06-hsrp",
       "title": "HSRPv2 First-Hop Redundancy with Object Tracking",
-      "version": "1",
+      "version": "2",
       "description": "Provide a redundant default gateway with HSRP version 2, priority, preemption and interface tracking.",
       "blueprint": [
         "3.3.c"
@@ -191,6 +261,15 @@
         "iosv",
         "iosvl2"
       ],
+      "exams": [
+        "ENCOR 3.3.c",
+        "ENCOR 1.1.b",
+        "CCNA 3.5",
+        "CCIE-EI 4.5.a.i",
+        "CCIE-EI 4.6.b",
+        "DCCOR 1.1.d",
+        "CCIE-DC 1.2.e"
+      ],
       "topics": [
         "fhrp",
         "challenge",
@@ -199,12 +278,12 @@
     },
     {
       "file": "07-acl-nat.encorlab",
-      "sha256": "7b76643fceaebd5d31ec870e69089d1bd8b0c1af91b5b174b99cb1c448d9d133",
-      "size": 4113,
+      "sha256": "1d03c27fdd443bec80f55a500400b599cc51d0eca670fffe676b20b74731ccb0",
+      "size": 4363,
       "kind": "lab",
       "id": "07-acl-nat",
       "title": "ACLs, PAT and Static NAT",
-      "version": "1",
+      "version": "2",
       "description": "Translate a private LAN with PAT, publish an internal host with static NAT and filter Telnet with a named extended ACL.",
       "blueprint": [
         "3.3.b",
@@ -224,6 +303,16 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 3.3.b",
+        "ENCOR 5.2.a",
+        "CCNA 4.1",
+        "CCNA 5.6",
+        "ENARSI 3.2.a",
+        "CCIE-EI 4.5.d.i",
+        "CCIE-EI 4.5.d.ii",
+        "CCIE-EI 4.2.b.ii"
+      ],
       "topics": [
         "security",
         "ip-services",
@@ -233,12 +322,12 @@
     },
     {
       "file": "08-vrf-lite.encorlab",
-      "sha256": "78b927fbdc60ee4e1fb7d73c500a2e6f85c5a12bacc6dbdef9bd8a0aa4f052dc",
-      "size": 3538,
+      "sha256": "f99a33e3425a469e7ae76cb3ed084f9e931e902cb160ea5f17710077f68122f2",
+      "size": 3774,
       "kind": "lab",
       "id": "08-vrf-lite",
       "title": "VRF-Lite with Overlapping Customer Addressing",
-      "version": "2",
+      "version": "3",
       "description": "Separate two customers with identical addressing on one router using VRF-lite and per-VRF static routing.",
       "blueprint": [
         "2.2.a"
@@ -257,6 +346,15 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 2.2.a",
+        "CCNA 1.12",
+        "ENARSI 1.7",
+        "CCIE-EI 1.2.d",
+        "CCIE-EI 1.2.e",
+        "CCIE-EI 1.2.b",
+        "CCIE-DC 3.2.a"
+      ],
       "topics": [
         "vrf",
         "challenge",
@@ -265,12 +363,12 @@
     },
     {
       "file": "09-gre-ipsec.encorlab",
-      "sha256": "9806fb68a916fac1afc4b0e968b991d1a268c81deb73d3155f27d663bce779fb",
-      "size": 4541,
+      "sha256": "1be277434f5a4b6b26f0d1eb49a49e83f1ff923ca7dc4c829159358fb4d96fbe",
+      "size": 4782,
       "kind": "lab",
       "id": "09-gre-ipsec",
       "title": "GRE over IPsec with OSPF",
-      "version": "1",
+      "version": "2",
       "description": "Build a GRE tunnel between two sites across an ISP, run OSPF over it, and protect it with an IPsec profile.",
       "blueprint": [
         "2.2.b"
@@ -289,6 +387,14 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 2.2.b",
+        "CCNA 5.5",
+        "CCIE-EI 3.1",
+        "ENARSI 2.3.a",
+        "ENARSI 2.3.c",
+        "CCIE-EI 1.4.a"
+      ],
       "topics": [
         "tunnels",
         "security",
@@ -298,12 +404,12 @@
     },
     {
       "file": "10-ntp-syslog-snmp.encorlab",
-      "sha256": "71b4dcf40412e70a86ea9f110a3dda479ea3449a4b6592d684c1a09625cfc370",
-      "size": 4104,
+      "sha256": "f22598f5a00087671083ab7495319691cd18bdbf82951ef92284af5754352c8a",
+      "size": 4378,
       "kind": "lab",
       "id": "10-ntp-syslog-snmp",
       "title": "NTP, Syslog, SNMPv3 and IP SLA",
-      "version": "1",
+      "version": "2",
       "description": "Build an authenticated NTP hierarchy, remote syslog with timestamps, an SNMPv3 authPriv user and an ICMP IP SLA probe.",
       "blueprint": [
         "3.3.a",
@@ -324,6 +430,25 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 3.3.a",
+        "ENCOR 4.1",
+        "ENCOR 4.4",
+        "CCNA 4.2",
+        "CCNA 4.4",
+        "CCNA 4.5",
+        "ENARSI 4.2",
+        "ENARSI 4.3",
+        "ENARSI 4.5",
+        "CCIE-EI 4.5.b.i",
+        "CCIE-EI 4.3.b",
+        "CCIE-EI 4.3.c.i",
+        "CCIE-EI 4.3.c.iii",
+        "CCIE-EI 4.6.a",
+        "CCIE-DC 6.4.c",
+        "CCIE-DC 6.4.d",
+        "CCIE-DC 6.4.f"
+      ],
       "topics": [
         "assurance",
         "ip-services",
@@ -333,12 +458,12 @@
     },
     {
       "file": "11-ipsla-tracking.encorlab",
-      "sha256": "d31e8d0f47e7c3ef48913ebbd7847189c9f8beba11a2a2154bb685dbc9c108f2",
-      "size": 5228,
+      "sha256": "77ef46fce0e3ced7b803c6334a91a18174cbd243d3b332847cea3e78e5887c0f",
+      "size": 5479,
       "kind": "lab",
       "id": "11-ipsla-tracking",
       "title": "IP SLA Reachability Tracking with HSRP Failover",
-      "version": "1",
+      "version": "2",
       "description": "Detect an upstream outage that keeps the link up with an IP SLA probe, then withdraw the static default route and fail HSRP over to the backup router.",
       "blueprint": [
         "4.4",
@@ -360,6 +485,17 @@
         "iosv",
         "iosvl2"
       ],
+      "exams": [
+        "ENCOR 4.4",
+        "ENCOR 3.3.c",
+        "CCNA 3.5",
+        "CCNA 3.3.a",
+        "ENARSI 4.5",
+        "CCIE-EI 4.6.a",
+        "CCIE-EI 4.6.b",
+        "CCIE-EI 4.5.a.i",
+        "CCIE-EI 1.2.b"
+      ],
       "topics": [
         "assurance",
         "fhrp",
@@ -369,12 +505,12 @@
     },
     {
       "file": "12-pbr.encorlab",
-      "sha256": "768d63631aebaf6972525cb181ed403c41edd12909c48b7eb37c2ec10b6a658e",
-      "size": 4249,
+      "sha256": "1983a3de3ce94fadff4f230361ba92b48560b27c7c8f281fd2bf0bb56b6161a0",
+      "size": 4485,
       "kind": "lab",
       "id": "12-pbr",
       "title": "Policy-Based Routing for a Second ISP",
-      "version": "1",
+      "version": "2",
       "description": "Send Engineering's traffic out a second ISP with a route-map and ip policy, while everyone else follows the default route.",
       "blueprint": [
         "3.2.d"
@@ -393,6 +529,13 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 3.2.d",
+        "ENARSI 1.6",
+        "ENARSI 1.2",
+        "CCIE-EI 1.2.c",
+        "CCIE-DC 6.3.a"
+      ],
       "topics": [
         "routing-policy",
         "challenge",
@@ -401,12 +544,12 @@
     },
     {
       "file": "13-redistribution.encorlab",
-      "sha256": "c94081cb4d021184dd36fcea5e31abe06de3a90bd8c2c18aa2295996b8696747",
-      "size": 4631,
+      "sha256": "5630a0aa86acdbf62771313ab0b15d10fec55a77a048b40c77aaef5bde75cc86",
+      "size": 4877,
       "kind": "lab",
       "id": "13-redistribution",
       "title": "Mutual OSPF/EIGRP Redistribution with Route Tags",
-      "version": "1",
+      "version": "2",
       "description": "Redistribute between OSPF and EIGRP at two border routers, using route-maps that tag routes and filter them on the tag to prevent feedback loops.",
       "blueprint": [
         "3.2.a",
@@ -426,6 +569,18 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 3.2.a",
+        "ENCOR 3.2.b",
+        "ENARSI 1.1",
+        "ENARSI 1.2",
+        "ENARSI 1.3",
+        "ENARSI 1.4",
+        "CCIE-EI 1.2.a",
+        "CCIE-EI 1.2.g",
+        "CCIE-EI 1.2.h",
+        "CCIE-DC 1.2.a.vi"
+      ],
       "topics": [
         "routing-policy",
         "ospf",
@@ -436,12 +591,12 @@
     },
     {
       "file": "14-multicast-pim-sm.encorlab",
-      "sha256": "9b3f0f5cde620916c77389b73e5aad0201510effcd727d920194556a89be6e87",
-      "size": 6210,
+      "sha256": "54e3c3a0e5ec8a138de59e400f1250c10798907d260c68f336b1cd0f2b4edfa8",
+      "size": 6463,
       "kind": "lab",
       "id": "14-multicast-pim-sm",
       "title": "Multicast: PIM Sparse Mode with a Static RP",
-      "version": "1",
+      "version": "2",
       "description": "Enable IP multicast routing and PIM sparse mode on three routers, point them at a static RP, join a receiver with IGMP and verify the shared tree, the source tree and the RPF check.",
       "blueprint": [
         "3.3.d"
@@ -460,6 +615,18 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 3.3.d",
+        "CCIE-EI 1.6.b",
+        "CCIE-EI 1.6.c.i",
+        "CCIE-EI 1.6.c.ii",
+        "CCIE-EI 1.6.c.iii",
+        "CCIE-EI 1.6.a.i",
+        "DCCOR 1.1.c",
+        "DCCOR 1.5",
+        "CCIE-DC 1.3.a.i",
+        "CCIE-DC 1.3.a.iii"
+      ],
       "topics": [
         "multicast",
         "challenge",
@@ -468,12 +635,12 @@
     },
     {
       "file": "15-multicast-bsr-ssm.encorlab",
-      "sha256": "ba36a69aec5abd10e844ac82c51a25358c5c72371e7b0bcc0d3bffd24e7d9db5",
-      "size": 6425,
+      "sha256": "723e96e9a21a35b8ec0598c41f0496707d40b23b14bdfdf415aacebc811bae5d",
+      "size": 6676,
       "kind": "lab",
       "id": "15-multicast-bsr-ssm",
       "title": "Multicast: BSR RP Election, IGMPv3 and SSM",
-      "version": "1",
+      "version": "2",
       "description": "Replace static RPs with a Bootstrap Router (BSR) election between two candidates, run IGMPv3 at the receiver edge and add a source-specific multicast (SSM) channel that needs no RP at all.",
       "blueprint": [
         "3.3.d"
@@ -492,6 +659,18 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 3.3.d",
+        "CCIE-EI 1.6.a.i",
+        "CCIE-EI 1.6.c.i",
+        "CCIE-EI 1.6.c.ii",
+        "CCIE-EI 1.6.c.iii",
+        "CCIE-EI 1.6.c.iv",
+        "DCCOR 1.1.c",
+        "CCIE-DC 1.3.a.i",
+        "CCIE-DC 1.3.a.iii",
+        "CCIE-DC 1.3.b.i"
+      ],
       "topics": [
         "multicast",
         "challenge",
@@ -500,12 +679,12 @@
     },
     {
       "file": "16-mpls-ldp.encorlab",
-      "sha256": "c6bbe8b76526929c657bbcbaf4be26676cce6fcc43563c8b6c117a38700f4e43",
-      "size": 5446,
+      "sha256": "c85f8550b3dcabce353f03842f2f028f93d31d86d6dda7ec98623c0d8028f9ed",
+      "size": 5680,
       "kind": "lab",
       "id": "16-mpls-ldp",
       "title": "MPLS: LDP Label Distribution in the Core",
-      "version": "1",
+      "version": "2",
       "description": "Turn an OSPF core into an MPLS core with LDP, pin the LDP router ID to a reachable loopback, and read label bindings, the forwarding table, penultimate-hop popping and an LSP ping.",
       "blueprint": [
         "2.2"
@@ -524,6 +703,14 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 2.2",
+        "ENARSI 2.1",
+        "CCIE-EI 3.2.a.i",
+        "CCIE-EI 3.2.a.ii",
+        "CCIE-EI 3.2.a.iii",
+        "CCIE-EI 1.4.a"
+      ],
       "topics": [
         "mpls",
         "challenge",
@@ -532,12 +719,12 @@
     },
     {
       "file": "17-mpls-l3vpn.encorlab",
-      "sha256": "45cbf27a6c4892862b88719d33c8e0a54e2f847eeedaf1ce962541d5d8a5e473",
-      "size": 6342,
+      "sha256": "457cf70ba12fb81a7b73977d77d69ca6842c97eb61e61d312ae587ab3083e566",
+      "size": 6607,
       "kind": "lab",
       "id": "17-mpls-l3vpn",
       "title": "MPLS L3VPN: VRFs and MP-BGP VPNv4 (advanced)",
-      "version": "1",
+      "version": "2",
       "description": "Build a basic MPLS Layer 3 VPN over an existing LDP core - customer VRF with RD and route targets on both PEs, an iBGP VPNv4 session between the PE loopbacks, and eBGP to the customer sites inside the VRF.",
       "blueprint": [
         "2.2",
@@ -557,6 +744,19 @@
         "iol-xe",
         "iosv"
       ],
+      "exams": [
+        "ENCOR 2.2",
+        "ENCOR 2.2.a",
+        "ENARSI 2.1",
+        "ENARSI 2.2",
+        "ENARSI 1.11.a",
+        "CCIE-EI 3.2.a.ii",
+        "CCIE-EI 3.2.b.i",
+        "CCIE-EI 3.2.b.ii",
+        "CCIE-EI 1.2.e",
+        "DCCOR 1.1.b",
+        "CCIE-DC 6.3.d"
+      ],
       "topics": [
         "mpls",
         "vrf",
@@ -567,12 +767,12 @@
     },
     {
       "file": "18-evpn-vxlan.encorlab",
-      "sha256": "6dcf39201e4bd249afaa16f0c11e4dd290dd50974b6af68bb4c584ed53c85669",
-      "size": 14546,
+      "sha256": "2e51a02cfdb713c63d64a3d0e25fc3802965029852e5da1d7a7bf7f21c356e38",
+      "size": 14927,
       "kind": "lab",
       "id": "18-evpn-vxlan",
       "title": "Walkthrough: BGP EVPN VXLAN spine-and-leaf (NX-OS 9000v)",
-      "version": "2",
+      "version": "3",
       "description": "Step-by-step build of a VXLAN EVPN fabric - OSPF underlay, iBGP EVPN with the spines as route reflectors, NVE/VTEPs with ingress replication, and VLANs 10 and 20 stretched across both leaves (optional L3VNI with an anycast gateway).",
       "blueprint": [
         "2.3",
@@ -593,6 +793,24 @@
         "iosv",
         "nxosv9000"
       ],
+      "exams": [
+        "ENCOR 2.3.b",
+        "ENCOR 1.1.a",
+        "CCNA 1.2.c",
+        "DCCOR 1.3",
+        "DCCOR 1.1.a",
+        "DCCOR 1.1.b",
+        "CCIE-DC 3.1.b",
+        "CCNA 1.6",
+        "CCIE-EI 1.2.k",
+        "ENCOR 3.2.b",
+        "CCIE-DC 1.2.a.ii",
+        "CCIE-DC 1.2.a.iii",
+        "CCIE-DC 1.2.c.ii",
+        "CCIE-DC 1.2.c.iii",
+        "DCCOR 1.5",
+        "CCIE-DC 6.3.c"
+      ],
       "topics": [
         "evpn-vxlan",
         "data-center",
@@ -603,12 +821,12 @@
     },
     {
       "file": "19-evpn-mpls.encorlab",
-      "sha256": "0f3f9563824dd1e7db9127fd34fbd4ea750eda84d491a490f30ccc6f11ef4c67",
-      "size": 13633,
+      "sha256": "791782d6bc3ec9bc348f2e0d4987b19127ab1ff52f11993cedbd49acfb20590a",
+      "size": 13952,
       "kind": "lab",
       "id": "19-evpn-mpls",
       "title": "Walkthrough: BGP EVPN over MPLS (IOS-XE, IOL)",
-      "version": "2",
+      "version": "3",
       "description": "Step-by-step build of an EVPN over MPLS service provider core - OSPF and LDP in the core, iBGP l2vpn evpn through a route reflector, VLAN-based EVIs with bridge domains stretching VLANs 10 and 20 across three sites, route type 2/3 verification (optional EVPN-VPWS point-to-point service).",
       "blueprint": [
         "2.2",
@@ -626,6 +844,18 @@
       "node_types": [
         "iol-xe"
       ],
+      "exams": [
+        "ENCOR 2.2",
+        "ENARSI 2.1",
+        "DCCOR 1.1.b",
+        "CCIE-EI 3.2.a.i",
+        "CCIE-EI 3.2.a.ii",
+        "CCIE-EI 1.5.e.i",
+        "ENCOR 3.2.b",
+        "CCIE-EI 1.4.a",
+        "CCIE-EI 1.5.a",
+        "CCIE-EI 3.2.a.iii"
+      ],
       "topics": [
         "evpn-vxlan",
         "mpls",
@@ -636,12 +866,12 @@
     },
     {
       "file": "20-evpn-vxlan-superspine.encorlab",
-      "sha256": "9fe7351f5a20acf1f175cd4e2eb47579ebe778a63811f2c766fe22bc5fed7efd",
-      "size": 16392,
+      "sha256": "c5d6e214cd58605e24402d5c7168554668b96e7ff2d48b885bb8df7fc58539de",
+      "size": 16756,
       "kind": "lab",
       "id": "20-evpn-vxlan-superspine",
       "title": "Walkthrough: BGP EVPN VXLAN across two data centers with super spines (5-stage Clos)",
-      "version": "2",
+      "version": "3",
       "description": "Step-by-step build of one VXLAN EVPN fabric spanning two data centers (two spine-and-leaf pods) joined by a super-spine layer - Cisco's 5-stage Clos. OSPF underlay through leaf-spine-super spine-spine-leaf, iBGP EVPN with the super spines as route reflectors, NX-OS VTEPs, VLANs 10 and 20 stretched across both DCs (optional L3VNI VRF with a distributed anycast gateway).",
       "blueprint": [
         "2.3",
@@ -660,6 +890,23 @@
         "iol-xe",
         "nxosv9000"
       ],
+      "exams": [
+        "ENCOR 2.3.b",
+        "ENCOR 1.1.a",
+        "CCNA 1.2.c",
+        "DCCOR 1.3",
+        "DCCOR 1.1.b",
+        "CCIE-DC 3.1.b",
+        "CCIE-DC 1.2.c.iii",
+        "CCIE-DC 2.1.d",
+        "ENCOR 3.2.b",
+        "DCCOR 1.1.a",
+        "CCIE-DC 1.2.a.ii",
+        "CCIE-DC 1.2.c.ii",
+        "CCIE-EI 1.5.e.i",
+        "DCCOR 1.5",
+        "CCIE-DC 6.3.c"
+      ],
       "topics": [
         "evpn-vxlan",
         "data-center",
@@ -670,12 +917,12 @@
     },
     {
       "file": "21-nxos-ospf-multiarea.encorlab",
-      "sha256": "e8da1dcb239bf66fd98f919c043f369a06379a93098a406948eb498f2998690f",
-      "size": 25127,
+      "sha256": "58059e21a740a0329d255c4e9db5b876ac6758adde48ce7e10aff655499867f3",
+      "size": 25587,
       "kind": "lab",
       "id": "21-nxos-ospf-multiarea",
       "title": "NX-OS study path 1/3: OSPF multi-area on a super-spine Clos, with deep debug inspection",
-      "version": "3",
+      "version": "4",
       "description": "Lab 1 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Six Nexus 9000v in Cisco's standard 5-stage Clos (2 super spines with no link between them, a spine and a leaf per pod). Build the OSPF underlay step by step: area 0 on the super-spine layer, one area per pod with the spines as ABRs, IP-unnumbered point-to-point fabric links that borrow loopback0, inter-area summarization with discard routes, an NSSA with a translated external, and a stub area. Every step explains what NX-OS does under the hood and how to inspect it with show, event-history and filtered debugs written to a debug logfile.",
       "blueprint": [
         "3.2.b"
@@ -693,6 +940,38 @@
         "iol-xe",
         "nxosv9000"
       ],
+      "exams": [
+        "ENCOR 3.2.b",
+        "ENCOR 3.2.a",
+        "CCNA 3.4",
+        "ENARSI 1.10.c",
+        "ENARSI 1.5",
+        "DCCOR 1.1.a",
+        "CCIE-DC 1.2.a.iii",
+        "CCIE-DC 1.2.a.iv",
+        "CCIE-DC 1.2.a.v",
+        "CCIE-EI 1.4.c",
+        "ENCOR 1.1.a",
+        "CCNA 1.2.c",
+        "CCIE-DC 2.1.d",
+        "CCIE-EI 1.2.k",
+        "CCNA 1.6",
+        "CCNA 3.4.a",
+        "CCNA 3.4.d",
+        "CCIE-DC 1.2.a.ii",
+        "ENCOR 4.1",
+        "ENARSI 1.10.c.iii",
+        "CCIE-EI 1.4.e.i",
+        "CCNA 3.4.b",
+        "CCNA 3.4.c",
+        "ENARSI 1.10.c.i",
+        "ENARSI 1.10.c.ii",
+        "CCIE-DC 1.2.a.vi",
+        "CCIE-EI 1.4.f.ii",
+        "CCNA 3.1",
+        "DCCOR 1.5",
+        "ENARSI 1.10.b"
+      ],
       "topics": [
         "ospf",
         "data-center",
@@ -702,12 +981,12 @@
     },
     {
       "file": "22-nxos-bgp-over-ospf.encorlab",
-      "sha256": "8e9b5c67118947eef3502e843a2695fe09669ada722971f01f7ea5ef33807c30",
-      "size": 19936,
+      "sha256": "f256d9ee70b97f38c0e249e880dc751083f1fe1b76ec88ec54a439967817378c",
+      "size": 20361,
       "kind": "lab",
       "id": "22-nxos-bgp-over-ospf",
       "title": "NX-OS study path 2/3: iBGP over OSPF with super-spine route reflectors, with deep debug inspection",
-      "version": "3",
+      "version": "4",
       "description": "Lab 2 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with lab 21's finished multi-area OSPF underlay already in its day-0. Build iBGP AS 65000 on top: SS1/SS2 as route reflectors with peer templates, loopback peering, prefix advertisement, best-path selection between two reflected copies, the BGP-free-core problem and its fix, optional policy with communities and local preference, plus eBGP and BFD design discussions. Every step explains the BGP internals and inspects them with show, event-history and filtered debugs in a debug logfile.",
       "blueprint": [
         "3.2.c"
@@ -725,6 +1004,32 @@
         "iol-xe",
         "nxosv9000"
       ],
+      "exams": [
+        "ENCOR 3.2.c",
+        "ENARSI 1.11",
+        "ENARSI 1.11.d",
+        "DCCOR 1.1.b",
+        "CCIE-DC 1.2.c.ii",
+        "CCIE-DC 1.2.c.iii",
+        "CCIE-DC 1.2.c.iv",
+        "CCIE-EI 1.5.e.i",
+        "DCCOR 1.1.a",
+        "CCIE-DC 1.2.a.ii",
+        "CCIE-EI 1.5.a.i",
+        "ENARSI 1.11.b",
+        "ENCOR 4.1",
+        "CCIE-EI 1.5.a",
+        "CCIE-EI 1.5.b.i",
+        "ENARSI 1.11.c",
+        "CCIE-DC 1.2.c.i",
+        "CCIE-EI 1.5.b.ii",
+        "ENARSI 1.11.e",
+        "ENARSI 1.2",
+        "CCIE-EI 1.5.c.i",
+        "CCIE-EI 1.5.c.iv",
+        "ENARSI 1.8",
+        "CCIE-EI 1.5.a.iii"
+      ],
       "topics": [
         "bgp",
         "ospf",
@@ -735,12 +1040,12 @@
     },
     {
       "file": "23-nxos-evpn-vxlan.encorlab",
-      "sha256": "bb6bd3fd891811d5fa6546d63e44c377044449a5b1f57abce54d98d0f075585e",
-      "size": 26219,
+      "sha256": "302371e7016a041161370733cb9920d7073285a5110269598a3766f42657b8aa",
+      "size": 26656,
       "kind": "lab",
       "id": "23-nxos-evpn-vxlan",
       "title": "NX-OS study path 3/3: BGP EVPN VXLAN over iBGP and OSPF (L2VNI, L3VNI, anycast gateway), with deep debug inspection",
-      "version": "3",
+      "version": "4",
       "description": "Lab 3 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with labs 21 and 22 already in its day-0: multi-area OSPF underlay and iBGP with SS1/SS2 as route reflectors. Add the L2VPN EVPN address family, map VLANs to VNIs, bring up the NVE interface with BGP ingress replication (and learn the multicast alternative), extend two VLANs between the pods, then add a tenant VRF with an L3VNI, a distributed anycast gateway and symmetric IRB, and type-5 prefixes; configure `retain route-target all` on the spines and super spines (with what it does and does not do for BGP path hunting). Every step explains what NX-OS builds internally (EVPN route types, RD/RT, l2rib/l2route, NVE peers, MAC and host routes) and inspects it with show, event-history, debug and ethanalyzer.",
       "blueprint": [
         "2.3",
@@ -759,12 +1064,203 @@
         "iol-xe",
         "nxosv9000"
       ],
+      "exams": [
+        "ENCOR 2.3.b",
+        "DCCOR 1.3",
+        "DCCOR 1.1.b",
+        "CCIE-DC 3.1.b",
+        "CCIE-DC 6.3.c",
+        "CCIE-DC 6.3.d",
+        "DCCOR 1.1.a",
+        "CCIE-DC 1.2.c.iii",
+        "CCNA 2.1.a",
+        "CCNA 2.5.c",
+        "CCIE-DC 1.1.d.i",
+        "DCCOR 1.5",
+        "CCNA 1.13.d",
+        "DCCOR 1.1.c",
+        "DCCOR 1.1.d",
+        "CCIE-DC 1.2.e",
+        "CCIE-DC 1.2.c.vii",
+        "ENCOR 4.1"
+      ],
       "topics": [
         "evpn-vxlan",
         "bgp",
         "data-center",
         "walkthrough",
         "encor"
+      ]
+    },
+    {
+      "file": "24-dmvpn-phase3.encorlab",
+      "sha256": "ee3e53a3a481a777b6afdd1623e9d480760d31fcfb324913df2d89424b5e1ffd",
+      "size": 12120,
+      "kind": "lab",
+      "id": "24-dmvpn-phase3",
+      "title": "Walkthrough: DMVPN Phase 3 with NHRP and EIGRP (IOS-XE, IOL)",
+      "version": "1",
+      "description": "Step-by-step build of a single-hub DMVPN Phase 3 cloud over a simulated Internet - mGRE tunnels, dynamic NHRP registration, EIGRP stub spokes over the tunnel, NHRP redirect/shortcut spoke-to-spoke tunnels and hub summarisation, plus a fault-finding guide.",
+      "blueprint": [
+        "2.2.b"
+      ],
+      "nodes": 5,
+      "difficulty": 4,
+      "type": "walkthrough",
+      "ram_gb": 5.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ],
+      "exams": [
+        "ENARSI 2.3",
+        "ENARSI 2.3.a",
+        "ENARSI 2.3.b",
+        "ENARSI 2.3.d",
+        "ENARSI 2.3.e",
+        "ENCOR 2.2.b",
+        "CCIE-EI 3.3",
+        "CCIE-EI 3.3.a.i",
+        "ENARSI 1.9",
+        "CCIE-EI 1.3.e.i",
+        "CCNA 3.3.a",
+        "ENARSI 1.3",
+        "CCIE-EI 1.3.a",
+        "ENARSI 1.5",
+        "ENCOR 4.1",
+        "ENARSI 4.3"
+      ],
+      "topics": [
+        "tunnels",
+        "eigrp",
+        "walkthrough",
+        "encor"
+      ]
+    },
+    {
+      "file": "25-infra-security.encorlab",
+      "sha256": "f6e38f868061a1410c36e390a119e8155dc8af5d3e120d7afd3ae4627c946e62",
+      "size": 12571,
+      "kind": "lab",
+      "id": "25-infra-security",
+      "title": "Walkthrough: Device and infrastructure security - AAA, SSH, CoPP, uRPF, IPv6 filters (IOS-XE, IOL)",
+      "version": "1",
+      "description": "Harden an edge router plane by plane - scrypt local accounts and login lockout, AAA method lists with local authorization, SSH v2-only VTYs restricted by an access class, control plane policing, strict uRPF anti-spoofing and an IPv6 traffic filter, each tested from a management and an untrusted user host.",
+      "blueprint": [
+        "5.1",
+        "5.1.a",
+        "5.1.b",
+        "5.2",
+        "5.2.a",
+        "5.2.b"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "walkthrough",
+      "ram_gb": 4.0,
+      "domain": "5.0 Security",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ],
+      "exams": [
+        "ENCOR 5.1",
+        "ENCOR 5.1.a",
+        "ENCOR 5.1.b",
+        "ENCOR 5.2.a",
+        "ENCOR 5.2.b",
+        "ENARSI 3.1",
+        "ENARSI 3.2.b",
+        "ENARSI 3.2.c",
+        "ENARSI 3.3",
+        "ENARSI 4.1.a",
+        "ENARSI 4.1.b",
+        "CCNA 2.8",
+        "CCNA 4.8",
+        "CCNA 5.3",
+        "CCNA 5.4",
+        "CCNA 5.6",
+        "CCIE-EI 4.1.a",
+        "CCIE-EI 4.1.b",
+        "CCIE-EI 4.2.b.i",
+        "CCIE-EI 4.2.b.ii",
+        "CCIE-EI 4.2.b.iii",
+        "CCIE-EI 4.3.a.i",
+        "CCIE-EI 4.3.a.ii",
+        "ENCOR 4.1",
+        "ENARSI 4.3"
+      ],
+      "topics": [
+        "security",
+        "walkthrough",
+        "encor"
+      ]
+    },
+    {
+      "file": "26-ipv6-dhcp-services.encorlab",
+      "sha256": "c44c489893382e587b87905734582036c6bc657d1ba1fbdb9a0c52a0972cbe24",
+      "size": 12681,
+      "kind": "lab",
+      "id": "26-ipv6-dhcp-services",
+      "title": "Walkthrough: IPv6 addressing, static routing and DHCP services (IOS-XE, IOL)",
+      "version": "1",
+      "description": "Dual-stack build covering IPv6 address types (GUA, ULA, link-local, EUI-64, multicast), IPv4/IPv6 default, network, host and floating static routes, DHCPv4 server, relay and client, SLAAC with stateless DHCPv6, stateful DHCPv6 through a relay and DHCPv6 prefix delegation to a branch router.",
+      "blueprint": [
+        "1.8",
+        "1.9",
+        "3.3",
+        "4.6"
+      ],
+      "nodes": 5,
+      "difficulty": 3,
+      "type": "walkthrough",
+      "ram_gb": 5.0,
+      "domain": "IP connectivity and IP services",
+      "track": "CCNA",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ],
+      "exams": [
+        "CCNA 1.8",
+        "CCNA 1.9",
+        "CCNA 1.9.a",
+        "CCNA 1.9.b",
+        "CCNA 1.9.c",
+        "CCNA 1.9.d",
+        "CCNA 3.3",
+        "CCNA 3.3.a",
+        "CCNA 3.3.b",
+        "CCNA 3.3.c",
+        "CCNA 3.3.d",
+        "CCNA 3.2.b",
+        "CCNA 4.3",
+        "CCNA 4.6",
+        "ENARSI 4.4",
+        "ENARSI 1.1",
+        "CCIE-EI 1.2.a",
+        "CCIE-EI 1.2.b",
+        "CCIE-EI 4.5.c",
+        "CCIE-EI 4.5.c.i",
+        "CCIE-EI 4.5.c.ii",
+        "CCIE-EI 4.5.c.iii",
+        "CCIE-EI 4.5.c.iv",
+        "CCIE-EI 4.5.c.v"
+      ],
+      "topics": [
+        "ipv6",
+        "ip-services",
+        "walkthrough",
+        "ccna"
       ]
     },
     {
@@ -790,12 +1286,12 @@
     },
     {
       "file": "eigrp-basic.encorlab",
-      "sha256": "0422969f170dd6d0811a20a669a28b90590075367915185233dbc608f864d47e",
-      "size": 3294,
+      "sha256": "6bd80c4b3784a978f593f64ce500f9e62371342b960f09d7063aaea2d7b763a4",
+      "size": 3524,
       "kind": "lab",
       "id": "eigrp-basic",
       "title": "EIGRP Basic Adjacency (AS 100)",
-      "version": "1",
+      "version": "2",
       "description": "Two routers, one link. Bring up EIGRP AS 100 so each router learns the other's loopback.",
       "blueprint": [
         "3.2.a"
@@ -813,6 +1309,13 @@
       "node_types": [
         "iol-xe",
         "iosv"
+      ],
+      "exams": [
+        "ENCOR 3.2.a",
+        "ENARSI 1.9",
+        "ENARSI 1.9.b",
+        "CCIE-EI 1.3.a",
+        "CCIE-EI 1.3.d"
       ],
       "topics": [
         "eigrp",
@@ -873,8 +1376,8 @@
     },
     {
       "file": "nxos-study-path.encorcourse",
-      "sha256": "969557ea3b3a53a67ff3c598f73fba05634085ab6e9f9391a01adea5c96e6dd0",
-      "size": 72342,
+      "sha256": "e2498db387cd3b0c6f8bb1e27f95f0a42c66998546d62958aafcf2f2813789e3",
+      "size": 73822,
       "kind": "course",
       "id": "nxos-study-path",
       "title": "NX-OS study path: OSPF \u2192 BGP \u2192 BGP EVPN VXLAN",
@@ -895,8 +1398,8 @@
     },
     {
       "file": "ospf-mastery.encorcourse",
-      "sha256": "7488afe8f55e2f7cb4fe04351cb85a1b40638cf781d4e48ffd7b0d2cd0496e0f",
-      "size": 14011,
+      "sha256": "7c63aa63778960a83eb05d635d23bfa50bfabfbfcd16e0ca58b49aff67289f10",
+      "size": 14603,
       "kind": "course",
       "id": "ospf-mastery",
       "title": "OSPF Mastery: design, areas and troubleshooting",
@@ -915,12 +1418,12 @@
     },
     {
       "file": "ospf-multiarea-stub.encorlab",
-      "sha256": "b7cbccf21e601413752820eb2f567e3f689171d1e3654ad9b89f5b6e330a4672",
-      "size": 4930,
+      "sha256": "d971dd3a82fbff2eaa5161cef2322cd5b78aea3c3943b5a7b4bdfbbe8e162141",
+      "size": 5175,
       "kind": "lab",
       "id": "ospf-multiarea-stub",
       "title": "OSPFv2 Multi-Area: ABR Summarization and a Totally Stubby Area",
-      "version": "2",
+      "version": "3",
       "description": "Four routers, two OSPF areas. Make area 1 totally stubby and summarize its loopbacks to a /22 on the ABR.",
       "blueprint": [
         "3.2.b"
@@ -937,6 +1440,16 @@
       "node_types": [
         "iol-xe"
       ],
+      "exams": [
+        "ENCOR 3.2.b",
+        "ENARSI 1.5",
+        "ENARSI 1.10.c.ii",
+        "ENARSI 1.10.c.iii",
+        "CCIE-EI 1.4.c",
+        "CCIE-DC 1.2.a.iii",
+        "CCIE-DC 1.2.a.v",
+        "DCCOR 1.1.a"
+      ],
       "topics": [
         "ospf",
         "challenge",
@@ -945,12 +1458,12 @@
     },
     {
       "file": "troubleshoot-ospf-7node.encorlab",
-      "sha256": "53b67bd3416e27210b4c15fcf86be37940c26deeb3709879cd07d66cec2c3bec",
-      "size": 8207,
+      "sha256": "30e267454af164e300ac0f2604bbccc9ecf74467ccf2b05fa15c98fefa3fe1e8",
+      "size": 8446,
       "kind": "lab",
       "id": "troubleshoot-ospf-7node",
       "title": "Troubleshooting: Branch-2 Cannot Reach the Data-Center Server",
-      "version": "2",
+      "version": "3",
       "description": "Seven-router multi-area OSPF enterprise, fully configured. Users at Branch-2 can't reach the DC server. Find and fix the one fault.",
       "blueprint": [
         "3.2.b"
@@ -966,6 +1479,16 @@
       ],
       "node_types": [
         "iol-xe"
+      ],
+      "exams": [
+        "ENCOR 3.2.b",
+        "ENCOR 4.1",
+        "ENARSI 1.10.b",
+        "CCNA 3.4.a",
+        "CCIE-EI 1.4.a",
+        "CCIE-EI 1.2.i",
+        "CCIE-DC 1.2.a.i",
+        "CCIE-DC 1.2.a.ii"
       ],
       "topics": [
         "troubleshooting",

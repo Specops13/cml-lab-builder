@@ -13,6 +13,7 @@ from cmllab import config, packs, signing
 from cmllab.paths import safe_name
 from cmllab.web import security
 from cmllab.web.app import create_app
+from tables import run_table
 
 
 def _client(token=None, csrf=True, **kw):
@@ -23,15 +24,27 @@ def _client(token=None, csrf=True, **kw):
 
 
 # ------------------------------------------------------------------ Host allowlist (DNS rebinding)
-@pytest.mark.parametrize("host", ["127.0.0.1:8765", "localhost:8765", "[::1]:8765", "testserver"])
-def test_loopback_hosts_allowed(host):
+LOOPBACK_HOSTS_ALLOWED_ROWS = ["127.0.0.1:8765", "localhost:8765", "[::1]:8765", "testserver"]
+
+
+def _loopback_hosts_allowed(host):
     assert _client().get("/api/health", headers={"host": host}).status_code == 200
 
 
-@pytest.mark.parametrize("host", ["evil.example", "evil.example:8765", "127.0.0.1.evil.example", ""])
-def test_unknown_host_refused(host):
+def test_loopback_hosts_allowed():
+    run_table(_loopback_hosts_allowed, LOOPBACK_HOSTS_ALLOWED_ROWS, single=True)
+
+
+UNKNOWN_HOST_REFUSED_ROWS = ["evil.example", "evil.example:8765", "127.0.0.1.evil.example", ""]
+
+
+def _unknown_host_refused(host):
     r = _client().get("/api/settings", headers={"host": host})
     assert r.status_code == 421 and "DNS rebinding" in r.json()["detail"]
+
+
+def test_unknown_host_refused():
+    run_table(_unknown_host_refused, UNKNOWN_HOST_REFUSED_ROWS, single=True)
 
 
 def test_extra_allowed_host():
@@ -39,32 +52,32 @@ def test_extra_allowed_host():
 
 
 # ------------------------------------------------------------------ CSRF / CORS
-def test_post_without_csrf_header_refused():
-    r = _client(csrf=False).post("/api/settings", json={})
-    assert r.status_code == 403 and "CSRF" in r.json()["detail"]
+def test_csrf_origin_and_cors_guards():
+    def _post_without_csrf_header_refused():
+        r = _client(csrf=False).post("/api/settings", json={})
+        assert r.status_code == 403 and "CSRF" in r.json()["detail"]
 
+    def _post_from_other_origin_refused():
+        r = _client().post("/api/settings", json={}, headers={"origin": "https://evil.example"})
+        assert r.status_code == 403
 
-def test_post_from_other_origin_refused():
-    r = _client().post("/api/settings", json={}, headers={"origin": "https://evil.example"})
-    assert r.status_code == 403
+    def _post_same_origin_passes_guard():
+        r = _client().post("/api/settings", json={"cml_url": "https://cml.example"}, headers={"origin": "http://testserver"})
+        assert r.status_code not in (401, 403, 421)
 
+    def _cross_site_fetch_refused_even_for_get():
+        r = _client().get("/api/settings", headers={"sec-fetch-site": "cross-site"})
+        assert r.status_code == 403
 
-def test_post_same_origin_passes_guard():
-    r = _client().post("/api/settings", json={"cml_url": "https://cml.example"}, headers={"origin": "http://testserver"})
-    assert r.status_code not in (401, 403, 421)
+    def _no_cors():
+        c = _client()
+        r = c.options("/api/settings", headers={"origin": "https://evil.example", "access-control-request-method": "POST"})
+        assert r.status_code == 403
+        r = c.get("/api/health", headers={"origin": "https://evil.example"})
+        assert "access-control-allow-origin" not in {k.lower() for k in r.headers}
 
-
-def test_cross_site_fetch_refused_even_for_get():
-    r = _client().get("/api/settings", headers={"sec-fetch-site": "cross-site"})
-    assert r.status_code == 403
-
-
-def test_no_cors():
-    c = _client()
-    r = c.options("/api/settings", headers={"origin": "https://evil.example", "access-control-request-method": "POST"})
-    assert r.status_code == 403
-    r = c.get("/api/health", headers={"origin": "https://evil.example"})
-    assert "access-control-allow-origin" not in {k.lower() for k in r.headers}
+    for case in (_post_without_csrf_header_refused, _post_from_other_origin_refused, _post_same_origin_passes_guard, _cross_site_fetch_refused_even_for_get, _no_cors):
+        case()
 
 
 # ------------------------------------------------------------------ headers
@@ -101,30 +114,32 @@ def test_path_traversal_refused():
 
 
 # ------------------------------------------------------------------ access token
-def test_token_required():
-    c = _client(token="t" * 32)
-    assert c.get("/api/settings").status_code == 401
-    page = c.get("/")
-    assert page.status_code == 401 and "<script" not in page.text
-    assert c.get("/api/health").status_code == 200          # public
-    assert c.get("/static/app.js").status_code == 200       # public
-    assert c.get("/api/settings", headers={"authorization": "Bearer " + "x" * 32}).status_code == 401
+def test_token_auth():
+    def _token_required():
+        c = _client(token="t" * 32)
+        assert c.get("/api/settings").status_code == 401
+        page = c.get("/")
+        assert page.status_code == 401 and "<script" not in page.text
+        assert c.get("/api/health").status_code == 200          # public
+        assert c.get("/static/app.js").status_code == 200       # public
+        assert c.get("/api/settings", headers={"authorization": "Bearer " + "x" * 32}).status_code == 401
 
+    def _token_link_sets_cookie():
+        tok = "t" * 32
+        c = _client(token=tok)
+        r = c.get(f"/?token={tok}", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/"
+        sc = r.headers["set-cookie"].lower()
+        assert "httponly" in sc and "samesite=strict" in sc
+        assert c.get("/api/settings").status_code == 200       # cookie kept by the client
+        assert c.get("/?token=wrong", follow_redirects=False).status_code == 200   # cookie still valid, no redirect
 
-def test_token_link_sets_cookie():
-    tok = "t" * 32
-    c = _client(token=tok)
-    r = c.get(f"/?token={tok}", follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/"
-    sc = r.headers["set-cookie"].lower()
-    assert "httponly" in sc and "samesite=strict" in sc
-    assert c.get("/api/settings").status_code == 200       # cookie kept by the client
-    assert c.get("/?token=wrong", follow_redirects=False).status_code == 200   # cookie still valid, no redirect
+    def _bearer_token():
+        tok = "t" * 32
+        assert _client(token=tok).get("/api/settings", headers={"authorization": f"Bearer {tok}"}).status_code == 200
 
-
-def test_bearer_token():
-    tok = "t" * 32
-    assert _client(token=tok).get("/api/settings", headers={"authorization": f"Bearer {tok}"}).status_code == 200
+    for case in (_token_required, _token_link_sets_cookie, _bearer_token):
+        case()
 
 
 def test_launch_token_file_private(tmp_path, monkeypatch):
@@ -311,11 +326,17 @@ def test_tls_ui_controls():
 
 
 # ------------------------------------------------------------------ import safety
-@pytest.mark.parametrize("name", ["../x.yaml", "a/../../x", "/etc/passwd", "C:/x", "a\\..\\..\\x", "..\\x", "a\x00b"])
-def test_zip_slip_names_rejected(name):
+ZIP_SLIP_NAMES_REJECTED_ROWS = ["../x.yaml", "a/../../x", "/etc/passwd", "C:/x", "a\\..\\..\\x", "..\\x", "a\x00b"]
+
+
+def _zip_slip_names_rejected(name):
     from cmllab import updates
     assert not packs._safe_member(name)
     assert not updates._safe_member(name)
+
+
+def test_zip_slip_names_rejected():
+    run_table(_zip_slip_names_rejected, ZIP_SLIP_NAMES_REJECTED_ROWS, single=True)
 
 
 def test_zip_pack_with_traversal_rejected():

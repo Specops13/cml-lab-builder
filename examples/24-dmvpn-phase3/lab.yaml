@@ -1,0 +1,758 @@
+id: 24-dmvpn-phase3
+type: walkthrough
+title: 'Walkthrough: DMVPN Phase 3 with NHRP and EIGRP (IOS-XE, IOL)'
+blueprint:
+- 2.2.b
+domain: 2.0 Virtualization
+difficulty: 4
+platforms:
+- iol
+summary: Step-by-step build of a single-hub DMVPN Phase 3 cloud over a simulated Internet - mGRE tunnels, dynamic NHRP registration,
+  EIGRP stub spokes over the tunnel, NHRP redirect/shortcut spoke-to-spoke tunnels and hub summarisation, plus a fault-finding
+  guide.
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: INET
+  kind: router
+  x: 0
+  y: -150
+  config: |
+    ! Simulated Internet (ISP). Fully configured at day-0 - do not change it. It only knows its connected /30s, so the overlay must carry all private traffic.
+    interface %if0%
+     description to HUB (Internet access)
+     ip address 203.0.113.1 255.255.255.252
+     no shutdown
+    interface %if1%
+     description to SPOKE1 (Internet access)
+     ip address 198.51.100.1 255.255.255.252
+     no shutdown
+    interface %if2%
+     description to SPOKE2 (Internet access)
+     ip address 198.51.100.5 255.255.255.252
+     no shutdown
+    interface %if3%
+     description to SPOKE3 (Internet access)
+     ip address 198.51.100.9 255.255.255.252
+     no shutdown
+- name: HUB
+  kind: router
+  x: 0
+  y: 0
+  config: |
+    ! DMVPN hub (NHS). Day-0: hostname, interface descriptions and the Internet link enabled (no IP addressing yet). You build the rest in the walkthrough steps.
+    interface %if0%
+     description to INET (DMVPN underlay / NBMA)
+     no ip address
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+- name: SPOKE1
+  kind: router
+  x: -250
+  y: 180
+  config: |
+    ! DMVPN spoke. Day-0: hostname, interface descriptions and the Internet link enabled (no IP addressing yet).
+    interface %if0%
+     description to INET (DMVPN underlay / NBMA)
+     no ip address
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+- name: SPOKE2
+  kind: router
+  x: 0
+  y: 180
+  config: |
+    ! DMVPN spoke. Day-0: hostname, interface descriptions and the Internet link enabled (no IP addressing yet).
+    interface %if0%
+     description to INET (DMVPN underlay / NBMA)
+     no ip address
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+- name: SPOKE3
+  kind: router
+  x: 250
+  y: 180
+  config: |
+    ! DMVPN spoke. Day-0: hostname, interface descriptions and the Internet link enabled (no IP addressing yet).
+    interface %if0%
+     description to INET (DMVPN underlay / NBMA)
+     no ip address
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+links:
+- a:
+    node: INET
+    port: 0
+  b:
+    node: HUB
+    port: 0
+- a:
+    node: INET
+    port: 1
+  b:
+    node: SPOKE1
+    port: 0
+- a:
+    node: INET
+    port: 2
+  b:
+    node: SPOKE2
+    port: 0
+- a:
+    node: INET
+    port: 3
+  b:
+    node: SPOKE3
+    port: 0
+task: |
+  ## DMVPN Phase 3 over a simulated Internet (IOL)
+
+  Build a single-hub **DMVPN Phase 3** overlay: one multipoint GRE (mGRE) interface per router, **NHRP** for
+  dynamic spoke registration and spoke-to-spoke resolution, **EIGRP** over the tunnel, and finally a
+  **summarised** hub so the spokes carry one route while traffic still goes spoke-to-spoke directly.
+
+  | Router | Internet (NBMA) address | Tunnel0 (overlay) | Loopback1 (site LAN) |
+  |---|---|---|---|
+  | HUB | 203.0.113.2/30 (INET .1) | 172.16.0.1/24 | 10.1.0.1/24 |
+  | SPOKE1 | 198.51.100.2/30 (INET .1) | 172.16.0.11/24 | 10.1.1.1/24 |
+  | SPOKE2 | 198.51.100.6/30 (INET .5) | 172.16.0.12/24 | 10.1.2.1/24 |
+  | SPOKE3 | 198.51.100.10/30 (INET .9) | 172.16.0.13/24 | 10.1.3.1/24 |
+
+  - NHRP network-id **24**, tunnel key **24**, NHRP authentication string **DMVPN24**.
+  - EIGRP AS **100** on the tunnel and the site LANs; the spokes are EIGRP **stub** routers.
+  - INET is the "Internet": it only knows the /30 transit links and never learns 10.x or 172.16.x.
+
+  **Resources:** 5 IOL-XE nodes, about 5 GB RAM - fits easily on a 20-node CML 2.9.1 licence.
+
+  **Note on encryption:** production DMVPN adds IPsec (`tunnel protection ipsec profile`). Reports from CML users
+  say IOL-XE has no IPsec data plane, so this lab builds the unencrypted overlay (the NHRP/mGRE/routing behaviour
+  is identical); the last step shows the IPsec profile to add on a platform that supports it (CSR1000v/Cat8000v).
+steps:
+- id: design
+  title: 'The design: NBMA underlay, mGRE overlay and NHRP'
+  explain: |
+    DMVPN (Dynamic Multipoint VPN) is not one protocol but three building blocks:
+
+    - **mGRE** - one *multipoint* GRE tunnel interface per router (`tunnel mode gre multipoint`). Unlike a
+      point-to-point GRE tunnel it has no fixed `tunnel destination`; the destination of each packet is looked
+      up per next hop.
+    - **NHRP** (Next Hop Resolution Protocol, RFC 2332) - the "ARP" of the overlay. It maps an overlay (tunnel)
+      address such as 172.16.0.12 to the *NBMA* (underlay, here public Internet) address 198.51.100.6.
+      The hub is the **NHS** (next hop server); spokes are **NHCs** (clients) that **register** their mapping
+      with the hub, so the hub needs no static per-spoke configuration (*dynamic neighbors*).
+    - **A routing protocol** (EIGRP here) running over the tunnel to exchange the site LANs.
+
+    The DMVPN *phase* describes how spoke-to-spoke traffic is handled:
+
+    | Phase | Spoke tunnel | Spoke-to-spoke | Hub may summarise? |
+    |---|---|---|---|
+    | 1 | point-to-point GRE | no - everything via the hub | yes |
+    | 2 | mGRE | yes, the spoke resolves the *routing next hop* (hub must preserve next hop: no summarisation) | no |
+    | 3 | mGRE | yes, the hub sends an **NHRP redirect**, the spoke sends a **resolution request** and installs an NHRP (`H`) route | **yes** |
+
+    Phase 3 combines the scalability of phase 1 (hub summarises, spokes keep tiny routing tables) with the
+    direct spoke-to-spoke path of phase 2. You will build it step by step and watch the shortcut appear.
+
+    Start by confirming the cabling: INET (the simulated Internet) sees the hub and the three spokes over CDP.
+  verify:
+  - device: INET
+    command: show cdp neighbors
+    expect: HUB on Eth 0/0 and SPOKE1-SPOKE3 on Eth 0/1-0/3.
+  checks:
+  - id: cabling
+    description: INET sees HUB and the three spokes over CDP
+    device: INET
+    command: show cdp neighbors
+    match:
+    - ^HUB\s
+    - ^SPOKE1\s
+    - ^SPOKE2\s
+    - ^SPOKE3\s
+    hint: Start the lab and wait for all nodes to boot; CDP needs about a minute.
+- id: underlay
+  title: 'Underlay: Internet addressing and default routes'
+  explain: |
+    Every DMVPN router needs one thing from the underlay: **reachability between NBMA addresses**. Here each
+    router gets its /30 public address on Ethernet0/0 and a static **default route** towards INET. The site
+    LANs are simulated with Loopback1.
+
+    INET never learns 10.1.x.x or 172.16.0.x - exactly like the real Internet. Anything private must travel
+    inside GRE, with the outer IP header carrying the NBMA addresses.
+
+    Check that the hub can reach every spoke's NBMA address. If not, nothing above it will work: NHRP
+    registrations are unicast packets from spoke NBMA to hub NBMA (GRE protocol 47).
+
+    Troubleshooting tip: `debug ip icmp` on INET shows the pings crossing it; remember to `undebug all`.
+  config:
+    HUB: |
+      interface %if0%
+       description to INET (DMVPN underlay / NBMA)
+       ip address 203.0.113.2 255.255.255.252
+       no shutdown
+      interface Loopback1
+       description HQ LAN
+       ip address 10.1.0.1 255.255.255.0
+      ip route 0.0.0.0 0.0.0.0 203.0.113.1
+    SPOKE1: |
+      interface %if0%
+       description to INET (DMVPN underlay / NBMA)
+       ip address 198.51.100.2 255.255.255.252
+       no shutdown
+      interface Loopback1
+       description SPOKE1 site LAN
+       ip address 10.1.1.1 255.255.255.0
+      ip route 0.0.0.0 0.0.0.0 198.51.100.1
+    SPOKE2: |
+      interface %if0%
+       description to INET (DMVPN underlay / NBMA)
+       ip address 198.51.100.6 255.255.255.252
+       no shutdown
+      interface Loopback1
+       description SPOKE2 site LAN
+       ip address 10.1.2.1 255.255.255.0
+      ip route 0.0.0.0 0.0.0.0 198.51.100.5
+    SPOKE3: |
+      interface %if0%
+       description to INET (DMVPN underlay / NBMA)
+       ip address 198.51.100.10 255.255.255.252
+       no shutdown
+      interface Loopback1
+       description SPOKE3 site LAN
+       ip address 10.1.3.1 255.255.255.0
+      ip route 0.0.0.0 0.0.0.0 198.51.100.9
+  verify:
+  - device: HUB
+    command: ping 198.51.100.2
+    expect: Success - the hub reaches SPOKE1's NBMA address.
+  - device: SPOKE3
+    command: show ip route static
+    expect: '`S* 0.0.0.0/0 [1/0] via 198.51.100.9`.'
+  checks:
+  - id: hub-nbma-spoke1
+    description: HUB reaches SPOKE1's Internet address
+    device: HUB
+    command: ping 198.51.100.2
+    min_success: 60
+    hint: Check the addresses and default routes on HUB and SPOKE1.
+  - id: hub-nbma-spoke2
+    description: HUB reaches SPOKE2's Internet address
+    device: HUB
+    command: ping 198.51.100.6
+    min_success: 60
+    hint: Check the addresses and default routes on HUB and SPOKE2.
+  - id: hub-nbma-spoke3
+    description: HUB reaches SPOKE3's Internet address
+    device: HUB
+    command: ping 198.51.100.10
+    min_success: 60
+    hint: Check the addresses and default routes on HUB and SPOKE3.
+  - id: spoke1-default
+    description: SPOKE1 has a default route towards INET
+    device: SPOKE1
+    mode: config
+    match:
+    - ^ip route 0\.0\.0\.0 0\.0\.0\.0 198\.51\.100\.1
+    hint: ip route 0.0.0.0 0.0.0.0 198.51.100.1
+- id: hub-mgre
+  title: 'Hub: multipoint GRE tunnel and NHRP server'
+  explain: |
+    The hub's Tunnel0 is a single mGRE interface for *all* spokes. Line by line:
+
+    - `tunnel source %if0%` + `tunnel mode gre multipoint` - mGRE, no tunnel destination.
+    - `tunnel key 24` - a GRE key; every router in the cloud must use the same value (a mismatch silently
+      drops the packets - a classic fault).
+    - `ip nhrp network-id 24` - locally significant ID that enables NHRP on the interface (it should still
+      match across the cloud for sanity). `ip nhrp authentication DMVPN24` - a clear-text string (max 8 chars)
+      carried in every NHRP packet; mismatches drop the registration.
+    - `ip nhrp map multicast dynamic` - the key hub command: when a spoke registers, add it to the multicast
+      replication list, so EIGRP hellos (multicast 224.0.0.10) are copied to every registered spoke.
+    - `ip mtu 1400` / `ip tcp adjust-mss 1360` - leave room for the GRE (24 bytes with key) and, later,
+      IPsec overhead; avoids fragmentation of full-size packets.
+    - `no ip redirects` - ICMP redirects make no sense on an NBMA overlay.
+
+    No spoke is configured on the hub: spokes will *register* dynamically (ENARSI "dynamic neighbor").
+    `show interfaces Tunnel0` already shows **multi-GRE/IP** transport, and `show dmvpn` on the hub shows
+    **Type:Hub, NHRP Peers:0** until the spokes are built.
+  config:
+    HUB: |
+      interface Tunnel0
+       description DMVPN hub (mGRE)
+       ip address 172.16.0.1 255.255.255.0
+       no ip redirects
+       ip mtu 1400
+       ip tcp adjust-mss 1360
+       ip nhrp authentication DMVPN24
+       ip nhrp network-id 24
+       ip nhrp map multicast dynamic
+       ip nhrp holdtime 300
+       tunnel source %if0%
+       tunnel mode gre multipoint
+       tunnel key 24
+  verify:
+  - device: HUB
+    command: show interfaces Tunnel0
+    expect: '`Tunnel protocol/transport multi-GRE/IP`, `Key 0x18`, source 203.0.113.2.'
+  checks:
+  - id: hub-mgre-int
+    description: HUB Tunnel0 is an mGRE interface
+    device: HUB
+    command: show interfaces Tunnel0
+    match:
+    - Tunnel protocol/transport multi-GRE/IP
+    - Tunnel source 203\.0\.113\.2
+    hint: tunnel source %if0% and tunnel mode gre multipoint under interface Tunnel0.
+  - id: hub-nhrp-cfg
+    description: HUB builds the multicast list dynamically and has no static spoke mappings
+    device: HUB
+    mode: config
+    match:
+    - ^[ \t]+ip nhrp map multicast dynamic
+    - ^[ \t]+ip nhrp network-id 24
+    - ^[ \t]+tunnel key 24
+    absent:
+    - ^[ \t]+ip nhrp map 172\.16\.0\.
+    hint: 'The hub needs no per-spoke mapping: ip nhrp map multicast dynamic, network-id 24, tunnel key 24.'
+- id: spokes-register
+  title: 'Spokes: mGRE tunnels and NHRP registration'
+  explain: |
+    Each spoke points to the hub as its NHS with one command:
+
+    `ip nhrp nhs 172.16.0.1 nbma 203.0.113.2 multicast`
+
+    This is the short form of three older commands (`ip nhrp map 172.16.0.1 203.0.113.2`,
+    `ip nhrp map multicast 203.0.113.2` and `ip nhrp nhs 172.16.0.1`): it tells the spoke how to reach the hub's
+    tunnel address in the underlay and to send multicast (routing hellos) to the hub.
+
+    As soon as Tunnel0 comes up, the spoke sends an **NHRP Registration Request** (its tunnel 172.16.0.1x
+    to NBMA 198.51.100.x mapping) to the hub; the hub stores it as a **dynamic** entry and replies. The
+    registration is refreshed every `registration timeout` (60 s here, default 1/3 of the holdtime).
+
+    Verify on the hub: `show dmvpn` lists three peers with attribute **D** (dynamic), and `show ip nhrp`
+    shows the cache. On a spoke, `show dmvpn` shows the hub as **S** (static, from the `nhs` command) and
+    `show ip nhrp nhs detail` shows the NHS as **R**esponding.
+
+    If a spoke does not appear: `debug nhrp packet` (or `debug dmvpn detail all`) on both ends shows the
+    registration request and reply, or a reason such as an authentication or network-id mismatch.
+  config:
+    SPOKE1: |
+      interface Tunnel0
+       description DMVPN spoke (mGRE)
+       ip address 172.16.0.11 255.255.255.0
+       no ip redirects
+       ip mtu 1400
+       ip tcp adjust-mss 1360
+       ip nhrp authentication DMVPN24
+       ip nhrp network-id 24
+       ip nhrp holdtime 300
+       ip nhrp nhs 172.16.0.1 nbma 203.0.113.2 multicast
+       ip nhrp registration timeout 60
+       tunnel source %if0%
+       tunnel mode gre multipoint
+       tunnel key 24
+    SPOKE2: |
+      interface Tunnel0
+       description DMVPN spoke (mGRE)
+       ip address 172.16.0.12 255.255.255.0
+       no ip redirects
+       ip mtu 1400
+       ip tcp adjust-mss 1360
+       ip nhrp authentication DMVPN24
+       ip nhrp network-id 24
+       ip nhrp holdtime 300
+       ip nhrp nhs 172.16.0.1 nbma 203.0.113.2 multicast
+       ip nhrp registration timeout 60
+       tunnel source %if0%
+       tunnel mode gre multipoint
+       tunnel key 24
+    SPOKE3: |
+      interface Tunnel0
+       description DMVPN spoke (mGRE)
+       ip address 172.16.0.13 255.255.255.0
+       no ip redirects
+       ip mtu 1400
+       ip tcp adjust-mss 1360
+       ip nhrp authentication DMVPN24
+       ip nhrp network-id 24
+       ip nhrp holdtime 300
+       ip nhrp nhs 172.16.0.1 nbma 203.0.113.2 multicast
+       ip nhrp registration timeout 60
+       tunnel source %if0%
+       tunnel mode gre multipoint
+       tunnel key 24
+  verify:
+  - device: HUB
+    command: show dmvpn
+    expect: Type:Hub, NHRP Peers:3, all three spokes UP with attribute D.
+  - device: HUB
+    command: show ip nhrp
+    expect: '172.16.0.11/32 via 172.16.0.11 ... dynamic, NBMA address: 198.51.100.2 (and the other two).'
+  - device: SPOKE1
+    command: show ip nhrp nhs detail
+    expect: 172.16.0.1 RE ... (R = responding).
+  checks:
+  - id: hub-dmvpn-peers
+    description: HUB has three dynamically registered spokes
+    device: HUB
+    command: show dmvpn
+    match:
+    - Type:Hub, NHRP Peers:3
+    - 198\.51\.100\.2\s+172\.16\.0\.11\s+UP\s+\S+\s+D
+    - 198\.51\.100\.6\s+172\.16\.0\.12\s+UP\s+\S+\s+D
+    - 198\.51\.100\.10\s+172\.16\.0\.13\s+UP\s+\S+\s+D
+    hint: Compare network-id, tunnel key and authentication on the spokes with the hub; debug nhrp packet shows the reason.
+  - id: spoke1-nhs
+    description: SPOKE1 lists the hub as a static NHS peer
+    device: SPOKE1
+    command: show dmvpn
+    match:
+    - Type:Spoke
+    - 203\.0\.113\.2\s+172\.16\.0\.1\s+UP\s+\S+\s+S
+    hint: ip nhrp nhs 172.16.0.1 nbma 203.0.113.2 multicast under Tunnel0.
+  - id: spoke3-hub-ping
+    description: SPOKE3 pings the hub's tunnel address
+    device: SPOKE3
+    command: ping 172.16.0.1
+    min_success: 60
+    hint: Check Tunnel0 on SPOKE3 and its NBMA reachability to the hub.
+- id: routing
+  title: EIGRP over the tunnel (spokes as stubs)
+  explain: |
+    Now run EIGRP AS 100 on Tunnel0 and the site LANs. Two DMVPN-specific details:
+
+    - **Split horizon** - the hub learns SPOKE1's LAN *on Tunnel0* and would not advertise it back out of
+      Tunnel0 to SPOKE2. On an mGRE hub, disable it: `no ip split-horizon eigrp 100` on Tunnel0
+      (only needed until the hub summarises in the last step).
+    - **Stub spokes** - `eigrp stub connected` makes each spoke advertise only its connected routes and,
+      more importantly, tells the hub never to send it EIGRP **queries**. When a route is lost, the query
+      stops at the hub instead of flooding to every spoke: the stub is a *query propagation boundary*,
+      essential for large DMVPN clouds.
+
+    The hub uses the multicast list built from registrations to send hellos to all spokes; spokes talk only to
+    the hub (no spoke-to-spoke EIGRP adjacency in DMVPN). Note the next hop of SPOKE2's LAN on SPOKE1 is the
+    **hub** (172.16.0.1): in phase 3 the hub may change the next hop - the shortcut comes from NHRP, not from
+    the routing protocol.
+
+    Troubleshooting: `show ip eigrp neighbors detail` on the hub shows *Stub Peer Advertising (CONNECTED)*;
+    `debug eigrp packets hello` shows hellos per spoke if an adjacency flaps (often an MTU, multicast mapping
+    or `ip nhrp map multicast dynamic` problem).
+  config:
+    HUB: |
+      router eigrp 100
+       eigrp router-id 10.1.0.1
+       network 172.16.0.0 0.0.0.255
+       network 10.1.0.0 0.0.0.255
+       passive-interface Loopback1
+      interface Tunnel0
+       no ip split-horizon eigrp 100
+    SPOKE1: |
+      router eigrp 100
+       eigrp router-id 10.1.1.1
+       network 172.16.0.0 0.0.0.255
+       network 10.1.1.0 0.0.0.255
+       passive-interface Loopback1
+       eigrp stub connected
+    SPOKE2: |
+      router eigrp 100
+       eigrp router-id 10.1.2.1
+       network 172.16.0.0 0.0.0.255
+       network 10.1.2.0 0.0.0.255
+       passive-interface Loopback1
+       eigrp stub connected
+    SPOKE3: |
+      router eigrp 100
+       eigrp router-id 10.1.3.1
+       network 172.16.0.0 0.0.0.255
+       network 10.1.3.0 0.0.0.255
+       passive-interface Loopback1
+       eigrp stub connected
+  verify:
+  - device: HUB
+    command: show ip eigrp neighbors
+    expect: Three neighbors 172.16.0.11-13 on Tu0.
+  - device: SPOKE1
+    command: show ip route eigrp
+    expect: 'Before the summary step: 10.1.0.0/24, 10.1.2.0/24, 10.1.3.0/24 via 172.16.0.1.'
+  checks:
+  - id: hub-eigrp-nbrs
+    description: HUB has EIGRP neighbors with all three spokes over Tunnel0
+    device: HUB
+    command: show ip eigrp neighbors
+    match:
+    - 172\.16\.0\.11\s+Tu0
+    - 172\.16\.0\.12\s+Tu0
+    - 172\.16\.0\.13\s+Tu0
+    hint: network 172.16.0.0 0.0.0.255 under router eigrp 100 on all four routers; the hub needs ip nhrp map multicast dynamic.
+  - id: hub-stub-peers
+    description: The spokes are EIGRP stub (connected) peers
+    device: HUB
+    command: show ip eigrp neighbors detail
+    match:
+    - Stub Peer Advertising \(\s*CONNECTED\s*\) Routes
+    hint: eigrp stub connected under router eigrp 100 on each spoke.
+  - id: hub-learns-lans
+    description: HUB learns the three spoke LANs via EIGRP
+    device: HUB
+    command: show ip route eigrp
+    match:
+    - 10\.1\.1\.0/24 \[90/\d+\] via 172\.16\.0\.11
+    - 10\.1\.2\.0/24 \[90/\d+\] via 172\.16\.0\.12
+    - 10\.1\.3\.0/24 \[90/\d+\] via 172\.16\.0\.13
+    hint: Each spoke advertises its Loopback1 network (network 10.1.x.0 0.0.0.255).
+  - id: spoke-lan-ping
+    description: SPOKE1 LAN reaches SPOKE3 LAN
+    device: SPOKE1
+    command: ping 10.1.3.1 source Loopback1
+    min_success: 60
+    hint: Disable split horizon on the hub Tunnel0 (no ip split-horizon eigrp 100) so spokes learn each other's LANs.
+- id: phase3
+  title: 'Phase 3: NHRP redirect and shortcut'
+  explain: |
+    Two commands turn the cloud into phase 3:
+
+    - Hub: `ip nhrp redirect` - when a packet enters Tunnel0 and must leave Tunnel0 again (spoke to spoke
+      through the hub), the hub forwards it **and** sends an **NHRP Traffic Indication (redirect)** back to
+      the source spoke: "there is a better path for this destination".
+    - Spokes: `ip nhrp shortcut` - on receiving the redirect, the spoke sends an **NHRP Resolution Request**
+      for the *destination* (10.1.2.1). It travels via the hub to SPOKE2, which answers **directly** with its
+      LAN prefix (10.1.2.0/24) and NBMA address. Both spokes install an **NHRP route** (`H` in
+      `show ip route`) or a next-hop override, and build a direct dynamic tunnel entry.
+
+    Test it: from SPOKE1 ping SPOKE2's LAN sourced from Loopback1. The first packets go via the hub; after the
+    resolution (well under a second) traffic flows SPOKE1 -> INET -> SPOKE2 without touching HUB. A
+    `traceroute 10.1.2.1 source Loopback1` run twice shows it: first 172.16.0.1 then 172.16.0.12, later
+    only 172.16.0.12.
+
+    Verify on SPOKE1: `show dmvpn` now has a second, **dynamic** peer 198.51.100.6 / 172.16.0.12 (attribute
+    `DT1` - dynamic, route installed), and `show ip route nhrp` shows `H 10.1.2.0/24 [250/1] via 172.16.0.12`.
+    The shortcut ages out after the NHRP holdtime (300 s) if unused.
+
+    Watching it happen: `debug nhrp packet` on SPOKE1 shows *Traffic Indication* received, *Resolution
+    Request* sent and *Resolution Reply* received; `debug dmvpn all nhrp` adds the tunnel events.
+  config:
+    HUB: |
+      interface Tunnel0
+       ip nhrp redirect
+    SPOKE1: |
+      interface Tunnel0
+       ip nhrp shortcut
+    SPOKE2: |
+      interface Tunnel0
+       ip nhrp shortcut
+    SPOKE3: |
+      interface Tunnel0
+       ip nhrp shortcut
+  verify:
+  - device: SPOKE1
+    command: ping 10.1.2.1 source Loopback1
+    expect: Success; this triggers the redirect and the shortcut.
+  - device: SPOKE1
+    command: show dmvpn
+    expect: NHRP Peers:2 - the hub (S) and SPOKE2 198.51.100.6 (DT1).
+  - device: SPOKE1
+    command: show ip route nhrp
+    expect: '`H 10.1.2.0/24 [250/1] via 172.16.0.12, Tunnel0`.'
+  - device: SPOKE1
+    command: show ip nhrp shortcut
+    expect: The shortcut entry for 10.1.2.0/24.
+  checks:
+  - id: s1-s2-ping
+    description: SPOKE1 LAN pings SPOKE2 LAN (triggers the shortcut)
+    device: SPOKE1
+    command: ping 10.1.2.1 source Loopback1
+    min_success: 60
+    hint: Routing must work first (previous step).
+  - id: s1-dynamic-peer
+    description: SPOKE1 built a dynamic spoke-to-spoke entry to SPOKE2
+    device: SPOKE1
+    command: show dmvpn
+    match:
+    - 198\.51\.100\.6\s+172\.16\.0\.12\s+UP\s+\S+\s+D
+    hint: The hub needs ip nhrp redirect and the spokes ip nhrp shortcut; run the ping again right before the check.
+  - id: s1-nhrp-route
+    description: SPOKE1 installed an NHRP route to SPOKE2's LAN
+    device: SPOKE1
+    command: show ip route nhrp
+    match:
+    - ^H\s+10\.1\.2\.0/24 \[250/1\] via 172\.16\.0\.12
+    hint: 'No H route: check ip nhrp shortcut on SPOKE1 and SPOKE2 and ip nhrp redirect on HUB.'
+  - id: hub-redirect-cfg
+    description: HUB sends NHRP redirects
+    device: HUB
+    mode: config
+    match:
+    - ^[ \t]+ip nhrp redirect
+    hint: ip nhrp redirect under HUB Tunnel0.
+  - id: spoke2-shortcut-cfg
+    description: SPOKE2 accepts NHRP shortcuts
+    device: SPOKE2
+    mode: config
+    match:
+    - ^[ \t]+ip nhrp shortcut
+    hint: ip nhrp shortcut under SPOKE2 Tunnel0.
+- id: summarize
+  title: Summarise on the hub (the phase 3 advantage)
+  explain: |
+    In phase 2 the hub must advertise every spoke prefix with the original next hop, so it cannot summarise.
+    Phase 3 does not care about the routing next hop - shortcuts come from NHRP - so the hub can send a
+    single summary to the spokes:
+
+    `ip summary-address eigrp 100 10.1.0.0 255.255.0.0` on Tunnel0.
+
+    Each spoke now has one EIGRP route, `D 10.1.0.0/16 via 172.16.0.1`, plus its own connected LAN. The hub
+    installs a discard route `10.1.0.0/16 is a summary, Null0` to prevent loops. Split horizon is now
+    irrelevant (the hub originates the summary), so you can even re-enable it.
+
+    Spoke-to-spoke still works: SPOKE2 -> SPOKE3 first follows the summary to the hub, the hub redirects,
+    and SPOKE2 installs `H 10.1.3.0/24 via 172.16.0.13` - a more specific route that wins by longest match.
+    This is how thousands of spokes can each hold a handful of routes.
+
+    Troubleshooting summarisation: `show ip eigrp topology 10.1.0.0/16` on the hub shows the summary and
+    its components; `debug eigrp fsm` shows the summary being created or withdrawn.
+  config:
+    HUB: |
+      interface Tunnel0
+       ip summary-address eigrp 100 10.1.0.0 255.255.0.0
+  verify:
+  - device: SPOKE2
+    command: show ip route eigrp
+    expect: Only `D 10.1.0.0/16 [90/...] via 172.16.0.1, Tunnel0`.
+  - device: HUB
+    command: show ip route 10.1.0.0 255.255.0.0
+    expect: The summary to Null0 (AD 5).
+  - device: SPOKE2
+    command: ping 10.1.3.1 source Loopback1
+    expect: Success; then `show ip route nhrp` shows H 10.1.3.0/24 via 172.16.0.13.
+  checks:
+  - id: s2-summary-only
+    description: SPOKE2 receives only the 10.1.0.0/16 summary from the hub
+    device: SPOKE2
+    command: show ip route eigrp
+    match:
+    - ^D\s+10\.1\.0\.0/16 \[90/\d+\] via 172\.16\.0\.1
+    absent:
+    - ^D\s+10\.1\.[13]\.0/24
+    hint: ip summary-address eigrp 100 10.1.0.0 255.255.0.0 under HUB Tunnel0.
+  - id: s2-s3-ping
+    description: SPOKE2 LAN pings SPOKE3 LAN through the summary
+    device: SPOKE2
+    command: ping 10.1.3.1 source Loopback1
+    min_success: 60
+    hint: Check the summary on the hub.
+  - id: s2-nhrp-route
+    description: SPOKE2 has an NHRP shortcut route to SPOKE3's LAN despite the summary
+    device: SPOKE2
+    command: show ip route nhrp
+    match:
+    - ^H\s+10\.1\.3\.0/24 \[250/1\] via 172\.16\.0\.13
+    hint: Run the ping again; the shortcut needs ip nhrp shortcut on SPOKE2 and SPOKE3.
+- id: troubleshoot
+  title: 'Optional: break it and fix it, then the IPsec layer'
+  explain: |
+    DMVPN faults are almost always one of a few things. Try each, observe, and revert:
+
+    | Break (on SPOKE3 Tunnel0) | What you see | Where |
+    |---|---|---|
+    | `tunnel key 99` | Spoke stays **NHRP** / not in the hub's `show dmvpn`; GRE packets dropped | `show dmvpn`, `show interfaces Tunnel0` (drops) |
+    | `ip nhrp authentication WRONG` | Hub ignores the registration | `debug nhrp packet` / `show ip nhrp traffic` |
+    | `ip nhrp network-id 99` | works locally significant, but a different id on a second tunnel would separate clouds | `show ip nhrp` |
+    | remove `ip nhrp shortcut` | Spoke-to-spoke traffic stays via the hub (no H route) | `show ip route nhrp`, traceroute |
+    | `no ip nhrp map multicast dynamic` on HUB | EIGRP adjacencies drop (no hellos to spokes) | `show ip eigrp neighbors` |
+    | NBMA unreachable (shut the default route) | NHS goes to **E** (expecting replies) | `show ip nhrp nhs detail` |
+
+    Useful commands: `show ip nhrp traffic` (counters per message type), `show ip nhrp nhs detail`,
+    `show ip nhrp shortcut`, `clear ip nhrp` (rebuild the cache - not a check, use it carefully), and the debugs
+    `debug nhrp packet`, `debug nhrp cache`, `debug dmvpn detail all` (with `debug condition peer nbma ...`
+    to limit output to one spoke).
+
+    **Adding IPsec (on CSR1000v / Cat8000v):**
+
+    ```
+    crypto ikev2 keyring DMVPN-KR
+     peer ANY
+      address 0.0.0.0 0.0.0.0
+      pre-shared-key DMVPN-PSK
+    crypto ikev2 profile DMVPN-IKEV2
+     match identity remote address 0.0.0.0
+     authentication remote pre-share
+     authentication local pre-share
+     keyring local DMVPN-KR
+    crypto ipsec transform-set DMVPN-TS esp-gcm 256
+     mode transport
+    crypto ipsec profile DMVPN-PROF
+     set transform-set DMVPN-TS
+     set ikev2-profile DMVPN-IKEV2
+    interface Tunnel0
+     tunnel protection ipsec profile DMVPN-PROF
+    ```
+
+    Transport mode is enough because GRE already adds the outer header. IOL-XE images are reported not to
+    forward IPsec traffic, so this lab does not grade it.
+  verify:
+  - device: HUB
+    command: show ip nhrp traffic
+    expect: Registration Request/Reply and Traffic Indication counters increasing.
+  - device: SPOKE1
+    command: show ip nhrp nhs detail
+    expect: The NHS 172.16.0.1 flagged R (responding).
+solution_summary: |
+  **What you built:** a single-hub DMVPN Phase 3 cloud over a simulated Internet.
+
+  - **Underlay**: each router has a public /30 on Ethernet0/0 and a default route to INET; INET knows no
+    private prefixes.
+  - **Overlay**: one mGRE `Tunnel0` per router (`tunnel mode gre multipoint`, `tunnel key 24`,
+    `ip mtu 1400`, `ip tcp adjust-mss 1360`), NHRP network-id 24 with authentication `DMVPN24`.
+  - **NHRP**: the hub is the NHS with `ip nhrp map multicast dynamic` and **no static spoke mappings**;
+    spokes use `ip nhrp nhs 172.16.0.1 nbma 203.0.113.2 multicast` and register dynamically
+    (`show dmvpn` on the hub: three `D` peers).
+  - **Routing**: EIGRP AS 100 over Tunnel0, spokes are `eigrp stub connected` (query boundary), hub
+    split horizon disabled on Tunnel0 and finally `ip summary-address eigrp 100 10.1.0.0 255.255.0.0`.
+  - **Phase 3**: hub `ip nhrp redirect`, spokes `ip nhrp shortcut`; spoke-to-spoke traffic triggers a
+    redirect and resolution and installs `H` (NHRP) routes such as `10.1.2.0/24 via 172.16.0.12`, so data
+    flows directly between spokes while their routing tables hold only the summary.
+
+  **Where to go next**: dual-hub DMVPN (two NHS entries, hub redundancy), IPsec/IKEv2 tunnel protection on a
+  Cat8000v image, front-door VRF for the Internet interface, and BGP instead of EIGRP over the tunnel.

@@ -151,6 +151,8 @@ class Step(_Strict):
     checks: list[Check] = Field(default=[], description="Checks run by 'Check this step' (live and/or config)")
     optional: bool = Field(default=False, description="Optional step: not needed to complete the walkthrough")
     apply: bool = Field(default=True, description="Offer 'Apply this step for me' (push the config over the console)")
+    exams: list[str] = Field(default=[], description="Exam objectives this step covers, e.g. ['ENCOR 3.2.b'] (3.3.5+; "
+                             "or exams.yaml `steps:`)")
 
     @field_validator("id")
     @classmethod
@@ -174,6 +176,7 @@ class Lab(_Strict):
     blueprint: list[str] = Field(description=(
         "Topics. ENCOR labs: 350-401 v1.2 blueprint items, e.g. ['3.2.b']. Other tracks: that exam's topic ids or "
         "short topic names, e.g. ['OSPF']"))
+    exams: list[str] = Field(default=[], description=("Cisco exam objectives covered, as '<EXAM> <objective>' from cmllab/exams/*.yaml, e.g. ['ENCOR 3.2.b', 'CCNA 3.4']. 3.3.5+ only: for packs that older apps must import, put them in exams.yaml next to lab.yaml instead"))
     domain: str = Field(description="Domain or area, e.g. '3.0 Infrastructure - Layer 3' (ENCOR) or 'Routing'")
     difficulty: int = Field(ge=1, le=5, description="1 (easy) to 5 (hard)")
     platforms: list[Literal["iol", "iosv"]] = Field(default=["iol", "iosv"], description="Image profiles the lab supports")

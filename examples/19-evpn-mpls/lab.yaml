@@ -7,7 +7,7 @@ difficulty: 5
 platforms: [iol]
 summary: Step-by-step build of an EVPN over MPLS service provider core - OSPF and LDP in the core, iBGP l2vpn evpn through a route reflector, VLAN-based EVIs with bridge domains stretching VLANs 10 and 20 across three sites, route type 2/3 verification (optional EVPN-VPWS point-to-point service).
 author: CML Lab Builder
-version: "2"
+version: "3"
 nodes:
   - name: P1
     kind: router

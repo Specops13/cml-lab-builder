@@ -53,18 +53,21 @@ def test_mark_whole_walkthrough_complete_and_undo():
     assert walkthrough.mark_complete(lab, False)["completed"]
 
 
-def test_reset_clears_manual_marks():
-    lab = evpn()
-    walkthrough.mark_step(lab, "nve", True)
-    walkthrough.mark_complete(lab, True)
-    st = walkthrough.reset(lab)
-    assert not st["completed"] and st["manual_completed"] is None and not any(x["manual_at"] for x in st["steps"])
+def test_reset_and_unknown_step():
+    def _reset_clears_manual_marks():
+        lab = evpn()
+        walkthrough.mark_step(lab, "nve", True)
+        walkthrough.mark_complete(lab, True)
+        st = walkthrough.reset(lab)
+        assert not st["completed"] and st["manual_completed"] is None and not any(x["manual_at"] for x in st["steps"])
 
+    def _unknown_step_is_an_error():
+        import pytest
+        with pytest.raises(walkthrough.WalkthroughError):
+            walkthrough.mark_step(evpn(), "nope", True)
 
-def test_unknown_step_is_an_error():
-    import pytest
-    with pytest.raises(walkthrough.WalkthroughError):
-        walkthrough.mark_step(evpn(), "nope", True)
+    for case in (_reset_clears_manual_marks, _unknown_step_is_an_error):
+        case()
 
 
 # ---------------------------------------------------------------- challenge labs + progress + courses

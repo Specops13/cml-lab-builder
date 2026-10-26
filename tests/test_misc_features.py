@@ -82,41 +82,42 @@ def mock(responses, seen):
     return httpx.MockTransport(handler)
 
 
-def test_ai_success_first_try_and_auth_header():
-    seen = []
-    t = mock([(200, _reply(json.dumps(EXAMPLE)))], seen)
-    r = ai.generate("eigrp pair", "https://api.example/v1", "m", "KEY", transport=t)
-    assert r["ok"] and "example-eigrp-pair" in r["lab_yaml"]
-    assert seen[0].url.path == "/v1/chat/completions" and seen[0].headers["authorization"] == "Bearer KEY"
-    body = json.loads(seen[0].content)
-    assert body["model"] == "m" and "JSON Schema" in body["messages"][0]["content"]
+def test_ai_generation_retries_and_errors():
+    def _ai_success_first_try_and_auth_header():
+        seen = []
+        t = mock([(200, _reply(json.dumps(EXAMPLE)))], seen)
+        r = ai.generate("eigrp pair", "https://api.example/v1", "m", "KEY", transport=t)
+        assert r["ok"] and "example-eigrp-pair" in r["lab_yaml"]
+        assert seen[0].url.path == "/v1/chat/completions" and seen[0].headers["authorization"] == "Bearer KEY"
+        body = json.loads(seen[0].content)
+        assert body["model"] == "m" and "JSON Schema" in body["messages"][0]["content"]
 
+    def _ai_retries_with_errors_then_succeeds_fenced_yaml():
+        bad = dict(EXAMPLE)
+        bad = {k: v for k, v in bad.items() if k != "solution"}
+        seen = []
+        t = mock([(200, _reply(json.dumps(bad))), (200, _reply("Here:\n```yaml\n" + prompt.example() + "```"))], seen)
+        r = ai.generate("eigrp pair", "http://localhost:1/v1", "m", None, transport=t)
+        assert r["ok"] and len(r["attempts"]) == 2 and r["attempts"][0]["errors"]
+        second = json.loads(seen[1].content)["messages"]
+        assert "failed validation" in second[-1]["content"] and "authorization" not in seen[0].headers
 
-def test_ai_retries_with_errors_then_succeeds_fenced_yaml():
-    bad = dict(EXAMPLE)
-    bad = {k: v for k, v in bad.items() if k != "solution"}
-    seen = []
-    t = mock([(200, _reply(json.dumps(bad))), (200, _reply("Here:\n```yaml\n" + prompt.example() + "```"))], seen)
-    r = ai.generate("eigrp pair", "http://localhost:1/v1", "m", None, transport=t)
-    assert r["ok"] and len(r["attempts"]) == 2 and r["attempts"][0]["errors"]
-    second = json.loads(seen[1].content)["messages"]
-    assert "failed validation" in second[-1]["content"] and "authorization" not in seen[0].headers
+    def _ai_gives_up_after_retries():
+        seen = []
+        t = mock([(200, _reply("not json {"))] * 3, seen)
+        r = ai.generate("x", "http://h/v1", "m", None, transport=t)
+        assert not r["ok"] and len(r["attempts"]) == 3
 
+    def _ai_401_and_400_fallback():
+        with pytest.raises(ai.AIError, match="401"):
+            ai.generate("x", "http://h/v1", "m", "bad", transport=mock([(401, {"error": "no"})], []))
+        seen = []
+        t = mock([(400, {"error": "response_format unsupported"}), (200, _reply(json.dumps(EXAMPLE)))], seen)
+        assert ai.generate("x", "http://h/v1", "m", None, transport=t)["ok"]
+        assert "response_format" not in json.loads(seen[1].content)
 
-def test_ai_gives_up_after_retries():
-    seen = []
-    t = mock([(200, _reply("not json {"))] * 3, seen)
-    r = ai.generate("x", "http://h/v1", "m", None, transport=t)
-    assert not r["ok"] and len(r["attempts"]) == 3
-
-
-def test_ai_401_and_400_fallback():
-    with pytest.raises(ai.AIError, match="401"):
-        ai.generate("x", "http://h/v1", "m", "bad", transport=mock([(401, {"error": "no"})], []))
-    seen = []
-    t = mock([(400, {"error": "response_format unsupported"}), (200, _reply(json.dumps(EXAMPLE)))], seen)
-    assert ai.generate("x", "http://h/v1", "m", None, transport=t)["ok"]
-    assert "response_format" not in json.loads(seen[1].content)
+    for case in (_ai_success_first_try_and_auth_header, _ai_retries_with_errors_then_succeeds_fenced_yaml, _ai_gives_up_after_retries, _ai_401_and_400_fallback):
+        case()
 
 
 def test_extract_lab_variants():

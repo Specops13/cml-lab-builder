@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import security
-from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, manual, migrate, packs, progress, report, resources, service, sizing, snapshots, updates, walkthrough
+from .. import __version__, ai, autoupdate, catalog, config, courses, exam, faults, history, library, manual, migrate, objectives, packs, progress, report, resources, service, sizing, snapshots, updates, walkthrough
 from .. import solution as solution_mod
 from ..cml_import import draft_from_topology
 from .. import cml as _cml_mod
@@ -237,7 +237,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                 wt = _wt_brief(l)
                 graded = any(x.get("passed") for x in h)
                 out.append({"id": l.id, "title": render(l.title, plat), "summary": render(l.summary, plat),
-                            "blueprint": l.blueprint,
+                            "blueprint": l.blueprint, "exams": objectives.chips(objectives.lab_tags(l)),
                             "domain": l.domain, "difficulty": l.difficulty, "nodes": l.node_count,
                             "platforms": l.platforms, "source": e.source, "track": l.track,
                             "node_types": sorted({d for pf in l.platforms for d in sizing.node_definitions(l, pf)}),
@@ -291,6 +291,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         if l.is_walkthrough:
             steps = [{"id": st.id, "title": render(st.title, plat), "explain": render(st.explain, plat),
                       "optional": st.optional, "apply": bool(st.apply and st.config),
+                      "exams": objectives.chips(st.exams),
                       "config": {d: render(c, plat) for d, c in st.config.items()},
                       "verify": [{"device": v.device, "command": render(v.command, plat), "expect": render(v.expect, plat)}
                                  for v in st.verify],
@@ -311,6 +312,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                 "faults": len(l.faults), "fault": fault,
                 "blueprint": l.blueprint, "domain": l.domain, "difficulty": l.difficulty, "nodes": l.node_count,
                 "platforms": l.platforms, "author": l.author, "track": l.track,
+                "exams": objectives.chips(objectives.lab_tags(l) if not l.exams else l.exams),
                 "node_list": [{"name": n.name, "definition": n.definition,
                                "os": _cml_mod.node_os(l).get(n.name, "ios")} for n in l.nodes],
                 "has_solution": bool(catalog.load_solution(lab_id)),
@@ -467,6 +469,17 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
             return {"ok": True, "removed_labs": courses.delete(course_id, remove_labs=labs)}
         except packs.LabError as e:
             raise HTTPException(404, "; ".join(e.errors))
+
+    @app.get("/api/exams")
+    def exams_registry():
+        """The Cisco exam blueprints the app knows (cmllab/exams/*.yaml): ids, versions, sources, objectives."""
+        return {"exams": objectives.as_json()}
+
+    @app.get("/api/exams/suggest")
+    def exams_suggest(blueprint: str = "", track: str = "ENCOR", text: str = ""):
+        """Exam-objective tags to suggest for a lab in the builder (from its blueprint items, track and title)."""
+        tags = objectives.suggest([b for b in blueprint.split(",") if b.strip()], track or "ENCOR", text[:500])
+        return {"tags": tags, "exams": objectives.chips(tags)}
 
     @app.get("/api/library")
     def library_index(url: str = ""):

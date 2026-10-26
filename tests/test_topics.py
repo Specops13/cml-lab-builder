@@ -8,35 +8,45 @@ import yaml
 
 from cmllab import library, topics
 from test_library_labs import client, fetcher
+from tables import run_table
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "cmllab" / "web" / "static"
 sys.path.insert(0, str(ROOT / "packaging"))
 
 
-def test_vocabulary_is_small_unique_and_labelled():
-    ids = [t for t, _, _ in topics.TOPICS]
-    assert len(ids) == len(set(ids)) and 15 <= len(ids) <= 30
-    assert all(lbl and area for _, lbl, area in topics.TOPICS)
-    assert {"walkthrough", "challenge"} <= set(ids) and "other" in topics.SUBJECTS and "walkthrough" not in topics.SUBJECTS
-    v = topics.vocabulary(["ospf", "ccnp-dc"])
-    assert v[0] == {"id": "ospf", "label": "OSPF", "area": "Routing"} and v[-1] == {"id": "ccnp-dc", "label": "CCNP DC", "area": "Track"}
+def test_vocabulary_and_normalize():
+    def _vocabulary_is_small_unique_and_labelled():
+        ids = [t for t, _, _ in topics.TOPICS]
+        assert len(ids) == len(set(ids)) and 15 <= len(ids) <= 30
+        assert all(lbl and area for _, lbl, area in topics.TOPICS)
+        assert {"walkthrough", "challenge"} <= set(ids) and "other" in topics.SUBJECTS and "walkthrough" not in topics.SUBJECTS
+        v = topics.vocabulary(["ospf", "ccnp-dc"])
+        assert v[0] == {"id": "ospf", "label": "OSPF", "area": "Routing"} and v[-1] == {"id": "ccnp-dc", "label": "CCNP DC", "area": "Track"}
+
+    def _normalize_accepts_ids_and_labels_and_drops_unknowns():
+        assert topics.normalize(["OSPF", "evpn / vxlan", "Data Center", "made-up", "ospf", 3]) == ["ospf", "evpn-vxlan", "data-center"]
+        assert topics.normalize(None) == [] and topics.normalize("bgp") == ["bgp"]
+
+    for case in (_vocabulary_is_small_unique_and_labelled, _normalize_accepts_ids_and_labels_and_drops_unknowns):
+        case()
 
 
-def test_normalize_accepts_ids_and_labels_and_drops_unknowns():
-    assert topics.normalize(["OSPF", "evpn / vxlan", "Data Center", "made-up", "ospf", 3]) == ["ospf", "evpn-vxlan", "data-center"]
-    assert topics.normalize(None) == [] and topics.normalize("bgp") == ["bgp"]
-
-
-@pytest.mark.parametrize("item,expect", [
+DERIVE_ROWS = [
     ({"id": "x", "title": "OSPF over GRE", "blueprint": ["3.2.b"]}, ["ospf", "tunnels"]),
     ({"id": "x", "title": "Leaf and spine", "node_types": ["nxosv9000"]}, ["data-center"]),
     ({"id": "x", "title": "Default routes", "description": "A lab with a default route."}, ["other"]),   # 'default' != fault
     ({"id": "x", "title": "Fix the broken HSRP", "blueprint": ["3.3.c"]}, ["fhrp", "troubleshooting"]),
     ({"id": "x", "title": "Something", "blueprint": ["3.2.b"], "track": "CCIE"}, ["other"]),   # blueprint map is ENCOR's
-])
-def test_derive(item, expect):
+]
+
+
+def _derive(item, expect):
     assert topics.derive(item)[:len(expect)] == expect if expect != ["other"] else topics.derive(item) == ["other"]
+
+
+def test_derive():
+    run_table(_derive, DERIVE_ROWS)
 
 
 def test_for_lab_adds_type_and_track():
@@ -50,7 +60,7 @@ def test_every_library_lab_has_curated_topics_in_both_indexes():
         idx = json.loads((ROOT / folder / "index.json").read_text(encoding="utf-8"))
         for it in idx["items"]:
             assert it.get("topics"), (folder, it["id"])
-            assert all(t in topics.LABELS or t == "encor" for t in it["topics"]), it
+            assert all(t in topics.LABELS or t == topics.track_topic(it.get("track") or "ENCOR") for t in it["topics"]), it
             if it["kind"] == "lab":
                 assert it["topics"][:len(src[it["id"]])] == src[it["id"]], it["id"]
                 assert ("walkthrough" if it.get("type") == "walkthrough" else "challenge") in it["topics"]

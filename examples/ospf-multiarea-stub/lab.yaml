@@ -6,7 +6,7 @@ difficulty: 3
 platforms: [iol]
 summary: Four routers, two OSPF areas. Make area 1 totally stubby and summarize its loopbacks to a /22 on the ABR.
 author: CML Lab Builder
-version: "2"
+version: "3"
 nodes:
   - name: R1
     kind: router

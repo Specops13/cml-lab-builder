@@ -355,3 +355,4 @@ faults:
   - What can an SSM receiver express that an ASM receiver doesn't need to?
   - '`show ip igmp interface %if2%` on R4: which IGMP version is running?'
   checks: []
+version: "2"

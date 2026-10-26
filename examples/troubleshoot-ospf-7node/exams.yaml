@@ -1,0 +1,10 @@
+# Cisco exam objectives this lab covers: '<EXAM> <objective>' from cmllab/exams/*.yaml
+lab:
+- ENCOR 3.2.b
+- ENCOR 4.1
+- ENARSI 1.10.b
+- CCNA 3.4.a
+- CCIE-EI 1.4.a
+- CCIE-EI 1.2.i
+- CCIE-DC 1.2.a.i
+- CCIE-DC 1.2.a.ii

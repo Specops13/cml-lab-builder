@@ -223,3 +223,4 @@ faults:
   - Both ends must protect the tunnel the same way.
   - Compare the Tunnel0 configs of R1 and R2.
   checks: []
+version: "2"

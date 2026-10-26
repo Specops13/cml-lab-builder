@@ -98,9 +98,13 @@ def test_steps_only_in_walkthroughs():
 
 
 # ---------------------------------------------------------------- offline grading per step
-@pytest.mark.parametrize("plat", ["iol", "iosv"])
-def test_every_step_passes_when_built_and_fails_when_blank(plat):
-    lab, p = evpn(), platforms.get(plat)
+def test_every_step_fails_when_blank():
+    """(Built = passes for every lab's steps: tests/test_lab_content.py.) Each step's checks fail before its config."""
+    for plat in ("iol", "iosv"):
+        _step_checks(evpn(), platforms.get(plat))
+
+
+def _step_checks(lab, p):
     solved, blank = SimRunner(lab, p, True), SimRunner(lab, p, False)
     for st in lab.steps:
         sl = walkthrough.step_lab(lab, st)

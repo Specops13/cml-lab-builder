@@ -17,7 +17,7 @@ import re
 from typing import Callable
 from urllib.parse import urljoin, urlparse
 
-from . import catalog, courses, packs, sizing, topics
+from . import catalog, courses, objectives, packs, sizing, topics
 from .schema import version_key
 
 ORIGIN_FILE = ".library.json"
@@ -134,7 +134,10 @@ def parse_index(raw: bytes) -> list[dict]:
                     # search fields (3.1.0+ indexes; older ones simply have none)
                     "domain": str(it.get("domain") or "")[:120], "track": str(it.get("track") or "")[:40],
                     "platforms": _strs(it.get("platforms"), 10), "node_types": _strs(it.get("node_types"), 20),
-                    "topics": _strs(it.get("topics"), topics.MAX_TOPICS)})
+                    "topics": _strs(it.get("topics"), topics.MAX_TOPICS),
+                    # exam objective tags (3.3.5+ indexes), well-formed ones only
+                    "exams": [t for t in objectives.normalize(_strs(it.get("exams"), objectives.MAX_TAGS))
+                              if objectives.split(t)]})
     # topic tags (3.2.0+ indexes): known ids only; labs without any (older or third-party indexes) get derived ones
     by_id = {}
     for o in out:
@@ -196,7 +199,8 @@ def index(url: str = DEFAULT_INDEX, fetch: Fetcher = http_fetch, *, heavy_gb: fl
                  versions={i["id"]: i["version"] for i in items if i["kind"] == "lab"})
     used = [t for it in items for t in it.get("topics", [])]
     return {"url": url, "items": items, "starter": [s for s in starter if s in by_id],
-            "updates": _LAST["updates"], "topics": topics.vocabulary(used)}
+            "updates": _LAST["updates"], "topics": topics.vocabulary(used),
+            "exams": objectives.vocabulary([t for it in items for t in it.get("exams", [])])}
 
 
 def install_bytes(name: str, data: bytes, node_limit: int = 20, overwrite: bool = False) -> dict:
@@ -334,9 +338,9 @@ def build_index(folder, base_items: list[dict] | None = None, lab_roots: list | 
                     labs_by_id.setdefault(d.name, catalog.load_lab_file(d / "lab.yaml"))
             for f2 in folder.iterdir():      # labs published next to the course
                 if f2.name.endswith(packs.PACK_EXTS) and f2.stem not in labs_by_id:
-                    labs_by_id[f2.stem] = packs.parse_lab_text(packs.read_upload(f2.name, f2.read_bytes()).lab_yaml)[0]
+                    labs_by_id[f2.stem] = packs.pack_lab(packs.read_upload(f2.name, f2.read_bytes()))
             for bp in bundled.values():
-                bl, _ = packs.parse_lab_text(bp.lab_yaml)
+                bl = packs.pack_lab(bp)
                 labs_by_id[bl.id] = bl
             rams = [sizing.estimate(labs_by_id[lid], labs_by_id[lid].platforms[0])["gb"]
                     for lid in c.labs if lid in labs_by_id]
@@ -344,13 +348,15 @@ def build_index(folder, base_items: list[dict] | None = None, lab_roots: list | 
                 it["ram_gb"] = max(rams)
         else:
             pk = packs.read_upload(f.name, data)
-            lab, _ = packs.parse_lab_text(pk.lab_yaml)
+            lab = packs.pack_lab(pk)
             it.update(kind="lab", id=lab.id, title=lab.title, version=lab.version, description=lab.summary,
                       blueprint=lab.blueprint, nodes=len(lab.nodes), difficulty=lab.difficulty, type=lab.type,
                       ram_gb=sizing.estimate(lab, lab.platforms[0])["gb"],
                       # for the library search: domain/track, image profiles and the CML node definitions used
                       domain=lab.domain, track=lab.track, platforms=list(lab.platforms),
-                      node_types=sorted({d for p in lab.platforms for d in sizing.node_definitions(lab, p)}))
+                      node_types=sorted({d for p in lab.platforms for d in sizing.node_definitions(lab, p)}),
+                      # exam objectives (3.3.5): lab-level first, then the ones only single steps cover
+                      exams=objectives.lab_tags(lab))
         items.append(it)
     # topic tags (3.2.0): subject topics from topic_map (labsrc/library.yaml), else derived; then type and track
     by_id = {}

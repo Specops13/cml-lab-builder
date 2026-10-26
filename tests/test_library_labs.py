@@ -198,18 +198,19 @@ def test_update_available_and_update_keeps_history(no_labs):
     c = client(fetcher(files))
     c.post("/api/library/install-set", json={"ids": ["06-hsrp", "eigrp-basic"]})
     history.add("06-hsrp", {"score_pct": 80, "passed": False, "earned": 4, "total": 5, "results": []})
+    catalog_v = catalog.get("06-hsrp").version
     hist = (history.data_dir() / "history" / "06-hsrp.json").read_bytes()
     assert not any(i.get("update_available") for i in c.get("/api/library").json()["items"])
-    files.update(_bumped(files, "06-hsrp", "2"))
+    files.update(_bumped(files, "06-hsrp", "9"))
     idx = c.get("/api/library").json()
     hs = next(i for i in idx["items"] if i["id"] == "06-hsrp")
-    assert hs["update_available"] and hs["installed_version"] == "1" and hs["version"] == "2" and idx["updates"] == ["06-hsrp"]
+    assert hs["update_available"] and hs["installed_version"] == catalog_v and hs["version"] == "9" and idx["updates"] == ["06-hsrp"]
     labs = {l["id"]: l for l in c.get("/api/labs").json()["labs"]}
     assert labs["06-hsrp"]["update_available"] and not labs["eigrp-basic"]["update_available"]
     r = c.post("/api/library/install-set", json={"updates": True}).json()
     assert r["installed"] == ["06-hsrp"]
-    assert catalog.get("06-hsrp").version == "2" and "(revised)" in catalog.get("06-hsrp").summary
-    assert library.origin("06-hsrp")["version"] == "2"
+    assert catalog.get("06-hsrp").version == "9" and "(revised)" in catalog.get("06-hsrp").summary
+    assert library.origin("06-hsrp")["version"] == "9"
     assert (history.data_dir() / "history" / "06-hsrp.json").read_bytes() == hist
     labs = {l["id"]: l for l in c.get("/api/labs").json()["labs"]}
     assert not labs["06-hsrp"]["update_available"] and labs["06-hsrp"]["best"] == 80
@@ -220,6 +221,7 @@ def test_version_ordering():
     assert version_key("2") > version_key("1.10") > version_key("1.9") > version_key("1") == version_key("1.0") > version_key("0.9")
 
 
+@pytest.mark.slow
 def test_build_library_refuses_a_changed_pack_without_a_version_bump(tmp_path):
     sys.path.insert(0, str(ROOT / "packaging"))
     import build_library
@@ -233,6 +235,7 @@ def test_build_library_refuses_a_changed_pack_without_a_version_bump(tmp_path):
     assert (tmp_path / "ok" / "index.json").read_bytes() == (LIB / "index.json").read_bytes()
 
 
+@pytest.mark.slow
 def test_new_library_folder_has_the_same_labs_under_the_new_names(tmp_path):
     """2.1.0: library/ (.cmllab/.cmlcourse, read by 2.1+) and labs/ (.encorlab/.encorcourse, read by 2.0 and older)."""
     sys.path.insert(0, str(ROOT / "packaging"))
@@ -395,6 +398,7 @@ def test_full_download_update_restores_from_library(no_labs):
     assert _data_digest() == before and migrate.run_local()["state"] == "done"
 
 
+@pytest.mark.slow
 def test_auto_restore_in_background_and_dismiss(no_labs):
     _user_data()
     migrate.run_local()

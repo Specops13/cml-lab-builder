@@ -25,7 +25,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pyats = ["virl2_client[pyats]>=2.9.0,<2.10"]   # Linux/macOS only (pyATS has no native Windows support)
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = ["pytest>=8", "httpx>=0.27", "pytest-xdist>=3.5"]
 build = ["pyinstaller>=6.22,<7"]
 
 [project.scripts]
@@ -40,10 +40,12 @@ py-modules = ["cmlboot"]   # boot loader of the packaged app (part of the frozen
 include = ["cmllab*"]
 
 [tool.setuptools.package-data]
-cmllab = ["web/templates/*.html", "web/static/*", "resources/*"]
+cmllab = ["web/templates/*.html", "web/static/*", "resources/*", "exams/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# `pytest -n auto` runs in parallel (pytest-xdist). Pushes/PRs run `-m "not slow"`; tags and releases run everything.
+markers = ["slow: long end-to-end tests (real sockets/threads/timeouts, rebuilding packs); skipped on push CI"]
 
 [tool.ruff]
 line-length = 130

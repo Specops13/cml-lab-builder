@@ -248,3 +248,4 @@ faults:
   - Which router is designed to never carry transit traffic?
   - 'Look at the EIGRP address family on R3: what makes it a stub?'
   checks: []
+version: "2"

@@ -1,0 +1,138 @@
+# ENARSI 300-410 v1.1 exam topics, transcribed from Cisco's published blueprint.
+# Source: https://learningcontent.cisco.com/documents/marketing/exam-topics/300-410-ENARSI-v1.1.pdf
+# Do not add or renumber objectives by hand: re-transcribe from the source.
+id: ENARSI
+code: 300-410
+name: Implementing Cisco Enterprise Advanced Routing and Services
+version: v1.1
+track: enterprise
+level: professional
+source: https://learningcontent.cisco.com/documents/marketing/exam-topics/300-410-ENARSI-v1.1.pdf
+source_page: https://learningnetwork.cisco.com/s/enarsi-exam-topics
+published: '2023-01-18'
+fetched: '2026-10-25'
+label: ENARSI
+domains:
+- id: '1.0'
+  name: Layer 3 Technologies
+  weight: 35
+- id: '2.0'
+  name: VPN Technologies
+  weight: 20
+- id: '3.0'
+  name: Infrastructure Security
+  weight: 20
+- id: '4.0'
+  name: Infrastructure Services
+  weight: 25
+objectives:
+- id: '1.1'
+  text: Troubleshoot administrative distance (all routing protocols)
+- id: '1.2'
+  text: Troubleshoot route map for any routing protocol (attributes, tagging, filtering)
+- id: '1.3'
+  text: Troubleshoot loop prevention mechanisms (filtering, tagging, split horizon, route poisoning)
+- id: '1.4'
+  text: Troubleshoot redistribution between any routing protocols or routing sources
+- id: '1.5'
+  text: Troubleshoot manual and auto-summarization with any routing protocol
+- id: '1.6'
+  text: Configure and verify policy-based routing
+- id: '1.7'
+  text: Configure and verify VRF-Lite
+- id: '1.8'
+  text: Describe Bidirectional Forwarding Detection
+- id: '1.9'
+  text: Troubleshoot EIGRP (classic and named mode; VRF and global)
+- id: 1.9.a
+  text: Address families (IPv4, IPv6)
+- id: 1.9.b
+  text: Neighbor relationship and authentication
+- id: 1.9.c
+  text: Loop-free path selections (RD, FD, FC, successor, feasible successor, stuck in active)
+- id: 1.9.d
+  text: Stubs
+- id: 1.9.e
+  text: Load balancing (equal and unequal cost)
+- id: 1.9.f
+  text: Metrics
+- id: '1.10'
+  text: Troubleshoot OSPF (v2/v3)
+- id: 1.10.a
+  text: Address families (IPv4, IPv6)
+- id: 1.10.b
+  text: Neighbor relationship and authentication
+- id: 1.10.c
+  text: Network types, area types, and router types
+- id: 1.10.c.i
+  text: Point-to-point, multipoint, broadcast, nonbroadcast
+- id: 1.10.c.ii
+  text: 'Area type: backbone, normal, transit, stub, NSSA, totally stub'
+- id: 1.10.c.iii
+  text: Internal router, backbone router, ABR, ASBR
+- id: 1.10.c.iv
+  text: Virtual link
+- id: 1.10.d
+  text: Path preference
+- id: '1.11'
+  text: Troubleshoot BGP (Internal and External, unicast, and VRF-Lite)
+- id: 1.11.a
+  text: Address families (IPv4, IPv6)
+- id: 1.11.b
+  text: Neighbor relationship and authentication (next-hop, mulithop, 4-byte AS, private AS, route refresh, synchronization, operation, peer group, states and timers)
+- id: 1.11.c
+  text: Path preference (attributes and best-path)
+- id: 1.11.d
+  text: Route reflector (excluding multiple route reflectors, confederations, dynamic peer)
+- id: 1.11.e
+  text: Policies (inbound/outbound filtering, path manipulation)
+- id: '2.1'
+  text: Describe MPLS operations (LSR, LDP, label switching, LSP)
+- id: '2.2'
+  text: Describe MPLS Layer 3 VPN
+- id: '2.3'
+  text: Configure and verify DMVPN (single hub)
+- id: 2.3.a
+  text: GRE/mGRE
+- id: 2.3.b
+  text: NHRP
+- id: 2.3.c
+  text: IPsec
+- id: 2.3.d
+  text: Dynamic neighbor
+- id: 2.3.e
+  text: Spoke-to-spoke
+- id: '3.1'
+  text: Troubleshoot device security using IOS AAA (TACACS+, RADIUS, local database)
+- id: '3.2'
+  text: Troubleshoot router security features
+- id: 3.2.a
+  text: IPv4 access control lists (standard, extended, time-based)
+- id: 3.2.b
+  text: IPv6 traffic filter
+- id: 3.2.c
+  text: Unicast reverse path forwarding (uRPF)
+- id: '3.3'
+  text: Troubleshoot control plane policing (CoPP) (Telnet, SSH, HTTP(S), SNMP, EIGRP, OSPF, BGP)
+- id: '3.4'
+  text: Describe IPv6 First Hop security features (RA guard, DHCP guard, binding table, ND inspection/snooping, source guard)
+- id: '4.1'
+  text: Troubleshoot device management
+- id: 4.1.a
+  text: Console and VTY
+- id: 4.1.b
+  text: Telnet, HTTP, HTTPS, SSH, SCP
+- id: 4.1.c
+  text: (T)FTP
+- id: '4.2'
+  text: Troubleshoot SNMP (v2c, v3)
+- id: '4.3'
+  text: Troubleshoot network problems using logging (local, syslog, debugs, conditional debugs, timestamps)
+- id: '4.4'
+  text: Troubleshoot IPv4 and IPv6 DHCP (DHCP client, IOS DHCP server, DHCP relay, DHCP options)
+- id: '4.5'
+  text: Troubleshoot network performance issues using IP SLA (jitter, tracking objects, delay, connectivity)
+- id: '4.6'
+  text: Troubleshoot NetFlow (v5, v9, flexible NetFlow)
+- id: '4.7'
+  text: Troubleshoot network problems using Cisco DNA Center assurance (connectivity, monitoring, device health, network health)

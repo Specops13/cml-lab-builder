@@ -1,0 +1,180 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Outputs follow the IOS XE IPv6 addressing, IPv6 static routing, DHCP and DHCPv6 configuration guides.
+# State: every step done (final state of the walkthrough).
+R1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    SRV              Eth 0/0             165              R B   Linux Uni Eth 0/0
+    CLIENT1          Eth 0/1             162              R B   Linux Uni Eth 0/0
+    CLIENT2          Eth 0/2             159              R B   Linux Uni Eth 0/0
+    SRV              Eth 0/3             156              R B   Linux Uni Eth 0/2
+
+    Total cdp entries displayed : 4
+  show ipv6 interface brief: |
+    %if0%            [up/up]
+        FE80::1
+        2001:DB8:0:1::2
+    %if1%            [up/up]
+        FE80::1
+        2001:DB8:A::1
+    %if2%            [up/up]
+        FE80::1
+        2001:DB8:B::1
+    %if3%            [up/up]
+        FE80::1
+        2001:DB8:0:3:A8BB:CCFF:FE00:130
+    Loopback0              [up/up]
+        FE80::A8BB:CCFF:FE00:100
+        2001:DB8:FFFF::1
+        FD00:20::1
+  ping 2001:DB8:0:1::1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:0:1::1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ipv6 interface %if0%: "%if0% is up, line protocol is up\n  IPv6 is enabled, link-local address is FE80::1 \n  No Virtual\
+    \ link-local address(es):\n  Description: to SRV (primary link)\n  Global unicast address(es):\n    2001:DB8:0:1::2, subnet\
+    \ is 2001:DB8:0:1::/64 \n  Joined group address(es):\n    FF02::1\n    FF02::2\n    FF02::1:FF00:1\n    FF02::1:FF00:2\n\
+    \  MTU is 1500 bytes\n  ICMP error messages limited to one every 100 milliseconds\n  ICMP redirects are enabled\n  ICMP\
+    \ unreachables are sent\n  ND DAD is enabled, number of DAD attempts: 1\n  ND reachable time is 30000 milliseconds (using\
+    \ 30000)\n  ND advertised reachable time is 0 (unspecified)\n  ND advertised retransmit interval is 0 (unspecified)\n\
+    \  ND router advertisements are sent every 200 seconds\n  ND router advertisements live for 1800 seconds\n  ND advertised\
+    \ default router preference is Medium\n  Hosts use stateless autoconfig for addresses.\n"
+  show ipv6 route static: |
+    IPv6 Routing Table - default - 12 entries
+    Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+           B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+           ND - ND Default, NDp - ND Prefix, DCE - Destination, NDr - Redirect
+    S   ::/0 [1/0]
+         via 2001:DB8:0:1::1
+  show ipv6 interface %if1%: "%if1% is up, line protocol is up\n  IPv6 is enabled, link-local address is FE80::1 \n  No Virtual\
+    \ link-local address(es):\n  Description: LAN-A (CLIENT1, dual stack)\n  Global unicast address(es):\n    2001:DB8:A::1,\
+    \ subnet is 2001:DB8:A::/64 \n  Joined group address(es):\n    FF02::1\n    FF02::2\n    FF02::1:2\n    FF02::1:FF00:1\n\
+    \  MTU is 1500 bytes\n  ND DAD is enabled, number of DAD attempts: 1\n  ND reachable time is 30000 milliseconds (using\
+    \ 30000)\n  ND router advertisements are sent every 200 seconds\n  ND router advertisements live for 1800 seconds\n  ND\
+    \ advertised default router preference is Medium\n  Hosts use stateless autoconfig for addresses.\n  Hosts use DHCP to\
+    \ obtain other configuration.\n"
+  show ipv6 dhcp interface %if2%: |
+    %if2% is in relay mode
+      Relay destinations:
+        2001:DB8:0:1::1
+SRV:
+  show ipv6 route static: |
+    IPv6 Routing Table - default - 14 entries
+    Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+           B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+           ND - ND Default, NDp - ND Prefix, DCE - Destination, NDr - Redirect
+    S   2001:DB8:A::/64 [1/0]
+         via 2001:DB8:0:1::2
+    S   2001:DB8:B::/64 [1/0]
+         via FE80::1, %if0%
+    S   2001:DB8:BB00::/48 [1/0]
+         via FE80::A8BB:CCFF:FE00:400, %if1%
+    S   2001:DB8:FFFF::1/128 [1/0]
+         via 2001:DB8:0:1::2
+    S   FD00:20::1/128 [1/0]
+         via 2001:DB8:0:1::2
+  ping FD00:20::1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to FD00:20::1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ip dhcp binding: |
+    Bindings from all pools not associated with VRF:
+    IP address      Client-ID/              Lease expiration        Type       State      Interface
+                    Hardware address/
+                    User name
+    10.20.1.10      0063.6973.636f.2d61.    Oct 26 2026 04:12 AM    Automatic  Active     %if0%
+                    6162.622e.6363.3030.
+                    2e30.3230.302d.4574.
+                    302f.30
+  show ipv6 dhcp binding: |
+    Client: FE80::A8BB:CCFF:FE00:300
+      DUID: 00030001AABBCC000300
+      Username : unassigned
+      VRF : default
+      Interface : %if0%
+      IA NA: IA ID 0x00030001, T1 43200, T2 69120
+        Address: 2001:DB8:B:0:7C1E:5A2B:9D40:16F3
+                preferred lifetime 86400, valid lifetime 43200
+                expires at Oct 26 2026 08:12 PM (86381 seconds)
+    Client: FE80::A8BB:CCFF:FE00:400
+      DUID: 00030001AABBCC000400
+      Username : unassigned
+      VRF : default
+      Interface : %if1%
+      IA PD: IA ID 0x00030001, T1 900, T2 1440
+        Prefix: 2001:DB8:BB00::/48
+                preferred lifetime 1800, valid lifetime 3600
+                expires at Oct 25 2026 09:12 PM (3581 seconds)
+CLIENT1:
+  show dhcp lease: |
+    Temp IP addr: 10.20.1.10  for peer on Interface: %if0%
+    Temp  sub net mask: 255.255.255.0
+       DHCP Lease server: 10.20.0.1, state: 5 Bound
+       DHCP transaction id: 1A2B
+       Lease: 28800 secs,  Renewal: 14400 secs,  Rebind: 25200 secs
+    Temp default-gateway addr: 10.20.1.1
+          Next timer fires after: 03:59:12
+       Retry count: 0   Client-ID: cisco-aabb.cc00.0200-Et0/0
+       Client-ID hex dump: 636973636F2D616162622E636330302E
+                           303230302D4574302F30
+       Hostname: CLIENT1
+  ping 10.20.0.1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.20.0.1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ipv6 interface %if0%: "%if0% is up, line protocol is up\n  IPv6 is enabled, link-local address is FE80::A8BB:CCFF:FE00:200\
+    \ \n  No Virtual link-local address(es):\n  Description: to R1 (LAN-A)\n  Stateless address autoconfig enabled\n  Global\
+    \ unicast address(es):\n    2001:DB8:A::A8BB:CCFF:FE00:200, subnet is 2001:DB8:A::/64 [EUI/CAL/PRE]\n      valid lifetime\
+    \ 2591979 preferred lifetime 604779\n  Joined group address(es):\n    FF02::1\n    FF02::1:FF00:200\n  MTU is 1500 bytes\n\
+    \  ND DAD is enabled, number of DAD attempts: 1\n  ND reachable time is 30000 milliseconds (using 30000)\n  Default router\
+    \ is FE80::1 on %if0%\n"
+  ping 2001:DB8:0:1::1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:0:1::1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+CLIENT2:
+  show ipv6 dhcp interface: |
+    %if0% is in client mode
+      Prefix State is IDLE
+      Address State is OPEN
+      Renew for address will be sent in 11:59:41
+      List of known servers:
+        Reachable via address: FE80::1
+        DUID: 00030001AABBCC000100
+        Preference: 0
+        Configuration parameters:
+          IA NA: IA ID 0x00030001, T1 43200, T2 69120
+            Address: 2001:DB8:B:0:7C1E:5A2B:9D40:16F3/128
+                    preferred lifetime 43200, valid lifetime 86400
+                    expires at Oct 26 2026 08:12 PM (86381 seconds)
+          DNS server: 2001:DB8:0:1::1
+          Domain name: lab.local
+          Information refresh time: 0
+      Prefix Rapid-Commit: disabled
+      Address Rapid-Commit: disabled
+BR:
+  show ipv6 general-prefix: |
+    IPv6 Prefix BR-PD, acquired via DHCP PD
+      2001:DB8:BB00::/48 Valid lifetime 3581, preferred lifetime 1781
+        Loopback1 (Address command)
+  show ipv6 interface brief: |
+    %if0%            [up/up]
+        FE80::A8BB:CCFF:FE00:400
+        2001:DB8:0:2::2
+    %if1%            [administratively down/down]
+        unassigned
+    %if2%            [administratively down/down]
+        unassigned
+    %if3%            [administratively down/down]
+        unassigned
+    Loopback1              [up/up]
+        FE80::A8BB:CCFF:FE00:400
+        2001:DB8:BB00:1::1

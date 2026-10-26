@@ -1,0 +1,36 @@
+# Cisco exam objectives this lab covers: '<EXAM> <objective>' from cmllab/exams/*.yaml
+lab:
+- ENARSI 2.3
+- ENARSI 2.3.a
+- ENARSI 2.3.b
+- ENARSI 2.3.d
+- ENARSI 2.3.e
+- ENCOR 2.2.b
+- CCIE-EI 3.3
+- CCIE-EI 3.3.a.i
+- ENARSI 1.9
+- CCIE-EI 1.3.e.i
+steps:
+  underlay:
+  - CCNA 3.3.a
+  hub-mgre:
+  - ENARSI 2.3.a
+  - ENCOR 2.2.b
+  spokes-register:
+  - ENARSI 2.3.b
+  - ENARSI 2.3.d
+  - CCIE-EI 3.3.a.i
+  routing:
+  - ENARSI 1.9
+  - ENARSI 1.3
+  - CCIE-EI 1.3.e.i
+  - CCIE-EI 1.3.a
+  phase3:
+  - ENARSI 2.3.e
+  - CCIE-EI 3.3.a.i
+  summarize:
+  - ENARSI 1.5
+  - ENARSI 2.3.e
+  troubleshoot:
+  - ENCOR 4.1
+  - ENARSI 4.3

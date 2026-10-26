@@ -39,6 +39,8 @@ which builds the lab in Cisco Modeling Labs 2.9 and grades it automatically.
 - Keep to 2-6 nodes; use only kind router/switch; platforms [iol, iosv] unless a feature needs one.
 - id: lowercase-with-dashes, unique and descriptive (never the id of a lab in the online library, e.g. 03-ospf-multiarea).
   Leave `version:` out for a new lab (it defaults to "1"); raise it only when revising a published lab.
+- Tag the lab with `exams:` (Cisco exam objectives it really practises, e.g. ["ENCOR 3.2.b", "CCNA 3.4"]; walkthrough
+  steps can carry their own `exams:`). Use only objective numbers from the exams listed under "Exam objectives".
 - Default to a challenge lab (`type` omitted). Only when the request asks for a guided, step-by-step build, write
   `type: walkthrough` with ordered `steps` (explain, config per device, verify with expected output, checks) and no
   lab-level checks, solution or faults (see "Walkthrough labs" in the guide).
@@ -293,6 +295,7 @@ The JSON Schema is `cml-lab.schema.json` (`cmllab schema`). For autocomplete in 
 | id, title | yes | |
 | track | no | study track, default `ENCOR`; e.g. `CCNA`, `ENARSI`. Progress groups labs by track. Needs 2.1.0+, so leave it out for ENCOR labs |
 | blueprint | yes | ENCOR labs: 350-401 v1.2 items, e.g. `["3.2.b"]`; other tracks: that exam's topic ids or short names |
+| exams | recommended | Cisco exam objectives the lab covers, e.g. `["ENCOR 3.2.b", "CCNA 3.4", "CCIE-EI 1.4.c"]` (see "Exam objectives"). Needs 3.3.5+; library labs use `exams.yaml` instead |
 | domain | yes | e.g. `"3.0 Infrastructure - Layer 3"` |
 | difficulty | yes | 1-5 |
 | platforms | no | default `[iol, iosv]`. Use both unless a feature needs one image |
@@ -308,6 +311,29 @@ The JSON Schema is `cml-lab.schema.json` (`cmllab schema`). For autocomplete in 
 | ram_gb | no | CML server RAM the lab needs, in GB. Default: estimated from the node types (see "RAM estimate") |
 | author | no | free text |
 | version | no | content version, e.g. `"1"`, `"2"` or `"1.1"` (default `"1"`). Raise it whenever you change a lab that is already published: installed copies then show *Update available* in the library |
+
+## Exam objectives (`exams`, 3.3.5+)
+Tag every lab (and, in a walkthrough, every step that teaches something) with the Cisco exam objectives it really
+practises. A tag is `<EXAM> <objective>`: the exam id and the objective number exactly as in Cisco's published exam
+topics. The app ships the blueprints in `cmllab/exams/*.yaml` (source URL, version and date in each file):
+`CCNA` (200-301 v1.1), `ENCOR` (350-401 v1.2), `ENARSI` (300-410 v1.1), `DCCOR` (350-601 v1.2),
+`CCIE-EI` (Enterprise Infrastructure v1.1) and `CCIE-DC` (Data Center v3.1). Sub-items use dots, e.g. `ENCOR 3.2.b`,
+`CCIE-EI 1.4.f.ii`; a tag on a parent (`CCNA 3.4`) covers its sub-items.
+- `python -m cmllab exams` lists the exams, `python -m cmllab exams ENCOR` the objectives, `--coverage` which labs
+  cover each one, and `--suggest 3.2.b,3.3.c` proposes tags from blueprint items (the builder's *Suggest* button does
+  the same). Keep only what the lab makes the student configure or verify, not everything it mentions.
+- Unknown exams or objective numbers are errors; a lab with no tags gets a validator warning (and the library build
+  refuses it).
+- Inline `exams:` (on the lab and on steps) needs 3.3.5 or later. For a lab that older versions must also open (the
+  library), put the tags in **`exams.yaml`** next to `lab.yaml` instead; older versions skip that file:
+```yaml
+lab: [ENCOR 3.2.b, CCNA 3.4, ENARSI 1.10.c]      # lab-level objectives
+steps:                                          # walkthroughs: per step id
+  underlay-ospf: [ENCOR 3.2.b, DCCOR 1.1.a]
+```
+- Adding an exam: drop a `<id>.yaml` file in `cmllab/exams/` with `id`, `code`, `name`, `version`, `source` (the
+  official exam-topics URL), `published`, `domains` and the numbered `objectives` copied from Cisco's document. Never
+  invent objective numbers.
 
 ## RAM estimate and the "RAM heavy" tag
 The app shows an estimated CML RAM figure on every lab (catalog, lab page, build confirmation, courses, library). It adds
@@ -548,7 +574,8 @@ Since 2.0.0 the app ships without labs; every lab, including the former built-in
 `.encorcourse` for 2.0 and older). Lab sources live in `labsrc/<id>/` (and `examples/<id>/`), courses in `examples/courses/`.
 `python packaging/build_library.py` packs them reproducibly, validates every lab strictly (solution 100%, starting config
 0%) and writes `library/index.json` (and `labs/index.json`) with each file's sha256, size, version, RAM estimate and the recommended starter set
-(`labsrc/library.yaml`). It refuses a changed pack whose `version:` was not raised. Anyone can host a library: serve a
+(`labsrc/library.yaml`). It refuses a changed pack whose `version:` was not raised, and a lab without exam-objective
+tags (`exams.yaml`) or with an unknown objective. Anyone can host a library: serve a
 folder with `index.json` and the packs over https and set *Settings > Library URL* (http is accepted only for
 localhost).
 
@@ -562,6 +589,7 @@ See the example below (also shipped as `example-lab.yaml`).
 id: example-eigrp-pair
 title: "Example: EIGRP between two routers"
 blueprint: ["3.2.a"]
+exams: ["ENCOR 3.2.a", "ENARSI 1.9", "CCIE-EI 1.3.a"]   # Cisco exam objectives covered (3.3.5+; see "Exam objectives")
 domain: "3.0 Infrastructure - Layer 3"
 difficulty: 1
 platforms: [iol, iosv]
@@ -1004,6 +1032,15 @@ hints:
      "description": "Offer 'Apply this step for me' (push the config over the console)",
      "title": "Apply",
      "type": "boolean"
+    },
+    "exams": {
+     "default": [],
+     "description": "Exam objectives this step covers, e.g. ['ENCOR 3.2.b'] (3.3.5+; or exams.yaml `steps:`)",
+     "items": {
+      "type": "string"
+     },
+     "title": "Exams",
+     "type": "array"
     }
    },
    "required": [
@@ -1078,6 +1115,15 @@ hints:
     "type": "string"
    },
    "title": "Blueprint",
+   "type": "array"
+  },
+  "exams": {
+   "default": [],
+   "description": "Cisco exam objectives covered, as '<EXAM> <objective>' from cmllab/exams/*.yaml, e.g. ['ENCOR 3.2.b', 'CCNA 3.4']. 3.3.5+ only: for packs that older apps must import, put them in exams.yaml next to lab.yaml instead",
+   "items": {
+    "type": "string"
+   },
+   "title": "Exams",
    "type": "array"
   },
   "domain": {

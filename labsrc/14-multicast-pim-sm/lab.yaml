@@ -305,3 +305,4 @@ faults:
     device: R3
     command: show ip rpf 10.0.1.10
     match: ['RPF interface: %if1%', 'RPF type: unicast \(ospf 1\)']
+version: "2"

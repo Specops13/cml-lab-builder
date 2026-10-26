@@ -1,0 +1,59 @@
+# Cisco exam objectives this lab covers: '<EXAM> <objective>' from cmllab/exams/*.yaml
+lab:
+- ENCOR 2.3.b
+- DCCOR 1.3
+- DCCOR 1.1.b
+- CCIE-DC 3.1.b
+- CCIE-DC 6.3.c
+- CCIE-DC 6.3.d
+steps:
+  baseline:
+  - DCCOR 1.1.a
+  - DCCOR 1.1.b
+  design:
+  - ENCOR 2.3.b
+  - DCCOR 1.3
+  - CCIE-DC 6.3.d
+  features:
+  - DCCOR 1.3
+  evpn-af:
+  - DCCOR 1.1.b
+  - CCIE-DC 1.2.c.iii
+  vni:
+  - DCCOR 1.3
+  - CCIE-DC 3.1.b
+  - CCIE-DC 6.3.d
+  nve:
+  - ENCOR 2.3.b
+  - DCCOR 1.3
+  - CCIE-DC 3.1.b
+  access:
+  - CCNA 2.1.a
+  - CCNA 2.5.c
+  - CCIE-DC 1.1.d.i
+  l2-test:
+  - DCCOR 1.5
+  - CCNA 1.13.d
+  bum:
+  - DCCOR 1.5
+  - DCCOR 1.1.c
+  l3vni:
+  - CCIE-DC 6.3.c
+  anycast-gw:
+  - DCCOR 1.1.d
+  - CCIE-DC 1.2.e
+  irb:
+  - DCCOR 1.5
+  - CCIE-DC 6.3.c
+  type5:
+  - CCIE-DC 3.1.b
+  - CCIE-DC 1.2.c.vii
+  retain-rt:
+  - CCIE-DC 6.3.d
+  suppress-arp:
+  - DCCOR 1.5
+  troubleshoot:
+  - ENCOR 4.1
+  - CCIE-DC 3.1.b
+  wrap-up:
+  - DCCOR 1.5

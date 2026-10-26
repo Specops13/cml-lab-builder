@@ -24,7 +24,8 @@ from .render import to_yaml
 from .schema import Lab
 
 MAX_PACK_BYTES = 5 * 1024 * 1024
-PACK_FILES = ("lab.yaml", "solution.cfg", "fixture_solved.yaml", "fixture_blank.yaml", "README.md")
+PACK_FILES = ("lab.yaml", "solution.cfg", "fixture_solved.yaml", "fixture_blank.yaml", "README.md", "exams.yaml")
+# exams.yaml (3.3.5): exam-objective tags; apps before 3.3.5 skip it ("ignored file in pack"), so packs stay importable
 PACK_EXT = ".cmllab"
 PACK_EXTS = (".cmllab", ".encorlab")    # .encorlab: the name before 2.1.0, still imported
 
@@ -43,6 +44,7 @@ class Pack:
     fixtures: dict = field(default_factory=dict)   # {"solved": {...}, "blank": {...}}
     readme: str | None = None
     warnings: list[str] = field(default_factory=list)
+    exams_yaml: str | None = None                  # exams.yaml (objective tags), see cmllab/objectives.py
 
 
 @dataclass
@@ -156,7 +158,20 @@ def read_upload(filename: str, data: bytes) -> Pack:
                 fixtures[st] = yaml.safe_load(t) or {}
             except yaml.YAMLError as e:
                 raise LabError([f"fixture_{st}.yaml: YAML error: {e}"])
-    return Pack(files["lab.yaml"], files.get("solution.cfg"), fixtures, files.get("README.md"), warnings)
+    return Pack(files["lab.yaml"], files.get("solution.cfg"), fixtures, files.get("README.md"), warnings,
+                files.get("exams.yaml"))
+
+
+def pack_lab(pack: Pack) -> Lab:
+    """The pack's Lab with the exam tags of its exams.yaml merged in (raises LabError)."""
+    lab, _ = parse_lab_text(pack.lab_yaml)
+    if pack.exams_yaml:
+        from . import objectives
+        try:
+            objectives.apply(lab, objectives.read_sidecar(pack.exams_yaml))
+        except (ValueError, yaml.YAMLError) as e:
+            raise LabError([f"exams.yaml: {e}"])
+    return lab
 
 
 def read_dir(path: Path) -> Pack:
@@ -194,10 +209,18 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
     from .sim import SimRunner
     warnings = list(pack.warnings)
     try:
-        lab, _ = parse_lab_text(pack.lab_yaml)
+        lab = pack_lab(pack)
     except LabError as e:
         return Report(False, None, None, e.errors, warnings, [])
     errors: list[str] = []
+    from . import objectives
+    ex_errs, ex_warns = objectives.lint(lab)
+    errors += ex_errs
+    warnings += ex_warns
+    if pack.exams_yaml:
+        known_steps = {st.id for st in lab.steps}
+        side = objectives.read_sidecar(pack.exams_yaml)
+        errors += [f"exams.yaml: step {s!r} is not a step of this lab" for s in side["steps"] if s not in known_steps]
     results: list[dict] = []
     if builtin_ids and lab.id in builtin_ids:
         errors.append(f"id {lab.id!r} is used by a built-in lab; pick another id")
@@ -328,6 +351,8 @@ def install(pack: Pack, node_limit: int = 20, overwrite: bool = False) -> Report
         (tmp / f"fixture_{st}.yaml").write_text(yaml.safe_dump(fx, sort_keys=False), encoding="utf-8")
     if pack.readme:
         (tmp / "README.md").write_text(pack.readme, encoding="utf-8")
+    if pack.exams_yaml:
+        (tmp / "exams.yaml").write_text(pack.exams_yaml, encoding="utf-8")
     if dest.exists():
         shutil.rmtree(dest)
     tmp.rename(dest)
@@ -362,4 +387,6 @@ def build_pack_bytes(pack: Pack) -> bytes:
             z.writestr(f"fixture_{st}.yaml", yaml.safe_dump(fx, sort_keys=False))
         if pack.readme:
             z.writestr("README.md", pack.readme)
+        if pack.exams_yaml:
+            z.writestr("exams.yaml", pack.exams_yaml)
     return buf.getvalue()

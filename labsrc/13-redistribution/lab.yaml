@@ -253,3 +253,4 @@ faults:
   - Loop prevention depends on both border routers using the same tags.
   - '`show ip route 4.4.4.4` on R1, then `show route-map E2O` on R3.'
   checks: []
+version: "2"

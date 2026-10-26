@@ -268,3 +268,4 @@ faults:
     match:
     - ^\s+neighbor 10\.0\.12\.2 remote-as 65000\s*$
     hint: neighbor 10.0.12.2 remote-as 65000
+version: "2"

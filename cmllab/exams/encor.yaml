@@ -1,0 +1,152 @@
+# ENCOR 350-401 v1.2 exam topics, transcribed from Cisco's published blueprint.
+# Source: https://learningcontent.cisco.com/documents/marketing/exam-topics/350-401-ENCORE-v1.2.pdf
+# Do not add or renumber objectives by hand: re-transcribe from the source.
+id: ENCOR
+code: 350-401
+name: Implementing Cisco Enterprise Network Core Technologies
+version: v1.2
+track: enterprise
+level: professional
+source: https://learningcontent.cisco.com/documents/marketing/exam-topics/350-401-ENCORE-v1.2.pdf
+source_page: https://www.cisco.com/site/us/en/learn/training-certifications/exams/encor.html
+published: '2025-08-06'
+fetched: '2026-10-25'
+label: ENCOR
+domains:
+- id: '1.0'
+  name: Architecture
+  weight: 15
+- id: '2.0'
+  name: Virtualization
+  weight: 10
+- id: '3.0'
+  name: Infrastructure
+  weight: 30
+- id: '4.0'
+  name: Network Assurance
+  weight: 10
+- id: '5.0'
+  name: Security
+  weight: 20
+- id: '6.0'
+  name: Automation and Artificial Intelligence
+  weight: 15
+objectives:
+- id: '1.1'
+  text: Explain the different design principles used in an enterprise network
+- id: 1.1.a
+  text: High-level enterprise network design such as 2-tier, 3-tier, fabric, and cloud
+- id: 1.1.b
+  text: High availability techniques such as redundancy, FHRP, and SSO
+- id: '1.2'
+  text: Explain the working principles of the Cisco Catalyst SD-WAN solution
+- id: 1.2.a
+  text: SD-WAN control and data planes elements
+- id: 1.2.b
+  text: Benefits and limitations of Catalyst SD-WAN solution
+- id: '1.3'
+  text: Explain the working principles of the Cisco SD-Access solution
+- id: 1.3.a
+  text: SD-Access control and data planes elements
+- id: 1.3.b
+  text: Traditional campus interoperating with SD-Access
+- id: '1.4'
+  text: Interpret QoS configurations
+- id: '2.1'
+  text: Describe device virtualization technologies
+- id: 2.1.a
+  text: Hypervisor type 1 and 2
+- id: 2.1.b
+  text: Virtual machine
+- id: 2.1.c
+  text: Virtual switching
+- id: '2.2'
+  text: Configure and verify data path virtualization technologies
+- id: 2.2.a
+  text: VRF
+- id: 2.2.b
+  text: GRE and IPsec tunneling
+- id: '2.3'
+  text: Describe network virtualization concepts
+- id: 2.3.a
+  text: LISP
+- id: 2.3.b
+  text: VXLAN
+- id: '3.1'
+  text: Layer 2
+- id: 3.1.a
+  text: Troubleshoot static and dynamic 802.1q trunking protocols
+- id: 3.1.b
+  text: Troubleshoot static and dynamic EtherChannels
+- id: 3.1.c
+  text: Configure and verify common Spanning Tree Protocols (RSTP, MST) and Spanning Tree enhancements such as root guard and BPDU guard
+- id: '3.2'
+  text: Layer 3
+- id: 3.2.a
+  text: Compare routing concepts of EIGRP and OSPF (advanced distance vector vs. link state, load balancing, path selection, path operations, metrics, and area types)
+- id: 3.2.b
+  text: Configure simple OSPFv2/v3 environments, including multiple normal areas, summarization, and filtering (neighbor adjacency, point-to-point, and broadcast network types, and passive-interface)
+- id: 3.2.c
+  text: Configure and verify eBGP between directly connected neighbors (best path selection algorithm and neighbor relationships)
+- id: 3.2.d
+  text: Describe policy-based routing
+- id: '3.3'
+  text: IP Services
+- id: 3.3.a
+  text: Interpret network time protocol configurations such as NTP and PTP
+- id: 3.3.b
+  text: Configure NAT/PAT
+- id: 3.3.c
+  text: Configure first hop redundancy protocols, such as HSRP, VRRP
+- id: 3.3.d
+  text: Describe multicast protocols, such as RPF check, PIM SM, IGMP v2/v3, SSM, bidir, and MSDP
+- id: '4.1'
+  text: Diagnose network problems using such as debugs, conditional debugs, traceroute, ping, SNMP, and syslog
+- id: '4.2'
+  text: Configure and verify Flexible NetFlow
+- id: '4.3'
+  text: Configure SPAN/RSPAN/ERSPAN
+- id: '4.4'
+  text: Configure and verify IPSLA
+- id: '4.5'
+  text: Describe how Cisco Catalyst Center (formerly Cisco DNA Center) is used to apply network configuration, monitoring, and management using traditional and AI-powered workflows
+- id: '4.6'
+  text: Configure and verify NETCONF and RESTCONF
+- id: '5.1'
+  text: Configure and verify device access control
+- id: 5.1.a
+  text: Lines and local user authentication
+- id: 5.1.b
+  text: Authentication and authorization using AAA
+- id: '5.2'
+  text: Configure and verify infrastructure security features
+- id: 5.2.a
+  text: ACLs
+- id: 5.2.b
+  text: CoPP
+- id: '5.3'
+  text: Describe REST API security
+- id: '5.4'
+  text: Describe the components of network security design
+- id: 5.4.a
+  text: Threat defense
+- id: 5.4.b
+  text: Endpoint security
+- id: 5.4.c
+  text: Next-generation firewall
+- id: 5.4.d
+  text: TrustSec and MACsec
+- id: '6.1'
+  text: Interpret basic Python components and scripts
+- id: '6.2'
+  text: Construct valid JSON-encoded files
+- id: '6.3'
+  text: Describe the high-level principles and benefits of a data modeling language, such as YANG
+- id: '6.4'
+  text: Describe APIs for Cisco Catalyst Center and SD-WAN Manager
+- id: '6.5'
+  text: Interpret REST API response codes and results in payload using Cisco Catalyst Center and RESTCONF
+- id: '6.6'
+  text: Construct an EEM applet to automate configuration, troubleshooting, or data collection
+- id: '6.7'
+  text: Compare agent vs. agentless orchestration tools

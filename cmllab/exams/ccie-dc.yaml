@@ -1,0 +1,329 @@
+# CCIE DC CCIE-DC v3.1 exam topics, transcribed from Cisco's published blueprint.
+# Source: https://learningcontent.cisco.com/documents/marketing/exam-topics/CCIE-DataCenter-v3.1-BluePrint_reviewed.pdf
+# Do not add or renumber objectives by hand: re-transcribe from the source.
+id: CCIE-DC
+label: CCIE DC
+code: CCIE-DC
+name: CCIE Data Center Lab Exam
+version: v3.1
+track: datacenter
+level: expert
+source: https://learningcontent.cisco.com/documents/marketing/exam-topics/CCIE-DataCenter-v3.1-BluePrint_reviewed.pdf
+source_page: https://learningnetwork.cisco.com/s/ccie-data-center-exam-topics
+published: '2023-10-19'
+notes: The PDF numbers the STP sub-items "1.1.e/1.1.f" and the external OSPF/BGP sub-items "3.3.b.*/3.3.c.*"; the Learning Network exam-topics page numbers them 1.1.d.i/1.1.d.ii and 3.2.b.*/3.2.c.*, which
+  is used here.
+fetched: '2026-10-25'
+domains:
+- id: '1.0'
+  name: Data Center L2/L3 Connectivity
+  weight: 20
+- id: '2.0'
+  name: Data Center Fabric Infrastructure
+  weight: 15
+- id: '3.0'
+  name: Data Center Fabric Connectivity
+  weight: 15
+- id: '4.0'
+  name: Data Center Compute
+  weight: 15
+- id: '5.0'
+  name: Data Center Storage Protocols and Features
+  weight: 10
+- id: '6.0'
+  name: Data Center Security and Network Services
+  weight: 10
+- id: '7.0'
+  name: Data Center Automation and Orchestration
+  weight: 15
+objectives:
+- id: '1.1'
+  text: Layer 2 technologies
+- id: 1.1.a
+  text: Link aggregation
+- id: 1.1.a.i
+  text: Virtual PortChannel
+- id: 1.1.a.ii
+  text: PortChannel
+- id: 1.1.b
+  text: Tagging/trunking
+- id: 1.1.c
+  text: Static path binding
+- id: 1.1.d
+  text: Spanning Tree Protocol
+- id: 1.1.d.i
+  text: PVST and Rapid PVST
+- id: 1.1.d.ii
+  text: MST
+- id: '1.2'
+  text: Route protocols and features
+- id: 1.2.a
+  text: OSPF (v2 and v3)
+- id: 1.2.a.i
+  text: Authentication
+- id: 1.2.a.ii
+  text: Adjacencies
+- id: 1.2.a.iii
+  text: Network types and area types
+- id: 1.2.a.iv
+  text: LSA types
+- id: 1.2.a.v
+  text: Route aggregation/summarization
+- id: 1.2.a.vi
+  text: Route redistribution
+- id: 1.2.b
+  text: ISIS
+- id: 1.2.b.i
+  text: Adjacencies
+- id: 1.2.b.i.1
+  text: Single area, single topology
+- id: 1.2.b.ii
+  text: Network types, levels, and router types
+- id: 1.2.b.ii.1
+  text: NSAP addressing
+- id: 1.2.b.ii.2
+  text: Point-to-point, broadcast links
+- id: 1.2.c
+  text: BGP
+- id: 1.2.c.i
+  text: Path selection
+- id: 1.2.c.ii
+  text: External and internal peering
+- id: 1.2.c.iii
+  text: Route reflector and route server
+- id: 1.2.c.iv
+  text: Peer templates
+- id: 1.2.c.v
+  text: Mulihop EBGP
+- id: 1.2.c.vi
+  text: Route aggregation/summarization
+- id: 1.2.c.vii
+  text: Route redistribution
+- id: 1.2.c.viii
+  text: Local-AS number
+- id: 1.2.d
+  text: BFD
+- id: 1.2.e
+  text: FHRP
+- id: '1.3'
+  text: Multicast protocols
+- id: 1.3.a
+  text: PIM
+- id: 1.3.a.i
+  text: Sparse mode
+- id: 1.3.a.ii
+  text: BIDIR
+- id: 1.3.a.iii
+  text: Static RP, BSR, Auto-RP, phantom RP
+- id: 1.3.a.iv
+  text: IPv4 PIM Anycast
+- id: 1.3.a.v
+  text: IPv4 Anycast-RP using MSDP
+- id: 1.3.b
+  text: IGMP
+- id: 1.3.b.i
+  text: IGMPv2, IGMPv3
+- id: 1.3.b.ii
+  text: IBMP snooping
+- id: 1.3.b.iii
+  text: IGMP querier
+- id: '2.1'
+  text: Physical fabric components
+- id: 2.1.a
+  text: Fabric discovery
+- id: 2.1.b
+  text: Controllers
+- id: 2.1.c
+  text: Switches
+- id: 2.1.d
+  text: Multi-tier architecture
+- id: '2.2'
+  text: ACI policies
+- id: 2.2.a
+  text: Access policies
+- id: 2.2.b
+  text: Fabric policies
+- id: 2.2.c
+  text: Multi-tenancy
+- id: '2.3'
+  text: Overlay policies
+- id: 2.3.a
+  text: Tenants, application profiles, EPGs and ESGs
+- id: 2.3.b
+  text: Networking (VRFs, bridge domains)
+- id: 2.3.c
+  text: Security (contracts, filters, vzAny)
+- id: '2.4'
+  text: Fabric monitoring
+- id: 2.4.a
+  text: Faults
+- id: 2.4.b
+  text: Events
+- id: 2.4.c
+  text: Health indicators
+- id: 2.4.d
+  text: Audit logs
+- id: '2.5'
+  text: Virtual networking
+- id: 2.5.a
+  text: vSphere VDS with or without VMM integration
+- id: '3.1'
+  text: Overlay fabrics
+- id: 3.1.a
+  text: ACI
+- id: 3.1.b
+  text: VXLAN EVPN
+- id: '3.2'
+  text: External connectivity
+- id: 3.2.a
+  text: VRF Lite
+- id: 3.2.b
+  text: OSPF
+- id: 3.2.b.i
+  text: Authentication
+- id: 3.2.b.ii
+  text: Adjacencies
+- id: 3.2.b.iii
+  text: Network types and area types
+- id: 3.2.b.iv
+  text: Route redistribution
+- id: 3.2.c
+  text: BGP
+- id: 3.2.c.i
+  text: AS manipulation
+- id: 3.2.c.ii
+  text: External and internal peering
+- id: 3.2.c.iii
+  text: Route reflectors
+- id: 3.2.c.iv
+  text: Route redistribution
+- id: 3.2.d
+  text: Transit routing
+- id: '3.3'
+  text: Inter-fabric connectivity
+- id: 3.3.a
+  text: 'Multi-Site: ACI or VXLAN EVPN'
+- id: 3.3.b
+  text: ACI Multi-Pod
+- id: 3.3.c
+  text: ACI remote leaf
+- id: '4.1'
+  text: Compute resources
+- id: 4.1.a
+  text: Compute policies, profiles, and templates
+- id: 4.1.b
+  text: Nutanix
+- id: '4.2'
+  text: Compute connectivity
+- id: 4.2.a
+  text: SAN/LAN uplinks
+- id: 4.2.b
+  text: Rack server integration
+- id: 4.2.c
+  text: Port modes
+- id: '4.3'
+  text: Compute management
+- id: 4.3.a
+  text: UCS Manager
+- id: 4.3.b
+  text: Intersight
+- id: '5.1'
+  text: FC and FCoE
+- id: 5.1.a
+  text: Zoning
+- id: 5.1.b
+  text: NPV/NPIV
+- id: 5.1.c
+  text: Trunking
+- id: 5.1.d
+  text: PortChannel
+- id: 5.1.e
+  text: Load balancing
+- id: '5.2'
+  text: RoCE v2 over IP networks
+- id: 5.2.a
+  text: DCQCN congestion control
+- id: 5.2.a.i
+  text: PFC
+- id: 5.2.a.ii
+  text: ECN
+- id: '6.1'
+  text: Security features
+- id: 6.1.a
+  text: ACLs
+- id: 6.1.b
+  text: First Hop Security
+- id: 6.1.c
+  text: Port security
+- id: 6.1.d
+  text: Private VLANs
+- id: 6.1.e
+  text: Contracts
+- id: '6.2'
+  text: RBAC
+- id: 6.2.a
+  text: RADIUS
+- id: 6.2.b
+  text: TACACS+
+- id: 6.2.c
+  text: LDAP
+- id: 6.2.d
+  text: AAA
+- id: '6.3'
+  text: Network services insertion and redirection
+- id: 6.3.a
+  text: Policy-based routing
+- id: 6.3.b
+  text: Policy-based redirect
+- id: 6.3.c
+  text: Inter VRF communication
+- id: 6.3.d
+  text: Route targets
+- id: 6.3.e
+  text: Prefix lists
+- id: '6.4'
+  text: Services
+- id: 6.4.a
+  text: Flow/telemetry export
+- id: 6.4.b
+  text: (R)SPAN/ERSPAN
+- id: 6.4.c
+  text: SNMP
+- id: 6.4.d
+  text: Syslog
+- id: 6.4.e
+  text: DHCP
+- id: 6.4.f
+  text: NTP/PTP
+- id: '6.5'
+  text: Traffic management
+- id: 6.5.a
+  text: Queueing
+- id: 6.5.b
+  text: Policing
+- id: 6.5.c
+  text: Classification/marking
+- id: 6.5.d
+  text: Scheduling
+- id: 6.5.e
+  text: CoPP
+- id: '7.1'
+  text: Data center tasks using scripts (Python, Ansible, and Terraform)
+- id: 7.1.a
+  text: Create, read, update, delete using RESTful APIs
+- id: 7.1.b
+  text: Deploy and modify configurations
+- id: 7.1.c
+  text: Statistics and data collection
+- id: '7.2'
+  text: Data center automation and orchestration tools
+- id: 7.2.a
+  text: Nexus Dashboard
+- id: 7.2.a.i
+  text: Orchestrator
+- id: 7.2.a.ii
+  text: Fabric Controller
+- id: 7.2.a.iii
+  text: Insights
+- id: 7.2.b
+  text: Cloud Network Controller

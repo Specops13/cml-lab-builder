@@ -40,7 +40,7 @@ def test_blueprint_v12_mapping_of_builtin_labs():
     for lid, e in catalog.entries().items():
         for b in e.lab.blueprint:
             assert blueprint.known(b), f"{lid}: {b} is not an ENCOR v1.2 topic"
-    assert catalog.get("06-hsrp").blueprint == ["3.3.c"] and blueprint.title("3.3.c").startswith("FHRP")
+    assert catalog.get("06-hsrp").blueprint == ["3.3.c"] and blueprint.title("3.3.c").startswith("Configure first hop redundancy")
     assert sum(w for _, w in blueprint.DOMAINS.values()) == 100
 
 

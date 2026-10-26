@@ -256,3 +256,4 @@ faults:
   - A FULL adjacency with missing routes often means the two ends describe the link differently.
   - Compare `show ip ospf interface brief` (or `show ip ospf interface`) on R1 and R3 for the R1-R3 link.
   checks: []
+version: "2"

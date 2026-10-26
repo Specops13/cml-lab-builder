@@ -1,0 +1,63 @@
+# Cisco exam objectives this lab covers: '<EXAM> <objective>' from cmllab/exams/*.yaml
+lab:
+- ENCOR 3.2.b
+- ENCOR 3.2.a
+- CCNA 3.4
+- ENARSI 1.10.c
+- ENARSI 1.5
+- DCCOR 1.1.a
+- CCIE-DC 1.2.a.iii
+- CCIE-DC 1.2.a.iv
+- CCIE-DC 1.2.a.v
+- CCIE-EI 1.4.c
+steps:
+  design:
+  - ENCOR 1.1.a
+  - CCNA 1.2.c
+  - CCIE-DC 2.1.d
+  links:
+  - CCIE-EI 1.2.k
+  - CCNA 1.6
+  area0:
+  - ENCOR 3.2.b
+  - CCNA 3.4.a
+  - CCNA 3.4.d
+  - DCCOR 1.1.a
+  - CCIE-DC 1.2.a.ii
+  - ENCOR 4.1
+  lsdb-area0:
+  - CCIE-DC 1.2.a.iv
+  - ENARSI 1.10.c.iii
+  - CCIE-EI 1.4.e.i
+  interfaces:
+  - CCNA 3.4.b
+  - CCNA 3.4.c
+  - ENARSI 1.10.c.i
+  - CCIE-DC 1.2.a.iii
+  - CCIE-EI 1.4.c
+  pods:
+  - ENCOR 3.2.b
+  - ENARSI 1.10.c.iii
+  - CCIE-DC 1.2.a.iii
+  summarize:
+  - ENCOR 3.2.b
+  - ENARSI 1.5
+  - CCIE-DC 1.2.a.v
+  nssa:
+  - ENARSI 1.10.c.ii
+  - CCIE-DC 1.2.a.iii
+  - CCIE-DC 1.2.a.iv
+  - CCIE-DC 1.2.a.vi
+  stub:
+  - ENARSI 1.10.c.ii
+  - CCIE-DC 1.2.a.iii
+  spf:
+  - CCIE-EI 1.4.f.ii
+  - CCIE-EI 1.4.e.i
+  vtep-path:
+  - CCNA 3.1
+  - DCCOR 1.5
+  break-fix:
+  - ENCOR 4.1
+  - ENARSI 1.10.b
+  - CCIE-EI 1.2.k

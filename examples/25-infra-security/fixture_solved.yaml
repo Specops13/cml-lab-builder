@@ -1,0 +1,83 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Outputs follow the IOS XE security configuration guides (AAA, SSH, CoPP, uRPF, IPv6 ACL) and command references.
+# State: every step done (final state of the walkthrough).
+R1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    R2               Eth 0/0             165              R B   Linux Uni Eth 0/0
+    ADMIN            Eth 0/1             162              R B   Linux Uni Eth 0/0
+    USER             Eth 0/2             159              R B   Linux Uni Eth 0/0
+
+    Total cdp entries displayed : 3
+  show aaa method-lists authentication: "authen queue=AAA_ML_AUTHEN_LOGIN\n  name=default valid=TRUE id=0 :state=ALIVE : LOCAL\
+    \ \n  name=CONSOLE valid=TRUE id=A5000001 :state=ALIVE : NONE \n  name=VTY valid=TRUE id=D9000002 :state=ALIVE : LOCAL\
+    \ \nauthen queue=AAA_ML_AUTHEN_ENABLE\nauthen queue=AAA_ML_AUTHEN_PPP\nauthen queue=AAA_ML_AUTHEN_SGBP\nauthen queue=AAA_ML_AUTHEN_ARAP\n\
+    authen queue=AAA_ML_AUTHEN_DOT1X\nauthen queue=AAA_ML_AUTHEN_EAPOUDP\npermanent lists\n  name=Permanent Enable None valid=TRUE\
+    \ id=0 :state=ALIVE : ENABLE  NONE \n  name=Permanent Enable valid=TRUE id=0 :state=ALIVE : ENABLE \n  name=Permanent\
+    \ None valid=TRUE id=0 :state=ALIVE : NONE \n  name=Permanent Local valid=TRUE id=0 :state=ALIVE : LOCAL \n"
+  show ip ssh: |
+    SSH Enabled - version 2.0
+    Authentication methods:publickey,keyboard-interactive,password
+    Authentication Publickey Algorithms:rsa-sha2-256,rsa-sha2-512
+    Hostkey Algorithms:rsa-sha2-512,rsa-sha2-256
+    Encryption Algorithms:aes128-gcm,aes256-gcm,aes128-ctr,aes192-ctr,aes256-ctr
+    MAC Algorithms:hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
+    KEX Algorithms:ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group14-sha256
+    Authentication timeout: 60 secs; Authentication retries: 3
+    Minimum expected Diffie Hellman key size : 2048 bits
+    IOS Keys in SECSH format(ssh-rsa, base64 encoded): R1.lab.local
+    Modulus Size : 2048 bits
+  show access-lists MGMT-ONLY: |
+    Standard IP access list MGMT-ONLY
+        10 permit 10.0.100.0, wildcard bits 0.0.0.255 (2 matches)
+        20 deny   any log (3 matches)
+  show policy-map control-plane: " Control Plane \n\n  Service-policy input: COPP\n\n    Class-map: COPP-ROUTING (match-all)\
+    \  \n      412 packets, 32960 bytes\n      5 minute offered rate 0000 bps, drop rate 0000 bps\n      Match: access-group\
+    \ name COPP-ROUTING\n      police:\n          cir 256000 bps, bc 8000 bytes\n        conformed 412 packets, 32960 bytes;\
+    \ actions:\n          transmit \n        exceeded 0 packets, 0 bytes; actions:\n          transmit \n        conformed\
+    \ 0000 bps, exceeded 0000 bps\n\n    Class-map: COPP-MGMT (match-all)  \n      96 packets, 7680 bytes\n      5 minute\
+    \ offered rate 0000 bps, drop rate 0000 bps\n      Match: access-group name COPP-MGMT\n      police:\n          cir 128000\
+    \ bps, bc 4000 bytes\n        conformed 96 packets, 7680 bytes; actions:\n          transmit \n        exceeded 0 packets,\
+    \ 0 bytes; actions:\n          drop \n        conformed 0000 bps, exceeded 0000 bps\n\n    Class-map: COPP-ICMP (match-all)\
+    \  \n      20 packets, 1600 bytes\n      5 minute offered rate 0000 bps, drop rate 0000 bps\n      Match: access-group\
+    \ name COPP-ICMP\n      police:\n          cir 32000 bps, bc 1500 bytes\n        conformed 20 packets, 1600 bytes; actions:\n\
+    \          transmit \n        exceeded 0 packets, 0 bytes; actions:\n          drop \n        conformed 0000 bps, exceeded\
+    \ 0000 bps\n\n    Class-map: class-default (match-any)  \n      57 packets, 4410 bytes\n      5 minute offered rate 0000\
+    \ bps, drop rate 0000 bps\n      Match: any \n      police:\n          cir 64000 bps, bc 2000 bytes\n        conformed\
+    \ 57 packets, 4410 bytes; actions:\n          transmit \n        exceeded 0 packets, 0 bytes; actions:\n          drop\
+    \ \n        conformed 0000 bps, exceeded 0000 bps\n"
+  show ip ospf neighbor: |
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    2.2.2.2           1   FULL/BDR        00:00:36    10.0.12.2       %if0%
+  show ip interface %if2%: "%if2% is up, line protocol is up\n  Internet address is 10.0.20.1/24\n  Broadcast address is 255.255.255.255\n\
+    \  Address determined by non-volatile memory\n  MTU is 1500 bytes\n  Helper address is not set\n  Directed broadcast forwarding\
+    \ is disabled\n  Outgoing Common access list is not set \n  Outgoing access list is not set\n  Inbound Common access list\
+    \ is not set \n  Inbound  access list is not set\n  Proxy ARP is enabled\n  Local Proxy ARP is disabled\n  Security level\
+    \ is default\n  Split horizon is enabled\n  ICMP redirects are always sent\n  ICMP unreachables are always sent\n  ICMP\
+    \ mask replies are never sent\n  IP fast switching is enabled\n  IP Flow switching is disabled\n  IP CEF switching is\
+    \ enabled\n  IP verify source reachable-via RX\n   5 verification drops\n   0 suppressed verification drops\n   0 verification\
+    \ drop-rate\n  IP multicast fast switching is enabled\n  Policy routing is disabled\n"
+  show ipv6 access-list USER-V6-IN: |
+    IPv6 access list USER-V6-IN
+        deny ipv6 2001:DB8:20::/64 host 2001:DB8:2::2 log (5 matches) sequence 20
+        permit ipv6 any any (14 matches) sequence 30
+USER:
+  ping 10.2.2.2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.2.2.2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 2001:DB8:2::2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:2::2, timeout is 2 seconds:
+    AAAAA
+    Success rate is 0 percent (0/5)
+  ping 2001:DB8:12::2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:12::2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms

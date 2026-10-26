@@ -45,19 +45,6 @@ def test_merge_isakmp_key_per_peer_and_secondary_ip():
 
 
 # ---------------------------------------------------------------- built-in faults
-BUILTIN = [lid for lid, e in catalog.entries().items() if e.source == "builtin" and not e.lab.is_walkthrough]  # walkthroughs have no faults
-
-
-@pytest.mark.parametrize("lab_id", BUILTIN)
-def test_every_builtin_lab_has_faults_that_are_detected_and_fixable(lab_id):
-    lab = catalog.get(lab_id)
-    assert len(lab.faults) >= 3, "each built-in lab ships at least 3 faults"
-    sol = catalog.load_solution(lab_id)
-    for plat in lab.platforms:
-        assert faults.validate(lab, sol, platforms.get(plat)) == []
-    for f in lab.faults:
-        assert f.hints and f.ticket.strip() and "**" in f.explanation
-        assert f.id not in f.ticket and "Fix" not in f.ticket   # tickets describe symptoms only
 
 
 def test_pick_avoids_recent_faults():

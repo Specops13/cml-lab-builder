@@ -1,0 +1,576 @@
+# CCIE EI CCIE-EI v1.1 exam topics, transcribed from Cisco's published blueprint.
+# Source: https://learningcontent.cisco.com/documents/marketing/exam-topics/CCIE_EI_v1.1_Blue_Print.pdf
+# Do not add or renumber objectives by hand: re-transcribe from the source.
+id: CCIE-EI
+label: CCIE EI
+code: CCIE-EI
+name: CCIE Enterprise Infrastructure Lab Exam
+version: v1.1
+track: enterprise
+level: expert
+source: https://learningcontent.cisco.com/documents/marketing/exam-topics/CCIE_EI_v1.1_Blue_Print.pdf
+source_page: https://learningnetwork.cisco.com/s/ccie-enterpr-infrastructure-exam-topics
+published: '2023-03-27'
+notes: Sub-items written "1.1.a (i)" in the PDF are stored as "1.1.a.i".
+fetched: '2026-10-25'
+domains:
+- id: '1.0'
+  name: Network Infrastructure
+  weight: 30
+- id: '2.0'
+  name: Software-Defined Infrastructure
+  weight: 25
+- id: '3.0'
+  name: Transport Technologies and Solutions
+  weight: 15
+- id: '4.0'
+  name: Infrastructure Security and Services
+  weight: 15
+- id: '5.0'
+  name: Infrastructure Automation and Programmability
+  weight: 15
+objectives:
+- id: '1.1'
+  text: Switched campus
+- id: 1.1.a
+  text: Switch administration
+- id: 1.1.a.i
+  text: Managing MAC address table
+- id: 1.1.a.ii
+  text: Errdisable recovery
+- id: 1.1.a.iii
+  text: L2 MTU
+- id: 1.1.b
+  text: Layer 2 protocols
+- id: 1.1.b.i
+  text: CDP, LLDP
+- id: 1.1.b.ii
+  text: UDLD
+- id: 1.1.c
+  text: VLAN technologies
+- id: 1.1.c.i
+  text: Access ports
+- id: 1.1.c.ii
+  text: Trunk ports (802.1Q)
+- id: 1.1.c.iii
+  text: Native VLAN
+- id: 1.1.c.iv
+  text: Manual VLAN pruning
+- id: 1.1.c.v
+  text: Normal range and extended range VLANs
+- id: 1.1.c.vi
+  text: Voice VLAN
+- id: 1.1.d
+  text: EtherChannel
+- id: 1.1.d.i
+  text: LACP, static
+- id: 1.1.d.ii
+  text: Layer 2, Layer 3
+- id: 1.1.d.iii
+  text: Load balancing
+- id: 1.1.d.iv
+  text: EtherChannel misconfiguration guard
+- id: 1.1.d.v
+  text: Identify multichassis EtherChannel use cases
+- id: 1.1.e
+  text: Spanning Tree Protocol
+- id: 1.1.e.i
+  text: PVST+, Rapid PVST+, MST
+- id: 1.1.e.ii
+  text: Switch priority, port priority, tuning port/path cost, STP timers
+- id: 1.1.e.iii
+  text: PortFast, BPDU guard, BPDU filter
+- id: 1.1.e.iv
+  text: Loop guard, root guard
+- id: '1.2'
+  text: Routing concepts
+- id: 1.2.a
+  text: Administrative distance
+- id: 1.2.b
+  text: Static routing (unicast, multicast)
+- id: 1.2.c
+  text: Policy-based routing
+- id: 1.2.d
+  text: VRF-Lite
+- id: 1.2.e
+  text: VRF-aware routing with BGP, EIGRP, OSPF, and static
+- id: 1.2.f
+  text: Route leaking between VRFs using route maps and VASI
+- id: 1.2.g
+  text: Route filtering with BGP, EIGRP, OSPF, and static
+- id: 1.2.h
+  text: Redistribution between BGP, EIGRP, OSPF, and static
+- id: 1.2.i
+  text: Routing protocol authentication
+- id: 1.2.j
+  text: Bidirectional Forwarding Detection
+- id: 1.2.k
+  text: L3 MTU
+- id: '1.3'
+  text: EIGRP
+- id: 1.3.a
+  text: Adjacencies
+- id: 1.3.b
+  text: Best path selection
+- id: 1.3.b.i
+  text: Reported distance, computed distance, feasible distance, feasibility condition, successor, feasible successor
+- id: 1.3.b.ii
+  text: Classic metrics and wide metrics
+- id: 1.3.c
+  text: Operations
+- id: 1.3.c.i
+  text: General operations
+- id: 1.3.c.ii
+  text: Topology table
+- id: 1.3.c.iii
+  text: Packet types
+- id: 1.3.c.iv
+  text: Stuck-in-active
+- id: 1.3.c.v
+  text: Graceful shutdown
+- id: 1.3.d
+  text: EIGRP named mode
+- id: 1.3.e
+  text: Optimization, convergence, and scalability
+- id: 1.3.e.i
+  text: Query propagation boundaries
+- id: 1.3.e.ii
+  text: Leak-map with summary routes
+- id: 1.3.e.iii
+  text: EIGRP stub with leak map
+- id: '1.4'
+  text: OSPF (v2 and v3)
+- id: 1.4.a
+  text: Adjacencies
+- id: 1.4.b
+  text: OSPFv3 address family support
+- id: 1.4.c
+  text: Network types, area types
+- id: 1.4.d
+  text: Path preference
+- id: 1.4.e
+  text: Operations
+- id: 1.4.e.i
+  text: General operations
+- id: 1.4.e.ii
+  text: Graceful shutdown
+- id: 1.4.e.iii
+  text: GTSM (Generic TTL Security Mechanism)
+- id: 1.4.f
+  text: Optimization, convergence, and scalability
+- id: 1.4.f.i
+  text: Metrics
+- id: 1.4.f.ii
+  text: LSA throttling, SPF tuning
+- id: 1.4.f.iii
+  text: Stub router
+- id: 1.4.f.iv
+  text: Prefix suppression
+- id: '1.5'
+  text: BGP
+- id: 1.5.a
+  text: IBGP and EBGP peer relations
+- id: 1.5.a.i
+  text: Peer groups, templates
+- id: 1.5.a.ii
+  text: Active, passive
+- id: 1.5.a.iii
+  text: Timers
+- id: 1.5.a.iv
+  text: Dynamic neighbors
+- id: 1.5.a.v
+  text: 4-byte AS numbers
+- id: 1.5.a.vi
+  text: Private AS numbers
+- id: 1.5.b
+  text: Path selection
+- id: 1.5.b.i
+  text: Attributes
+- id: 1.5.b.ii
+  text: Best path selection algorithm
+- id: 1.5.b.iii
+  text: Load balancing
+- id: 1.5.c
+  text: Routing policies
+- id: 1.5.c.i
+  text: Attribute manipulation
+- id: 1.5.c.ii
+  text: Conditional advertisement
+- id: 1.5.c.iii
+  text: Outbound route filtering
+- id: 1.5.c.iv
+  text: Standard and extended communities
+- id: 1.5.c.v
+  text: Multihoming
+- id: 1.5.d
+  text: AS path manipulations
+- id: 1.5.d.i
+  text: local-as, allowas-in, remove-private-as
+- id: 1.5.d.ii
+  text: AS path prepending
+- id: 1.5.d.iii
+  text: Regular expressions
+- id: 1.5.e
+  text: Convergence and scalability
+- id: 1.5.e.i
+  text: Route reflectors
+- id: 1.5.e.ii
+  text: Aggregation, as-set
+- id: 1.5.f
+  text: Other BGP features such as soft reconfiguration and route refresh
+- id: '1.6'
+  text: Multicast
+- id: 1.6.a
+  text: Layer 2 multicast
+- id: 1.6.a.i
+  text: IGMPv2, IGMPv3
+- id: 1.6.a.ii
+  text: IGMP snooping, PIM snooping
+- id: 1.6.a.iii
+  text: IGMP querier
+- id: 1.6.a.iv
+  text: IGMP filter
+- id: 1.6.a.v
+  text: MLD
+- id: 1.6.b
+  text: Reverse path forwarding check
+- id: 1.6.c
+  text: PIM
+- id: 1.6.c.i
+  text: Sparse mode
+- id: 1.6.c.ii
+  text: Static RP, BSR, Auto-RP
+- id: 1.6.c.iii
+  text: Group-to-RP mapping
+- id: 1.6.c.iv
+  text: Source Specific Multicast
+- id: 1.6.c.v
+  text: Multicast boundary, RP announcement filter
+- id: 1.6.c.vi
+  text: PIMv6 anycast RP
+- id: 1.6.c.vii
+  text: IPv4 anycast RP using MSDP
+- id: 1.6.c.viii
+  text: Multicast multipath
+- id: '2.1'
+  text: Cisco SD-Access
+- id: 2.1.a
+  text: Underlay
+- id: 2.1.a.i
+  text: Manual
+- id: 2.1.a.ii
+  text: LAN automation / PnP
+- id: 2.1.a.iii
+  text: Device discovery and device management
+- id: 2.1.a.iv
+  text: Extended nodes / policy extended nodes
+- id: 2.1.b
+  text: Overlay
+- id: 2.1.b.i
+  text: LISP, BGP control planes
+- id: 2.1.b.ii
+  text: VXLAN data plane
+- id: 2.1.b.iii
+  text: Cisco TrustSec policy plane
+- id: 2.1.b.iv
+  text: L2 flooding
+- id: 2.1.b.v
+  text: Native multicast
+- id: 2.1.c
+  text: Fabric design
+- id: 2.1.c.i
+  text: Single-site campus
+- id: 2.1.c.ii
+  text: Multisite
+- id: 2.1.c.iii
+  text: Fabric in a box
+- id: 2.1.d
+  text: Fabric deployment
+- id: 2.1.d.i
+  text: Host onboarding
+- id: 2.1.d.ii
+  text: Authentication templates
+- id: 2.1.d.iii
+  text: Port configuration
+- id: 2.1.d.iv
+  text: Multisite remote border
+- id: 2.1.d.v
+  text: Border priority
+- id: 2.1.d.vi
+  text: Adding devices to fabric
+- id: 2.1.e
+  text: Fabric border handoff
+- id: 2.1.e.i
+  text: SDA, SDWAN, IP transits
+- id: 2.1.e.ii
+  text: Peer device (Fusion router)
+- id: 2.1.e.iii
+  text: Layer 2 border handoff
+- id: 2.1.f
+  text: Segmentation
+- id: 2.1.f.i
+  text: Macro segmentation using virtual networks
+- id: 2.1.f.ii
+  text: Micro-level segmentation using SGTs and SGACLs
+- id: '2.2'
+  text: Cisco SD-WAN
+- id: 2.2.a
+  text: Controller architecture
+- id: 2.2.a.i
+  text: Management plane (vManage)
+- id: 2.2.a.ii
+  text: Orchestration plane (vBond)
+- id: 2.2.a.iii
+  text: Control plane (vSmart)
+- id: 2.2.b
+  text: SD-WAN underlay
+- id: 2.2.b.i
+  text: WAN Cloud Edge deployment (AWS, Azure, Google Cloud)
+- id: 2.2.b.ii
+  text: WAN Edge deployment (hardware)
+- id: 2.2.b.iii
+  text: Greenfield, brownfield, and hybrid deployments
+- id: 2.2.b.iv
+  text: System configuration (system IP, site ID, org name, vBond address)
+- id: 2.2.b.v
+  text: Transport configuration (underlay and tunnel interfaces, allowed services, TLOC extension)
+- id: 2.2.c
+  text: Overlay Management Protocol (OMP)
+- id: 2.2.c.i
+  text: OMP attributes
+- id: 2.2.c.ii
+  text: IPsec key management
+- id: 2.2.c.iii
+  text: Route aggregation
+- id: 2.2.c.iv
+  text: Redistribution
+- id: 2.2.c.v
+  text: Additional features (BGP AS path propagation, SDA integration)
+- id: 2.2.d
+  text: Configuration templates
+- id: 2.2.d.i
+  text: CLI templates
+- id: 2.2.d.ii
+  text: Feature templates
+- id: 2.2.d.iii
+  text: Device templates
+- id: 2.2.e
+  text: Centralized policies
+- id: 2.2.e.i
+  text: Data policies
+- id: 2.2.e.ii
+  text: Application-aware routing policies
+- id: 2.2.e.iii
+  text: Control policies
+- id: 2.2.f
+  text: Localized policies
+- id: 2.2.f.i
+  text: Access lists
+- id: 2.2.f.ii
+  text: Route policies
+- id: '3.1'
+  text: Static point-to-point GRE tunnels
+- id: '3.2'
+  text: MPLS
+- id: 3.2.a
+  text: Operations
+- id: 3.2.a.i
+  text: Label stack, LSR, LSP
+- id: 3.2.a.ii
+  text: LDP
+- id: 3.2.a.iii
+  text: MPLS ping, MPLS traceroute
+- id: 3.2.b
+  text: L3VPN
+- id: 3.2.b.i
+  text: PE-CE routing using BGP
+- id: 3.2.b.ii
+  text: Basic MP-BGP VPNv4/VPNv6
+- id: '3.3'
+  text: DMVPN
+- id: 3.3.a
+  text: Troubleshoot DMVPN Phase 3 with dual hub
+- id: 3.3.a.i
+  text: NHRP
+- id: 3.3.a.ii
+  text: IPsec/IKEv2 using preshared key
+- id: '4.1'
+  text: Device security on Cisco IOS XE
+- id: 4.1.a
+  text: Control plane policing and protection
+- id: 4.1.b
+  text: AAA
+- id: '4.2'
+  text: Network security
+- id: 4.2.a
+  text: Switch security features
+- id: 4.2.a.i
+  text: VACL, PACL
+- id: 4.2.a.ii
+  text: Storm control
+- id: 4.2.a.iii
+  text: DHCP snooping, DHCP option 82
+- id: 4.2.a.iv
+  text: IP Source Guard
+- id: 4.2.a.v
+  text: Dynamic ARP Inspection
+- id: 4.2.a.vi
+  text: Port security
+- id: 4.2.b
+  text: Router security features
+- id: 4.2.b.i
+  text: IPv6 traffic filters
+- id: 4.2.b.ii
+  text: IPv4 access control lists
+- id: 4.2.b.iii
+  text: Unicast Reverse Path Forwarding
+- id: 4.2.c
+  text: IPv6 infrastructure security features
+- id: 4.2.c.i
+  text: RA Guard
+- id: 4.2.c.ii
+  text: DHCP Guard
+- id: 4.2.c.iii
+  text: Binding table
+- id: 4.2.c.iv
+  text: Device tracking
+- id: 4.2.c.v
+  text: ND Inspection/Snooping
+- id: 4.2.c.vi
+  text: Source Guard
+- id: '4.3'
+  text: System management
+- id: 4.3.a
+  text: Device management
+- id: 4.3.a.i
+  text: Console and VTY
+- id: 4.3.a.ii
+  text: SSH, SCP
+- id: 4.3.a.iii
+  text: RESTCONF, NETCONF
+- id: 4.3.b
+  text: SNMP (v2c, v3)
+- id: 4.3.c
+  text: Logging
+- id: 4.3.c.i
+  text: Local logging, syslog, debugs, conditional debugs
+- id: 4.3.c.ii
+  text: Configuration change notification and logging
+- id: 4.3.c.iii
+  text: Timestamps
+- id: '4.4'
+  text: Quality of Service
+- id: 4.4.a
+  text: Differentiated Services architecture
+- id: 4.4.b
+  text: Classification, trust boundary
+- id: 4.4.c
+  text: Network Based Application Recognition (NBAR)
+- id: 4.4.d
+  text: Marking DSCP values in IPv4 and IPv6 headers
+- id: 4.4.e
+  text: Policing, shaping
+- id: 4.4.f
+  text: Congestion management and avoidance
+- id: 4.4.g
+  text: HQoS
+- id: 4.4.h
+  text: End-to-end Layer 3 QoS using MQC
+- id: '4.5'
+  text: Network services
+- id: 4.5.a
+  text: First-Hop Redundancy Protocols
+- id: 4.5.a.i
+  text: HSRP, VRRP
+- id: 4.5.a.ii
+  text: Redundancy using IPv6 RS/RA
+- id: 4.5.b
+  text: Time synchronization protocols
+- id: 4.5.b.i
+  text: NTP as a client
+- id: 4.5.b.ii
+  text: PTP design considerations
+- id: 4.5.c
+  text: DHCP on Cisco devices
+- id: 4.5.c.i
+  text: Client, server, relay
+- id: 4.5.c.ii
+  text: Options
+- id: 4.5.c.iii
+  text: SLAAC/DHCPv6 integration
+- id: 4.5.c.iv
+  text: Stateful, stateless DHCPv6
+- id: 4.5.c.v
+  text: DHCPv6 Prefix Delegation
+- id: 4.5.d
+  text: IPv4 Network Address Translation
+- id: 4.5.d.i
+  text: Static NAT, PAT
+- id: 4.5.d.ii
+  text: Dynamic NAT, PAT
+- id: 4.5.d.iii
+  text: Policy-based NAT, PAT
+- id: 4.5.d.iv
+  text: VRF-aware NAT, PAT
+- id: 4.5.d.v
+  text: VRF-aware Software Infrastructure (VASI) NAT
+- id: '4.6'
+  text: Network optimization
+- id: 4.6.a
+  text: IP SLA (ICMP, UDP, TCP probes)
+- id: 4.6.b
+  text: Tracking objects and lists
+- id: 4.6.c
+  text: Flexible NetFlow
+- id: '4.7'
+  text: Network operations
+- id: 4.7.a
+  text: Traffic capture
+- id: 4.7.a.i
+  text: SPAN, RSPAN, ERSPAN
+- id: 4.7.a.ii
+  text: Embedded packet capture
+- id: 4.7.b
+  text: Troubleshooting tools
+- id: 4.7.b.i
+  text: Data path packet trace
+- id: 4.7.b.ii
+  text: Conditional debugger (debug platform condition)
+- id: '5.1'
+  text: Data encoding formats
+- id: 5.1.a
+  text: JSON
+- id: 5.1.b
+  text: XML
+- id: 5.1.c
+  text: YAML
+- id: 5.1.d
+  text: Jinja
+- id: '5.2'
+  text: Automation and scripting
+- id: 5.2.a
+  text: EEM applets
+- id: 5.2.b
+  text: Guest shell
+- id: 5.2.b.i
+  text: Linux environment
+- id: 5.2.b.ii
+  text: CLI Python module
+- id: 5.2.b.iii
+  text: EEM Python module
+- id: '5.3'
+  text: Programmability
+- id: 5.3.a
+  text: Interaction with vManage API
+- id: 5.3.a.i
+  text: Python requests library and Postman
+- id: 5.3.a.ii
+  text: Monitoring endpoints
+- id: 5.3.a.iii
+  text: Configuration endpoints
+- id: 5.3.b
+  text: Interaction with Cisco DNA Center API using HTTP requests (GET, PUT, POST) via Python requests library and Postman
+- id: 5.3.c
+  text: Deploy and verify model-driven telemetry
+- id: 5.3.c.i
+  text: Configure on-change subscription using gRPC

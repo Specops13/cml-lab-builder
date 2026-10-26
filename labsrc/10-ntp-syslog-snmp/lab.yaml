@@ -222,3 +222,4 @@ faults:
   - 'An IP SLA operation needs two parts: the definition and something that starts it.'
   - 'Check `show ip sla configuration 10` on R3: is it scheduled?'
   checks: []
+version: "2"

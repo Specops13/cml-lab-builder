@@ -1,0 +1,62 @@
+# Cisco exam objectives this lab covers: '<EXAM> <objective>' from cmllab/exams/*.yaml
+lab:
+- CCNA 1.8
+- CCNA 1.9
+- CCNA 1.9.a
+- CCNA 1.9.b
+- CCNA 1.9.c
+- CCNA 1.9.d
+- CCNA 3.3
+- CCNA 3.3.a
+- CCNA 3.3.b
+- CCNA 3.3.c
+- CCNA 3.3.d
+- CCNA 3.2.b
+- CCNA 4.3
+- CCNA 4.6
+- ENARSI 4.4
+- ENARSI 1.1
+- CCIE-EI 1.2.a
+- CCIE-EI 1.2.b
+- CCIE-EI 4.5.c
+- CCIE-EI 4.5.c.i
+- CCIE-EI 4.5.c.ii
+- CCIE-EI 4.5.c.iii
+- CCIE-EI 4.5.c.iv
+- CCIE-EI 4.5.c.v
+steps:
+  design:
+  - CCNA 1.9
+  - CCNA 4.3
+  addressing:
+  - CCNA 1.8
+  - CCNA 1.9.a
+  - CCNA 1.9.c
+  - CCNA 1.9.d
+  static:
+  - CCNA 3.3.a
+  - CCNA 3.3.b
+  - CCNA 3.3.c
+  - CCNA 3.3.d
+  - CCNA 3.2.b
+  - ENARSI 1.1
+  - CCIE-EI 1.2.a
+  - CCIE-EI 1.2.b
+  dhcpv4:
+  - CCNA 4.6
+  - ENARSI 4.4
+  - CCIE-EI 4.5.c.i
+  - CCIE-EI 4.5.c.ii
+  slaac:
+  - CCNA 1.9.d
+  - ENARSI 4.4
+  - CCIE-EI 4.5.c.iii
+  - CCIE-EI 4.5.c.iv
+  stateful:
+  - ENARSI 4.4
+  - CCIE-EI 4.5.c.i
+  - CCIE-EI 4.5.c.iv
+  prefix-delegation:
+  - CCIE-EI 4.5.c.v
+  troubleshoot:
+  - ENARSI 4.4

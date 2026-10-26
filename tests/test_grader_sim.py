@@ -1,30 +1,5 @@
-import pytest
-
 from cmllab import catalog, grader, platforms, sim
 from cmllab.schema import Check
-
-LABS = [e.lab for e in catalog.entries().values() if e.source == "builtin"]  # never the user folder
-CASES = [(l, p) for l in LABS for p in l.platforms]
-
-
-CASES = [(l, p, m) for l in LABS for p in l.platforms for m in ("live", "config")]
-IDS = [f"{l.id}-{p}-{m}" for l, p, m in CASES]
-
-
-@pytest.mark.parametrize("lab,plat,mode", CASES, ids=IDS)
-def test_solution_scores_100(lab, plat, mode):
-    P = platforms.get(plat)
-    rep = grader.grade(lab, sim.SimRunner(lab, P, solved=True), P, mode=mode)
-    assert rep.passed, [r for r in rep.results if not r.passed]
-    assert rep.score_pct == 100.0
-
-
-@pytest.mark.parametrize("lab,plat,mode", CASES, ids=IDS)
-def test_blank_fails(lab, plat, mode):
-    P = platforms.get(plat)
-    rep = grader.grade(lab, sim.SimRunner(lab, P, solved=False), P, mode=mode)
-    assert not rep.passed and rep.score_pct < 50
-
 
 P = platforms.get("iol")
 

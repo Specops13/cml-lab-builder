@@ -248,3 +248,4 @@ faults:
   - How does R1 route the probe packets to 203.0.113.1 when its default route is not installed?
   - Compare `show ip route 203.0.113.1` with what the probe needs.
   checks: []
+version: "2"

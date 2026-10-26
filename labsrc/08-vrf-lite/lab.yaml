@@ -3,7 +3,7 @@ title: VRF-Lite with Overlapping Customer Addressing
 blueprint: ["2.2.a"]
 domain: "2.0 Virtualization"
 difficulty: 3
-version: "2"
+version: "3"
 summary: Separate two customers with identical addressing on one router using VRF-lite and per-VRF static routing.
 nodes:
   - name: PE

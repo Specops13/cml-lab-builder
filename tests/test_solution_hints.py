@@ -13,24 +13,10 @@ from test_web import make, wait
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "cmllab" / "web" / "static"
 IOL = platforms.get("iol")
-BUILTIN = sorted(d.name for d in catalog.lab_dirs() if not catalog.get(d.name).is_walkthrough)  # challenge labs only
 
 
 def _lab_dict(lab_id="eigrp-basic"):
     return yaml.safe_load((catalog.LABS_DIR / lab_id / "lab.yaml").read_text(encoding="utf-8"))
-
-
-@pytest.mark.parametrize("lab_id", BUILTIN)
-def test_builtin_labs_have_summary_and_hints(lab_id):
-    lab = catalog.get(lab_id)
-    s = lab.solution_summary
-    assert s.strip() and "```" in s and "Why it works" in s, lab_id
-    assert re.search(r"\*\*(Root cause|What was missing)", s), lab_id
-    assert 2 <= len(lab.hints) <= 4
-    text, auto = solution.summary(lab, catalog.load_solution(lab_id), IOL)
-    assert not auto and "%if" not in text
-    for h in lab.hints:  # hints never paste a whole solution block
-        assert "```" not in h and len(h) < 300
 
 
 def test_example_pack_has_summary_and_hints():

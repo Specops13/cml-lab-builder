@@ -1,0 +1,719 @@
+id: 26-ipv6-dhcp-services
+type: walkthrough
+track: CCNA
+title: 'Walkthrough: IPv6 addressing, static routing and DHCP services (IOS-XE, IOL)'
+blueprint:
+- '1.8'
+- '1.9'
+- '3.3'
+- '4.6'
+domain: IP connectivity and IP services
+difficulty: 3
+platforms:
+- iol
+summary: Dual-stack build covering IPv6 address types (GUA, ULA, link-local, EUI-64, multicast), IPv4/IPv6 default, network,
+  host and floating static routes, DHCPv4 server, relay and client, SLAAC with stateless DHCPv6, stateful DHCPv6 through a
+  relay and DHCPv6 prefix delegation to a branch router.
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: SRV
+  kind: router
+  x: 250
+  y: 0
+  config: |
+    ! Services router: DHCPv4 server, DHCPv6 server and prefix-delegation server. Day-0: IPv4 on the R1 links only.
+    interface %if0%
+     description to R1 (primary link)
+     ip address 10.20.0.1 255.255.255.252
+     no shutdown
+    interface %if1%
+     description to BR (IPv6-only WAN)
+     no ip address
+     no shutdown
+    interface %if2%
+     description to R1 (backup link)
+     ip address 10.20.0.6 255.255.255.252
+     no shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+- name: R1
+  kind: router
+  x: 0
+  y: 0
+  config: |
+    ! Campus gateway: LAN-A (dual stack) and LAN-B (IPv6 only), DHCP relay. Day-0: IPv4 addresses only.
+    interface %if0%
+     description to SRV (primary link)
+     ip address 10.20.0.2 255.255.255.252
+     no shutdown
+    interface %if1%
+     description LAN-A (CLIENT1, dual stack)
+     ip address 10.20.1.1 255.255.255.0
+     no shutdown
+    interface %if2%
+     description LAN-B (CLIENT2, IPv6 only)
+     no ip address
+     no shutdown
+    interface %if3%
+     description to SRV (backup link)
+     ip address 10.20.0.5 255.255.255.252
+     no shutdown
+- name: CLIENT1
+  kind: router
+  x: -250
+  y: -120
+  config: |
+    ! LAN-A host (an IOL router acting as a host). Day-0: link enabled, no addressing - it will use DHCP and SLAAC.
+    interface %if0%
+     description to R1 (LAN-A)
+     no ip address
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+- name: CLIENT2
+  kind: router
+  x: -250
+  y: 120
+  config: |
+    ! LAN-B host (IPv6 only). Day-0: link enabled, no addressing - it will use stateful DHCPv6.
+    interface %if0%
+     description to R1 (LAN-B)
+     no ip address
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+- name: BR
+  kind: router
+  x: 500
+  y: 0
+  config: |
+    ! Branch router: requests an IPv6 prefix from SRV with DHCPv6 prefix delegation.
+    interface %if0%
+     description to SRV (IPv6-only WAN)
+     no ip address
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+links:
+- a:
+    node: R1
+    port: 0
+  b:
+    node: SRV
+    port: 0
+- a:
+    node: R1
+    port: 1
+  b:
+    node: CLIENT1
+    port: 0
+- a:
+    node: R1
+    port: 2
+  b:
+    node: CLIENT2
+    port: 0
+- a:
+    node: R1
+    port: 3
+  b:
+    node: SRV
+    port: 2
+- a:
+    node: SRV
+    port: 1
+  b:
+    node: BR
+    port: 0
+task: |
+  ## IPv6 addressing, static routing and DHCP services (IOL)
+
+  Build dual-stack addressing, static and floating static routes, and every flavour of address assignment:
+  DHCPv4 through a relay, SLAAC with stateless DHCPv6, stateful DHCPv6 through a relay, and DHCPv6 prefix
+  delegation to a branch.
+
+  | Link / LAN | IPv4 | IPv6 |
+  |---|---|---|
+  | R1 Et0/0 - SRV Et0/0 (primary) | 10.20.0.0/30 (SRV .1, R1 .2) | 2001:DB8:0:1::/64 (SRV ::1, R1 ::2) |
+  | R1 Et0/3 - SRV Et0/2 (backup) | 10.20.0.4/30 (R1 .5, SRV .6) | 2001:DB8:0:3::/64 **EUI-64** on both ends |
+  | LAN-A: R1 Et0/1 - CLIENT1 | 10.20.1.0/24 (R1 .1, CLIENT1 by **DHCP**) | 2001:DB8:A::/64 (R1 ::1, CLIENT1 by **SLAAC** + stateless DHCPv6) |
+  | LAN-B: R1 Et0/2 - CLIENT2 | - (IPv6 only) | 2001:DB8:B::/64 (R1 ::1, CLIENT2 by **stateful DHCPv6**) |
+  | SRV Et0/1 - BR Et0/0 | - | 2001:DB8:0:2::/64 (SRV ::1, BR ::2); BR gets a /48 by **prefix delegation** from 2001:DB8:BB00::/40 |
+  | R1 Loopback0 | - | 2001:DB8:FFFF::1/128 and **ULA** FD00:20::1/128 |
+
+  - Link-local addresses: R1 **FE80::1** and SRV **FE80::2** on every interface (used as static next hops).
+  - DHCP server for everything: **SRV**; DNS server handed out: 10.20.0.1 / 2001:DB8:0:1::1, domain `lab.local`.
+
+  **Resources:** 5 IOL-XE nodes, about 5 GB RAM.
+steps:
+- id: design
+  title: 'The plan: address types and assignment methods'
+  explain: |
+    IPv6 gives every interface several addresses at once. The types you will configure:
+
+    | Type | Prefix | Here |
+    |---|---|---|
+    | Global unicast (GUA) | 2000::/3 | 2001:DB8:... (documentation range) |
+    | Unique local (ULA) | FC00::/7 (FD00::/8 in practice) | FD00:20::1 on R1 Loopback0 - private, never routed on the Internet |
+    | Link-local | FE80::/10 | FE80::1 / FE80::2 - every IPv6 interface has one; next hops and NDP use them |
+    | Multicast | FF00::/8 | FF02::1 all nodes, FF02::2 all routers, FF02::1:FFxx:xxxx solicited-node, FF02::1:2 DHCPv6 |
+    | Anycast | any unicast | the same address on several devices; e.g. the subnet-router anycast (prefix::) |
+
+    How a host gets an address (signalled in the router's **RA** flags):
+
+    | Method | RA flags | Address from | Other info (DNS) from |
+    |---|---|---|---|
+    | SLAAC | A=1, M=0, O=0 | the host (prefix + EUI-64 or random) | RA (RDNSS) only |
+    | SLAAC + stateless DHCPv6 | A=1, O=1 | the host | DHCPv6 server (no state kept) |
+    | Stateful DHCPv6 | M=1 (A=0 via `no-autoconfig`) | DHCPv6 server (keeps a binding) | DHCPv6 server |
+    | Prefix delegation | - | a whole prefix for a *router* | DHCPv6 server |
+
+    IPv4 uses DHCP (DORA), with a relay (`ip helper-address`) when the server is on another subnet.
+    Confirm the cabling first: R1 sees SRV twice (primary and backup link) and both clients.
+  verify:
+  - device: R1
+    command: show cdp neighbors
+    expect: SRV on Eth 0/0 and Eth 0/3, CLIENT1 on Eth 0/1, CLIENT2 on Eth 0/2.
+  checks:
+  - id: cabling
+    description: R1 sees SRV (twice), CLIENT1 and CLIENT2
+    device: R1
+    command: show cdp neighbors
+    match:
+    - ^SRV\s+Eth 0/0
+    - ^SRV\s+Eth 0/3
+    - ^CLIENT1\s
+    - ^CLIENT2\s
+    hint: Start the lab and wait for the nodes to boot.
+- id: addressing
+  title: 'IPv6 addressing: GUA, ULA, link-local and EUI-64'
+  explain: |
+    Enable IPv6 routing (`ipv6 unicast-routing`: the router sends RAs and forwards IPv6) and address R1 and SRV.
+
+    - **Manual link-local** `ipv6 address FE80::1 link-local` - otherwise it is derived from the MAC (EUI-64)
+      and changes per device; short, fixed link-locals make static next hops and `show` output readable.
+    - **EUI-64** on the backup link: `ipv6 address 2001:DB8:0:3::/64 eui-64`. The interface ID is built from
+      the 48-bit MAC: split it in half, insert `FFFE` in the middle and flip the 7th bit (U/L) of the first
+      byte. MAC `aabb.cc00.0130` -> interface ID `A8BB:CCFF:FE00:0130` (AA = 1010 1010 -> A8 = 1010 1000).
+    - **ULA** FD00:20::1/128 and a GUA /128 on Loopback0 - a host route target for the next step.
+
+    `show ipv6 interface %if0%` lists the joined multicast groups: FF02::1, FF02::2 (because it is a router),
+    FF02::1:FF00:2 and FF02::1:FF00:1 - the **solicited-node** groups for ::2 and FE80::1, used by
+    Neighbor Discovery instead of ARP broadcasts (DAD and address resolution).
+
+    Troubleshooting: `debug ipv6 nd` shows DAD and neighbor solicitations; `show ipv6 neighbors` is the
+    IPv6 "ARP table".
+  config:
+    R1: |
+      ipv6 unicast-routing
+      interface %if0%
+       ipv6 address FE80::1 link-local
+       ipv6 address 2001:DB8:0:1::2/64
+      interface %if1%
+       ipv6 address FE80::1 link-local
+       ipv6 address 2001:DB8:A::1/64
+      interface %if2%
+       ipv6 address FE80::1 link-local
+       ipv6 address 2001:DB8:B::1/64
+      interface %if3%
+       ipv6 address FE80::1 link-local
+       ipv6 address 2001:DB8:0:3::/64 eui-64
+      interface Loopback0
+       description router ID / management
+       ipv6 address 2001:DB8:FFFF::1/128
+       ipv6 address FD00:20::1/128
+    SRV: |
+      ipv6 unicast-routing
+      interface %if0%
+       ipv6 address FE80::2 link-local
+       ipv6 address 2001:DB8:0:1::1/64
+      interface %if1%
+       ipv6 address FE80::2 link-local
+       ipv6 address 2001:DB8:0:2::1/64
+      interface %if2%
+       ipv6 address FE80::2 link-local
+       ipv6 address 2001:DB8:0:3::/64 eui-64
+  verify:
+  - device: R1
+    command: show ipv6 interface brief
+    expect: FE80::1 everywhere; Et0/3 has 2001:DB8:0:3:<EUI-64>.
+  - device: R1
+    command: show ipv6 interface %if0%
+    expect: Joined groups FF02::1, FF02::2, FF02::1:FF00:1, FF02::1:FF00:2.
+  checks:
+  - id: r1-v6-addrs
+    description: R1 has its link-local, GUA and EUI-64 addresses
+    device: R1
+    command: show ipv6 interface brief
+    match:
+    - ^\s+FE80::1\s*$
+    - 2001:DB8:0:1::2
+    - 2001:DB8:A::1
+    - 2001:DB8:B::1
+    - 2001:DB8:0:3:[0-9A-F]{1,4}:[0-9A-F]{0,2}FF:FE[0-9A-F]{2}:[0-9A-F]{1,4}
+    - FD00:20::1
+    hint: ipv6 address FE80::1 link-local plus the GUA on each interface; eui-64 on %if3%; Loopback0 gets the /128s.
+  - id: r1-srv-v6-ping
+    description: R1 pings SRV over IPv6 on the primary link
+    device: R1
+    command: ping 2001:DB8:0:1::1
+    min_success: 60
+    hint: Check ipv6 unicast-routing and the addresses on both ends.
+  - id: r1-solicited-node
+    description: R1 joined the all-routers and solicited-node groups on the primary link
+    device: R1
+    command: show ipv6 interface %if0%
+    match:
+    - FF02::2
+    - FF02::1:FF00:2
+    - FF02::1:FF00:1
+    hint: ipv6 unicast-routing makes the router join FF02::2; the solicited-node groups follow from the addresses.
+- id: static
+  title: 'Static routes: default, network, host and floating'
+  explain: |
+    No routing protocol in this lab - every path is static, IPv4 and IPv6:
+
+    | Route | Example | Notes |
+    |---|---|---|
+    | Default | `ipv6 route ::/0 2001:DB8:0:1::1` | recursive next hop (looked up in the table) |
+    | Network | `ipv6 route 2001:DB8:A::/64 2001:DB8:0:1::2` | a whole subnet |
+    | Host | `ipv6 route FD00:20::1/128 2001:DB8:0:1::2` | /128 (/32 in IPv4) |
+    | Fully specified, link-local | `ipv6 route 2001:DB8:B::/64 %if0% FE80::1` | a link-local next hop *must* include the interface |
+    | Floating | `ipv6 route ::/0 %if3% FE80::2 200` | AD 200 > 1: installed only when the primary disappears |
+
+    The router installs the route with the lowest **administrative distance**; the floating route sits in
+    the configuration until the primary is withdrawn (its next hop becomes unreachable or its interface
+    goes down). Test it after the step: `shutdown` R1 %if0% - `show ipv6 route static` now shows
+    `S ::/0 [200/0] via FE80::2, %if3%` and pings still work over the backup link; `no shutdown` restores
+    the primary.
+
+    Caveat: a recursive static route only disappears when its next hop is unreachable *in the routing table*;
+    on Ethernet with a far-end failure the link stays up, so production designs add IP SLA tracking.
+
+    Troubleshooting: `show ipv6 static detail` shows why a static route is not installed; `debug ipv6 routing`
+    shows table changes.
+  config:
+    R1: |
+      ip route 0.0.0.0 0.0.0.0 10.20.0.1
+      ip route 0.0.0.0 0.0.0.0 10.20.0.6 200
+      ipv6 route ::/0 2001:DB8:0:1::1
+      ipv6 route ::/0 %if3% FE80::2 200
+    SRV: |
+      ip route 10.20.1.0 255.255.255.0 10.20.0.2
+      ip route 10.20.1.0 255.255.255.0 10.20.0.5 200
+      ipv6 route 2001:DB8:A::/64 2001:DB8:0:1::2
+      ipv6 route 2001:DB8:B::/64 %if0% FE80::1
+      ipv6 route FD00:20::1/128 2001:DB8:0:1::2
+      ipv6 route 2001:DB8:FFFF::1/128 2001:DB8:0:1::2
+      ipv6 route 2001:DB8:A::/64 %if2% FE80::1 200
+      ipv6 route 2001:DB8:B::/64 %if2% FE80::1 200
+  verify:
+  - device: R1
+    command: show ipv6 route static
+    expect: '`S ::/0 [1/0] via 2001:DB8:0:1::1` (the floating route is not shown).'
+  - device: SRV
+    command: show ipv6 route static
+    expect: Network routes for LAN-A and LAN-B and the two /128 host routes, AD 1.
+  - device: SRV
+    command: ping FD00:20::1
+    expect: Success via the host route.
+  checks:
+  - id: r1-v6-default
+    description: R1 uses the primary IPv6 default route (AD 1), not the floating one
+    device: R1
+    command: show ipv6 route static
+    match:
+    - ^S\s+::/0 \[1/0\]\s*\n\s+via 2001:DB8:0:1::1
+    absent:
+    - \[200/0\]
+    hint: ipv6 route ::/0 2001:DB8:0:1::1 on R1; the floating route has AD 200.
+  - id: srv-v6-static
+    description: SRV has network routes for both LANs and a host route to R1's ULA
+    device: SRV
+    command: show ipv6 route static
+    match:
+    - ^S\s+2001:DB8:A::/64 \[1/0\]
+    - ^S\s+2001:DB8:B::/64 \[1/0\]\s*\n\s+via FE80::1, %if0%
+    - ^S\s+FD00:20::1/128 \[1/0\]
+    hint: Network routes for 2001:DB8:A::/64 and 2001:DB8:B::/64 (the latter via %if0% FE80::1) and FD00:20::1/128.
+  - id: srv-ula-ping
+    description: SRV reaches R1's ULA loopback over the host route
+    device: SRV
+    command: ping FD00:20::1
+    min_success: 60
+    hint: ipv6 route FD00:20::1/128 2001:DB8:0:1::2 on SRV.
+  - id: r1-floating
+    description: R1 has IPv4 and IPv6 floating defaults over the backup link
+    device: R1
+    mode: config
+    match:
+    - ^ipv6 route ::/0 %if3% FE80::2 200
+    - ^ip route 0\.0\.0\.0 0\.0\.0\.0 10\.20\.0\.6 200
+    hint: ipv6 route ::/0 %if3% FE80::2 200 and ip route 0.0.0.0 0.0.0.0 10.20.0.6 200
+- id: dhcpv4
+  title: DHCPv4 server, relay and client
+  explain: |
+    The DHCP server (SRV) is two hops from CLIENT1, so R1 relays:
+
+    1. CLIENT1 broadcasts **DISCOVER** (src 0.0.0.0, dst 255.255.255.255).
+    2. R1's `ip helper-address 10.20.0.1` on the LAN-A interface turns it into a unicast to SRV and sets
+       **giaddr = 10.20.1.1** (the receiving interface). SRV picks the pool whose `network` contains giaddr.
+    3. **OFFER**, **REQUEST**, **ACK** follow (DORA); SRV answers to giaddr, so SRV needs a route back to
+       10.20.1.0/24 (you added it in the static step).
+
+    The pool hands out address, mask, `default-router` (option 3), `dns-server` (6), `domain-name` (15),
+    an NTP server with a raw option (`option 42 ip 10.20.0.1`) and an 8-hour lease.
+    `ip dhcp excluded-address` keeps .1-.9 for static use. The IOS client (`ip address dhcp`) also installs a
+    default route to the offered gateway (AD 254).
+
+    Note `ip helper-address` also forwards other UDP broadcasts (TFTP, DNS, TACACS, NetBIOS...) unless you
+    restrict it with `no ip forward-protocol udp <port>`.
+
+    Troubleshooting: `debug ip dhcp server packet` / `events` on SRV, `debug dhcp detail` on CLIENT1;
+    `show ip dhcp conflict` and `show ip dhcp server statistics`. Typical faults: no helper, no route back to
+    giaddr, a pool that does not match giaddr, the whole subnet excluded.
+  config:
+    SRV: |
+      ip dhcp excluded-address 10.20.1.1 10.20.1.9
+      ip dhcp pool LAN-A
+       network 10.20.1.0 255.255.255.0
+       default-router 10.20.1.1
+       dns-server 10.20.0.1
+       domain-name lab.local
+       option 42 ip 10.20.0.1
+       lease 0 8
+    R1: |
+      interface %if1%
+       ip helper-address 10.20.0.1
+    CLIENT1: |
+      interface %if0%
+       ip address dhcp
+  verify:
+  - device: CLIENT1
+    command: show dhcp lease
+    expect: Temp IP addr 10.20.1.10 (the first non-excluded), state Bound, server 10.20.0.1.
+  - device: SRV
+    command: show ip dhcp binding
+    expect: 10.20.1.10 - Automatic - Active.
+  - device: CLIENT1
+    command: show ip route static
+    expect: S* 0.0.0.0/0 [254/0] via 10.20.1.1.
+  checks:
+  - id: c1-lease
+    description: CLIENT1 holds a DHCP lease from SRV
+    device: CLIENT1
+    command: show dhcp lease
+    match:
+    - 'Temp IP addr: 10\.20\.1\.\d+'
+    - 'DHCP Lease server: 10\.20\.0\.1, state: \d+ Bound'
+    hint: ip address dhcp on CLIENT1, ip helper-address 10.20.0.1 on R1 %if1%, and the LAN-A pool on SRV.
+  - id: srv-binding
+    description: SRV has an active binding in 10.20.1.0/24
+    device: SRV
+    command: show ip dhcp binding
+    match:
+    - ^10\.20\.1\.\d+\s+\S+.*Automatic\s+Active
+    hint: SRV needs a route back to 10.20.1.0/24 (giaddr) and a pool network 10.20.1.0 255.255.255.0.
+  - id: c1-v4-ping
+    description: CLIENT1 reaches SRV with its DHCP address and default route
+    device: CLIENT1
+    command: ping 10.20.0.1
+    min_success: 60
+    hint: The pool must hand out default-router 10.20.1.1.
+  - id: r1-helper
+    description: R1 relays DHCP on LAN-A to SRV
+    device: R1
+    mode: config
+    match:
+    - ^interface %if1%(\n[ \t].*)*\n[ \t]+ip helper-address 10\.20\.0\.1
+    hint: ip helper-address 10.20.0.1 under R1 %if1%.
+- id: slaac
+  title: SLAAC with stateless DHCPv6 on LAN-A
+  explain: |
+    On LAN-A, CLIENT1 builds its own IPv6 address from R1's Router Advertisement:
+
+    - R1 advertises 2001:DB8:A::/64 with the **A** (autonomous) flag - the default for any /64 on a routing
+      interface. `ipv6 nd other-config-flag` sets the **O** flag: "ask DHCPv6 for other information".
+    - R1 answers those information requests itself with a **stateless** pool (`ipv6 dhcp pool LAN-A-INFO`:
+      DNS and domain only, no addresses, no bindings) applied with `ipv6 dhcp server LAN-A-INFO`.
+    - CLIENT1: `ipv6 address autoconfig default` - SLAAC address (prefix + EUI-64 from its MAC) and a default
+      route to the RA's source (R1's link-local FE80::1). CLIENT1 must **not** run `ipv6 unicast-routing`:
+      a router ignores RAs for its own addressing.
+
+    Before using it, the client runs **DAD** (duplicate address detection): a neighbor solicitation to the
+    solicited-node group of its tentative address.
+
+    Verify: `show ipv6 interface %if0%` on CLIENT1 shows the EUI-64 address and the default router;
+    `show ipv6 routers` lists R1 with the flags; on R1, `show ipv6 interface %if1%` says *Hosts use stateless
+    autoconfig for addresses* and *Hosts use DHCP to obtain other configuration*.
+
+    Troubleshooting: `debug ipv6 nd` (RA/RS, DAD), `debug ipv6 dhcp detail` (information-request/reply).
+  config:
+    R1: |
+      ipv6 dhcp pool LAN-A-INFO
+       dns-server 2001:DB8:0:1::1
+       domain-name lab.local
+      interface %if1%
+       ipv6 nd other-config-flag
+       ipv6 dhcp server LAN-A-INFO
+    CLIENT1: |
+      interface %if0%
+       ipv6 enable
+       ipv6 address autoconfig default
+  verify:
+  - device: CLIENT1
+    command: show ipv6 routers
+    expect: Router FE80::1 on %if0%, prefix 2001:DB8:A::/64 autoconfig, O flag set.
+  - device: R1
+    command: show ipv6 dhcp pool
+    expect: LAN-A-INFO with DNS server 2001:DB8:0:1::1 and domain lab.local.
+  checks:
+  - id: c1-slaac
+    description: CLIENT1 has a SLAAC (EUI-64) address in 2001:DB8:A::/64
+    device: CLIENT1
+    command: show ipv6 interface %if0%
+    match:
+    - 2001:DB8:A::[0-9A-F]{1,4}:[0-9A-F]{0,2}FF:FE[0-9A-F]{2}:[0-9A-F]{1,4}, subnet is 2001:DB8:A::/64
+    hint: ipv6 address autoconfig default on CLIENT1 (and no ipv6 unicast-routing there).
+  - id: r1-o-flag
+    description: R1 tells LAN-A hosts to use DHCPv6 for other configuration
+    device: R1
+    command: show ipv6 interface %if1%
+    match:
+    - Hosts use stateless autoconfig for addresses
+    - Hosts use DHCP to obtain other configuration
+    hint: ipv6 nd other-config-flag under R1 %if1%.
+  - id: c1-v6-ping
+    description: CLIENT1 reaches SRV over IPv6 via the RA default route
+    device: CLIENT1
+    command: ping 2001:DB8:0:1::1
+    min_success: 60
+    hint: autoconfig default installs the default route; SRV needs the route back to 2001:DB8:A::/64.
+- id: stateful
+  title: Stateful DHCPv6 through a relay on LAN-B
+  explain: |
+    LAN-B is IPv6-only and fully managed - the server decides every address and keeps a binding:
+
+    - R1 RA flags: `ipv6 nd managed-config-flag` (**M** = get addresses by DHCPv6), `other-config-flag`, and
+      `ipv6 nd prefix 2001:DB8:B::/64 no-autoconfig` clears the **A** flag so hosts do not *also* build a
+      SLAAC address. The RA still provides the default router (DHCPv6 has no default-gateway option!).
+    - R1 is a **DHCPv6 relay**: `ipv6 dhcp relay destination 2001:DB8:0:1::1`. Clients send SOLICIT to
+      FF02::1:2 (all DHCP agents); R1 wraps it in a RELAY-FORW with its link address 2001:DB8:B::1, which
+      SRV uses to choose the pool.
+    - SRV's pool `LAN-B` has `address prefix 2001:DB8:B::/64` (the address range) plus DNS/domain, and is
+      applied to the interface facing the relay.
+    - CLIENT2: `ipv6 address dhcp`. Exchange: SOLICIT, ADVERTISE, REQUEST, REPLY (four messages; two
+      with rapid commit).
+
+    DHCPv6 identifies clients by **DUID**, not MAC - `show ipv6 dhcp binding` on SRV shows the DUID, the IA
+    NA (identity association for non-temporary addresses) and the leased address.
+
+    Troubleshooting: `debug ipv6 dhcp detail` on CLIENT2, R1 and SRV (`debug ipv6 dhcp relay` on R1). Typical
+    faults: the A flag still set (hosts get two addresses), no route on SRV back to the relay's link prefix,
+    the pool not applied to the interface that receives the relayed packets.
+  config:
+    SRV: |
+      ipv6 dhcp pool LAN-B
+       address prefix 2001:DB8:B::/64 lifetime 86400 43200
+       dns-server 2001:DB8:0:1::1
+       domain-name lab.local
+      interface %if0%
+       ipv6 dhcp server LAN-B
+    R1: |
+      interface %if2%
+       ipv6 nd managed-config-flag
+       ipv6 nd other-config-flag
+       ipv6 nd prefix 2001:DB8:B::/64 no-autoconfig
+       ipv6 dhcp relay destination 2001:DB8:0:1::1
+    CLIENT2: |
+      interface %if0%
+       ipv6 enable
+       ipv6 address dhcp
+  verify:
+  - device: CLIENT2
+    command: show ipv6 dhcp interface
+    expect: 'Client mode, Address State OPEN, IA NA with a 2001:DB8:B:: address, DNS 2001:DB8:0:1::1.'
+  - device: R1
+    command: show ipv6 dhcp interface %if2%
+    expect: In relay mode, relay destination 2001:DB8:0:1::1.
+  - device: SRV
+    command: show ipv6 dhcp binding
+    expect: 'A client with IA NA and the leased 2001:DB8:B:: address.'
+  checks:
+  - id: c2-dhcpv6
+    description: CLIENT2 leased an address by stateful DHCPv6
+    device: CLIENT2
+    command: show ipv6 dhcp interface
+    match:
+    - is in client mode
+    - Address State is OPEN
+    - 'Address: 2001:DB8:B:'
+    - 'DNS server: 2001:DB8:0:1::1'
+    hint: ipv6 address dhcp on CLIENT2, the relay on R1 %if2% and pool LAN-B on SRV %if0%.
+  - id: r1-relay6
+    description: R1 relays DHCPv6 on LAN-B to SRV
+    device: R1
+    command: show ipv6 dhcp interface %if2%
+    match:
+    - is in relay mode
+    - 2001:DB8:0:1::1
+    hint: ipv6 dhcp relay destination 2001:DB8:0:1::1 under R1 %if2%.
+  - id: srv-binding6
+    description: SRV has a stateful binding (IA NA) in 2001:DB8:B::/64
+    device: SRV
+    command: show ipv6 dhcp binding
+    match:
+    - 'IA NA: IA ID'
+    - 'Address: 2001:DB8:B:'
+    hint: The pool must contain address prefix 2001:DB8:B::/64 and be applied with ipv6 dhcp server LAN-B on %if0%.
+  - id: r1-managed-flag
+    description: LAN-B RAs set M and clear A for the prefix
+    device: R1
+    mode: config
+    match:
+    - ^[ \t]+ipv6 nd managed-config-flag
+    - ^[ \t]+ipv6 nd prefix 2001:DB8:B::/64 no-autoconfig
+    hint: ipv6 nd managed-config-flag and ipv6 nd prefix 2001:DB8:B::/64 no-autoconfig under %if2%.
+- id: prefix-delegation
+  title: DHCPv6 prefix delegation to the branch
+  explain: |
+    Prefix delegation (RFC 8415, formerly 3633) hands a whole prefix to a **requesting router** - the way ISPs
+    give customers a /48 or /56.
+
+    - SRV (delegating router): `ipv6 local pool PD-POOL 2001:DB8:BB00::/40 48` - carve /48s out of a /40;
+      pool `PD-BR` with `prefix-delegation pool PD-POOL lifetime 3600 1800` (valid / preferred seconds),
+      applied to the BR-facing interface. The server also installs a route for each delegated prefix towards
+      the client.
+    - BR (requesting router): `ipv6 dhcp client pd BR-PD` on the WAN interface stores the received prefix as a
+      **general prefix** named BR-PD. `ipv6 address BR-PD ::1:0:0:0:1/64` on Loopback1 numbers a LAN from it:
+      delegated 2001:DB8:BB00::/48 + ::1:0:0:0:1 -> **2001:DB8:BB00:1::1/64**. If the delegated prefix
+      changes, every interface using BR-PD renumbers automatically.
+
+    Verify on BR: `show ipv6 general-prefix` (prefix, lifetimes, which interfaces use it) and
+    `show ipv6 dhcp interface %if0%` (Prefix State OPEN). On SRV: `show ipv6 dhcp binding` shows an **IA PD**
+    with the delegated prefix, and `show ipv6 local pool` the allocation.
+
+    Troubleshooting: `debug ipv6 dhcp detail` on both ends shows SOLICIT with IA_PD and the REPLY.
+  config:
+    SRV: |
+      ipv6 local pool PD-POOL 2001:DB8:BB00::/40 48
+      ipv6 dhcp pool PD-BR
+       prefix-delegation pool PD-POOL lifetime 3600 1800
+       dns-server 2001:DB8:0:1::1
+       domain-name lab.local
+      interface %if1%
+       ipv6 dhcp server PD-BR
+    BR: |
+      ipv6 unicast-routing
+      interface %if0%
+       ipv6 address 2001:DB8:0:2::2/64
+       ipv6 dhcp client pd BR-PD
+      ipv6 route ::/0 2001:DB8:0:2::1
+      interface Loopback1
+       description branch LAN (numbered from the delegated prefix)
+       ipv6 address BR-PD ::1:0:0:0:1/64
+  verify:
+  - device: BR
+    command: show ipv6 general-prefix
+    expect: 'IPv6 Prefix BR-PD, acquired via DHCP PD: 2001:DB8:BB00::/48, used by Loopback1.'
+  - device: SRV
+    command: show ipv6 local pool
+    expect: PD-POOL 2001:DB8:BB00::/40 with 1 prefix in use.
+  checks:
+  - id: br-general-prefix
+    description: BR received a /48 by prefix delegation
+    device: BR
+    command: show ipv6 general-prefix
+    match:
+    - IPv6 Prefix BR-PD, acquired via DHCP PD
+    - 2001:DB8:BB00::/48
+    hint: ipv6 dhcp client pd BR-PD on BR %if0% and pool PD-BR applied on SRV %if1%.
+  - id: br-lan-from-pd
+    description: BR numbered Loopback1 from the delegated prefix
+    device: BR
+    command: show ipv6 interface brief
+    match:
+    - 2001:DB8:BB00:1::1
+    hint: ipv6 address BR-PD ::1:0:0:0:1/64 under Loopback1.
+  - id: srv-ia-pd
+    description: SRV shows the IA PD binding for BR
+    device: SRV
+    command: show ipv6 dhcp binding
+    match:
+    - 'IA PD: IA ID'
+    - 'Prefix: 2001:DB8:BB00::/48'
+    hint: ipv6 local pool PD-POOL 2001:DB8:BB00::/40 48 and prefix-delegation pool PD-POOL in pool PD-BR.
+- id: troubleshoot
+  title: 'Optional: break and fix the services'
+  explain: |
+    Try each fault, find it with show commands and debugs, then revert:
+
+    | Fault | Symptom | Find it with |
+    |---|---|---|
+    | remove `ip helper-address` on R1 %if1% | CLIENT1 stays without an address | `show dhcp lease`, `debug ip dhcp server packet` on SRV (silent) |
+    | remove SRV's route to 10.20.1.0/24 | SRV sends OFFERs nobody receives | `debug ip dhcp server packet` (OFFER sent), `show ip dhcp server statistics` |
+    | `ip dhcp excluded-address 10.20.1.1 10.20.1.254` | "no address available" | `debug ip dhcp server events` |
+    | `no ipv6 nd prefix 2001:DB8:B::/64 no-autoconfig` | CLIENT2 gets a SLAAC address too | `show ipv6 interface` on CLIENT2 (two global addresses) |
+    | `ipv6 unicast-routing` on CLIENT1 | no SLAAC address, no RA default route | `show ipv6 routers`, `debug ipv6 nd` |
+    | shut R1 %if0% | floating routes take over | `show ip route static`, `show ipv6 route static` (AD 200) |
+
+    Handy commands: `show ipv6 neighbors`, `show ipv6 routers`, `show ipv6 dhcp`, (`show ipv6 dhcp` prints the
+    device DUID), `show ip dhcp pool`, `show ipv6 dhcp pool`, `clear ip dhcp binding *` and
+    `clear ipv6 dhcp binding` to reset leases.
+  verify:
+  - device: SRV
+    command: show ip dhcp server statistics
+    expect: DISCOVER/REQUEST received and OFFER/ACK sent counters.
+solution_summary: |
+  **What you built:** dual-stack addressing, static routing and all DHCP address-assignment methods.
+
+  - **IPv6 addressing**: `ipv6 unicast-routing`; manual link-locals FE80::1 (R1) / FE80::2 (SRV); GUAs on the
+    links and LANs; **EUI-64** on the backup link (MAC split, FFFE inserted, 7th bit flipped); a **ULA**
+    FD00:20::1/128 and a GUA /128 on R1 Loopback0; solicited-node multicast groups for Neighbor Discovery.
+  - **Static routing**: R1 IPv4/IPv6 **defaults** to SRV (AD 1) plus **floating** defaults over the backup link
+    (AD 200, IPv6 via `%if3% FE80::2`); SRV **network** routes to LAN-A/LAN-B (one fully specified with a
+    link-local next hop), **host** routes to R1's /128s, and floating backups.
+  - **DHCPv4**: pool LAN-A on SRV (excluded .1-.9, router, DNS, domain, option 42, 8 h lease), relay
+    `ip helper-address 10.20.0.1` on R1 (giaddr selects the pool), client `ip address dhcp` on CLIENT1.
+  - **SLAAC + stateless DHCPv6** (LAN-A): A+O flags, R1's information-only pool LAN-A-INFO,
+    `ipv6 address autoconfig default` on CLIENT1.
+  - **Stateful DHCPv6** (LAN-B): M flag and `no-autoconfig` prefix, relay `ipv6 dhcp relay destination
+    2001:DB8:0:1::1`, pool LAN-B on SRV, `ipv6 address dhcp` on CLIENT2 (binding by DUID / IA NA).
+  - **Prefix delegation**: SRV delegates /48s from 2001:DB8:BB00::/40; BR stores 2001:DB8:BB00::/48 as general
+    prefix BR-PD and numbers Loopback1 2001:DB8:BB00:1::1/64 from it.
+
+  **Where to go next**: DHCPv6 guard and RA guard (IPv6 first-hop security on a switch), DHCP snooping
+  and option 82, OSPFv3 or EIGRP for IPv6 instead of static routes, and IP SLA tracking for the floating routes.

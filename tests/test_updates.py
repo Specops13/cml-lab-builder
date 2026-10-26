@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 from cmllab import __version__, config, library, updates
 from cmllab.cli import app as cli_app
 from cmllab.web.app import create_app
+from tables import run_table
 
 
 def rel(tag, **kw):
@@ -26,14 +27,23 @@ def rel(tag, **kw):
     return f
 
 
-def test_parse_version():
-    assert updates.parse_version("v1.5.0") == (1, 5, 0) and updates.parse_version("2.0") == (2, 0, 0)
-    assert updates.parse_version("1.10.2-rc1") == (1, 10, 2) and updates.parse_version("latest") is None
+def test_versions():
+    def _parse_version():
+        assert updates.parse_version("v1.5.0") == (1, 5, 0) and updates.parse_version("2.0") == (2, 0, 0)
+        assert updates.parse_version("1.10.2-rc1") == (1, 10, 2) and updates.parse_version("latest") is None
+
+    def _check_compares_versions():
+        run_table(_check_compares_versions_row, CHECK_COMPARES_VERSIONS_ROWS)
+
+    for case in (_parse_version, _check_compares_versions):
+        case()
 
 
-@pytest.mark.parametrize("tag,current,avail", [("v1.6.0", "1.5.0", True), ("v1.5.0", "1.5.0", False),
-                                               ("v1.4.0", "1.5.0", False), ("v1.10.0", "1.9.3", True)])
-def test_check_compares_versions(tag, current, avail):
+CHECK_COMPARES_VERSIONS_ROWS = [("v1.6.0", "1.5.0", True), ("v1.5.0", "1.5.0", False),
+                                               ("v1.4.0", "1.5.0", False), ("v1.10.0", "1.9.3", True)]
+
+
+def _check_compares_versions_row(tag, current, avail):
     f = rel(tag)
     r = updates.check(current, fetch=f)
     assert r["update_available"] is avail and r["latest"] == tag[1:] and f.calls == [updates.LATEST_URL]

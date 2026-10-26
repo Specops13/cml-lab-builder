@@ -224,3 +224,4 @@ faults:
   - The bundle is up; the issue is how flows are distributed across it.
   - Check `show etherchannel load-balance` on SW1.
   checks: []
+version: "2"

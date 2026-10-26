@@ -1,0 +1,52 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Outputs follow the IOS XE security configuration guides (AAA, SSH, CoPP, uRPF, IPv6 ACL) and command references.
+# State: freshly booted lab (day-0 only).
+R1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    R2               Eth 0/0             165              R B   Linux Uni Eth 0/0
+    ADMIN            Eth 0/1             162              R B   Linux Uni Eth 0/0
+    USER             Eth 0/2             159              R B   Linux Uni Eth 0/0
+
+    Total cdp entries displayed : 3
+  show aaa method-lists authentication: |2
+                             ^
+    % Invalid input detected at '^' marker.
+  show ip ssh: |
+    SSH Disabled - version 1.99
+    %Please create RSA keys to enable SSH (and of atleast 768 bits for SSH v2).
+    Authentication methods:publickey,keyboard-interactive,password
+    Authentication timeout: 120 secs; Authentication retries: 3
+  show access-lists MGMT-ONLY: ''
+  show policy-map control-plane: ''
+  show ip ospf neighbor: |
+    Neighbor ID     Pri   State           Dead Time   Address         Interface
+    2.2.2.2           1   FULL/BDR        00:00:36    10.0.12.2       %if0%
+  show ip interface %if2%: "%if2% is up, line protocol is up\n  Internet address is 10.0.20.1/24\n  Broadcast address is 255.255.255.255\n\
+    \  Address determined by non-volatile memory\n  MTU is 1500 bytes\n  Helper address is not set\n  Directed broadcast forwarding\
+    \ is disabled\n  Outgoing Common access list is not set \n  Outgoing access list is not set\n  Inbound Common access list\
+    \ is not set \n  Inbound  access list is not set\n  Proxy ARP is enabled\n  Local Proxy ARP is disabled\n  Security level\
+    \ is default\n  Split horizon is enabled\n  ICMP redirects are always sent\n  ICMP unreachables are always sent\n  ICMP\
+    \ mask replies are never sent\n  IP fast switching is enabled\n  IP Flow switching is disabled\n  IP CEF switching is\
+    \ enabled\n  IP multicast fast switching is enabled\n  Policy routing is disabled\n"
+  show ipv6 access-list USER-V6-IN: ''
+USER:
+  ping 10.2.2.2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.2.2.2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 2001:DB8:2::2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:2::2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 2001:DB8:12::2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:12::2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms

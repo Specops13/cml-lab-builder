@@ -8,6 +8,8 @@ and the same files under the pre-2.1 names in labs/ (*.encorlab, *.encorcourse, 
 read labs/index.json and only accept those extensions. The pack bytes are identical in both folders.
 
 A lab whose pack changed must raise its `version:` (the app shows "Update available" for installed copies).
+Every lab must carry exam-objective tags (exams.yaml next to lab.yaml, ids from cmllab/exams/*.yaml): unknown
+objective ids and untagged labs fail the build.
 
 Zips are built with fixed timestamps, so re-running without changes produces identical files.
 Usage: python packaging/build_library.py [--check]   (--check: fail if labs/ is out of date)"""
@@ -67,6 +69,9 @@ def build(out: Path, previous: dict | None = None, pack_ext: str = packs.PACK_EX
         rep = packs.lint(packs.read_upload(d.name + packs.PACK_EXT, data), strict=True)
         if not rep.ok:
             sys.exit(f"{d.name}: " + "; ".join(rep.errors))
+        untagged = [w for w in rep.warnings if w.startswith("no exam objectives")]
+        if untagged:         # every library lab names the exam objectives it covers (exams.yaml, 3.3.5)
+            sys.exit(f"{d.name}: {untagged[0]}")
         (out / f"{rep.lab_id}{pack_ext}").write_bytes(data)
         ids.add(rep.lab_id)
     lib_ids = {d.name for d in LABSRC.iterdir() if (d / "lab.yaml").is_file()}

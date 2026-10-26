@@ -7,7 +7,7 @@ difficulty: 4
 platforms: [iol]
 summary: "Lab 2 of the NX-OS study path (OSPF -> BGP -> BGP EVPN VXLAN). Boots with lab 21's finished multi-area OSPF underlay already in its day-0. Build iBGP AS 65000 on top: SS1/SS2 as route reflectors with peer templates, loopback peering, prefix advertisement, best-path selection between two reflected copies, the BGP-free-core problem and its fix, optional policy with communities and local preference, plus eBGP and BFD design discussions. Every step explains the BGP internals and inspects them with show, event-history and filtered debugs in a debug logfile."
 author: CML Lab Builder
-version: "3"
+version: "4"
 ram_gb: 76
 nodes:
   - name: SS1

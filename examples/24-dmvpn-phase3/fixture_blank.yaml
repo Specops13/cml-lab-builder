@@ -1,0 +1,57 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# DMVPN Phase 3 outputs follow the IOS XE DMVPN configuration guide and show dmvpn / show ip nhrp examples.
+# State: freshly booted lab (day-0 only).
+INET:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    HUB              Eth 0/0             165              R B   Linux Uni Eth 0/0
+    SPOKE1           Eth 0/1             162              R B   Linux Uni Eth 0/0
+    SPOKE2           Eth 0/2             159              R B   Linux Uni Eth 0/0
+    SPOKE3           Eth 0/3             156              R B   Linux Uni Eth 0/0
+
+    Total cdp entries displayed : 4
+HUB:
+  ping 198.51.100.2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 198.51.100.2, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)
+  ping 198.51.100.6: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 198.51.100.6, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)
+  ping 198.51.100.10: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 198.51.100.10, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)
+  show interfaces Tunnel0: |2
+                         ^
+    % Invalid input detected at '^' marker.
+  show dmvpn: ''
+  show ip eigrp neighbors: ''
+  show ip eigrp neighbors detail: ''
+  show ip route eigrp: ''
+SPOKE1:
+  show dmvpn: ''
+  ping 10.1.3.1 source Loopback1: |
+    % Invalid source interface - IP not enabled or interface is down
+  ping 10.1.2.1 source Loopback1: |
+    % Invalid source interface - IP not enabled or interface is down
+  show ip route nhrp: ''
+SPOKE2:
+  show ip route eigrp: ''
+  ping 10.1.3.1 source Loopback1: |
+    % Invalid source interface - IP not enabled or interface is down
+  show ip route nhrp: ''
+SPOKE3:
+  ping 172.16.0.1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 172.16.0.1, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)

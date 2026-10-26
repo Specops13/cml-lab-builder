@@ -2,6 +2,46 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [3.3.5] - 2026-10-25
+### Added
+- **Cisco exam-objective map.** New data-driven exam registry `cmllab/exams/*.yaml`, transcribed from Cisco's
+  published exam topics. Each file records the source URL, blueprint version, publish date and fetch date. Exams:
+  CCNA 200-301 v1.1 (111 objectives), ENCOR 350-401 v1.2 (59), ENARSI 300-410 v1.1 (55), DCCOR 350-601 v1.2 (72),
+  CCIE Enterprise Infrastructure v1.1 (272) and CCIE Data Center v3.1 (145). Adding an exam is one YAML file.
+  Labs and walkthrough steps carry tags like `ENCOR 3.2.b`. They show as chips (*exam objective · topic*, tooltip = the
+  official objective text) on lab cards, the lab header and each step. Long lists collapse into *+N more*.
+- **Exam and objective filters** in *Library & courses*, combined with the topic tags and the fuzzy search. The search
+  also matches `encor 3.2.b`, exam names and objective topics.
+- `python -m cmllab exams [EXAM] [--coverage] [--suggest ITEMS --track T]`, `GET /api/exams` and
+  `GET /api/exams/suggest`. The lab builder suggests tags from the blueprint items and title.
+- **All 26 library labs tagged** (lab level, and step level for walkthroughs) in an `exams.yaml` sidecar next to
+  `lab.yaml`. Older apps ignore it, so the library stays installable in 2.x/3.x. Pack versions were raised and the packs
+  and both indexes rebuilt. Inline `exams:` is supported for 3.3.5+ labs.
+- **Validation:** unknown exams or objective ids are errors (lint, import, `build_library.py`, tests). A lab with no
+  tags gets a warning that lists suggested tags. `build_library.py` refuses untagged library labs.
+- **Three new walkthroughs, chosen from the coverage gaps** (IOL only, strict day-0 config on every Ethernet port,
+  `show`/`ping` checks, debug commands in the text, solution summary at the end):
+  - `24-dmvpn-phase3`: DMVPN Phase 3 (mGRE, NHRP registration/auth, EIGRP over the hub with stub spokes, NHRP
+    redirect/shortcut for spoke-to-spoke, hub summary, troubleshooting). 5 IOL nodes, about 5 GB. ENARSI 2.3.a/b/d/e,
+    ENCOR 2.2.b, CCIE-EI 3.3.a.i.
+  - `25-infra-security`: device access and control-plane security (local users with scrypt, AAA method lists,
+    SSHv2-only VTY with an ACL, CoPP, strict uRPF against a spoofed source, IPv6 traffic filter). 4 IOL nodes, about 4 GB.
+    ENCOR 5.1.a/b, 5.2.a/b; ENARSI 3.1-3.3, 4.1.a/b; CCNA 4.8, 5.3; CCIE-EI 4.1-4.3.
+  - `26-ipv6-dhcp-services` (CCNA track): IPv6 addressing (link-local, EUI-64, ULA), IPv4/IPv6 static and floating
+    routes, DHCPv4 relay, SLAAC with stateless DHCPv6, stateful DHCPv6 relay and prefix delegation. 5 IOL nodes, about 5 GB.
+    CCNA 1.8, 1.9, 3.3, 4.6; ENARSI 4.4; CCIE-EI 4.5.c.
+  - New topic **IPv6**. dmvpn/nhrp, copp/aaa/urpf and dhcp/dhcpv6/slaac are search aliases.
+- `CONTRIBUTING.md`: how to add a lab, exam tags, the test layout and adding an exam.
+
+### Changed
+- **Test suite slimmed and parallel:** 861 to about 480 tests with the same coverage. Repetitive per-lab test files were
+  replaced by one generic validator over every library lab (`tests/test_lab_content.py`, plus an optional
+  `SPECS` entry for each lab) and table-driven tests (`tests/tables.py`). True duplicates were removed. Security,
+  update/signing, day-0 and resource-check tests are kept. pytest-xdist (`-n auto`) and a `slow` marker were added.
+  Locally: 364.7 s serial before, about 88 s for the full suite and about 35 s for the fast set (`-m "not slow"`) now,
+  on 8 cores. A new lab needs 0 to 2 new tests.
+- The lab lint's short objective labels use word boundaries (no more *CoPP* for "copper").
+
 ## [3.3.4] - 2026-10-25
 ### Added
 - **Mark a lab complete by hand when a check is buggy.** Walkthroughs get **Mark step done** (next to *Check this

@@ -260,3 +260,4 @@ faults:
     description: P1 has no one-sided LDP password toward 3.3.3.3 (or P2 has the matching one)
     device: P1
     absent: ['^mpls ldp neighbor 3\.3\.3\.3 password']
+version: "2"

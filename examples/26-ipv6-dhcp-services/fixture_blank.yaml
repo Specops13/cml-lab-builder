@@ -1,0 +1,58 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Outputs follow the IOS XE IPv6 addressing, IPv6 static routing, DHCP and DHCPv6 configuration guides.
+# State: freshly booted lab (day-0 only).
+R1:
+  show cdp neighbors: |
+    Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                      S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                      D - Remote, C - CVTA, M - Two-port Mac Relay
+
+    Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+    SRV              Eth 0/0             165              R B   Linux Uni Eth 0/0
+    CLIENT1          Eth 0/1             162              R B   Linux Uni Eth 0/0
+    CLIENT2          Eth 0/2             159              R B   Linux Uni Eth 0/0
+    SRV              Eth 0/3             156              R B   Linux Uni Eth 0/2
+
+    Total cdp entries displayed : 4
+  show ipv6 interface brief: |
+    %if0%            [up/up]
+        unassigned
+    %if1%            [up/up]
+        unassigned
+    %if2%            [up/up]
+        unassigned
+    %if3%            [up/up]
+        unassigned
+  ping 2001:DB8:0:1::1: |
+    % IPv6 routing table default does not exist
+  show ipv6 interface %if0%: ''
+  show ipv6 route static: ''
+  show ipv6 interface %if1%: ''
+  show ipv6 dhcp interface %if2%: ''
+SRV:
+  show ipv6 route static: ''
+  ping FD00:20::1: |
+    % IPv6 routing table default does not exist
+  show ip dhcp binding: |
+    Bindings from all pools not associated with VRF:
+    IP address      Client-ID/              Lease expiration        Type       State      Interface
+                    Hardware address/
+                    User name
+  show ipv6 dhcp binding: ''
+CLIENT1:
+  show dhcp lease: ''
+  ping 10.20.0.1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.20.0.1, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)
+  show ipv6 interface %if0%: ''
+  ping 2001:DB8:0:1::1: |
+    % IPv6 routing table default does not exist
+CLIENT2:
+  show ipv6 dhcp interface: ''
+BR:
+  show ipv6 general-prefix: ''
+  show ipv6 interface brief: |
+    %if0%            [up/up]
+        unassigned

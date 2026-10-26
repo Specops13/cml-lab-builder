@@ -72,34 +72,35 @@ def test_boot_timeout(settings):
         mk(settings, c).build(LAB)
 
 
-def test_reset(settings):
-    c = FakeClient()
-    m = mk(settings, c)
-    lab = m.build(LAB)
-    m.reset(LAB)
-    assert lab.calls == ["start", "stop", "wipe", "start"]
-    assert all(n.state == "BOOTED" for n in lab.nodes())
+def test_reset_and_destroy(settings):
+    def _reset():
+        c = FakeClient()
+        m = mk(settings, c)
+        lab = m.build(LAB)
+        m.reset(LAB)
+        assert lab.calls == ["start", "stop", "wipe", "start"]
+        assert all(n.state == "BOOTED" for n in lab.nodes())
 
+    def _reset_requires_built():
+        with pytest.raises(CMLError, match="not built"):
+            mk(settings, FakeClient()).reset(LAB)
 
-def test_reset_requires_built(settings):
-    with pytest.raises(CMLError, match="not built"):
-        mk(settings, FakeClient()).reset(LAB)
+    def _destroy():
+        c = FakeClient()
+        m = mk(settings, c)
+        lab = m.build(LAB)
+        assert m.destroy(LAB) is True and lab.removed
+        assert m.destroy(LAB) is False
 
+    def _refuse_foreign_delete():
+        c = FakeClient()
+        m = mk(settings, c)
+        foreign = c.add_foreign_running_lab(1, title="Prod lab")
+        with pytest.raises(CMLError, match="refusing"):
+            m._destroy(foreign)
 
-def test_destroy(settings):
-    c = FakeClient()
-    m = mk(settings, c)
-    lab = m.build(LAB)
-    assert m.destroy(LAB) is True and lab.removed
-    assert m.destroy(LAB) is False
-
-
-def test_refuse_foreign_delete(settings):
-    c = FakeClient()
-    m = mk(settings, c)
-    foreign = c.add_foreign_running_lab(1, title="Prod lab")
-    with pytest.raises(CMLError, match="refusing"):
-        m._destroy(foreign)
+    for case in (_reset, _reset_requires_built, _destroy, _refuse_foreign_delete):
+        case()
 
 
 def test_duplicate_titles(settings):
@@ -111,6 +112,7 @@ def test_duplicate_titles(settings):
         m.find(LAB)
 
 
+@pytest.mark.slow
 def test_doctor(settings):
     info = mk(settings, FakeClient()).doctor()
     assert info["version_ok"] and info["missing_node_definitions"] == []
@@ -149,27 +151,29 @@ def test_reset_restores_initial_configs_after_extraction(settings):
     assert r1.configuration == original and "interface Ethernet0/0" in original
 
 
-def test_config_source_extracts(settings):
-    c = FakeClient()
-    m = mk(settings, c)
-    lab = m.build(LAB)
-    n = lab.get_node_by_label("R2")
-    n.running_config = "hostname R2\nrouter eigrp 100\n network 2.2.2.2 0.0.0.0\n"
-    cfg = m.config_source(LAB).get_config("R2")
-    assert "router eigrp 100" in cfg and n.extract_calls == 1 and "sync" in lab.calls
+def test_config_source(settings):
+    def _config_source_extracts():
+        c = FakeClient()
+        m = mk(settings, c)
+        lab = m.build(LAB)
+        n = lab.get_node_by_label("R2")
+        n.running_config = "hostname R2\nrouter eigrp 100\n network 2.2.2.2 0.0.0.0\n"
+        cfg = m.config_source(LAB).get_config("R2")
+        assert "router eigrp 100" in cfg and n.extract_calls == 1 and "sync" in lab.calls
 
+    def _config_source_requires_booted():
+        c = FakeClient()
+        m = mk(settings, c)
+        lab = m.build(LAB, start=False)
+        with pytest.raises(CMLError, match="BOOTED"):
+            m.config_source(LAB).get_config("R1")
 
-def test_config_source_requires_booted(settings):
-    c = FakeClient()
-    m = mk(settings, c)
-    lab = m.build(LAB, start=False)
-    with pytest.raises(CMLError, match="BOOTED"):
-        m.config_source(LAB).get_config("R1")
+    def _config_source_requires_built():
+        with pytest.raises(CMLError, match="not built"):
+            mk(settings, FakeClient()).config_source(LAB)
 
-
-def test_config_source_requires_built(settings):
-    with pytest.raises(CMLError, match="not built"):
-        mk(settings, FakeClient()).config_source(LAB)
+    for case in (_config_source_extracts, _config_source_requires_booted, _config_source_requires_built):
+        case()
 
 
 def test_doctor_reports_console(settings, monkeypatch):

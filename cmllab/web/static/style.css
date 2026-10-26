@@ -15,6 +15,7 @@
   --color-success:#17733a;--color-success-bg:#e8f5ec;--color-warning:#8a5a00;--color-warning-bg:#fff6df;--color-warning-border:#e0b04f;
   --color-danger:#b42318;--color-danger-bg:#fdecea;--color-info-bg:#eaf2fe;--color-info-border:#9cc0f5;
   --color-ram-heavy:#c62828;--color-header:#0d274d;--color-header-text:#d9e7ff;
+  --color-exam:#5b2a86;--color-exam-bg:#f3ecfa;--color-exam-border:#a77fcc;
   --focus-ring:0 0 0 2px var(--color-surface),0 0 0 4px #1d5fd1;--focus-color:#1d5fd1;
   --shadow-1:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);--shadow-2:0 8px 24px rgba(16,24,40,.16);
   --dur-fast:120ms;--dur-med:200ms;--control-h:36px;
@@ -28,6 +29,7 @@
   --color-success:#5fd08a;--color-success-bg:#12291b;--color-warning:#f0c35a;--color-warning-bg:#2f2817;--color-warning-border:#8a6d2b;
   --color-danger:#ff8a80;--color-danger-bg:#3a1715;--color-info-bg:#14233a;--color-info-border:#2f5ea8;
   --color-ram-heavy:#c62828;--color-header:#0a1628;--color-header-text:#d9e7ff;
+  --color-exam:#dcc2ff;--color-exam-bg:#2a1f3a;--color-exam-border:#8a6bb5;
   --focus-ring:0 0 0 2px var(--color-surface),0 0 0 4px #8db4ff;--focus-color:#8db4ff;
   --shadow-1:0 1px 2px rgba(0,0,0,.4);--shadow-2:0 8px 24px rgba(0,0,0,.5);--code-bg:#0a0e13}
 *{box-sizing:border-box}
@@ -378,3 +380,15 @@ aside.catalog[hidden]{display:none}
 /* 3.3.4: completed by hand (a buggy check) - subtle, distinct from a graded pass */
 .tag.manual{border-style:dashed;background:transparent;color:var(--muted);font-style:italic}
 .walk-steps li.man button{border-style:dashed;border-color:var(--ok);color:var(--ok)}
+/* exam-objective tags (3.3.5): "ENCOR 3.2.b · OSPF", objective text in the tooltip */
+.exam-tags{display:flex;flex-wrap:wrap;gap:var(--sp-1);align-items:center;margin:var(--sp-1) 0}
+.tag.exam,.chip.exam{color:var(--color-exam);background:var(--color-exam-bg);border:1px solid var(--color-exam-border);cursor:help;margin:0}
+.chip.exam{cursor:pointer}
+.chip.exam:hover{color:var(--color-exam);border-color:var(--color-exam)}
+.chip.exam[aria-pressed=true]{background:var(--color-exam);border-color:var(--color-exam);color:var(--color-exam-bg)}
+.exam-more{display:inline}
+.exam-more>summary{display:inline;cursor:pointer;font-size:var(--fs-xs);color:var(--color-primary-text);list-style:none;padding:0 var(--sp-1)}
+.exam-more>summary::-webkit-details-marker{display:none}
+.exam-more[open]{display:contents}
+.exam-more[open]>summary{order:99}
+.inline-row{display:flex;gap:var(--sp-1);align-items:center}.inline-row>input{flex:1;min-width:0}
