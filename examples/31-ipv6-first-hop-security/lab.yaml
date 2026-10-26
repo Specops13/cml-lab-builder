@@ -1,0 +1,398 @@
+id: 31-ipv6-first-hop-security
+type: walkthrough
+title: 'Walkthrough: IPv6 first-hop security - RA guard, DHCPv6 guard, binding table, source guard (IOL-L2)'
+track: ENARSI
+blueprint:
+- '3.4'
+domain: 3.0 Infrastructure Security
+difficulty: 3
+platforms:
+- iol
+summary: Stop a rogue router and a rogue DHCPv6 server on an access switch with RA guard and DHCPv6 guard, build the SISF
+  binding table with ND inspection and filter spoofed sources with IPv6 source guard.
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: R1
+  kind: router
+  x: 0
+  y: -180
+  config: |
+    ! Legitimate gateway: sends RAs for 2001:DB8:31:10::/64 and answers stateless DHCPv6. Fully configured.
+    interface %if0%
+     description to SW1 Et0/0 (VLAN 10)
+     no ip address
+     ipv6 address FE80::1 link-local
+     ipv6 address 2001:DB8:31:10::1/64
+     ipv6 nd other-config-flag
+     ipv6 dhcp server LAN
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ipv6 unicast-routing
+    ipv6 dhcp pool LAN
+     dns-server 2001:DB8:31:10::53
+     domain-name corp.lab
+- name: SW1
+  kind: switch
+  x: 0
+  y: 0
+  config: |
+    ! Access switch (IOL-L2). All user ports in VLAN 10. You add the IPv6 first-hop security policies here.
+    vlan 10
+     name USERS
+    interface %if0%
+     description R1 (legitimate router / DHCPv6 server)
+     switchport mode access
+     switchport access vlan 10
+    interface %if1%
+     description PC1 (host)
+     switchport mode access
+     switchport access vlan 10
+    interface %if2%
+     description ROGUE (host port - attacker)
+     switchport mode access
+     switchport access vlan 10
+    interface %if3%
+     description unused
+     shutdown
+- name: PC1
+  kind: router
+  x: -220
+  y: 180
+  config: |
+    ! User host (IOL, no IPv6 routing): takes its address and default router from RAs. Do not change it.
+    interface %if0%
+     description NIC to SW1 Et0/1
+     no ip address
+     ipv6 address autoconfig default
+     ipv6 enable
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+- name: ROGUE
+  kind: router
+  x: 220
+  y: 180
+  config: |
+    ! ATTACKER: a rogue router on a host port sending RAs for 2001:DB8:BAD::/64 and a rogue DHCPv6 server. Do not change it.
+    interface %if0%
+     description to SW1 Et0/2
+     no ip address
+     ipv6 address FE80::BAD link-local
+     ipv6 address 2001:DB8:BAD::1/64
+     ipv6 nd router-preference High
+     ipv6 nd other-config-flag
+     ipv6 dhcp server EVIL
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ipv6 unicast-routing
+    ipv6 dhcp pool EVIL
+     dns-server 2001:DB8:BAD::53
+     domain-name evil.lab
+links:
+- a:
+    node: R1
+    port: 0
+  b:
+    node: SW1
+    port: 0
+- a:
+    node: PC1
+    port: 0
+  b:
+    node: SW1
+    port: 1
+- a:
+    node: ROGUE
+    port: 0
+  b:
+    node: SW1
+    port: 2
+task: |
+  ## IPv6 first-hop security: RA guard, DHCPv6 guard, binding table, ND inspection, source guard (IOL-L2)
+
+  IPv6 hosts trust whatever **Router Advertisements** and **DHCPv6** replies they hear. ROGUE, plugged into a normal
+  access port, advertises its own prefix with *high* router preference and runs a DHCPv6 server - so PC1 picks up a
+  rogue address, a rogue default router and a rogue DNS server (a man-in-the-middle). You fix it on the access switch
+  with the IPv6 first-hop security (FHS) features of ENARSI 3.4 / CCIE-EI 4.2.c:
+
+  | Device | Port on SW1 | Role |
+  |---|---|---|
+  | R1 | Et0/0 | legitimate router: RA for 2001:DB8:31:10::/64, link-local FE80::1, stateless DHCPv6 (DNS ...::53) |
+  | PC1 | Et0/1 | host using SLAAC |
+  | ROGUE | Et0/2 | attacker: RA for 2001:DB8:BAD::/64 (preference High), link-local FE80::BAD, rogue DHCPv6 |
+
+  Order of work: see the attack, then **RA guard**, **DHCPv6 guard**, the **binding table** (device tracking) with
+  **ND inspection**, and **IPv6 source guard**.
+
+  **Resources:** 3 IOL-XE + 1 IOL-L2 nodes, about 4 GB RAM.
+
+  **Platform note:** IOL-L2 runs the SISF-based FHS commands of IOS XE (`device-tracking`, `ipv6 nd raguard`,
+  `ipv6 dhcp guard`, `ipv6 source-guard`). If your image rejects one of them, read the step and use a Catalyst 9000v.
+steps:
+- id: attack
+  title: 'See the attack: PC1 trusts the rogue router'
+  explain: |
+    PC1 is a plain IPv6 host: it forms an address from **every** prefix it hears in an RA (SLAAC) and adds every
+    advertising router as a default router. ROGUE advertises *router-preference High*, so PC1 prefers it.
+
+    Look at PC1: it has **two** global addresses (2001:DB8:31:10:... and 2001:DB8:BAD:...) and two default
+    routers (FE80::1 and FE80::BAD). Traffic to the Internet would go to ROGUE first.
+
+    `debug ipv6 nd` on PC1 shows the RAs arriving from both routers.
+  verify:
+  - device: PC1
+    command: show ipv6 interface brief
+    expect: Addresses in 2001:DB8:31:10::/64 and 2001:DB8:BAD::/64.
+  - device: PC1
+    command: show ipv6 routers
+    expect: 'Two routers: FE80::1 and FE80::BAD (preference High).'
+  checks:
+  - id: pc1-r1
+    description: PC1 reaches the legitimate router over IPv6
+    device: PC1
+    command: ping 2001:DB8:31:10::1
+    min_success: 60
+    hint: Wait for all nodes to boot; PC1 needs an RA from R1 for its address.
+- id: ra-guard
+  title: 'SW1: RA guard'
+  explain: |
+    **RA guard** (RFC 6105) inspects Router Advertisements (and redirects) on the switch. A port with a policy of
+    `device-role host` **drops every RA** received on it; `device-role router` permits them (optionally
+    filtered with `match ra prefix-list`, `managed-config-flag`, `router-preference maximum` and hop-limit limits).
+
+    Attach `HOSTS` to the user ports (PC1, ROGUE) and `ROUTER` to R1's port.
+
+    PC1 still holds the rogue address and router until they age out - bounce its interface to speed it up:
+    on PC1 `interface Ethernet0/0`, `shutdown`, `no shutdown`. Afterwards PC1 lists only FE80::1.
+
+    Limits: RA guard can be bypassed by IPv6 extension-header tricks (fragmented RAs, RFC 7113); later IOS XE
+    releases block those, and the device-tracking `security-level guard` adds protection.
+  config:
+    SW1: |
+      ipv6 nd raguard policy HOSTS
+       device-role host
+      ipv6 nd raguard policy ROUTER
+       device-role router
+      interface %if0%
+       ipv6 nd raguard attach-policy ROUTER
+      interface %if1%
+       ipv6 nd raguard attach-policy HOSTS
+      interface %if2%
+       ipv6 nd raguard attach-policy HOSTS
+  verify:
+  - device: SW1
+    command: show ipv6 nd raguard policy HOSTS
+    expect: device-role host, applied on Et0/1 and Et0/2.
+  - device: PC1
+    command: show ipv6 routers
+    expect: Only FE80::1 (after the interface bounce).
+  checks:
+  - id: rag-policy
+    description: RA guard policy HOSTS is on the user ports
+    device: SW1
+    command: show ipv6 nd raguard policy HOSTS
+    match:
+    - device-role host
+    - Et0/1\s+PORT\s+HOSTS
+    - Et0/2\s+PORT\s+HOSTS
+    hint: 'ipv6 nd raguard policy HOSTS / device-role host; interface Ethernet0/1 and 0/2: ipv6 nd raguard attach-policy HOSTS'
+  - id: rag-router
+    description: R1's port is trusted for RAs
+    device: SW1
+    mode: config
+    match:
+    - ^ipv6 nd raguard policy ROUTER\n device-role router
+    - ^interface Ethernet0/0(\n .*)*\n ipv6 nd raguard attach-policy ROUTER
+    hint: ipv6 nd raguard policy ROUTER / device-role router; attach it to Ethernet0/0
+  - id: pc1-clean
+    description: PC1 has no rogue address or rogue router any more
+    device: PC1
+    command: show ipv6 routers
+    match:
+    - FE80::1 on Ethernet0/0
+    absent:
+    - FE80::BAD
+    hint: Bounce PC1's Ethernet0/0 (shutdown / no shutdown) so it forgets the rogue RA.
+- id: dhcp-guard
+  title: 'SW1: DHCPv6 guard'
+  explain: |
+    **DHCPv6 guard** drops DHCPv6 **server** messages (ADVERTISE, REPLY) received on ports whose policy says
+    `device-role client`. Only R1's port (`device-role server`) may answer. A server policy can be narrowed further
+    with `match server access-list` and `match reply prefix-list` and `preference min|max`.
+
+    Without it ROGUE could still hand out a rogue DNS server (2001:DB8:BAD::53) even with RA guard on, because
+    stateless DHCPv6 is a separate protocol. On PC1, `show ipv6 dhcp interface` (where the image runs a stateless
+    client) shows where its DNS server came from.
+  config:
+    SW1: |
+      ipv6 dhcp guard policy DHCP-CLIENT
+       device-role client
+      ipv6 dhcp guard policy DHCP-SERVER
+       device-role server
+      interface %if0%
+       ipv6 dhcp guard attach-policy DHCP-SERVER
+      interface %if1%
+       ipv6 dhcp guard attach-policy DHCP-CLIENT
+      interface %if2%
+       ipv6 dhcp guard attach-policy DHCP-CLIENT
+  verify:
+  - device: SW1
+    command: show ipv6 dhcp guard policy DHCP-CLIENT
+    expect: 'Device Role: dhcp client, targets Et0/1 Et0/2.'
+  checks:
+  - id: dhg-config
+    description: 'DHCPv6 guard: client role on user ports, server role on R1''s port'
+    device: SW1
+    mode: config
+    match:
+    - ^ipv6 dhcp guard policy DHCP-CLIENT\n device-role client
+    - ^ipv6 dhcp guard policy DHCP-SERVER\n device-role server
+    - ^interface Ethernet0/2(\n .*)*\n ipv6 dhcp guard attach-policy DHCP-CLIENT
+    - ^interface Ethernet0/0(\n .*)*\n ipv6 dhcp guard attach-policy DHCP-SERVER
+    hint: ipv6 dhcp guard policy DHCP-CLIENT / device-role client (Et0/1, Et0/2); DHCP-SERVER / device-role server (Et0/0)
+- id: binding
+  title: 'SW1: binding table (device tracking) and ND inspection'
+  explain: |
+    The **binding table** is the base of the other FHS features: the switch *gleans* IPv6 (and IPv4) addresses
+    from ND, DHCP and ARP and records address - MAC - port - VLAN - state for every host
+    (`show device-tracking database`).
+
+    A **device-tracking policy** controls it:
+    - `security-level glean` - only learn; `inspect` - also validate ND messages against the table (**ND
+      inspection**: drop an NS/NA that claims an address already bound to another port/MAC - the IPv6 version
+      of Dynamic ARP Inspection); `guard` - inspect plus drop RAs and DHCP server messages from hosts.
+    - `tracking enable` - probe entries so stale ones age out.
+    - Older releases call this `ipv6 snooping policy`; the separate `ipv6 nd inspection policy` does the same
+      validation.
+
+    After the policy is attached, ping R1 from PC1 so its address appears in the table.
+  config:
+    SW1: |
+      device-tracking policy HOST-TRACK
+       security-level inspect
+       device-role node
+       tracking enable
+      interface %if1%
+       device-tracking attach-policy HOST-TRACK
+      interface %if2%
+       device-tracking attach-policy HOST-TRACK
+  verify:
+  - device: PC1
+    command: ping 2001:DB8:31:10::1
+    expect: Traffic for the switch to glean.
+  - device: SW1
+    command: show device-tracking database
+    expect: PC1's link-local and 2001:DB8:31:10:... addresses bound to Et0/1, VLAN 10, REACHABLE.
+  - device: SW1
+    command: show device-tracking policies
+    expect: HOST-TRACK on Et0/1 and Et0/2.
+  checks:
+  - id: dt-policy
+    description: HOST-TRACK inspects ND on the user ports
+    device: SW1
+    mode: config
+    match:
+    - ^device-tracking policy HOST-TRACK(\n .*)*\n security-level inspect
+    - ^interface Ethernet0/1(\n .*)*\n device-tracking attach-policy HOST-TRACK
+    hint: device-tracking policy HOST-TRACK / security-level inspect / tracking enable; attach it on Et0/1 and Et0/2
+  - id: dt-binding
+    description: PC1's global address is in the binding table on Et0/1
+    device: SW1
+    command: show device-tracking database
+    match:
+    - 2001:DB8:31:10:\S+\s+\S+\s+Et0/1\s+10
+    hint: Ping 2001:DB8:31:10::1 from PC1 after attaching the policy.
+- id: source-guard
+  title: 'SW1: IPv6 source guard'
+  explain: |
+    **IPv6 source guard** uses the binding table to filter **data traffic**: a packet whose source address is not
+    bound to the ingress port is dropped - a host cannot spoof another host's address or invent one. It needs
+    device tracking on the same port (previous step). `permit link-local` lets link-local traffic through without
+    a binding (useful while hosts boot); `deny global-autoconf` would block SLAAC addresses altogether.
+
+    Its IPv6 prefix-based sibling is **destination guard** (drop traffic to addresses with no binding, protecting
+    the ND cache). Together with RA guard, DHCPv6 guard and ND inspection, this completes the FHS set.
+
+    Test idea: on ROGUE add `ipv6 address 2001:DB8:31:10::99/64` and try to ping R1 - SW1 drops it (no binding
+    for that address on Et0/2 until ND has been validated). Remove the address afterwards.
+  config:
+    SW1: |
+      ipv6 source-guard policy SG
+       permit link-local
+      interface %if1%
+       ipv6 source-guard attach-policy SG
+      interface %if2%
+       ipv6 source-guard attach-policy SG
+  verify:
+  - device: SW1
+    command: show ipv6 source-guard policy SG
+    expect: Applied on Et0/1 and Et0/2.
+  - device: PC1
+    command: ping 2001:DB8:31:10::1
+    expect: Still 100 percent - PC1's address is bound.
+  checks:
+  - id: sg-config
+    description: Source guard is attached on the user ports
+    device: SW1
+    mode: config
+    match:
+    - ^ipv6 source-guard policy SG
+    - ^interface Ethernet0/1(\n .*)*\n ipv6 source-guard attach-policy SG
+    - ^interface Ethernet0/2(\n .*)*\n ipv6 source-guard attach-policy SG
+    hint: ipv6 source-guard policy SG / permit link-local; ipv6 source-guard attach-policy SG on Et0/1 and Et0/2
+  - id: pc1-still
+    description: PC1 still reaches R1 with source guard on
+    device: PC1
+    command: ping 2001:DB8:31:10::1
+    min_success: 60
+    hint: 'If PC1 fails, its address may not be in the binding table yet: check show device-tracking database.'
+solution_summary: |
+  **What you built on SW1**
+
+  - **RA guard:** `ipv6 nd raguard policy HOSTS` (`device-role host`) on Et0/1 and Et0/2, `ROUTER`
+    (`device-role router`) on Et0/0 - ROGUE's RAs are dropped, PC1 keeps only R1 (FE80::1).
+  - **DHCPv6 guard:** `ipv6 dhcp guard policy DHCP-CLIENT` (`device-role client`) on the user ports,
+    `DHCP-SERVER` (`device-role server`) on R1's port.
+  - **Binding table + ND inspection:** `device-tracking policy HOST-TRACK` with `security-level inspect` and
+    `tracking enable` on the user ports; `show device-tracking database` lists PC1's addresses on Et0/1.
+  - **Source guard:** `ipv6 source-guard policy SG` (`permit link-local`) on the user ports.
+
+  **Why it works:** hosts trust RAs and DHCPv6 blindly, so the switch enforces which ports may send them and which
+  addresses each port owns.
+
+  **Verification commands:** `show ipv6 nd raguard policy`, `show ipv6 dhcp guard policy`,
+  `show device-tracking database`, `show device-tracking policies`, `show ipv6 source-guard policy`, and on the host
+  `show ipv6 routers`, `show ipv6 interface brief`.

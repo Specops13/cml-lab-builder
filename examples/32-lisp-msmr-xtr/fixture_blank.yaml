@@ -1,0 +1,29 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# LISP outputs follow the IOS XE LISP configuration guide (show lisp site, show ip lisp map-cache).
+# State: freshly booted lab (day-0 only).
+XTR1:
+  ping 10.32.0.2 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.32.0.2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 10.32.0.100 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.32.0.100, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ip lisp database: |
+    % LISP is not configured
+  ping 172.16.2.1 source Loopback1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 172.16.2.1, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)
+  show ip lisp map-cache: |
+    % LISP is not configured
+MSMR:
+  show lisp site: |
+    % LISP is not configured
+CORE:
+  show ip route 172.16.2.0: |
+    % Network not in table

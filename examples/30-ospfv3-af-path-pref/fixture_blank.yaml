@@ -1,0 +1,34 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# OSPFv3 outputs follow the IOS XE OSPFv3 Address Families configuration guide.
+# State: freshly booted lab (day-0 only).
+R1:
+  ping 10.30.12.2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.30.12.2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 2001:DB8:30:12::2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:30:12::2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ospfv3 ipv4 neighbor: ''
+  show ospfv3 ipv6 neighbor: ''
+  ping 10.30.0.4 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.30.0.4, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)
+  ping 2001:DB8:30::4 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:30::4, timeout is 2 seconds:
+    .....
+    Success rate is 0 percent (0/5)
+  show ip route 10.30.0.4: |
+    % Network not in table
+  show ipv6 route 2001:DB8:30::4/128: |
+    % Route not found
+  show ip route 10.30.99.0: |
+    % Network not in table
+  show ipv6 route 2001:DB8:30:99::/64: |
+    % Route not found

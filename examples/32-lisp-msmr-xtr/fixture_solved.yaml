@@ -1,0 +1,41 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# LISP outputs follow the IOS XE LISP configuration guide (show lisp site, show ip lisp map-cache).
+# State: every step done (final state of the walkthrough).
+XTR1:
+  ping 10.32.0.2 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.32.0.2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 10.32.0.100 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.32.0.100, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ip lisp database: |
+    LISP ETR IPv4 Mapping Database for EID-table default (IID 0), LSBs: 0x1, 1 entries
+
+    172.16.1.0/24
+      Locator     Pri/Wgt  Source     State
+      10.32.0.1     1/100  cfg-addr   site-self, reachable
+  ping 172.16.2.1 source Loopback1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 172.16.2.1, timeout is 2 seconds:
+    .!!!!
+    Success rate is 80 percent (4/5), round-trip min/avg/max = 1/1/2 ms
+  show ip lisp map-cache: |
+    LISP IPv4 Mapping Cache for EID-table default (IID 0), 2 entries
+
+    0.0.0.0/0, uptime: 00:05:11, expires: never, via static-send-map-request
+      Negative cache entry, action: send-map-request
+    172.16.2.0/24, uptime: 00:00:12, expires: 23:59:47, via map-reply, complete
+      Locator    Uptime    State      Pri/Wgt     Encap-IID
+      10.32.0.2  00:00:12  up           1/100       -
+MSMR:
+  show lisp site: "LISP Site Registration Information\n* = Some locators are down or unreachable\n# = Some registrations are\
+    \ sourced by reliable transport\n\nSite Name      Last      Up     Who Last             Inst     EID Prefix\n        \
+    \       Register         Registered           ID       \nSITE1          00:00:23  yes    10.32.0.1:4342              \
+    \  172.16.1.0/24\nSITE2          00:00:19  yes    10.32.0.2:4342                172.16.2.0/24\n"
+CORE:
+  show ip route 172.16.2.0: |
+    % Network not in table

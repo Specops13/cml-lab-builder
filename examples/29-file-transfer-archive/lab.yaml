@@ -1,8 +1,10 @@
 id: 29-file-transfer-archive
 type: walkthrough
 title: 'Walkthrough: TFTP, FTP, SCP and the configuration archive (IOL)'
+track: ENARSI
 blueprint:
-- '4.1'
+- 4.1.b
+- 4.1.c
 domain: 4.0 Infrastructure Services
 difficulty: 2
 platforms:
@@ -10,7 +12,7 @@ platforms:
 summary: Serve and fetch files with TFTP, set up the FTP client, build an IOS SCP server (SSH + AAA exec authorization) and
   archive the configuration off-box over SCP with change logging and configure replace.
 author: CML Lab Builder
-version: '1'
+version: '2'
 nodes:
 - name: R1
   kind: router

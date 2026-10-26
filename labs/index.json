@@ -1349,22 +1349,23 @@
     },
     {
       "file": "29-file-transfer-archive.encorlab",
-      "sha256": "dd46ad22068808f3f525dc6a8929870347e2bd3ccceff23da296075063dfbc4b",
-      "size": 6298,
+      "sha256": "69931ce88dab23ddb29c9437cd0533502b8742df97c6077e3ffb78424145c0ba",
+      "size": 6304,
       "kind": "lab",
       "id": "29-file-transfer-archive",
       "title": "Walkthrough: TFTP, FTP, SCP and the configuration archive (IOL)",
-      "version": "1",
+      "version": "2",
       "description": "Serve and fetch files with TFTP, set up the FTP client, build an IOS SCP server (SSH + AAA exec authorization) and archive the configuration off-box over SCP with change logging and configure replace.",
       "blueprint": [
-        "4.1"
+        "4.1.b",
+        "4.1.c"
       ],
       "nodes": 2,
       "difficulty": 2,
       "type": "walkthrough",
       "ram_gb": 2.0,
       "domain": "4.0 Infrastructure Services",
-      "track": "ENCOR",
+      "track": "ENARSI",
       "platforms": [
         "iol"
       ],
@@ -1382,6 +1383,124 @@
       "topics": [
         "assurance",
         "security",
+        "walkthrough",
+        "enarsi"
+      ]
+    },
+    {
+      "file": "30-ospfv3-af-path-pref.encorlab",
+      "sha256": "e69be544907c2652311b17d1e03f5a4e5fc6359f100efc646b997fc5af8ad28e",
+      "size": 6138,
+      "kind": "lab",
+      "id": "30-ospfv3-af-path-pref",
+      "title": "Walkthrough: OSPFv3 address families and OSPF path preference (IOL)",
+      "version": "1",
+      "description": "Run IPv4 and IPv6 in one OSPFv3 process with address families, steer each family over a different path with per-AF costs, and prove the OSPF path-type order (intra > inter > E1 > E2) with an anycast prefix.",
+      "blueprint": [
+        "1.10.a",
+        "1.10.d"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "walkthrough",
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure",
+      "track": "ENARSI",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ],
+      "exams": [
+        "ENARSI 1.10",
+        "ENARSI 1.10.a",
+        "ENARSI 1.10.d",
+        "ENCOR 3.2.b",
+        "CCIE-EI 1.4.b",
+        "CCNA 1.8"
+      ],
+      "topics": [
+        "ospf",
+        "ipv6",
+        "walkthrough",
+        "enarsi"
+      ]
+    },
+    {
+      "file": "31-ipv6-first-hop-security.encorlab",
+      "sha256": "8667d58dbe6850c2847fe3d7d51b39762965ac1d14aba4ee514d5c0c186cce80",
+      "size": 6825,
+      "kind": "lab",
+      "id": "31-ipv6-first-hop-security",
+      "title": "Walkthrough: IPv6 first-hop security - RA guard, DHCPv6 guard, binding table, source guard (IOL-L2)",
+      "version": "1",
+      "description": "Stop a rogue router and a rogue DHCPv6 server on an access switch with RA guard and DHCPv6 guard, build the SISF binding table with ND inspection and filter spoofed sources with IPv6 source guard.",
+      "blueprint": [
+        "3.4"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "walkthrough",
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure Security",
+      "track": "ENARSI",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe",
+        "ioll2-xe"
+      ],
+      "exams": [
+        "ENARSI 3.4",
+        "CCIE-EI 4.2.c",
+        "CCIE-EI 4.2.c.i",
+        "CCIE-EI 4.2.c.ii",
+        "CCIE-EI 4.2.c.iii",
+        "CCIE-EI 4.2.c.iv",
+        "CCIE-EI 4.2.c.v",
+        "CCIE-EI 4.2.c.vi"
+      ],
+      "topics": [
+        "ipv6",
+        "security",
+        "walkthrough",
+        "enarsi"
+      ]
+    },
+    {
+      "file": "32-lisp-msmr-xtr.encorlab",
+      "sha256": "74f0809ba1140597d3648395779700353a614fee2b42a0c591ee7b0d68abbc1c",
+      "size": 5818,
+      "kind": "lab",
+      "id": "32-lisp-msmr-xtr",
+      "title": "Walkthrough: LISP map-server/map-resolver and xTRs (IOL)",
+      "version": "1",
+      "description": "Separate identity from location with LISP: build a map-server/map-resolver, register two sites from xTRs, watch Map-Request/Map-Reply fill the map-cache and relate it to the SD-Access control plane.",
+      "blueprint": [
+        "2.3.a",
+        "1.3.a"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "walkthrough",
+      "ram_gb": 4.0,
+      "domain": "2.0 Virtualization",
+      "track": "ENCOR",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ],
+      "exams": [
+        "ENCOR 2.3.a",
+        "ENCOR 1.3.a",
+        "CCIE-EI 2.1.b.i"
+      ],
+      "topics": [
+        "tunnels",
         "walkthrough",
         "encor"
       ]

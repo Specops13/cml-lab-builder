@@ -1,0 +1,29 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Outputs follow the IOS XE IPv6 First-Hop Security / SISF configuration guide.
+# State: every step done (final state of the walkthrough).
+PC1:
+  ping 2001:DB8:31:10::1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:31:10::1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ipv6 routers: |
+    Router FE80::1 on Ethernet0/0, last update 0 min, CLC
+      Hops 64, Lifetime 1800 sec, AddrFlag=0, OtherFlag=1, MTU=1500
+      HomeAgentFlag=0, Preference=Medium
+      Reachable time 0 (unspecified), Retransmit time 0 (unspecified)
+      Prefix 2001:DB8:31:10::/64 onlink autoconfig
+        Valid lifetime 2592000, preferred lifetime 604800
+SW1:
+  show ipv6 nd raguard policy HOSTS: "Policy HOSTS configuration: \n  device-role host\nPolicy HOSTS is applied on the following\
+    \ targets: \nTarget               Type  Policy               Feature        Target range\nEt0/1                PORT  HOSTS\
+    \                RA guard       vlan all\nEt0/2                PORT  HOSTS                RA guard       vlan all\n"
+  show device-tracking database: "Binding Table has 3 entries, 3 dynamic (limit 200000)\nCodes: L - Local, S - Static, ND\
+    \ - Neighbor Discovery, ARP - Address Resolution Protocol, DH4 - IPv4 DHCP, DH6 - IPv6 DHCP, PKT - Other Packet, API -\
+    \ API created\nPreflevel flags (prlvl):\n0001:MAC and LLA match     0002:Orig trunk            0004:Orig access      \
+    \     \n0008:Orig trusted trunk    0010:Orig trusted access   0020:DHCP assigned         \n0040:Cga authenticated    \
+    \ 0080:Cert authenticated    0100:Statically assigned   \n\n\n    Network Layer Address                    Link Layer\
+    \ Address Interface  vlan prlvl  age    state     Time left \nND  FE80::A8BB:CCFF:FE00:3100                 aabb.cc00.3100\
+    \     Et0/1      10   0005   12s    REACHABLE  290 s   \nND  FE80::BAD                                 aabb.cc00.4100\
+    \     Et0/2      10   0005   40s    REACHABLE  262 s   \nND  2001:DB8:31:10:A8BB:CCFF:FE00:3100        aabb.cc00.3100\
+    \     Et0/1      10   0005   12s    REACHABLE  290 s   \n"

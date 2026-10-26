@@ -1,0 +1,379 @@
+id: 32-lisp-msmr-xtr
+type: walkthrough
+title: 'Walkthrough: LISP map-server/map-resolver and xTRs (IOL)'
+blueprint:
+- 2.3.a
+- 1.3.a
+domain: 2.0 Virtualization
+difficulty: 3
+platforms:
+- iol
+summary: 'Separate identity from location with LISP: build a map-server/map-resolver, register two sites from xTRs, watch
+  Map-Request/Map-Reply fill the map-cache and relate it to the SD-Access control plane.'
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: CORE
+  kind: router
+  x: 0
+  y: 0
+  config: |
+    ! Underlay (RLOC space) router. Knows only RLOCs, never the EID prefixes. Fully configured.
+    interface %if0%
+     description to XTR1 Et0/0
+     ip address 10.32.1.1 255.255.255.252
+     no shutdown
+    interface %if1%
+     description to XTR2 Et0/0
+     ip address 10.32.2.1 255.255.255.252
+     no shutdown
+    interface %if2%
+     description to MSMR Et0/0
+     ip address 10.32.3.1 255.255.255.252
+     no shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     ip address 10.32.0.254 255.255.255.255
+    router ospf 1
+     network 10.32.0.0 0.0.255.255 area 0
+- name: XTR1
+  kind: router
+  x: -250
+  y: 150
+  config: |
+    ! Site 1 xTR (ITR + ETR). RLOC 10.32.0.1; EID prefix 172.16.1.0/24 (Loopback1). Underlay OSPF pre-built.
+    interface %if0%
+     description to CORE Et0/0 (underlay)
+     ip address 10.32.1.2 255.255.255.252
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description RLOC
+     ip address 10.32.0.1 255.255.255.255
+    interface Loopback1
+     description site 1 EID space (hosts)
+     ip address 172.16.1.1 255.255.255.0
+    router ospf 1
+     network 10.32.0.1 0.0.0.0 area 0
+     network 10.32.1.0 0.0.0.3 area 0
+- name: XTR2
+  kind: router
+  x: 250
+  y: 150
+  config: |
+    ! Site 2 xTR (ITR + ETR). RLOC 10.32.0.2; EID prefix 172.16.2.0/24 (Loopback1). Underlay OSPF pre-built.
+    interface %if0%
+     description to CORE Et0/1 (underlay)
+     ip address 10.32.2.2 255.255.255.252
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description RLOC
+     ip address 10.32.0.2 255.255.255.255
+    interface Loopback1
+     description site 2 EID space (hosts)
+     ip address 172.16.2.1 255.255.255.0
+    router ospf 1
+     network 10.32.0.2 0.0.0.0 area 0
+     network 10.32.2.0 0.0.0.3 area 0
+- name: MSMR
+  kind: router
+  x: 0
+  y: -170
+  config: |
+    ! LISP map-server / map-resolver at 10.32.0.100. Underlay OSPF pre-built.
+    interface %if0%
+     description to CORE Et0/2 (underlay)
+     ip address 10.32.3.2 255.255.255.252
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description MS/MR address
+     ip address 10.32.0.100 255.255.255.255
+    router ospf 1
+     network 10.32.0.100 0.0.0.0 area 0
+     network 10.32.3.0 0.0.0.3 area 0
+links:
+- a:
+    node: CORE
+    port: 0
+  b:
+    node: XTR1
+    port: 0
+- a:
+    node: CORE
+    port: 1
+  b:
+    node: XTR2
+    port: 0
+- a:
+    node: CORE
+    port: 2
+  b:
+    node: MSMR
+    port: 0
+task: |
+  ## LISP: map-server/map-resolver and xTRs (IOL)
+
+  **LISP** (Locator/ID Separation Protocol, RFC 9300/9301) splits an address into *who* (the **EID**, endpoint
+  identifier) and *where* (the **RLOC**, routing locator). The underlay routes only RLOCs; EID-to-RLOC mappings live
+  in a **mapping system** and are pulled on demand - the same idea is the **control plane of Cisco SD-Access**
+  (ENCOR 1.3.a, 2.3.a).
+
+  | Device | Role | RLOC | EID prefix |
+  |---|---|---|---|
+  | XTR1 | ITR + ETR for site 1 | 10.32.0.1 | 172.16.1.0/24 (Loopback1) |
+  | XTR2 | ITR + ETR for site 2 | 10.32.0.2 | 172.16.2.0/24 (Loopback1) |
+  | MSMR | map-server + map-resolver | 10.32.0.100 | - |
+  | CORE | underlay (OSPF, RLOCs only) | 10.32.0.254 | - |
+
+  The underlay (OSPF) is pre-built. The EID prefixes are **not** in OSPF, so site 1 cannot reach site 2 until LISP
+  is running.
+
+  **Resources:** 4 IOL-XE nodes, about 4 GB RAM.
+
+  **Platform note:** this lab uses the classic (flat) LISP syntax taught for ENCOR. IOS XE 16.x+ also accepts it and
+  may show it in the hierarchical `instance-id` / `service ipv4` form in `show running-config`.
+steps:
+- id: baseline
+  title: 'Baseline: RLOCs reachable, EIDs not'
+  explain: |
+    The underlay routes RLOCs (10.32.0.0/24 loopbacks and links) with OSPF. The EID prefixes 172.16.1.0/24 and
+    172.16.2.0/24 are *not* advertised - in LISP the core never learns endpoint prefixes, which keeps its
+    routing table small and lets endpoints move without routing changes.
+
+    From XTR1, `ping 10.32.0.2 source Loopback0` works (RLOC to RLOC); `ping 172.16.2.1 source Loopback1` fails
+    (no route to the EID).
+  verify:
+  - device: XTR1
+    command: show ip route ospf
+    expect: RLOCs and links only - no 172.16.x.x prefixes.
+  - device: XTR1
+    command: ping 172.16.2.1 source Loopback1
+    expect: Fails before LISP is configured.
+  checks:
+  - id: rloc
+    description: XTR1's RLOC reaches XTR2's RLOC
+    device: XTR1
+    command: ping 10.32.0.2 source Loopback0
+    min_success: 60
+    hint: Wait for OSPF to converge.
+  - id: msmr-reach
+    description: XTR1 reaches the MS/MR
+    device: XTR1
+    command: ping 10.32.0.100 source Loopback0
+    min_success: 60
+    hint: Wait for OSPF to converge.
+- id: msmr
+  title: 'MSMR: map-server and map-resolver'
+  explain: |
+    The **map-server (MS)** accepts *Map-Register* messages from ETRs - each site has an **authentication key** and
+    the EID prefixes it may register. The **map-resolver (MR)** receives *Map-Requests* from ITRs and forwards them
+    to the MS, which hands them to the registered ETR; the ETR answers the ITR directly with a *Map-Reply*.
+    One box usually does both:
+
+    ```
+    router lisp
+     site SITE1
+      authentication-key LISP-S1
+      eid-prefix 172.16.1.0/24
+     site SITE2
+      authentication-key LISP-S2
+      eid-prefix 172.16.2.0/24
+     ipv4 map-server
+     ipv4 map-resolver
+    ```
+
+    Until the xTRs register, `show lisp site` lists both sites with *Up: no*.
+    LISP control messages use UDP **4342**; encapsulated data uses UDP **4341**.
+  config:
+    MSMR: |
+      router lisp
+       site SITE1
+        description site 1 (XTR1)
+        authentication-key LISP-S1
+        eid-prefix 172.16.1.0/24
+        exit
+       site SITE2
+        description site 2 (XTR2)
+        authentication-key LISP-S2
+        eid-prefix 172.16.2.0/24
+        exit
+       ipv4 map-server
+       ipv4 map-resolver
+  verify:
+  - device: MSMR
+    command: show lisp site
+    expect: 'SITE1 and SITE2 listed (Up: no until the xTRs register).'
+  checks:
+  - id: ms-config
+    description: MSMR is a map-server and map-resolver with two sites
+    device: MSMR
+    mode: config
+    match:
+    - ^router lisp
+    - site SITE1
+    - site SITE2
+    - map-server
+    - map-resolver
+    hint: router lisp / site SITE1 ... / ipv4 map-server / ipv4 map-resolver
+- id: xtr
+  title: 'XTR1 and XTR2: database mapping, ITR and ETR'
+  explain: |
+    Each site router is both **ITR** (ingress tunnel router: looks up and encapsulates traffic leaving the site)
+    and **ETR** (egress tunnel router: registers the site's EIDs and decapsulates traffic arriving):
+
+    - `database-mapping <EID-prefix> <RLOC> priority P weight W` - the local EID space and the locator(s) to reach
+      it (lower priority preferred; weight shares load between equal priorities).
+    - `ipv4 etr map-server 10.32.0.100 key ...` + `ipv4 etr` - register the database with the MS (every 60 s).
+    - `ipv4 itr map-resolver 10.32.0.100` + `ipv4 itr` - where to send Map-Requests.
+
+    XTR1 (XTR2 is the same with 172.16.2.0/24, 10.32.0.2 and key LISP-S2):
+
+    ```
+    router lisp
+     database-mapping 172.16.1.0/24 10.32.0.1 priority 1 weight 100
+     ipv4 itr map-resolver 10.32.0.100
+     ipv4 itr
+     ipv4 etr map-server 10.32.0.100 key LISP-S1
+     ipv4 etr
+    ```
+
+    A wrong key is the classic fault: the MS drops the Map-Register (`debug lisp control-plane map-server-registration`
+    on MSMR shows the authentication failure) and the site stays *Up: no*.
+  config:
+    XTR1: |
+      router lisp
+       database-mapping 172.16.1.0/24 10.32.0.1 priority 1 weight 100
+       ipv4 itr map-resolver 10.32.0.100
+       ipv4 itr
+       ipv4 etr map-server 10.32.0.100 key LISP-S1
+       ipv4 etr
+    XTR2: |
+      router lisp
+       database-mapping 172.16.2.0/24 10.32.0.2 priority 1 weight 100
+       ipv4 itr map-resolver 10.32.0.100
+       ipv4 itr
+       ipv4 etr map-server 10.32.0.100 key LISP-S2
+       ipv4 etr
+  verify:
+  - device: XTR1
+    command: show ip lisp database
+    expect: 172.16.1.0/24 with locator 10.32.0.1, site-self, reachable.
+  - device: MSMR
+    command: show lisp site
+    expect: 'SITE1 registered by 10.32.0.1, SITE2 by 10.32.0.2, Up: yes.'
+  checks:
+  - id: site1-up
+    description: SITE1 is registered by XTR1
+    device: MSMR
+    command: show lisp site
+    match:
+    - SITE1\s+\S+\s+yes\s+10\.32\.0\.1
+    - SITE2\s+\S+\s+yes\s+10\.32\.0\.2
+    hint: 'On each xTR: ipv4 etr map-server 10.32.0.100 key <site key> and ipv4 etr; keys must match the MS site.'
+  - id: xtr1-db
+    description: XTR1 announces 172.16.1.0/24 at RLOC 10.32.0.1
+    device: XTR1
+    command: show ip lisp database
+    match:
+    - ^172\.16\.1\.0/24
+    - 10\.32\.0\.1\s+1/100
+    hint: router lisp / database-mapping 172.16.1.0/24 10.32.0.1 priority 1 weight 100
+- id: map-cache
+  title: 'EID-to-EID traffic: Map-Request, Map-Reply and the map-cache'
+  explain: |
+    Ping from site 1's EID to site 2's EID: `ping 172.16.2.1 source Loopback1` on XTR1. The **first packet is
+    lost**: XTR1 has no mapping, so it sends a Map-Request to the MR (its default *negative* map-cache entry says
+    "send-map-request"). The MR forwards it to the MS, the MS to XTR2, and XTR2 sends a Map-Reply straight back.
+    XTR1 caches `172.16.2.0/24 -> RLOC 10.32.0.2` and encapsulates the following packets in LISP (outer IP
+    10.32.0.1 -> 10.32.0.2, UDP 4341). CORE forwards them on RLOCs alone.
+
+    How this maps to **SD-Access** (ENCOR 1.3.a): the *control plane node* is a LISP MS/MR; fabric edge nodes
+    are xTRs that register endpoints (host /32s and MACs) as they connect; the *data plane* is **VXLAN** (LISP
+    control plane + VXLAN-GPO encapsulation carrying the SGT for the *policy plane*, TrustSec); borders are proxy
+    xTRs (PxTR) that connect the fabric to non-LISP networks.
+
+    Troubleshooting: `show ip lisp map-cache`, `show ip lisp database`, `show lisp site detail`,
+    `lig 172.16.2.1` (LISP Internet Groper - sends a Map-Request on demand) and `debug lisp control-plane all`.
+  verify:
+  - device: XTR1
+    command: ping 172.16.2.1 source Loopback1
+    expect: .!!!! - the first packet triggers the Map-Request.
+  - device: XTR1
+    command: show ip lisp map-cache
+    expect: 172.16.2.0/24 via map-reply, complete, locator 10.32.0.2 up.
+  - device: CORE
+    command: show ip route 172.16.2.0
+    expect: '% Network not in table - the core never learns EIDs.'
+  checks:
+  - id: eid-ping
+    description: Site 1 EID reaches site 2 EID over LISP
+    device: XTR1
+    command: ping 172.16.2.1 source Loopback1
+    min_success: 60
+    hint: Both sites must be registered (show lisp site). Ping twice - the first packet starts the resolution.
+  - id: map-cache
+    description: XTR1 has a complete map-cache entry for 172.16.2.0/24 via RLOC 10.32.0.2
+    device: XTR1
+    command: show ip lisp map-cache
+    match:
+    - 172\.16\.2\.0/24, .*via map-reply, complete
+    - 10\.32\.0\.2\s+\S+\s+up
+    hint: Ping 172.16.2.1 source Loopback1 first; check ipv4 itr map-resolver 10.32.0.100.
+  - id: core-no-eid
+    description: CORE has no route to the EID prefixes
+    device: CORE
+    command: show ip route 172.16.2.0
+    match:
+    - Network not in table
+    hint: Do not advertise the EID prefixes in OSPF - LISP carries them.
+solution_summary: |
+  **What you built**
+
+  - **MSMR:** `router lisp` with `site SITE1` (key LISP-S1, `eid-prefix 172.16.1.0/24`) and `site SITE2`
+    (key LISP-S2, `eid-prefix 172.16.2.0/24`), `ipv4 map-server`, `ipv4 map-resolver`.
+  - **XTR1 / XTR2:** `database-mapping 172.16.N.0/24 10.32.0.N priority 1 weight 100`,
+    `ipv4 itr map-resolver 10.32.0.100`, `ipv4 itr`, `ipv4 etr map-server 10.32.0.100 key LISP-SN`, `ipv4 etr`.
+
+  **Why it works:** ETRs register their EID prefixes with the map-server; an ITR asks the map-resolver on the first
+  packet, caches the EID-to-RLOC mapping from the Map-Reply and encapsulates (UDP 4341) toward the RLOC. The underlay
+  only routes RLOCs. SD-Access uses the same control plane with VXLAN as the data plane and SGTs as the policy plane.
+
+  **Verification commands:** `show lisp site`, `show ip lisp database`, `show ip lisp map-cache`, `lig <EID>`.

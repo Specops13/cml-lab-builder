@@ -774,11 +774,14 @@ install in any 3.x app; they are published in the library as soon as they are co
 | `27-qos-mqc`: MQC classification, marking, policing, HQoS shaping with LLQ/CBWFQ/WRED | 4 IOL, ~4 GB | ENCOR 1.4, CCNA 4.7, CCIE-EI 4.4.a/b/d-h |
 | `28-netflow-span-rspan`: Flexible NetFlow (v9 and v5 exporters), local SPAN, RSPAN; ERSPAN and EPC explained | 4 IOL + 2 IOL-L2, ~6 GB | ENCOR 4.2, 4.3, ENARSI 4.6, CCIE-EI 4.6.c, 4.7.a.i/ii |
 | `29-file-transfer-archive`: TFTP server/client, FTP client, SCP server, configuration archive over SCP | 2 IOL, ~2 GB | ENARSI 4.1.b/c, CCNA 4.9, CCIE-EI 4.3.a.ii, 4.3.c.ii |
+| `30-ospfv3-af-path-pref`: OSPFv3 IPv4/IPv6 address families, per-AF costs, path-type preference (intra > inter > E1 > E2) | 4 IOL, ~4 GB | ENARSI 1.10.a, 1.10.d, ENCOR 3.2.b, CCIE-EI 1.4.b |
+| `31-ipv6-first-hop-security`: rogue RA/DHCPv6 attack, RA guard, DHCPv6 guard, device-tracking binding table with ND inspection, source guard | 3 IOL + 1 IOL-L2, ~4 GB | ENARSI 3.4, CCIE-EI 4.2.c.i-vi |
+| `32-lisp-msmr-xtr`: LISP map-server/map-resolver, xTR registration, Map-Request/Reply and map-cache, SD-Access control plane | 4 IOL, ~4 GB | ENCOR 2.3.a, 1.3.a, CCIE-EI 2.1.b.i |
 
 IOL has no NetFlow collector, so the NetFlow lab verifies on the exporter (cache and export counters); the SPAN
 analyser is an IOL node that counts the mirrored packets. IOS has no FTP server, so FTP is client configuration only.
 The file-transfer lab moves files device-to-device (`more tftp://`, `scp://` archive paths), so it does not depend on
-the name of IOL's local file system.
+the name of IOL's local file system. Labs 29-31 use the ENARSI track.
 
 ### RAM estimate and the RAM heavy tag
 Every lab shows an estimate of the CML server RAM it needs, summed from the default RAM of each node's CML 2.9 node

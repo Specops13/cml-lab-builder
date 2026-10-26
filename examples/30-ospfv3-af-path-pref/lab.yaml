@@ -1,0 +1,504 @@
+id: 30-ospfv3-af-path-pref
+type: walkthrough
+title: 'Walkthrough: OSPFv3 address families and OSPF path preference (IOL)'
+track: ENARSI
+blueprint:
+- 1.10.a
+- 1.10.d
+domain: 3.0 Infrastructure
+difficulty: 3
+platforms:
+- iol
+summary: Run IPv4 and IPv6 in one OSPFv3 process with address families, steer each family over a different path with per-AF
+  costs, and prove the OSPF path-type order (intra > inter > E1 > E2) with an anycast prefix.
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: R1
+  kind: router
+  x: -250
+  y: 0
+  config: |
+    ! Dual-stack router. Addresses are pre-built; you add OSPFv3 for both address families.
+    interface %if0%
+     description to R2 Et0/0
+     ip address 10.30.12.1 255.255.255.0
+     ipv6 address 2001:DB8:30:12::1/64
+     no shutdown
+    interface %if1%
+     description to R3 Et0/0
+     ip address 10.30.13.1 255.255.255.0
+     ipv6 address 2001:DB8:30:13::1/64
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ipv6 unicast-routing
+    interface Loopback0
+     description router-id / loopback
+     ip address 10.30.0.1 255.255.255.255
+     ipv6 address 2001:DB8:30::1/128
+- name: R2
+  kind: router
+  x: 0
+  y: -150
+  config: |
+    ! Dual-stack router (upper path).
+    interface %if0%
+     description to R1 Et0/0
+     ip address 10.30.12.2 255.255.255.0
+     ipv6 address 2001:DB8:30:12::2/64
+     no shutdown
+    interface %if1%
+     description to R4 Et0/0
+     ip address 10.30.24.2 255.255.255.0
+     ipv6 address 2001:DB8:30:24::2/64
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ipv6 unicast-routing
+    interface Loopback0
+     description router-id / loopback
+     ip address 10.30.0.2 255.255.255.255
+     ipv6 address 2001:DB8:30::2/128
+    interface Loopback99
+     description anycast service prefix (redistributed in step 4)
+     ip address 10.30.99.1 255.255.255.0
+     ipv6 address 2001:DB8:30:99::1/64
+- name: R3
+  kind: router
+  x: 0
+  y: 150
+  config: |
+    ! Dual-stack router (lower path).
+    interface %if0%
+     description to R1 Et0/1
+     ip address 10.30.13.3 255.255.255.0
+     ipv6 address 2001:DB8:30:13::3/64
+     no shutdown
+    interface %if1%
+     description to R4 Et0/1
+     ip address 10.30.34.3 255.255.255.0
+     ipv6 address 2001:DB8:30:34::3/64
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ipv6 unicast-routing
+    interface Loopback0
+     description router-id / loopback
+     ip address 10.30.0.3 255.255.255.255
+     ipv6 address 2001:DB8:30::3/128
+    interface Loopback99
+     description anycast service prefix (redistributed in step 4)
+     ip address 10.30.99.1 255.255.255.0
+     ipv6 address 2001:DB8:30:99::1/64
+- name: R4
+  kind: router
+  x: 250
+  y: 0
+  config: |
+    ! Dual-stack router; its Loopback0 is the destination we steer.
+    interface %if0%
+     description to R2 Et0/1
+     ip address 10.30.24.4 255.255.255.0
+     ipv6 address 2001:DB8:30:24::4/64
+     no shutdown
+    interface %if1%
+     description to R3 Et0/1
+     ip address 10.30.34.4 255.255.255.0
+     ipv6 address 2001:DB8:30:34::4/64
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    ipv6 unicast-routing
+    interface Loopback0
+     description router-id / loopback
+     ip address 10.30.0.4 255.255.255.255
+     ipv6 address 2001:DB8:30::4/128
+links:
+- a:
+    node: R1
+    port: 0
+  b:
+    node: R2
+    port: 0
+- a:
+    node: R1
+    port: 1
+  b:
+    node: R3
+    port: 0
+- a:
+    node: R2
+    port: 1
+  b:
+    node: R4
+    port: 0
+- a:
+    node: R3
+    port: 1
+  b:
+    node: R4
+    port: 1
+task: |
+  ## OSPFv3 address families and OSPF path preference (IOL)
+
+  One OSPFv3 process can carry **both IPv4 and IPv6** (address families, RFC 5838). In this lab you build it on a
+  dual-stack diamond, then steer traffic: different paths per address family with per-AF interface costs, and the
+  **path-type preference** rules (intra-area > inter-area > external type 1 > external type 2) with an anycast prefix
+  that two routers redistribute differently. ENARSI 1.10.a (address families) and 1.10.d (path preference).
+
+  ```
+            R2 (Lo99 anycast)
+           /  \
+         R1    R4  (Lo0 10.30.0.4 / 2001:DB8:30::4)
+           \  /
+            R3 (Lo99 anycast)
+  ```
+
+  | Link | IPv4 | IPv6 |
+  |---|---|---|
+  | R1-R2 | 10.30.12.0/24 | 2001:DB8:30:12::/64 |
+  | R1-R3 | 10.30.13.0/24 | 2001:DB8:30:13::/64 |
+  | R2-R4 | 10.30.24.0/24 | 2001:DB8:30:24::/64 |
+  | R3-R4 | 10.30.34.0/24 | 2001:DB8:30:34::/64 |
+  | Loopback0 | 10.30.0.N/32 | 2001:DB8:30::N/128 |
+
+  **Resources:** 4 IOL-XE nodes, about 4 GB RAM.
+steps:
+- id: baseline
+  title: 'Baseline: dual-stack links are up'
+  explain: |
+    Every link has an IPv4 and an IPv6 address and `ipv6 unicast-routing` is on. Neighbours answer on both
+    protocols, but nothing beyond a directly connected subnet is reachable yet.
+  verify:
+  - device: R1
+    command: ping 2001:DB8:30:12::2
+    expect: Success rate 100 percent.
+  - device: R1
+    command: show ipv6 interface brief
+    expect: Global and link-local addresses on Et0/0, Et0/1 and Loopback0.
+  checks:
+  - id: r1-r2-v4
+    description: R1 reaches R2 over IPv4
+    device: R1
+    command: ping 10.30.12.2
+    min_success: 60
+    hint: Wait for the nodes to boot.
+  - id: r1-r2-v6
+    description: R1 reaches R2 over IPv6
+    device: R1
+    command: ping 2001:DB8:30:12::2
+    min_success: 60
+    hint: Wait for the nodes to boot (IPv6 DAD takes a few seconds).
+- id: ospfv3-af
+  title: 'All routers: one OSPFv3 process, IPv4 and IPv6 address families'
+  explain: |
+    `router ospfv3 1` with `address-family ipv4 unicast` and `address-family ipv6 unicast` starts **two OSPFv3
+    instances** under one process (separate neighbour tables, databases and SPF runs, instance IDs 64 and 0).
+    Interfaces join an AF with `ospfv3 1 ipv4 area 0` / `ospfv3 1 ipv6 area 0`.
+
+    Things that differ from OSPFv2:
+    - OSPFv3 always runs over **IPv6 link-local** addresses, even for the IPv4 AF - an interface needs IPv6
+      enabled (an IPv6 address or `ipv6 enable`) to form IPv4-AF adjacencies.
+    - The **router ID** is still a 32-bit number. With no IPv4 address it must be set by hand (`router-id`).
+    - Prefixes are carried in new LSA types (8 link, 9 intra-area-prefix); router and network LSAs carry topology
+      only.
+
+    Repeat on all four routers (R1 shown):
+
+    ```
+    router ospfv3 1
+     router-id 10.30.0.1
+     address-family ipv4 unicast
+     address-family ipv6 unicast
+    interface Loopback0
+     ospfv3 1 ipv4 area 0
+     ospfv3 1 ipv6 area 0
+    interface Ethernet0/0
+     ospfv3 1 ipv4 area 0
+     ospfv3 1 ipv6 area 0
+    interface Ethernet0/1
+     ospfv3 1 ipv4 area 0
+     ospfv3 1 ipv6 area 0
+    ```
+
+    With equal costs (10 per 10 Mb/s IOL link), R1 has **two equal-cost paths** to R4's loopback.
+    Troubleshooting: `show ospfv3 neighbor` (per AF), `show ospfv3 interface brief`, `debug ospfv3 adj`;
+    mismatched area, hello/dead timers, MTU or a missing IPv6 address on the link are the usual causes.
+  config:
+    R1: |
+      router ospfv3 1
+       router-id 10.30.0.1
+       address-family ipv4 unicast
+       address-family ipv6 unicast
+      interface Loopback0
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+      interface %if0%
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+      interface %if1%
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+    R2: |
+      router ospfv3 1
+       router-id 10.30.0.2
+       address-family ipv4 unicast
+       address-family ipv6 unicast
+      interface Loopback0
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+      interface %if0%
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+      interface %if1%
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+    R3: |
+      router ospfv3 1
+       router-id 10.30.0.3
+       address-family ipv4 unicast
+       address-family ipv6 unicast
+      interface Loopback0
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+      interface %if0%
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+      interface %if1%
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+    R4: |
+      router ospfv3 1
+       router-id 10.30.0.4
+       address-family ipv4 unicast
+       address-family ipv6 unicast
+      interface Loopback0
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+      interface %if0%
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+      interface %if1%
+       ospfv3 1 ipv4 area 0
+       ospfv3 1 ipv6 area 0
+  verify:
+  - device: R1
+    command: show ospfv3 ipv4 neighbor
+    expect: R2 and R3 FULL.
+  - device: R1
+    command: show ospfv3 ipv6 neighbor
+    expect: R2 and R3 FULL.
+  - device: R1
+    command: show ip route ospfv3
+    expect: IPv4 routes learned through OSPFv3, two paths to 10.30.0.4.
+  checks:
+  - id: af-config
+    description: R1 runs OSPFv3 with both address families
+    device: R1
+    mode: config
+    match:
+    - ^router ospfv3 1\n router-id 10\.30\.0\.1
+    - ^ address-family ipv4 unicast
+    - ^ address-family ipv6 unicast
+    - ^interface Ethernet0/0(\n .*)*\n ospfv3 1 ipv4 area 0
+    hint: router ospfv3 1 / router-id 10.30.0.1 / address-family ipv4 unicast / address-family ipv6 unicast; ospfv3 1 ipv4|ipv6
+      area 0 on the interfaces
+  - id: v4-nbr
+    description: R1 has two FULL IPv4-AF neighbours
+    device: R1
+    command: show ospfv3 ipv4 neighbor
+    match:
+    - 10\.30\.0\.2\s+\d+\s+FULL
+    - 10\.30\.0\.3\s+\d+\s+FULL
+    hint: IPv4 AF adjacencies need IPv6 on the link and ospfv3 1 ipv4 area 0 on both ends.
+  - id: v6-nbr
+    description: R1 has two FULL IPv6-AF neighbours
+    device: R1
+    command: show ospfv3 ipv6 neighbor
+    match:
+    - 10\.30\.0\.2\s+\d+\s+FULL
+    - 10\.30\.0\.3\s+\d+\s+FULL
+    hint: ospfv3 1 ipv6 area 0 on both ends of each link.
+  - id: v4-e2e
+    description: R1 reaches R4's loopback over IPv4
+    device: R1
+    command: ping 10.30.0.4 source Loopback0
+    min_success: 60
+    hint: Check all four routers are in both AFs.
+  - id: v6-e2e
+    description: R1 reaches R4's loopback over IPv6
+    device: R1
+    command: ping 2001:DB8:30::4 source Loopback0
+    min_success: 60
+    hint: Check the IPv6 AF on R2, R3 and R4.
+- id: af-cost
+  title: 'R1: different paths per address family'
+  explain: |
+    Interface cost can be set **per address family**: `ospfv3 1 ipv4 cost N` changes only the IPv4 instance,
+    `ospfv3 1 ipv6 cost N` only IPv6 (`ospfv3 cost N` sets both). Make IPv4 prefer the R2 path and IPv6 the R3
+    path:
+
+    ```
+    interface Ethernet0/1
+     ospfv3 1 ipv4 cost 50     ! IPv4 avoids R3
+    interface Ethernet0/0
+     ospfv3 1 ipv6 cost 50     ! IPv6 avoids R2
+    ```
+
+    Other ways to influence the OSPF cost: `bandwidth` on the interface (cost = reference bandwidth /
+    interface bandwidth) and `auto-cost reference-bandwidth` under the process (set it the same on **every**
+    router, otherwise paths become asymmetric). Cost is outgoing: it only changes R1's decision, not the return path.
+
+    `show ospfv3 interface brief` shows the cost per AF; the routes now have one next hop each with metric 21
+    (10 + 10 + loopback 1).
+  config:
+    R1: |
+      interface %if1%
+       ospfv3 1 ipv4 cost 50
+      interface %if0%
+       ospfv3 1 ipv6 cost 50
+  verify:
+  - device: R1
+    command: show ospfv3 interface brief
+    expect: Et0/1 cost 50 in the ipv4 AF, Et0/0 cost 50 in the ipv6 AF.
+  - device: R1
+    command: show ip route 10.30.0.4
+    expect: One path via 10.30.12.2 (R2), metric 21. (traceroute 10.30.0.4 shows the same.)
+  checks:
+  - id: v4-path
+    description: IPv4 to R4 goes via R2 (metric 21)
+    device: R1
+    command: show ip route 10.30.0.4
+    match:
+    - metric 21
+    - \* 10\.30\.12\.2, from 10\.30\.0\.4
+    hint: interface Ethernet0/1 / ospfv3 1 ipv4 cost 50
+  - id: v6-path
+    description: IPv6 to R4 goes via R3 (Ethernet0/1, metric 21)
+    device: R1
+    command: show ipv6 route 2001:DB8:30::4/128
+    match:
+    - metric 21
+    - FE80::\S+, Ethernet0/1
+    hint: interface Ethernet0/0 / ospfv3 1 ipv6 cost 50 (the IPv6 AF only)
+- id: path-type
+  title: 'R2 and R3: path-type preference with an anycast prefix'
+  explain: |
+    OSPF chooses a route by **path type first, cost second** (RFC 2328 16.4, RFC 5340):
+
+    1. intra-area (O)
+    2. inter-area (O IA)
+    3. external type 1 (O E1) / NSSA type 1 (O N1) - external metric **plus** the internal cost to the ASBR
+    4. external type 2 (O E2) / NSSA type 2 (O N2) - external metric only (ties broken by the cost to the ASBR,
+       the "forward metric")
+
+    R2 and R3 both own the anycast prefix 10.30.99.0/24 (2001:DB8:30:99::/64) on Loopback99 and redistribute it:
+    R2 as **E2 metric 1**, R3 as **E1 metric 100**. A cost-only view would pick R2; OSPF picks **R3** because E1
+    beats E2 whatever the metric. The IPv4 metric is 150 (100 + R1's IPv4 cost 50 to R3), the IPv6 metric 110.
+
+    ```
+    ! R2                                   ! R3
+    route-map LO99 permit 10               route-map LO99 permit 10
+     match interface Loopback99             match interface Loopback99
+    router ospfv3 1                        router ospfv3 1
+     address-family ipv4 unicast            address-family ipv4 unicast
+      redistribute connected metric 1        redistribute connected metric 100
+       metric-type 2 route-map LO99           metric-type 1 route-map LO99
+     address-family ipv6 unicast            address-family ipv6 unicast
+      (same)                                 (same)
+    ```
+
+    Look at both type-5 LSAs with `show ospfv3 ipv4 database external` - R1 knows the E2 route but does not
+    install it. Remove R3's redistribution and the route fails over to R2 (E2, metric 1). If either router
+    advertised 10.30.99.0/24 *inside* OSPF (intra-area), that would win over both externals.
+    Use `debug ospfv3 ipv4 spf` (or `debug ip ospf spf` for OSPFv2) to watch the calculation.
+  config:
+    R2: |
+      route-map LO99 permit 10
+       match interface Loopback99
+      router ospfv3 1
+       address-family ipv4 unicast
+        redistribute connected metric 1 metric-type 2 route-map LO99
+       address-family ipv6 unicast
+        redistribute connected metric 1 metric-type 2 route-map LO99
+    R3: |
+      route-map LO99 permit 10
+       match interface Loopback99
+      router ospfv3 1
+       address-family ipv4 unicast
+        redistribute connected metric 100 metric-type 1 route-map LO99
+       address-family ipv6 unicast
+        redistribute connected metric 100 metric-type 1 route-map LO99
+  verify:
+  - device: R1
+    command: show ospfv3 ipv4 database external
+    expect: 'Two LSAs for 10.30.99.0/24: from 10.30.0.2 (E2, metric 1) and 10.30.0.3 (E1, metric 100).'
+  - device: R1
+    command: show ip route 10.30.99.0
+    expect: type extern 1, metric 150, via 10.30.13.3.
+  checks:
+  - id: v4-e1
+    description: R1 prefers R3's E1 route for 10.30.99.0/24
+    device: R1
+    command: show ip route 10.30.99.0
+    match:
+    - type extern 1
+    - \* 10\.30\.13\.3
+    hint: 'R3: redistribute connected metric 100 metric-type 1 route-map LO99 (ipv4 AF); R2 uses metric-type 2.'
+  - id: v6-e1
+    description: R1 prefers R3's E1 route for 2001:DB8:30:99::/64
+    device: R1
+    command: show ipv6 route 2001:DB8:30:99::/64
+    match:
+    - type extern 1
+    - FE80::\S+, Ethernet0/1
+    hint: Same redistribution under address-family ipv6 unicast on R2 and R3.
+  - id: r2-redist
+    description: R2 redistributes Loopback99 as E2 metric 1
+    device: R2
+    mode: config
+    match:
+    - redistribute connected metric 1 metric-type 2 route-map LO99
+    - ^route-map LO99 permit 10\n match interface Loopback99
+    hint: route-map LO99 / match interface Loopback99; redistribute connected metric 1 metric-type 2 route-map LO99
+solution_summary: |
+  **What you built**
+
+  - **OSPFv3 with address families** on R1-R4: `router ospfv3 1`, `router-id 10.30.0.N`,
+    `address-family ipv4 unicast` and `address-family ipv6 unicast`; `ospfv3 1 ipv4 area 0` and
+    `ospfv3 1 ipv6 area 0` on Loopback0 and both links.
+  - **Per-AF cost on R1:** `ospfv3 1 ipv4 cost 50` on Et0/1 and `ospfv3 1 ipv6 cost 50` on Et0/0 - IPv4 to R4 via
+    R2, IPv6 via R3.
+  - **Path type:** R2 redistributes Loopback99 as E2 metric 1, R3 as E1 metric 100 (route-map LO99,
+    `match interface Loopback99`); R1 installs the E1 route via R3.
+
+  **Why it works:** each AF is a separate OSPFv3 instance with its own costs and SPF; OSPF compares path type
+  (intra > inter > E1/N1 > E2/N2) before cost.
+
+  **Verification commands:** `show ospfv3 ipv4|ipv6 neighbor`, `show ospfv3 interface brief`,
+  `show ip route 10.30.0.4`, `show ipv6 route 2001:DB8:30::4/128`, `show ospfv3 ipv4 database external`.

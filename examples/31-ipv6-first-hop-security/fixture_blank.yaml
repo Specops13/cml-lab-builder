@@ -1,0 +1,26 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# Outputs follow the IOS XE IPv6 First-Hop Security / SISF configuration guide.
+# State: freshly booted lab (day-0 only).
+PC1:
+  ping 2001:DB8:31:10::1: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:31:10::1, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ipv6 routers: |
+    Router FE80::1 on Ethernet0/0, last update 0 min, CLC
+      Hops 64, Lifetime 1800 sec, AddrFlag=0, OtherFlag=1, MTU=1500
+      HomeAgentFlag=0, Preference=Medium
+      Reachable time 0 (unspecified), Retransmit time 0 (unspecified)
+      Prefix 2001:DB8:31:10::/64 onlink autoconfig
+        Valid lifetime 2592000, preferred lifetime 604800
+    Router FE80::BAD on Ethernet0/0, last update 0 min
+      Hops 64, Lifetime 1800 sec, AddrFlag=0, OtherFlag=1, MTU=1500
+      HomeAgentFlag=0, Preference=High
+      Reachable time 0 (unspecified), Retransmit time 0 (unspecified)
+      Prefix 2001:DB8:BAD::/64 onlink autoconfig
+        Valid lifetime 2592000, preferred lifetime 604800
+SW1:
+  show ipv6 nd raguard policy HOSTS: |
+    % Policy HOSTS not found
+  show device-tracking database: ''

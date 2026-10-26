@@ -14,6 +14,16 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
   - `29-file-transfer-archive`: IOS TFTP server and client, FTP client settings, SCP server (SSH + AAA exec
     authorization), configuration archive over SCP with change logging and `configure replace`. 2 IOL nodes, about
     2 GB. ENARSI 4.1.b/c, CCNA 4.9, CCIE-EI 4.3.a.ii, 4.3.c.ii.
+  - `30-ospfv3-af-path-pref` (ENARSI track): one OSPFv3 process with IPv4 and IPv6 address families, different paths
+    per family with per-AF interface costs, path-type preference (intra > inter > E1 > E2) with an anycast prefix.
+    4 IOL nodes, about 4 GB. ENARSI 1.10.a/d, ENCOR 3.2.b, CCIE-EI 1.4.b.
+  - `31-ipv6-first-hop-security` (ENARSI track): a rogue router and DHCPv6 server on an access port, stopped with RA
+    guard and DHCPv6 guard; device-tracking binding table with ND inspection; IPv6 source guard. 3 IOL + 1 IOL-L2
+    nodes, about 4 GB. ENARSI 3.4, CCIE-EI 4.2.c.i-vi.
+  - `32-lisp-msmr-xtr`: LISP map-server/map-resolver, xTR registration, Map-Request/Map-Reply and the map-cache, and
+    how this is the SD-Access control plane. 4 IOL nodes, about 4 GB. ENCOR 2.3.a, 1.3.a, CCIE-EI 2.1.b.i.
+### Changed
+- `29-file-transfer-archive` moved to the ENARSI track (pack version 2).
 
 ## [3.3.5] - 2026-10-25
 ### Added

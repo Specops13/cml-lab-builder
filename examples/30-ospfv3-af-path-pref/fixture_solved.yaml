@@ -1,0 +1,66 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# OSPFv3 outputs follow the IOS XE OSPFv3 Address Families configuration guide.
+# State: every step done (final state of the walkthrough).
+R1:
+  ping 10.30.12.2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.30.12.2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 2001:DB8:30:12::2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:30:12::2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ospfv3 ipv4 neighbor: |2
+              OSPFv3 1 address-family ipv4 (router-id 10.30.0.1)
+
+    Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+    10.30.0.2         1   FULL/BDR        00:00:35    3               Ethernet0/0
+    10.30.0.3         1   FULL/BDR        00:00:33    3               Ethernet0/1
+  show ospfv3 ipv6 neighbor: |2
+              OSPFv3 1 address-family ipv6 (router-id 10.30.0.1)
+
+    Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+    10.30.0.2         1   FULL/BDR        00:00:35    3               Ethernet0/0
+    10.30.0.3         1   FULL/BDR        00:00:33    3               Ethernet0/1
+  ping 10.30.0.4 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.30.0.4, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  ping 2001:DB8:30::4 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 2001:DB8:30::4, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ip route 10.30.0.4: |
+    Routing entry for 10.30.0.4/32
+      Known via "ospfv3 1", distance 110, metric 21, type intra area
+      Last update from 10.30.12.2 on Ethernet0/0, 00:01:12 ago
+      Routing Descriptor Blocks:
+      * 10.30.12.2, from 10.30.0.4, 00:01:12 ago, via Ethernet0/0
+          Route metric is 21, traffic share count is 1
+  show ipv6 route 2001:DB8:30::4/128: |
+    Routing entry for 2001:DB8:30::4/128
+      Known via "ospf 1", distance 110, metric 21, type intra area
+      Route count is 1/1, share count 0
+      Routing paths:
+        FE80::A8BB:CCFF:FE00:3100, Ethernet0/1
+          From FE80::A8BB:CCFF:FE00:3100
+          Last updated 00:00:45 ago
+  show ip route 10.30.99.0: |
+    Routing entry for 10.30.99.0/24
+      Known via "ospfv3 1", distance 110, metric 150, type extern 1
+      Last update from 10.30.13.3 on Ethernet0/1, 00:00:20 ago
+      Routing Descriptor Blocks:
+      * 10.30.13.3, from 10.30.0.3, 00:00:20 ago, via Ethernet0/1
+          Route metric is 150, traffic share count is 1
+  show ipv6 route 2001:DB8:30:99::/64: |
+    Routing entry for 2001:DB8:30:99::/64
+      Known via "ospf 1", distance 110, metric 110, type extern 1
+      Route count is 1/1, share count 0
+      Routing paths:
+        FE80::A8BB:CCFF:FE00:3100, Ethernet0/1
+          From FE80::A8BB:CCFF:FE00:3100
+          Last updated 00:00:20 ago
