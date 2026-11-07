@@ -212,7 +212,11 @@ def _grade(settings, lab: Lab, progress, **kw) -> dict:
     if has_cfg:
         reports.append(do_check(settings, lab.id, progress, config_source=kw.get("config_source"), mode="config",
                                 **common))
-    return _merge(reports)
+    d = _merge(reports)
+    if has_live and not d["results"]:
+        d["notes"].append("This step's checks run show commands on the device consoles, which could not be "
+                          "reached, so nothing was graded. Fix console access (Settings) and check again.")
+    return d
 
 
 def check_step(settings, lab_id: str, step_id: str, progress, **kw) -> dict:

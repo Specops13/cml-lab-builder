@@ -2,6 +2,28 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [3.3.8] - 2026-11-07
+### Fixed
+- **Day-0 configs could be lost on real CML** (reported on `05-bgp-ebgp-ibgp`: R3 booted with only Loopback0, its
+  Ethernet links unaddressed and shut, so the iBGP/eBGP sessions through R3 and *Verify end to end* failed).
+  Config-mode grading (`extract_configuration`) replaced each node's stored day-0 config with whatever was running
+  at that moment (on a node still loading its startup config: only the first lines); a later wipe/start or a Build
+  that reused the existing CML lab then booted the node from that partial copy. Grading now puts the day-0 config
+  back after reading, and Build on an existing lab re-applies this version's day-0 config to every node that will
+  boot from it (wiped / never started), reporting which nodes keep their running state (use Rebuild or Reset).
+- **Walkthrough mode, *Verify end to end* always failed under config-mode grading** (console unreachable, auto
+  fallback): the step held only live checks, so nothing was graded. The derived step now also carries every config
+  check; a step with nothing gradable says why instead of just failing.
+- Walkthrough verify text: table excerpts include the column header as IOS prints it, notes on reading
+  `show ip bgp` / `show ip bgp summary` / `show ip ospf neighbor`, and convergence times (BGP up to a minute,
+  `clear ip bgp * soft` after changing an existing session). Lab 05's recorded output now matches IOL-XE 17
+  (full status-code legend, RPKI line, summary header). `troubleshoot-ospf-7node`'s verify step grades its fix
+  config too.
+### Tests
+- One shared end-to-end test: for every challenge lab, apply only the walkthrough's commands on top of the day-0
+  configs and every step must pass, in live and config grading (all 20 derived walkthroughs pass); one test for
+  day-0 configs surviving config grading and lab reuse.
+
 ## [3.3.7] - 2026-11-07
 ### Added
 - **Two ways to do every lab: challenge or walkthrough, chosen at build time.** The Build dialog asks *How do you

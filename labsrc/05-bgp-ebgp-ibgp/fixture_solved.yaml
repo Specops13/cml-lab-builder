@@ -2,7 +2,11 @@ R1:
   show ip bgp: |
     BGP table version is 3, local router ID is 10.255.0.1
     Status codes: s suppressed, d damped, h history, * valid, > best, i - internal,
+                  r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter,
+                  x best-external, a additional-path, c RIB-compressed,
+                  t secondary path, L long-lived-stale,
     Origin codes: i - IGP, e - EGP, ? - incomplete
+    RPKI validation codes: V valid, I invalid, N Not found
 
          Network          Next Hop            Metric LocPrf Weight Path
      *>   192.168.1.0      0.0.0.0                  0         32768 i
@@ -18,18 +22,43 @@ R2:
     BGP router identifier 10.255.0.2, local AS number 65000
     BGP table version is 3, main routing table version 3
     2 network entries using 496 bytes of memory
+    2 path entries using 272 bytes of memory
+    2/2 BGP path/bestpath attribute entries using 592 bytes of memory
+    2 BGP AS-PATH entries using 64 bytes of memory
+    0 BGP route-map cache entries using 0 bytes of memory
+    0 BGP filter-list cache entries using 0 bytes of memory
+    BGP using 1424 total bytes of memory
+    BGP activity 2/0 prefixes, 2/0 paths, scan interval 60 secs
+    2 networks peaked at 00:07:05 Nov 7 2026 UTC (00:07:02.512 ago)
 
     Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
     10.0.12.1       4        65001      12      13        3    0    0 00:07:21        1
     10.255.0.3      4        65000      12      12        3    0    0 00:07:02        1
   show ip bgp: |
     BGP table version is 3, local router ID is 10.255.0.2
+    Status codes: s suppressed, d damped, h history, * valid, > best, i - internal,
+                  r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter,
+                  x best-external, a additional-path, c RIB-compressed,
+                  t secondary path, L long-lived-stale,
+    Origin codes: i - IGP, e - EGP, ? - incomplete
+    RPKI validation codes: V valid, I invalid, N Not found
+
          Network          Next Hop            Metric LocPrf Weight Path
      *>   192.168.1.0      10.0.12.1                0             0 65001 i
      *>i  192.168.4.0      10.255.0.3               0    100      0 65002 i
 R3:
   show ip bgp summary: |
     BGP router identifier 10.255.0.3, local AS number 65000
+    BGP table version is 3, main routing table version 3
+    2 network entries using 496 bytes of memory
+    2 path entries using 272 bytes of memory
+    2/2 BGP path/bestpath attribute entries using 592 bytes of memory
+    2 BGP AS-PATH entries using 64 bytes of memory
+    0 BGP route-map cache entries using 0 bytes of memory
+    0 BGP filter-list cache entries using 0 bytes of memory
+    BGP using 1424 total bytes of memory
+    BGP activity 2/0 prefixes, 2/0 paths, scan interval 60 secs
+    2 networks peaked at 00:07:05 Nov 7 2026 UTC (00:07:02.512 ago)
 
     Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
     10.0.34.4       4        65002      12      12        3    0    0 00:07:15        1
@@ -37,6 +66,13 @@ R3:
 R4:
   show ip bgp: |
     BGP table version is 3, local router ID is 10.255.0.4
+    Status codes: s suppressed, d damped, h history, * valid, > best, i - internal,
+                  r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter,
+                  x best-external, a additional-path, c RIB-compressed,
+                  t secondary path, L long-lived-stale,
+    Origin codes: i - IGP, e - EGP, ? - incomplete
+    RPKI validation codes: V valid, I invalid, N Not found
+
          Network          Next Hop            Metric LocPrf Weight Path
      *>   192.168.1.0      10.0.34.3                              0 65000 65001 i
      *>   192.168.4.0      0.0.0.0                  0         32768 i

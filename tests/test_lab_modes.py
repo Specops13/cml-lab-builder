@@ -73,3 +73,55 @@ def test_cli_build_mode_switch_and_guide_scaffold(tmp_path):
     assert "wrote" in r.invoke(cli, ["guide", str(d), "--write"]).output and (d / "guide.yaml").is_file()
     pk = packs.read_dir(d)
     assert pk.guide_yaml and packs.lint(pk, strict=True).ok
+
+
+def test_walkthrough_commands_alone_pass_every_step_in_live_and_config_grading():
+    """3.3.8 (lab 05 step 5): apply only what each challenge lab's walkthrough tells you to type on top of the
+    day-0 configs, then every step must pass, both with console (live) grading and in the config-mode fallback."""
+    import yaml
+
+    from cmllab import config, platforms, walkthrough
+    from cmllab.sim import SimRunner
+    s = config.Settings(cml_url="https://cml.x", username="u", password="pw")
+    n = 0
+    for root in (ROOT / "labsrc", ROOT / "examples"):
+        for d in sorted(p for p in root.iterdir() if (p / "lab.yaml").is_file()):
+            pk = packs.read_dir(d)
+            lab = packs.pack_lab(pk)
+            if lab.is_walkthrough:
+                continue
+            wl = guide.as_walkthrough(lab, guide.guide_steps(lab, d)[0])
+            fx = {k: yaml.safe_load((d / f"fixture_{k}.yaml").read_text()) if (d / f"fixture_{k}.yaml").is_file()
+                  else {} for k in ("solved", "blank")}
+            sim = SimRunner(wl, platforms.get("iol"), True, solution=wl.step_solution(), fixtures=fx)
+            assert any(c.mode == "config" for c in wl.steps[-1].checks), d.name   # gradable without consoles
+            for st in (st for st in wl.steps if st.checks):
+                for m in ("live", "config") if any(c.mode == "config" for c in st.checks) else ("live",):
+                    s.grading_mode = m
+                    r = walkthrough._grade(s, walkthrough.step_lab(wl, st), lambda _: None, runner=sim,
+                                           config_source=sim)
+                    assert r["results"] and r["passed"], (d.name, st.id, m, [x["id"] for x in r["results"]
+                                                                            if not x["passed"]])
+            n += 1
+    assert n >= 20
+
+
+def test_day0_config_survives_config_grading_and_lab_reuse():
+    """3.3.8 (lab 05 on real CML: R3 booted with only Loopback0): config extraction must not replace a node's
+    stored day-0 config, and building over an existing lab restores day-0 on nodes that will boot from it."""
+    from cmllab import config
+    from cmllab.cml import CML, CMLConfigSource
+    from fakes import FakeClient
+    lab = packs.pack_lab(packs.read_dir(ROOT / "labsrc" / "05-bgp-ebgp-ibgp"))
+    fc = FakeClient()
+    cml = CML(config.Settings(cml_url="https://cml.x", username="u", password="pw"), client_factory=lambda s: fc)
+    cl = cml.build(lab, start=False)
+    r3 = cl.get_node_by_label("R3")
+    day0 = r3.configuration
+    assert "ip address 10.0.23.3 255.255.255.252" in day0 and "ip address 10.0.34.3" in day0
+    r3.state, r3.running_config = "BOOTED", "hostname R3\ninterface Loopback0\n ip address 10.255.0.3 255.255.255.255\n"
+    assert "Loopback0" in CMLConfigSource(cl).get_config("R3") and r3.configuration == day0
+    r3.state, r3.configuration = "DEFINED_ON_CORE", r3.running_config      # stale stored config from an older run
+    msgs = []
+    cml.build(lab, start=False, progress=msgs.append)
+    assert r3.configuration == day0 and any("R3: restored" in m for m in msgs)

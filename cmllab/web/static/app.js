@@ -1,6 +1,6 @@
 "use strict";
 /* CML Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "3.3.7";  // must equal cmllab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "3.3.8";  // must equal cmllab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 /* links that come from data (CML, GitHub, lab files) are only ever http(s): never javascript: or data: URLs */
@@ -1137,7 +1137,7 @@ async function libFitTags() {
   }
 }
 const gb1 = (x) => x == null ? "?" : (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10);
-/* 3.3.7: two ways to do every lab, chosen when it is built and switchable later without a rebuild */
+/* 3.3.8: two ways to do every lab, chosen when it is built and switchable later without a rebuild */
 const MODE_TEXT = {
   challenge: ["Challenge", "Goals and checks only: work it out yourself. Hints on request, the full solution at the end."],
   walkthrough: ["Walkthrough", "Step by step: the exact commands per device, what each one does and what good output looks like. Checks still run."]};

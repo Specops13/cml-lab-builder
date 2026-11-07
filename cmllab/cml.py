@@ -171,12 +171,33 @@ class CML:
         else:
             progress("Lab already exists in CML; reusing it (use rebuild to recreate)")
             cl = existing
+            self._refresh_day0(lab, cl, plat, progress)
         if start:
             self.check_capacity(lab, cl)
             progress("Starting nodes")
             cl.start(wait=False)
             self.wait_booted(cl, progress, self.boot_timeout(lab))
         return cl
+
+    def _refresh_day0(self, lab: Lab, cl, plat, progress) -> None:
+        """A reused lab: nodes that will boot from their stored config (wiped, never started) get this version's
+        day-0 config again, so a stale or partial stored config (older lab version, an earlier config extraction)
+        is never what the walkthrough starts from. Running or stopped nodes keep their state."""
+        names = {n.name for n in lab.nodes}
+        kept = []
+        for n in cl.nodes():
+            if n.label not in names:
+                continue
+            if n.state == "DEFINED_ON_CORE":
+                want = full_config(lab, n.label, plat, None, self.creds())
+                if n.configuration != want:
+                    n.configuration = want
+                    progress(f"{n.label}: restored the lab's day-0 config")
+            else:
+                kept.append(n.label)
+        if kept:
+            progress(f"{', '.join(sorted(kept))} keep their current state; use Rebuild (or Reset) for fresh "
+                     "day-0 configs")
 
     def wait_booted(self, cl, progress: Callable[[str], None] = lambda m: None, timeout: int | None = None) -> None:
         timeout = timeout or self.s.boot_timeout
@@ -278,9 +299,18 @@ class CMLConfigSource:
         node = self.cl.get_node_by_label(device)
         if node.state != "BOOTED":
             raise CMLError(f"{device} is {node.state}; config extraction needs a running (BOOTED) node")
+        # Extraction replaces the node's stored day-0 config with whatever is running at that moment (on a node
+        # still applying its startup config: only the first lines). Put the day-0 config back afterwards so a
+        # later wipe or reuse never boots the node from a partial snapshot.
+        day0 = node.configuration
         node.extract_configuration()
         self.cl.sync(exclude_configurations=False)
         cfg = node.configuration
+        if day0 and cfg != day0:
+            try:
+                node.configuration = day0
+            except Exception:  # noqa: BLE001 - grading must not fail because the restore did
+                pass
         if not cfg:
             raise CMLError(f"CML returned no configuration for {device}")
         return cfg

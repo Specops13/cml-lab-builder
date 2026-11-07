@@ -517,7 +517,13 @@ Every lab in the library (01-33 and the others) works in both modes:
   otherwise they are derived from data the lab already has: one *Configure <device>* step per device with that
   device's reference-solution lines (each line explained by the command glossary in `cmllab/guide.py`, plus
   `show running-config` views to confirm it) and its config checks, then a *Verify end to end* step with every
-  live check, the lines to look for (taken from the lab's recorded good output) and the hint if it fails.
+  live check, the lines to look for (taken from the lab's recorded good output, with the table's column header as
+  IOS prints it, and a note on how to read `show ip bgp`, `show ip bgp summary` and `show ip ospf neighbor`), the
+  hint if it fails, and how long the protocols need to converge (BGP: up to a minute; `clear ip bgp * soft` to
+  resend after a change). Since 3.3.8 the *Verify end to end* step also grades every config check, so it can pass
+  when the consoles are unreachable and grading falls back to config mode (before, it had nothing to grade there
+  and always failed). A test applies only the walkthrough's commands on top of each lab's day-0 configs and
+  requires every step to pass, in both live and config grading.
   `troubleshoot-ospf-7node` has a hand-written `guide.yaml` that walks through the diagnosis instead of a build.
 - **Walkthrough labs in challenge mode** show their introduction with the step titles as goals, grade every step
   check, keep hints, and reveal the step configs and solution summary as the solution.
@@ -1326,7 +1332,7 @@ After changing the schema, templates, guide or example, run `python -m cmllab do
 fact you want pinned (0 to 2 asserts). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Version and changelog
-Current version: **3.3.7**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.3.8**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License

@@ -378,7 +378,19 @@ def _excerpt(check: Check, output: str | None) -> str:
         keep += [i for i, ln in enumerate(lines) if "Success rate" in ln and i not in keep]
     if not keep:
         return ""
-    return "\n".join(lines[i] for i in sorted(keep))
+    keep.sort()
+    for j in range(keep[0] - 1, max(-1, keep[0] - 15), -1):      # the table's column header, as IOS prints it
+        if _HEADER.match(lines[j]):
+            keep.insert(0, j)
+            break
+        if not lines[j].strip():
+            break
+    return "\n".join(lines[i] for i in keep)
+
+
+_HEADER = re.compile(r"^\s*(Neighbor\s+(V|ID)|Network\s+Next Hop|Interface\s+(IP|Grp|Status|Port)|Protocol\s+Address|"
+                     r"Address\s+(Ref|Age|Hold)|VLAN\s+Name|Port\s+(Name|Mode)|Group\s+Port|Local Intf|"
+                     r"Peer\s+(IP|Address)|\(\S+, ?\S+\)|Destination|Prefix\s+Next|Group\s+Address|Tunnel\s+)")
 
 
 def _expect(check: Check, fixture: dict) -> str:
@@ -387,6 +399,10 @@ def _expect(check: Check, fixture: dict) -> str:
         parts.append(check.description.rstrip(".") + ".")
     if check.min_success:
         parts.append(f"Success rate of at least {check.min_success} percent.")
+    for rx, note in _READ_IT:
+        if check.command and re.match(rx, check.command):
+            parts.append(note)
+            break
     ex = _excerpt(check, (fixture.get(check.device) or {}).get(check.command))
     if ex:
         parts.append("Look for:\n```\n" + ex + "\n```")
@@ -399,11 +415,40 @@ def _expect(check: Check, fixture: dict) -> str:
     return "\n\n".join(parts) or "The command succeeds."
 
 
+_READ_IT = [
+    (r"show (ip )?bgp( \S+)* summary", "A number in the last column (State/PfxRcd, prefixes received) means the "
+     "session is Established; Idle, Active or Connect there means it is still down."),
+    (r"show (ip )?bgp", "In the first column `*` = valid, `>` = best (installed), `i` = learned from an iBGP peer. "
+     "Up/Down times, table versions and message counts on your devices will differ."),
+    (r"show ip ospf neighbor", "FULL is a complete adjacency (FULL/DR, FULL/BDR, FULL/DROTHER or FULL/  -); "
+     "INIT, 2WAY to a DR/BDR, EXSTART or LOADING means it is still forming."),
+]
+
+
 def _readable(rx: str) -> str:
     s = re.sub(r"\\s[+*]|\\s", " ", rx)
     s = re.sub(r"\(\?:?[^)]*\)\??", "", s) if len(s) > 60 else s
     s = s.replace("\\.", ".").replace("\\d+", "N").replace("\\S+", "x").replace("^", "").replace("$", "").replace("\\b", "")
     return re.sub(r"\s+", " ", s).strip().replace("`", "'")
+
+
+def _converge_note(lab: Lab, solution: dict[str, str]) -> str:
+    """Routing protocols need time after the last line is typed; say how long and how to hurry BGP along."""
+    text = "\n".join(solution.values()) + "\n" + "\n".join(n.config or "" for n in lab.nodes)
+    notes = []
+    if re.search(r"^router bgp", text, re.M):
+        notes.append("BGP: sessions take up to a minute to reach Established, and an eBGP peer waits up to 30 s "
+                     "before advertising (IOS advertisement interval), so a prefix two AS hops away can take about "
+                     "a minute to appear. A change to an existing session (for example `next-hop-self`) is only "
+                     "sent with the next update: run `clear ip bgp * soft` on that router to resend now.")
+    if re.search(r"^router (ospf|eigrp)|ip ospf \d+ area|ipv6 ospf", text, re.M):
+        notes.append("OSPF/EIGRP: neighbors need up to 40 s to come up.")
+    if re.search(r"^ip pim|^ip multicast-routing", text, re.M):
+        notes.append("PIM: the RP and multicast state can take a minute to appear.")
+    if not notes:
+        return ""
+    return ("\n\n**Give it time.** Protocols converge after the last device is configured. " + " ".join(notes) +
+            " If a check fails right after configuring, wait a minute and check again before changing anything.")
 
 
 def derive(lab: Lab, solution: dict[str, str], fixture: dict | None = None) -> list[dict]:
@@ -431,9 +476,11 @@ def derive(lab: Lab, solution: dict[str, str], fixture: dict | None = None) -> l
             "title": "Verify end to end",
             "explain": ("Every device is configured. Run each command below on the device shown and compare it with "
                         "the expected output, then click **Check this step**. If a check fails, its hint tells you "
-                        "where to look; re-read the step for that device."),
+                        "where to look; re-read the step for that device." + _converge_note(lab, solution)),
             "verify": [{"device": c.device, "command": c.command, "expect": _expect(c, fixture)} for c in live],
-            "checks": [c.id for c in live]})
+            # the live checks need the device consoles; the config checks keep this step gradable when the app
+            # falls back to config mode (console unreachable), instead of failing with nothing graded
+            "checks": [c.id for c in live] + [c.id for c in lab.checks if c.mode == "config"]})
     return steps
 
 

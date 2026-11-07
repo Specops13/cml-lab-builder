@@ -146,7 +146,7 @@ def test_reset_restores_initial_configs_after_extraction(settings):
     r1 = lab.get_node_by_label("R1")
     r1.running_config = "hostname R1\nrouter eigrp 100\n"
     m.config_source(LAB).get_config("R1")
-    assert r1.configuration != original  # extraction overwrote the stored config
+    assert r1.configuration == original  # 3.3.8: extraction no longer replaces the stored day-0 config
     m.reset(LAB)
     assert r1.configuration == original and "interface Ethernet0/0" in original
 

@@ -191,12 +191,12 @@
     },
     {
       "file": "05-bgp-ebgp-ibgp.cmllab",
-      "sha256": "49bf9f9092784569390058fd478f3cdb598145b19ceed31b98619acc7a4fc872",
-      "size": 4301,
+      "sha256": "986e5a773b7cf8c3b4f09b28409074b50b14bef5618069266961d77eff93bfc7",
+      "size": 4594,
       "kind": "lab",
       "id": "05-bgp-ebgp-ibgp",
       "title": "BGP - eBGP and iBGP with next-hop-self",
-      "version": "2",
+      "version": "3",
       "description": "Peer three autonomous systems, run iBGP between loopbacks over OSPF, fix the next-hop problem and advertise prefixes.",
       "blueprint": [
         "3.2.c"
@@ -1698,8 +1698,8 @@
     },
     {
       "file": "ospf-mastery.cmlcourse",
-      "sha256": "0fd618aad6e51febace68bef5cdad490a05c4cf04411274e053f79b75e0d725c",
-      "size": 16765,
+      "sha256": "2bab369100ecde9e99334378323cbb85f6a74bf771a57cfc36dacae45efe3022",
+      "size": 16768,
       "kind": "course",
       "id": "ospf-mastery",
       "title": "OSPF Mastery: design, areas and troubleshooting",
@@ -1758,12 +1758,12 @@
     },
     {
       "file": "troubleshoot-ospf-7node.cmllab",
-      "sha256": "9735572a21619b5082ec9b947c3a8318e9b94cb5fc55a008844df1fe556a8d7a",
-      "size": 10550,
+      "sha256": "60eebd96ac8dbd6effc0ef9d0f2a109050fda68c4a7fdd08b435f345f868dece",
+      "size": 10553,
       "kind": "lab",
       "id": "troubleshoot-ospf-7node",
       "title": "Troubleshooting: Branch-2 Cannot Reach the Data-Center Server",
-      "version": "4",
+      "version": "5",
       "description": "Seven-router multi-area OSPF enterprise, fully configured. Users at Branch-2 can't reach the DC server. Find and fix the one fault.",
       "blueprint": [
         "3.2.b"

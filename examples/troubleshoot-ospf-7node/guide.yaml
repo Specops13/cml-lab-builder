@@ -96,4 +96,5 @@ steps:
   - device: DIST1
     command: show ip ospf neighbor
     expect: 5.5.5.5 (BR1) still `FULL`; on CORE1, 7.7.7.7 (EDGE) is also still `FULL`.
-  checks: [br2-ping-server, dist2-nbr-br2, br2-route-server, core2-route-br2-users, guard-dist1-br1, guard-core1-edge]
+  checks: [br2-ping-server, dist2-nbr-br2, br2-route-server, core2-route-br2-users, guard-dist1-br1, guard-core1-edge,
+           br2-cfg-fix-mode, br2-cfg-fix-key]
