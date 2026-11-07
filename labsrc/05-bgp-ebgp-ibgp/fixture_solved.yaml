@@ -61,7 +61,7 @@ R3:
     2 networks peaked at 00:07:05 Nov 7 2026 UTC (00:07:02.512 ago)
 
     Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
-    10.0.34.4       4        65002      12      12        3    0    0 00:07:15        1
+    10.0.34.2       4        65002      12      12        3    0    0 00:07:15        1
     10.255.0.2      4        65000      12      12        3    0    0 00:07:02        1
 R4:
   show ip bgp: |
@@ -74,5 +74,5 @@ R4:
     RPKI validation codes: V valid, I invalid, N Not found
 
          Network          Next Hop            Metric LocPrf Weight Path
-     *>   192.168.1.0      10.0.34.3                              0 65000 65001 i
+     *>   192.168.1.0      10.0.34.1                              0 65000 65001 i
      *>   192.168.4.0      0.0.0.0                  0         32768 i

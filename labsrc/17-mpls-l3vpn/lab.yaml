@@ -81,7 +81,7 @@ nodes:
        ip address 3.3.3.3 255.255.255.255
       interface %if0%
        description to P (core)
-       ip address 10.0.23.3 255.255.255.252
+       ip address 10.0.23.1 255.255.255.252
        ip ospf network point-to-point
        mpls ip
        no shutdown
@@ -316,4 +316,4 @@ faults:
   - What does IOS do to an interface's addressing when you change its VRF?
   - '`show ip vrf interfaces` or `show ip interface brief` on PE1.'
   checks: []
-version: "2"
+version: "3"

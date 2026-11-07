@@ -42,7 +42,7 @@ nodes:
        ip address 10.255.0.3 255.255.255.255
        ip ospf 1 area 0
       interface %if0%
-       ip address 10.0.23.3 255.255.255.252
+       ip address 10.0.23.1 255.255.255.252
        ip ospf 1 area 0
        no shutdown
 links:
@@ -222,4 +222,4 @@ faults:
   - 'An IP SLA operation needs two parts: the definition and something that starts it.'
   - 'Check `show ip sla configuration 10` on R3: is it scheduled?'
   checks: []
-version: "2"
+version: "3"

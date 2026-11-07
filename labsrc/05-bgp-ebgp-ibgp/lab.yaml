@@ -47,12 +47,12 @@ nodes:
        ip ospf 1 area 0
       interface %if0%
        description core link to R2
-       ip address 10.0.23.3 255.255.255.252
+       ip address 10.0.23.1 255.255.255.252
        ip ospf 1 area 0
        no shutdown
       interface %if1%
        description eBGP to R4 (AS 65002)
-       ip address 10.0.34.3 255.255.255.252
+       ip address 10.0.34.1 255.255.255.252
        no shutdown
       router ospf 1
        router-id 10.255.0.3
@@ -67,7 +67,7 @@ nodes:
        ip address 192.168.4.1 255.255.255.0
       interface %if0%
        description eBGP to R3 (AS 65000)
-       ip address 10.0.34.4 255.255.255.252
+       ip address 10.0.34.2 255.255.255.252
        no shutdown
 links:
   - {a: {node: R1, port: 0}, b: {node: R2, port: 0}}
@@ -104,7 +104,7 @@ checks:
     description: R3 sessions to R2 (iBGP) and R4 (eBGP) are Established
     device: R3
     command: show ip bgp summary
-    match: ['^10\.255\.0\.2\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.34\.4\s+4\s+65002\s.*\s\d+\s*$']
+    match: ['^10\.255\.0\.2\s+4\s+65000\s.*\s\d+\s*$', '^10\.0\.34\.2\s+4\s+65002\s.*\s\d+\s*$']
   - id: r2-nhs
     description: R2 learns 192.168.4.0 from iBGP with next hop 10.255.0.3 (next-hop-self)
     device: R2
@@ -120,7 +120,7 @@ checks:
     description: R4 has a best path to 192.168.1.0 with AS path 65000 65001
     device: R4
     command: show ip bgp
-    match: ['\*>\s+192\.168\.1\.0\s+10\.0\.34\.3\s.*65000 65001 i']
+    match: ['\*>\s+192\.168\.1\.0\s+10\.0\.34\.1\s.*65000 65001 i']
   - id: r1-ping
     description: End-to-end reachability 192.168.1.1 -> 192.168.4.1
     device: R1
@@ -183,7 +183,7 @@ solution_summary: |
   ! R3 (AS 65000)
   router bgp 65000
    bgp router-id 10.255.0.3
-   neighbor 10.0.34.4 remote-as 65002
+   neighbor 10.0.34.2 remote-as 65002
    neighbor 10.255.0.2 remote-as 65000
    neighbor 10.255.0.2 update-source Loopback0
    neighbor 10.255.0.2 next-hop-self
@@ -191,7 +191,7 @@ solution_summary: |
   router bgp 65002
    bgp router-id 10.255.0.4
    network 192.168.4.0
-   neighbor 10.0.34.3 remote-as 65000
+   neighbor 10.0.34.1 remote-as 65000
   ```
 
   **Why it works:** eBGP peers on the directly connected links. iBGP peers between loopbacks, which OSPF makes reachable,
@@ -268,4 +268,4 @@ faults:
     match:
     - ^\s+neighbor 10\.0\.12\.2 remote-as 65000\s*$
     hint: neighbor 10.0.12.2 remote-as 65000
-version: "3"
+version: "4"

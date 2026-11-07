@@ -61,12 +61,12 @@ nodes:
        ip address 99.99.99.3 255.255.255.255
       interface %if0%
        description to P1
-       ip address 10.0.23.3 255.255.255.252
+       ip address 10.0.23.1 255.255.255.252
        ip ospf network point-to-point
        no shutdown
       interface %if1%
        description to PE2
-       ip address 10.0.34.3 255.255.255.252
+       ip address 10.0.34.1 255.255.255.252
        ip ospf network point-to-point
        no shutdown
       router ospf 1
@@ -86,7 +86,7 @@ nodes:
        ip address 99.99.99.4 255.255.255.255
       interface %if0%
        description to P2
-       ip address 10.0.34.4 255.255.255.252
+       ip address 10.0.34.2 255.255.255.252
        ip ospf network point-to-point
        no shutdown
       router ospf 1
@@ -145,7 +145,7 @@ checks:
     description: P2 pops the label for 4.4.4.4/32 (penultimate-hop popping toward PE2)
     device: P2
     command: show mpls forwarding-table 4.4.4.4 32
-    match: ['^\d+\s+Pop Label\s+4\.4\.4\.4/32\s+\d+\s+%if1s%\s+10\.0\.34\.4\b']
+    match: ['^\d+\s+Pop Label\s+4\.4\.4\.4/32\s+\d+\s+%if1s%\s+10\.0\.34\.2\b']
     hint: PE2 advertises implicit-null (label 3) for its own connected prefix, so the last P router pops.
   - id: pe1-lsp-ping
     description: An MPLS LSP ping from PE1 to 4.4.4.4/32 succeeds
@@ -260,4 +260,4 @@ faults:
     description: P1 has no one-sided LDP password toward 3.3.3.3 (or P2 has the matching one)
     device: P1
     absent: ['^mpls ldp neighbor 3\.3\.3\.3 password']
-version: "2"
+version: "3"

@@ -58,12 +58,12 @@ nodes:
        ip address 3.3.3.3 255.255.255.255
       interface %if0%
        description to R1 (OSPF)
-       ip address 10.0.13.3 255.255.255.252
+       ip address 10.0.13.2 255.255.255.252
        ip ospf network point-to-point
        no shutdown
       interface %if1%
        description to R4 (EIGRP)
-       ip address 10.0.34.3 255.255.255.252
+       ip address 10.0.34.1 255.255.255.252
        no shutdown
       router ospf 1
        router-id 3.3.3.3
@@ -80,11 +80,11 @@ nodes:
        ip address 4.4.4.4 255.255.255.255
       interface %if0%
        description to R2
-       ip address 10.0.24.4 255.255.255.252
+       ip address 10.0.24.1 255.255.255.252
        no shutdown
       interface %if1%
        description to R3
-       ip address 10.0.34.4 255.255.255.252
+       ip address 10.0.34.2 255.255.255.252
        no shutdown
       router eigrp 100
        eigrp router-id 4.4.4.4
@@ -253,4 +253,4 @@ faults:
   - Loop prevention depends on both border routers using the same tags.
   - '`show ip route 4.4.4.4` on R1, then `show route-map E2O` on R3.'
   checks: []
-version: "2"
+version: "3"

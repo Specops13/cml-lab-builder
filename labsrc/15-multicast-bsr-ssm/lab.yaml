@@ -85,13 +85,13 @@ nodes:
        ip pim sparse-mode
       interface %if0%
        description to R1
-       ip address 10.1.13.3 255.255.255.252
+       ip address 10.1.13.2 255.255.255.252
        ip pim sparse-mode
        ip ospf network point-to-point
        no shutdown
       interface %if1%
        description to R4
-       ip address 10.1.34.3 255.255.255.252
+       ip address 10.1.34.1 255.255.255.252
        ip pim sparse-mode
        ip ospf network point-to-point
        no shutdown
@@ -110,13 +110,13 @@ nodes:
        ip address 4.4.4.4 255.255.255.255
       interface %if0%
        description to R2
-       ip address 10.1.24.4 255.255.255.252
+       ip address 10.1.24.1 255.255.255.252
        ip pim sparse-mode
        ip ospf network point-to-point
        no shutdown
       interface %if1%
        description to R3
-       ip address 10.1.34.4 255.255.255.252
+       ip address 10.1.34.2 255.255.255.252
        ip pim sparse-mode
        ip ospf network point-to-point
        no shutdown
@@ -315,7 +315,7 @@ faults:
     interface %if0%
      no ip pim sparse-mode
   explanation: |-
-    **Root cause:** R4 %if0% (toward R2) lost `ip pim sparse-mode`. R4's RPF interface toward the RP 2.2.2.2 is that link, so its (*,G) join for 239.2.2.2 has nowhere to go. SSM still works because the RPF path to the source 10.1.1.10 uses the equal-cost link via R3 (PIM picks the highest RPF neighbor address, 10.1.34.3).
+    **Root cause:** R4 %if0% (toward R2) lost `ip pim sparse-mode`. R4's RPF interface toward the RP 2.2.2.2 is that link, so its (*,G) join for 239.2.2.2 has nowhere to go. SSM still works because the RPF path to the source 10.1.1.10 uses the equal-cost link via R3 (PIM picks the highest RPF neighbor address, 10.1.34.1).
 
     **Fix (R4):**
     ```
@@ -335,7 +335,7 @@ faults:
     description: R4 has PIM neighbors on both uplinks
     device: R4
     command: show ip pim neighbor
-    match: ['^10\.1\.24\.2\s+%if0%\s', '^10\.1\.34\.3\s+%if1%\s']
+    match: ['^10\.1\.24\.2\s+%if0%\s', '^10\.1\.34\.1\s+%if1%\s']
 - id: r4-igmpv2
   title: IGMPv2 on the receiver LAN
   device: R4
@@ -355,4 +355,4 @@ faults:
   - What can an SSM receiver express that an ASM receiver doesn't need to?
   - '`show ip igmp interface %if2%` on R4: which IGMP version is running?'
   checks: []
-version: "2"
+version: "3"

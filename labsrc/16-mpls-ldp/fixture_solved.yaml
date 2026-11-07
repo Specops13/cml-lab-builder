@@ -14,9 +14,9 @@ P1:
             State: Oper; Msgs sent/rcvd: 22/21; Downstream
             Up time: 00:08:10
             LDP discovery sources:
-              %if1%, Src IP addr: 10.0.23.3
+              %if1%, Src IP addr: 10.0.23.1
             Addresses bound to peer LDP Ident:
-              10.0.23.3       10.0.34.3       3.3.3.3         99.99.99.3
+              10.0.23.1       10.0.34.1       3.3.3.3         99.99.99.3
   show mpls interfaces: |
     Interface              IP            Tunnel   BGP Static Operational
     %if0%            Yes (ldp)     No       No  No     Yes
@@ -28,9 +28,9 @@ PE2:
             State: Oper; Msgs sent/rcvd: 20/20; Downstream
             Up time: 00:08:05
             LDP discovery sources:
-              %if0%, Src IP addr: 10.0.34.3
+              %if0%, Src IP addr: 10.0.34.1
             Addresses bound to peer LDP Ident:
-              10.0.23.3       10.0.34.3       3.3.3.3         99.99.99.3
+              10.0.23.1       10.0.34.1       3.3.3.3         99.99.99.3
 PE1:
   show mpls forwarding-table 4.4.4.4 32: |
     Local      Outgoing   Prefix           Bytes Label   Outgoing   Next Hop
@@ -56,4 +56,4 @@ P2:
   show mpls forwarding-table 4.4.4.4 32: |
     Local      Outgoing   Prefix           Bytes Label   Outgoing   Next Hop
     Label      Label      or Tunnel Id     Switched      interface
-    18         Pop Label  4.4.4.4/32       1140          %if1s%      10.0.34.4
+    18         Pop Label  4.4.4.4/32       1140          %if1s%      10.0.34.2

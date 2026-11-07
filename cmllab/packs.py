@@ -206,6 +206,41 @@ def solution_of(lab: Lab, pack: Pack) -> dict[str, str]:
     return dict(lab.solution or {})
 
 
+_IPADDR = re.compile(r"^\s*ip address (\d+\.\d+\.\d+\.\d+)(?: (\d+\.\d+\.\d+\.\d+)|/(\d+))", re.M)
+_VRF = re.compile(r"^\s*(vrf forwarding|ip vrf forwarding|vrf member)\s", re.M)
+
+
+def address_errors(lab: Lab, sol: dict[str, str]) -> list[str]:
+    """IPv4 `ip address` lines in day-0, solution and step configs: a usable host address for the mask (IOS
+    rejects the network or broadcast address, e.g. .3/30: 'Bad mask /30 for address'), and one owner per
+    address in the lab (overlapping addresses are allowed in labs that use VRFs, and on interfaces described as anycast)."""
+    import ipaddress
+    srcs = [(f"{n.name} day-0", n.name, n.config or "") for n in lab.nodes]
+    srcs += [(f"{d} solution", d, c) for d, c in (sol or {}).items()]
+    srcs += [(f"{d} step {st.id}", d, c) for st in (lab.steps or []) for d, c in st.config.items()]
+    vrfs = any(_VRF.search(c) for _, _, c in srcs)
+    errs, owner = [], {}
+    for where, dev, cfg in srcs:
+        for m in _IPADDR.finditer(cfg):
+            a, mask, plen = m.groups()
+            try:
+                ifc = ipaddress.ip_interface(f"{a}/{mask or plen}")
+            except ValueError:
+                errs.append(f"{where}: `ip address {a} {mask or plen}` is not a valid address/mask")
+                continue
+            net = ifc.network
+            if net.prefixlen < 31 and ifc.ip in (net.network_address, net.broadcast_address):
+                kind = "network" if ifc.ip == net.network_address else "broadcast"
+                errs.append(f"{where}: {a}/{net.prefixlen} is the {kind} address of {net}; IOS rejects it")
+            blk = cfg[cfg.rfind("\ninterface", 0, m.start()) + 1:]
+            blk = blk[:re.search(r"\n(?! )", blk[1:]).start() + 1] if re.search(r"\n(?! )", blk[1:]) else blk
+            if "anycast" in blk.lower():
+                continue                    # an anycast address is on several routers on purpose
+            if owner.setdefault(a, dev) != dev and not vrfs:
+                errs.append(f"{a} is configured on both {owner[a]} and {dev}")
+    return list(dict.fromkeys(errs))
+
+
 def guide_errors(lab: Lab, pack: Pack, sol: dict[str, str], strict: bool) -> list[str]:
     from . import guide
     if lab.is_walkthrough:
@@ -311,6 +346,7 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
     # both modes (3.3.7): every lab must have walkthrough content on every step - its own steps, guide.yaml, or
     # steps derived from the solution (every line explained by the glossary)
     errors += guide_errors(lab, pack, sol, strict)
+    errors += address_errors(lab, sol)
     if errors:
         return Report(False, lab.id, lab.title, errors, warnings, results)
     # walkthroughs: grade every step's checks (optional steps too) against all step configs

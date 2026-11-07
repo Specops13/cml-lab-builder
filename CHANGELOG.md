@@ -4,13 +4,25 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
 
 ## [3.3.8] - 2026-11-07
 ### Fixed
-- **Day-0 configs could be lost on real CML** (reported on `05-bgp-ebgp-ibgp`: R3 booted with only Loopback0, its
-  Ethernet links unaddressed and shut, so the iBGP/eBGP sessions through R3 and *Verify end to end* failed).
-  Config-mode grading (`extract_configuration`) replaced each node's stored day-0 config with whatever was running
-  at that moment (on a node still loading its startup config: only the first lines); a later wipe/start or a Build
-  that reused the existing CML lab then booted the node from that partial copy. Grading now puts the day-0 config
-  back after reading, and Build on an existing lab re-applies this version's day-0 config to every node that will
-  boot from it (wiped / never started), reporting which nodes keep their running state (use Rebuild or Reset).
+- **Invalid /30 addresses in 9 labs: IOS rejected them, so those links never came up** (reported on
+  `05-bgp-ebgp-ibgp`: R3 booted with its Ethernet links unaddressed and shut, so iBGP R2-R3, eBGP R3-R4 and
+  *Verify end to end* failed). `ip address 10.0.23.3 255.255.255.252` is the broadcast address of 10.0.23.0/30
+  (IOS: *Bad mask /30 for address*), and .4 is the network address of x.x.x.4/30. Renumbered to valid host
+  addresses, with every neighbor statement, check, hint, solution, fixture and task text updated:
+  - 05-bgp-ebgp-ibgp: R3 10.0.23.3 -> 10.0.23.1, R3 10.0.34.3 -> 10.0.34.1, R4 10.0.34.4 -> 10.0.34.2
+  - 06-hsrp, 10-ntp-syslog-snmp, 17-mpls-l3vpn: 10.0.23.3 -> 10.0.23.1
+  - 12-pbr: 10.0.13.3 -> 10.0.13.2
+  - 13-redistribution: 10.0.13.3 -> .2, 10.0.34.3 -> .1, 10.0.34.4 -> .2, 10.0.24.4 -> 10.0.24.1
+  - 14-multicast-pim-sm: 10.0.13.3 -> .2, 10.0.23.3 -> .1
+  - 15-multicast-bsr-ssm: 10.1.13.3 -> .2, 10.1.34.3 -> .1, 10.1.34.4 -> .2, 10.1.24.4 -> 10.1.24.1
+  - 16-mpls-ldp: 10.0.23.3 -> .1, 10.0.34.3 -> .1, 10.0.34.4 -> .2
+
+  New lint rule (library build and pack import): every IPv4 `ip address` in day-0, solution and walkthrough
+  configs must be a usable host address for its mask, and no address may be on two devices (except in VRF labs
+  and on interfaces described as anycast). Rebuild these labs to get the new day-0 configs.
+- Hardening: config-mode grading (`extract_configuration`) no longer replaces a node's stored day-0 config, and
+  Build over an existing CML lab re-applies this version's day-0 config to nodes that will boot from it (wiped /
+  never started) and says which nodes keep their state.
 - **Walkthrough mode, *Verify end to end* always failed under config-mode grading** (console unreachable, auto
   fallback): the step held only live checks, so nothing was graded. The derived step now also carries every config
   check; a step with nothing gradable says why instead of just failing.

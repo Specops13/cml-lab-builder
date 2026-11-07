@@ -191,12 +191,12 @@
     },
     {
       "file": "05-bgp-ebgp-ibgp.encorlab",
-      "sha256": "986e5a773b7cf8c3b4f09b28409074b50b14bef5618069266961d77eff93bfc7",
-      "size": 4594,
+      "sha256": "0939581582d0f9fcc6d7a262cfbcf36d739597c9e2bbff5a6c9d2efebe997a2d",
+      "size": 4593,
       "kind": "lab",
       "id": "05-bgp-ebgp-ibgp",
       "title": "BGP - eBGP and iBGP with next-hop-self",
-      "version": "3",
+      "version": "4",
       "description": "Peer three autonomous systems, run iBGP between loopbacks over OSPF, fix the next-hop problem and advertise prefixes.",
       "blueprint": [
         "3.2.c"
@@ -235,12 +235,12 @@
     },
     {
       "file": "06-hsrp.encorlab",
-      "sha256": "ded061e1241bcd6d3a3d0adc3e75ce038f7373fba9a5115a646069aa64a6b7ab",
-      "size": 4036,
+      "sha256": "51ce6deb6b6e996fd24fb4a6aabbc008572e8cbc71814724dbb62adfda9d05c1",
+      "size": 4035,
       "kind": "lab",
       "id": "06-hsrp",
       "title": "HSRPv2 First-Hop Redundancy with Object Tracking",
-      "version": "2",
+      "version": "3",
       "description": "Provide a redundant default gateway with HSRP version 2, priority, preemption and interface tracking.",
       "blueprint": [
         "3.3.c"
@@ -404,12 +404,12 @@
     },
     {
       "file": "10-ntp-syslog-snmp.encorlab",
-      "sha256": "f22598f5a00087671083ab7495319691cd18bdbf82951ef92284af5754352c8a",
-      "size": 4378,
+      "sha256": "b09d54c1c9d6fda6c706324ca641e09056d51f42cff5575849d581cdaf359c76",
+      "size": 4376,
       "kind": "lab",
       "id": "10-ntp-syslog-snmp",
       "title": "NTP, Syslog, SNMPv3 and IP SLA",
-      "version": "2",
+      "version": "3",
       "description": "Build an authenticated NTP hierarchy, remote syslog with timestamps, an SNMPv3 authPriv user and an ICMP IP SLA probe.",
       "blueprint": [
         "3.3.a",
@@ -505,12 +505,12 @@
     },
     {
       "file": "12-pbr.encorlab",
-      "sha256": "1983a3de3ce94fadff4f230361ba92b48560b27c7c8f281fd2bf0bb56b6161a0",
-      "size": 4485,
+      "sha256": "76fe8eb41694cc72af3e2954cd0063ea2e40ed07311d8e27d42b3abd9aa51694",
+      "size": 4480,
       "kind": "lab",
       "id": "12-pbr",
       "title": "Policy-Based Routing for a Second ISP",
-      "version": "2",
+      "version": "3",
       "description": "Send Engineering's traffic out a second ISP with a route-map and ip policy, while everyone else follows the default route.",
       "blueprint": [
         "3.2.d"
@@ -544,12 +544,12 @@
     },
     {
       "file": "13-redistribution.encorlab",
-      "sha256": "5630a0aa86acdbf62771313ab0b15d10fec55a77a048b40c77aaef5bde75cc86",
-      "size": 4877,
+      "sha256": "c7ab95af5bfd39ab3dc5b98f081dd4f1d474a0ed8b61bddd91eb3f39dc62f99f",
+      "size": 4873,
       "kind": "lab",
       "id": "13-redistribution",
       "title": "Mutual OSPF/EIGRP Redistribution with Route Tags",
-      "version": "2",
+      "version": "3",
       "description": "Redistribute between OSPF and EIGRP at two border routers, using route-maps that tag routes and filter them on the tag to prevent feedback loops.",
       "blueprint": [
         "3.2.a",
@@ -591,12 +591,12 @@
     },
     {
       "file": "14-multicast-pim-sm.encorlab",
-      "sha256": "54e3c3a0e5ec8a138de59e400f1250c10798907d260c68f336b1cd0f2b4edfa8",
-      "size": 6463,
+      "sha256": "e348c79aec32747d7824d8b6ed499ad24b066f5a1d7fd8677956eb9b5a291a50",
+      "size": 6452,
       "kind": "lab",
       "id": "14-multicast-pim-sm",
       "title": "Multicast: PIM Sparse Mode with a Static RP",
-      "version": "2",
+      "version": "3",
       "description": "Enable IP multicast routing and PIM sparse mode on three routers, point them at a static RP, join a receiver with IGMP and verify the shared tree, the source tree and the RPF check.",
       "blueprint": [
         "3.3.d"
@@ -635,12 +635,12 @@
     },
     {
       "file": "15-multicast-bsr-ssm.encorlab",
-      "sha256": "723e96e9a21a35b8ec0598c41f0496707d40b23b14bdfdf415aacebc811bae5d",
-      "size": 6676,
+      "sha256": "58728323c2ca40d89cb31ebefbc6afccab5e8abc040bf5f37b56309d0c149177",
+      "size": 6674,
       "kind": "lab",
       "id": "15-multicast-bsr-ssm",
       "title": "Multicast: BSR RP Election, IGMPv3 and SSM",
-      "version": "2",
+      "version": "3",
       "description": "Replace static RPs with a Bootstrap Router (BSR) election between two candidates, run IGMPv3 at the receiver edge and add a source-specific multicast (SSM) channel that needs no RP at all.",
       "blueprint": [
         "3.3.d"
@@ -679,12 +679,12 @@
     },
     {
       "file": "16-mpls-ldp.encorlab",
-      "sha256": "c85f8550b3dcabce353f03842f2f028f93d31d86d6dda7ec98623c0d8028f9ed",
-      "size": 5680,
+      "sha256": "0df3a086caf46d51869ed3385a3426fab39fdcc71cc2a7ac540041c41d5dcc6b",
+      "size": 5677,
       "kind": "lab",
       "id": "16-mpls-ldp",
       "title": "MPLS: LDP Label Distribution in the Core",
-      "version": "2",
+      "version": "3",
       "description": "Turn an OSPF core into an MPLS core with LDP, pin the LDP router ID to a reachable loopback, and read label bindings, the forwarding table, penultimate-hop popping and an LSP ping.",
       "blueprint": [
         "2.2"
@@ -719,12 +719,12 @@
     },
     {
       "file": "17-mpls-l3vpn.encorlab",
-      "sha256": "457cf70ba12fb81a7b73977d77d69ca6842c97eb61e61d312ae587ab3083e566",
-      "size": 6607,
+      "sha256": "e4c8650b807294eabb7b3cbd96969479a22e20566b6e67cc17e0b02c63d3cea9",
+      "size": 6606,
       "kind": "lab",
       "id": "17-mpls-l3vpn",
       "title": "MPLS L3VPN: VRFs and MP-BGP VPNv4 (advanced)",
-      "version": "2",
+      "version": "3",
       "description": "Build a basic MPLS Layer 3 VPN over an existing LDP core - customer VRF with RD and route targets on both PEs, an iBGP VPNv4 session between the PE loopbacks, and eBGP to the customer sites inside the VRF.",
       "blueprint": [
         "2.2",

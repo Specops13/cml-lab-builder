@@ -118,10 +118,25 @@ def test_day0_config_survives_config_grading_and_lab_reuse():
     cl = cml.build(lab, start=False)
     r3 = cl.get_node_by_label("R3")
     day0 = r3.configuration
-    assert "ip address 10.0.23.3 255.255.255.252" in day0 and "ip address 10.0.34.3" in day0
+    assert "ip address 10.0.23.1 255.255.255.252" in day0 and "ip address 10.0.34.1" in day0
     r3.state, r3.running_config = "BOOTED", "hostname R3\ninterface Loopback0\n ip address 10.255.0.3 255.255.255.255\n"
     assert "Loopback0" in CMLConfigSource(cl).get_config("R3") and r3.configuration == day0
     r3.state, r3.configuration = "DEFINED_ON_CORE", r3.running_config      # stale stored config from an older run
     msgs = []
     cml.build(lab, start=False, progress=msgs.append)
     assert r3.configuration == day0 and any("R3: restored" in m for m in msgs)
+
+
+def test_every_lab_uses_valid_unique_ip_host_addresses():
+    """3.3.8: lab 05's R3 used 10.0.23.3/30 (the broadcast address), which IOS rejects, so its links never came up.
+    Every library lab: day-0, solution and step `ip address` lines are usable host addresses, one owner each."""
+    bad = []
+    for root in (ROOT / "labsrc", ROOT / "examples"):
+        for d in sorted(p for p in root.iterdir() if (p / "lab.yaml").is_file()):
+            pk = packs.read_dir(d)
+            lab = packs.pack_lab(pk)
+            bad += [f"{d.name}: {e}" for e in packs.address_errors(lab, packs.solution_of(lab, pk))]
+    assert not bad, bad
+    from cmllab.schema import Lab
+    probe = Lab.model_validate({**lab.model_dump(), "steps": [], "type": "challenge"})
+    assert packs.address_errors(probe, {"R9": "interface e0/0\n ip address 10.0.0.3 255.255.255.252\n"})

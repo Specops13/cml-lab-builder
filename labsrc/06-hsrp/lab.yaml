@@ -32,7 +32,7 @@ nodes:
        description uplink to R3
        ip address 10.0.23.2 255.255.255.252
        no shutdown
-      ip route 0.0.0.0 0.0.0.0 10.0.23.3
+      ip route 0.0.0.0 0.0.0.0 10.0.23.1
   - name: R3
     kind: router
     x: 0
@@ -45,7 +45,7 @@ nodes:
        ip address 10.0.13.2 255.255.255.252
        no shutdown
       interface %if1%
-       ip address 10.0.23.3 255.255.255.252
+       ip address 10.0.23.1 255.255.255.252
        no shutdown
       ip route 192.168.10.0 255.255.255.0 10.0.13.1
       ip route 192.168.10.0 255.255.255.0 10.0.23.2
@@ -232,4 +232,4 @@ faults:
   - Tracking only helps if it watches the right thing.
   - 'Check `show track 1` on R1: which interface does it follow?'
   checks: []
-version: "2"
+version: "3"

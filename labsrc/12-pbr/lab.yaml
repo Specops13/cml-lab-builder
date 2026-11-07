@@ -60,7 +60,7 @@ nodes:
        description Engineering cloud lab (only reachable via ISP-B)
        ip address 203.0.113.3 255.255.255.255
       interface %if0%
-       ip address 10.0.13.3 255.255.255.252
+       ip address 10.0.13.2 255.255.255.252
        no shutdown
       ip route 10.30.0.0 255.255.0.0 10.0.13.1
 links:
@@ -70,13 +70,13 @@ links:
 task: |
   # Lab 12 - Policy-based routing
 
-  R1 is the campus edge router with two Internet connections: **ISP-A** (10.0.12.2) and **ISP-B** (10.0.13.3).
+  R1 is the campus edge router with two Internet connections: **ISP-A** (10.0.12.2) and **ISP-B** (10.0.13.2).
   H1 stands in for two user groups. Its Loopback0 (10.30.1.0/24) is **Sales** and its Loopback1 (10.30.2.0/24) is **Engineering**.
 
   1. On R1, add a default route via **ISP-A** (10.0.12.2). This is the normal path for everybody.
   2. Engineering's traffic (source **10.30.2.0/24**) must leave through **ISP-B** instead, because Engineering's cloud lab
      203.0.113.3 is only reachable there. Match it with a standard named ACL **ENG**.
-  3. Create route-map **PBR-ENG** (permit, sequence 10) that matches ACL ENG and sets the next hop **10.0.13.3**.
+  3. Create route-map **PBR-ENG** (permit, sequence 10) that matches ACL ENG and sets the next hop **10.0.13.2**.
   4. Apply the policy on the interface where the traffic **enters** R1 (from H1).
   5. Test from H1: `ping 203.0.113.3 source Loopback1` (Engineering) and `ping 198.51.100.2 source Loopback0` (Sales) must both work.
 
@@ -89,10 +89,10 @@ checks:
     match: ['^%if0s%\s+PBR-ENG\s*$']
     hint: PBR is applied inbound on the interface the packets arrive on (ip policy route-map ...).
   - id: r1-route-map
-    description: PBR-ENG matches ACL ENG and sets next hop 10.0.13.3
+    description: PBR-ENG matches ACL ENG and sets next hop 10.0.13.2
     device: R1
     command: show route-map PBR-ENG
-    match: ['route-map PBR-ENG, permit, sequence 10', 'ip address \(access-lists\): ENG', 'ip next-hop 10\.0\.13\.3']
+    match: ['route-map PBR-ENG, permit, sequence 10', 'ip address \(access-lists\): ENG', 'ip next-hop 10\.0\.13\.2']
   - id: r1-default
     description: R1's default route points to ISP-A
     device: R1
@@ -118,11 +118,11 @@ checks:
     - ^ip access-list standard ENG\s*\n(?:[ \t].*\n)*?[ \t]+(\d+\s+)?permit 10\.30\.2\.0 0\.0\.0\.255
   - id: r1-cfg-route-map
     mode: config
-    description: Route-map PBR-ENG 10 matches ENG and sets next hop 10.0.13.3
+    description: Route-map PBR-ENG 10 matches ENG and sets next hop 10.0.13.2
     device: R1
     match:
     - ^route-map PBR-ENG permit 10\s*\n(?:[ \t].*\n)*?[ \t]+match ip address ENG\s*$
-    - ^route-map PBR-ENG permit 10\s*\n(?:[ \t].*\n)*?[ \t]+set ip next-hop 10\.0\.13\.3\s*$
+    - ^route-map PBR-ENG permit 10\s*\n(?:[ \t].*\n)*?[ \t]+set ip next-hop 10\.0\.13\.2\s*$
   - id: r1-cfg-policy
     mode: config
     description: ip policy route-map PBR-ENG on the campus interface, default route via ISP-A
@@ -141,13 +141,13 @@ solution_summary: |
    permit 10.30.2.0 0.0.0.255
   route-map PBR-ENG permit 10
    match ip address ENG
-   set ip next-hop 10.0.13.3
+   set ip next-hop 10.0.13.2
   interface %if0%
    ip policy route-map PBR-ENG
   ```
 
   **Why it works:** PBR runs before the routing table lookup, on packets **received** on an interface with `ip policy`.
-  Packets sourced from 10.30.2.0/24 match ACL ENG and are forwarded to 10.0.13.3 (ISP-B). Everything else falls through
+  Packets sourced from 10.30.2.0/24 match ACL ENG and are forwarded to 10.0.13.2 (ISP-B). Everything else falls through
   the route-map (no match = normal routing) and follows the default route to ISP-A. PBR does not touch traffic R1
   generates itself; that would need `ip local policy route-map`.
 hints:
@@ -184,7 +184,7 @@ faults:
   ticket: Engineering can't reach the cloud lab 203.0.113.3, and the policy-routing counter on R1 keeps increasing.
   config: |
     route-map PBR-ENG permit 10
-     no set ip next-hop 10.0.13.3
+     no set ip next-hop 10.0.13.2
      set ip next-hop 10.0.12.2
   explanation: |-
     **Root cause:** the route-map now sets next hop 10.0.12.2 (ISP-A). Engineering's traffic still matches, which is why the counter increases, but it is sent to the ISP that cannot reach the cloud lab.
@@ -193,7 +193,7 @@ faults:
     ```
     route-map PBR-ENG permit 10
      no set ip next-hop 10.0.12.2
-     set ip next-hop 10.0.13.3
+     set ip next-hop 10.0.13.2
     ```
   hints:
   - The traffic matches the policy (the counter increases), so look at what the policy does with it.
@@ -220,4 +220,4 @@ faults:
   - Both groups are on the wrong ISP. What decides which traffic is policy-routed?
   - '`show ip access-lists ENG` on R1.'
   checks: []
-version: "2"
+version: "3"

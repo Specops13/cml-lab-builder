@@ -523,7 +523,8 @@ Every lab in the library (01-33 and the others) works in both modes:
   resend after a change). Since 3.3.8 the *Verify end to end* step also grades every config check, so it can pass
   when the consoles are unreachable and grading falls back to config mode (before, it had nothing to grade there
   and always failed). A test applies only the walkthrough's commands on top of each lab's day-0 configs and
-  requires every step to pass, in both live and config grading.
+  requires every step to pass, in both live and config grading. The library build also rejects any `ip address`
+  that is a network or broadcast address for its mask (IOS refuses those) or that is on two devices.
   `troubleshoot-ospf-7node` has a hand-written `guide.yaml` that walks through the diagnosis instead of a build.
 - **Walkthrough labs in challenge mode** show their introduction with the step titles as goals, grade every step
   check, keep hints, and reveal the step configs and solution summary as the solution.

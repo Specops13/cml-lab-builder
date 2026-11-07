@@ -76,12 +76,12 @@ nodes:
        ip address 3.3.3.3 255.255.255.255
       interface %if0%
        description to R2
-       ip address 10.0.23.3 255.255.255.252
+       ip address 10.0.23.1 255.255.255.252
        ip ospf network point-to-point
        no shutdown
       interface %if1%
        description to R1
-       ip address 10.0.13.3 255.255.255.252
+       ip address 10.0.13.2 255.255.255.252
        ip ospf network point-to-point
        no shutdown
       interface %if2%
@@ -138,10 +138,10 @@ task: |
   after the source stops sending.
 checks:
   - id: r2-pim-nbrs
-    description: R2 has PIM neighbors R1 (10.0.12.1) and R3 (10.0.23.3)
+    description: R2 has PIM neighbors R1 (10.0.12.1) and R3 (10.0.23.1)
     device: R2
     command: show ip pim neighbor
-    match: ['^10\.0\.12\.1\s+%if0%\s', '^10\.0\.23\.3\s+%if1%\s']
+    match: ['^10\.0\.12\.1\s+%if0%\s', '^10\.0\.23\.1\s+%if1%\s']
     hint: PIM neighbors only form where both ends of a link run `ip pim sparse-mode` and `ip multicast-routing` is on.
   - id: r3-pim-nbrs
     description: R3 has PIM neighbors R2 (10.0.23.2) and R1 (10.0.13.1)
@@ -305,4 +305,4 @@ faults:
     device: R3
     command: show ip rpf 10.0.1.10
     match: ['RPF interface: %if1%', 'RPF type: unicast \(ospf 1\)']
-version: "2"
+version: "3"

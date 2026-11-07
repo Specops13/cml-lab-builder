@@ -7,7 +7,7 @@ R1:
       Match clauses:
         ip address (access-lists): ENG
       Set clauses:
-        ip next-hop 10.0.13.3
+        ip next-hop 10.0.13.2
       Policy routing matches: 10 packets, 1140 bytes
   show ip route static: |
     Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
