@@ -247,6 +247,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                             "solved": bool(wt["completed"]) if wt else (graded or lid in marked),
                             "marked_manually": bool(wt["completed_manually"]) if wt else (lid in marked and not graded),
                             "type": l.type, "walkthrough": wt, "ram": _ram(l, s), "version": l.version,
+                            "native_type": e.own.type,
                             "library": e.source == "builtin" or bool(library.origin(lid)),
                             "update_available": lid in library.last_index().get("updates", [])})
             except Exception as ex:  # pragma: no cover - defensive
@@ -300,7 +301,11 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
                      for st in l.steps]
         graded = None if l.is_walkthrough else any(x.get("passed") for x in history.load(lab_id))
         man_at = None if l.is_walkthrough else manual.get(lab_id)
+        from .. import guide
         return {"type": l.type, "steps": steps, "ram": _ram(l),
+                "mode": l.type, "native_type": e.own.type, "mode_chosen": guide.get_mode(lab_id),
+                "guide_source": (("guide.yaml" if (e.path / guide.SIDECAR).is_file() else "derived")
+                                 if e.native is not None and l.is_walkthrough else None),
                 "solved": None if l.is_walkthrough else bool(graded or man_at),
                 "marked_manually": None if l.is_walkthrough else bool(man_at and not graded),
                 "manual_completed": man_at,
@@ -403,7 +408,7 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         _no_exam(lab_id)
         data = yaml.safe_load((e.path / "lab.yaml").read_text(encoding="utf-8"))
         sol = catalog.load_solution(lab_id)
-        if sol and not e.lab.is_walkthrough:      # a walkthrough's solution is its step configs
+        if sol and not e.own.is_walkthrough:      # a walkthrough's solution is its step configs
             data["solution"] = sol
         return {"yaml": ai.to_yaml_text(data), "source": e.source}
 
@@ -744,8 +749,20 @@ def create_app(store: config.SettingsStore | None = None, client_factory=None, r
         return out
 
     # ------------------------------------------------------------ CML actions
+    @app.post("/api/labs/{lab_id}/mode")
+    def lab_mode(lab_id: str, mode: str):
+        """Challenge or walkthrough (3.3.7): how the lab is presented and graded; no rebuild needed."""
+        _entry(lab_id)
+        from .. import guide
+        try:
+            return service.set_mode(lab_id, mode)
+        except guide.GuideError as ex:
+            raise HTTPException(409 if "before switching" in str(ex) else 400, str(ex))
+
     @app.post("/api/labs/{lab_id}/build")
-    def build(lab_id: str, rebuild: bool = False):
+    def build(lab_id: str, rebuild: bool = False, mode: str | None = None):
+        if mode is not None:
+            lab_mode(lab_id, mode)      # chosen in the build dialog; saved before the job starts
         _entry(lab_id)
         return _start("build", lab_id, lambda s, p: service.do_build(s, lab_id, p, rebuild=rebuild, client_factory=client_factory))
 

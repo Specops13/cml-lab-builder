@@ -33,6 +33,16 @@ class Entry:
     lab: Lab
     path: Path
     source: str  # "builtin" | "user"
+    native: Lab | None = None   # the lab as written, when the chosen mode (guide.py) presents it in the other shape
+
+    @property
+    def own(self) -> Lab:
+        """The lab as written in lab.yaml (independent of the chosen challenge/walkthrough mode)."""
+        return self.native or self.lab
+
+    @property
+    def mode(self) -> str:
+        return self.lab.type
 
 
 def user_labs_dir() -> Path:
@@ -90,6 +100,23 @@ def entries(root: Path | None = None, user_root: Path | None = None, errors: dic
                 errors[str(v.path)] = f"id {k!r} clashes with a built-in lab"
             continue
         res[k] = v
+    return _with_modes(res, errors)
+
+
+def _with_modes(res: dict[str, Entry], errors: dict | None) -> dict[str, Entry]:
+    """Present each lab in the mode chosen for it at build time (3.3.7, guide.py); a lab whose other shape cannot be
+    produced (e.g. a broken guide.yaml) stays in its own shape and is reported in `errors`."""
+    from . import guide
+    chosen = guide.modes()
+    for k, e in res.items():
+        m = chosen.get(k)
+        if not m or m == e.lab.type:
+            continue
+        try:
+            res[k] = Entry(guide.effective(e.lab, e.path, m), e.path, e.source, native=e.lab)
+        except Exception as ex:  # noqa: BLE001 - never hide the lab
+            if errors is not None:
+                errors[str(e.path)] = f"{m} mode unavailable: {ex}"
     return res
 
 
@@ -146,6 +173,8 @@ def load_solution(lab_id: str) -> dict[str, str]:
     e = entry(lab_id)
     if e.lab.is_walkthrough:
         return e.lab.step_solution()
+    if e.native is not None and e.native.is_walkthrough:    # a walkthrough lab played as a challenge
+        return dict(e.lab.solution or {})
     f = e.path / "solution.cfg"
     if f.exists():
         return parse_solution_cfg(f.read_text(encoding="utf-8"))

@@ -2,6 +2,28 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [3.3.7] - 2026-11-07
+### Added
+- **Two ways to do every lab: challenge or walkthrough, chosen at build time.** The Build dialog asks *How do you
+  want to do this lab?* (Challenge preselected); `cmllab build <lab> --mode challenge|walkthrough` does the same.
+  The choice is saved per lab (`modes.json` in the data folder), shown as a *Challenge mode* / *Walkthrough mode*
+  badge on the lab page and switchable there (or with `cmllab mode <lab> <mode>`) without rebuilding: only the
+  presentation and grading change. Not available during an exam or fault practice.
+  - Challenge mode is the existing experience (goals, checks, hints, solution summary at the end).
+  - Walkthrough mode shows per step the exact commands per device (copy buttons), what each command does and why,
+    and the expected verification output; *Check this step* and *Apply this step for me* work as in walkthrough labs.
+- **Walkthrough content for all 36 library labs.** Challenge labs use a `guide.yaml` sidecar when present, otherwise
+  steps derived from the reference solution (one step per device, every line explained by a new IOS command glossary
+  in `cmllab/guide.py`, `show running-config` views and the device's config checks) and a final end-to-end step with
+  every live check and the matching lines of the recorded good output. Walkthrough labs (18-33) in challenge mode
+  show their goals, grade every step check and reveal the step configs as the solution.
+  `troubleshoot-ospf-7node` got a hand-written `guide.yaml` (a guided diagnosis; pack version 4).
+- `guide.yaml` (3.3.7+, ignored by older apps like `exams.yaml`), `cmllab guide <folder> [--write]` to preview or
+  scaffold it, `POST /api/labs/{id}/mode?mode=` and `mode=` on `POST /api/labs/{id}/build`.
+- **Validation:** the shared lab lint (import, `validate`, `build_library.py`) requires walkthrough content on
+  every step of every lab: commands (config or verify), an explanation, expected output for every verify command,
+  every check in some step, and (library) an explanation for every solution command.
+
 ## [3.3.6] - 2026-10-26
 ### Added
 - **New walkthroughs for the remaining ENCOR and ENARSI objectives** (IOL unless noted, strict day-0 config on every

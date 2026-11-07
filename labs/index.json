@@ -1698,8 +1698,8 @@
     },
     {
       "file": "ospf-mastery.encorcourse",
-      "sha256": "7c63aa63778960a83eb05d635d23bfa50bfabfbfcd16e0ca58b49aff67289f10",
-      "size": 14603,
+      "sha256": "0fd618aad6e51febace68bef5cdad490a05c4cf04411274e053f79b75e0d725c",
+      "size": 16765,
       "kind": "course",
       "id": "ospf-mastery",
       "title": "OSPF Mastery: design, areas and troubleshooting",
@@ -1758,12 +1758,12 @@
     },
     {
       "file": "troubleshoot-ospf-7node.encorlab",
-      "sha256": "30e267454af164e300ac0f2604bbccc9ecf74467ccf2b05fa15c98fefa3fe1e8",
-      "size": 8446,
+      "sha256": "9735572a21619b5082ec9b947c3a8318e9b94cb5fc55a008844df1fe556a8d7a",
+      "size": 10550,
       "kind": "lab",
       "id": "troubleshoot-ospf-7node",
       "title": "Troubleshooting: Branch-2 Cannot Reach the Data-Center Server",
-      "version": "3",
+      "version": "4",
       "description": "Seven-router multi-area OSPF enterprise, fully configured. Users at Branch-2 can't reach the DC server. Find and fix the one fault.",
       "blueprint": [
         "3.2.b"

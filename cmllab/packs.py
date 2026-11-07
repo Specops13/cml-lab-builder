@@ -24,8 +24,9 @@ from .render import to_yaml
 from .schema import Lab
 
 MAX_PACK_BYTES = 5 * 1024 * 1024
-PACK_FILES = ("lab.yaml", "solution.cfg", "fixture_solved.yaml", "fixture_blank.yaml", "README.md", "exams.yaml")
+PACK_FILES = ("lab.yaml", "solution.cfg", "fixture_solved.yaml", "fixture_blank.yaml", "README.md", "exams.yaml", "guide.yaml")
 # exams.yaml (3.3.5): exam-objective tags; apps before 3.3.5 skip it ("ignored file in pack"), so packs stay importable
+# guide.yaml (3.3.7): walkthrough-mode steps for a challenge lab (cmllab/guide.py); older apps skip it the same way
 PACK_EXT = ".cmllab"
 PACK_EXTS = (".cmllab", ".encorlab")    # .encorlab: the name before 2.1.0, still imported
 
@@ -45,6 +46,7 @@ class Pack:
     readme: str | None = None
     warnings: list[str] = field(default_factory=list)
     exams_yaml: str | None = None                  # exams.yaml (objective tags), see cmllab/objectives.py
+    guide_yaml: str | None = None                  # guide.yaml (walkthrough-mode steps), see cmllab/guide.py
 
 
 @dataclass
@@ -159,7 +161,7 @@ def read_upload(filename: str, data: bytes) -> Pack:
             except yaml.YAMLError as e:
                 raise LabError([f"fixture_{st}.yaml: YAML error: {e}"])
     return Pack(files["lab.yaml"], files.get("solution.cfg"), fixtures, files.get("README.md"), warnings,
-                files.get("exams.yaml"))
+                files.get("exams.yaml"), files.get("guide.yaml"))
 
 
 def pack_lab(pack: Pack) -> Lab:
@@ -202,6 +204,28 @@ def solution_of(lab: Lab, pack: Pack) -> dict[str, str]:
     if pack.solution_cfg:
         return catalog.parse_solution_cfg(pack.solution_cfg)
     return dict(lab.solution or {})
+
+
+def guide_errors(lab: Lab, pack: Pack, sol: dict[str, str], strict: bool) -> list[str]:
+    from . import guide
+    if lab.is_walkthrough:
+        if pack.guide_yaml:
+            return ["guide.yaml is only for challenge labs (a walkthrough lab already has steps)"]
+        return [f"walkthrough content: {e}" for e in guide.problems(lab, lab.steps)]
+    try:
+        if pack.guide_yaml:
+            steps = guide.steps_from(lab, guide.read_sidecar(pack.guide_yaml))
+        else:
+            steps = guide.steps_from(lab, guide.derive(lab, sol, pack.fixtures.get("solved")))
+    except (guide.GuideError, yaml.YAMLError) as e:
+        return [f"guide.yaml: {e}"]
+    errs = [f"walkthrough mode: {e}" for e in guide.problems(lab, steps)] if sol or pack.guide_yaml else []
+    if strict and not pack.guide_yaml:
+        for dev, cfg in sol.items():
+            for ln in guide.unexplained(cfg):
+                errs.append(f"walkthrough mode: no explanation for `{ln}` on {dev}; add it to cmllab/guide.py's glossary "
+                            "or write a guide.yaml")
+    return errs
 
 
 def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: set[str] | None = None) -> Report:
@@ -284,6 +308,9 @@ def lint(pack: Pack, node_limit: int = 20, strict: bool = False, builtin_ids: se
         for st in lab.steps:
             if st.config and not (st.checks or st.verify):
                 warnings.append(f"step {st.id} changes config but has no verify commands or checks")
+    # both modes (3.3.7): every lab must have walkthrough content on every step - its own steps, guide.yaml, or
+    # steps derived from the solution (every line explained by the glossary)
+    errors += guide_errors(lab, pack, sol, strict)
     if errors:
         return Report(False, lab.id, lab.title, errors, warnings, results)
     # walkthroughs: grade every step's checks (optional steps too) against all step configs
@@ -353,6 +380,8 @@ def install(pack: Pack, node_limit: int = 20, overwrite: bool = False) -> Report
         (tmp / "README.md").write_text(pack.readme, encoding="utf-8")
     if pack.exams_yaml:
         (tmp / "exams.yaml").write_text(pack.exams_yaml, encoding="utf-8")
+    if pack.guide_yaml:
+        (tmp / "guide.yaml").write_text(pack.guide_yaml, encoding="utf-8")
     if dest.exists():
         shutil.rmtree(dest)
     tmp.rename(dest)
@@ -389,4 +418,6 @@ def build_pack_bytes(pack: Pack) -> bytes:
             z.writestr("README.md", pack.readme)
         if pack.exams_yaml:
             z.writestr("exams.yaml", pack.exams_yaml)
+        if pack.guide_yaml:
+            z.writestr("guide.yaml", pack.guide_yaml)
     return buf.getvalue()

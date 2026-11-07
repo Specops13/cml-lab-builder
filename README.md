@@ -445,7 +445,9 @@ Use **Test console** in the lab view to see exactly where a console session stop
    - Set *Console server host* if SSH port 22 isn't reachable at the URL's host name.
 2. **Get labs** (first start only): click **Install recommended starter set**, or **Browse library** to pick labs and
    courses (sizes and RAM estimates are shown), or import a `.cmllab` file.
-3. **Labs**: pick a lab and click **Build**. It imports the topology as `CML-<lab>`, starts it and waits until all nodes are BOOTED.
+3. **Labs**: pick a lab and click **Build**, then choose **Challenge** or **Walkthrough** (see
+   [Two ways to do every lab](#two-ways-to-do-every-lab-challenge-or-walkthrough)). It imports the topology as
+   `CML-<lab>`, starts it and waits until all nodes are BOOTED.
 4. Open the device consoles: the lab's **Consoles** section has an *Open lab in CML* link and a copyable
    `ssh -t <user>@<console host> "open /CML-<lab>/<node>/0"` command per node (Windows 11 has `ssh` built in).
    *Test console* next to it checks each node's console from the app.
@@ -490,6 +492,40 @@ CLI equivalents (`CMLLabBuilder.exe <cmd>` / `./cml-lab-builder <cmd>` for the d
 | `test-live <lab> [--keep]` | builds `CML-TEST-<lab>` with the solution applied, grades it, deletes it |
 | `schema [-o f]`, `prompt ["request"]`, `docs` | JSON Schema, AI prompt, regenerate `docs/` |
 | `save-password`, `web [--no-open]` | keyring, web UI |
+
+### Two ways to do every lab: challenge or walkthrough
+New in 3.3.7. The **Build** dialog asks *How do you want to do this lab?*:
+
+- **Challenge** (the default, same as before): the task and goals, graded checks, hints on request, the solution
+  summary at the end.
+- **Walkthrough**: ordered steps. Each step shows the exact commands to type per device (copy buttons), what each
+  command does and why, and what good verification output looks like. *Check this step* still grades it, and
+  *Apply this step for me* can type it in for you.
+
+The choice is saved per lab in your data folder (`modes.json`) and shown as a **Challenge mode** / **Walkthrough
+mode** badge on the lab page. **Switch to ... mode** next to the badge changes it at any time without rebuilding:
+only how the lab is presented and graded changes, the devices keep their configs (not available during an exam or
+fault practice). A lab you never built in a chosen mode keeps its own type. On the command line:
+
+    cmllab build 03-ospf-multiarea --mode walkthrough   # --mode challenge is the default
+    cmllab mode 03-ospf-multiarea                       # show; `cmllab mode <lab> challenge` switches
+    cmllab step 03-ospf-multiarea 1                     # walkthrough mode: show step 1 (--check, --apply)
+
+Every lab in the library (01-33 and the others) works in both modes:
+
+- **Challenge labs in walkthrough mode** get their steps from a `guide.yaml` next to `lab.yaml` when the lab has one,
+  otherwise they are derived from data the lab already has: one *Configure <device>* step per device with that
+  device's reference-solution lines (each line explained by the command glossary in `cmllab/guide.py`, plus
+  `show running-config` views to confirm it) and its config checks, then a *Verify end to end* step with every
+  live check, the lines to look for (taken from the lab's recorded good output) and the hint if it fails.
+  `troubleshoot-ospf-7node` has a hand-written `guide.yaml` that walks through the diagnosis instead of a build.
+- **Walkthrough labs in challenge mode** show their introduction with the step titles as goals, grade every step
+  check, keep hints, and reveal the step configs and solution summary as the solution.
+
+`guide.yaml` is a sidecar like `exams.yaml`: older apps ignore it, so packs stay importable by 2.x and 3.x.
+`cmllab guide <lab folder>` prints the walkthrough of a challenge lab and `--write` scaffolds its `guide.yaml` to
+edit. The library build refuses a lab whose walkthrough steps lack commands, an explanation or expected output,
+or whose solution has a command the glossary cannot explain (write a `guide.yaml` or extend the glossary).
 
 ### Multicast and MPLS labs
 These labs need nothing beyond the standard CML 2.9 images. Every node is a plain router (`iol-xe` by default, or
@@ -1290,7 +1326,7 @@ After changing the schema, templates, guide or example, run `python -m cmllab do
 fact you want pinned (0 to 2 asserts). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Version and changelog
-Current version: **3.3.6**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.3.7**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License

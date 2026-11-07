@@ -1,0 +1,99 @@
+# Walkthrough mode for this challenge lab (CML Lab Builder 3.3.7+; older apps ignore this file).
+# Each step: id, title, explain (Markdown), config (device -> exact lines), verify (device, command, expect),
+# checks (ids of this lab's checks). Scaffold with `cmllab guide <lab folder> --write`.
+# Hand-written: a troubleshooting lab is walked through as a diagnosis, not as a build.
+steps:
+- id: isolate
+  title: Start at the edge of the problem (BR2)
+  explain: |
+    Troubleshoot from the symptom outwards. Branch-2 users cannot reach 10.100.0.10, so start on **BR2**, the
+    router of the broken site, and ask two questions: does BR2 have a route to the server at all, and which OSPF
+    neighbors does it have?
+
+    - `show ip route 10.100.0.10` asks the routing table for the server's address. "Subnet not in table" means
+      the problem is routing (control plane), not filtering.
+    - `show ip ospf neighbor` lists BR2's adjacencies. BR2 has a single uplink (to DIST2): with no neighbor there,
+      area 2 is cut off and BR2 learns no routes at all.
+    - `ping 10.2.46.4` proves the link itself works (layer 1-3 up), so the problem is OSPF itself.
+  verify:
+  - device: BR2
+    command: show ip route 10.100.0.10
+    expect: Before the fix `% Subnet not in table`. After the fix an `O IA` route via 10.2.46.4.
+  - device: BR2
+    command: show ip ospf neighbor
+    expect: Before the fix the list is empty. After the fix DIST2 (4.4.4.4) in state `FULL`.
+  - device: BR2
+    command: ping 10.2.46.4
+    expect: Success rate 80-100 percent (the WAN link works; the fault is in OSPF).
+  checks: [guard-br2-no-static, guard-br2-area]
+- id: compare
+  title: Compare both ends of the WAN link
+  explain: |
+    The link is up and pings cross it, yet no adjacency forms. OSPF neighbors must agree on area, subnet/mask,
+    hello/dead timers, network type, MTU and **authentication**. Compare the interface on both ends:
+
+    - `show ip ospf interface %if1%` on **DIST2** shows `Message digest authentication enabled` and
+      `Youngest key id is 1`.
+    - `show ip ospf interface %if0%` on **BR2** shows no authentication at all.
+
+    `debug ip ospf adj` on DIST2 confirms it: "Mismatched Authentication type. Input packet specified type 0, we
+    use type 2". (Turn it off with `undebug all`.) DIST2 is the working router: the rules say you must not weaken
+    it, so BR2 has to match it.
+  verify:
+  - device: DIST2
+    command: show ip ospf interface %if1%
+    expect: "`Message digest authentication enabled` and `Youngest key id is 1`. This must stay as it is."
+  - device: BR2
+    command: show ip ospf interface %if0%
+    expect: Before the fix no authentication lines; process 1, area 2, network type and timers otherwise match DIST2.
+  - device: DIST2
+    command: show running-config interface %if1%
+    expect: "`ip ospf authentication message-digest` and `ip ospf message-digest-key 1 md5 ...`: the key BR2 must use."
+  checks: [guard-dist2-wan-security, guard-dist2-no-static]
+- id: fix
+  title: Fix the root cause on BR2
+  explain: |
+    On **BR2**, enter `configure terminal` and give the WAN interface the same OSPF authentication as DIST2:
+
+    - `interface %if0%`: the interface towards DIST2.
+    - `ip ospf authentication message-digest`: turns on MD5 authentication for OSPF on this interface (type 2,
+      as DIST2 uses). `area 2 authentication message-digest` under `router ospf 1` would also work, for the whole
+      area.
+    - `ip ospf message-digest-key 1 md5 ENCOR-TS1`: key ID 1 and the key string; both must be identical to
+      DIST2's or the hellos are still dropped (then `debug ip ospf adj` says "Mismatched authentication key").
+
+    Within a dead interval (40 s) the adjacency goes to FULL, BR2 learns every route and DIST2 advertises the
+    Branch-2 subnet to the core.
+  config:
+    BR2: |
+      interface %if0%
+       ip ospf authentication message-digest
+       ip ospf message-digest-key 1 md5 ENCOR-TS1
+  verify:
+  - device: BR2
+    command: show ip ospf interface %if0%
+    expect: "`Message digest authentication enabled` and `Youngest key id is 1`."
+  checks: [br2-cfg-fix-mode, br2-cfg-fix-key]
+- id: verify
+  title: Verify the ticket is closed and nothing else broke
+  explain: |
+    Check the expected end state from the ticket, and that the rest of the design is untouched (the guard checks):
+    the DIST2-BR2 adjacency is FULL, BR2 has the server route, the core has the Branch-2 users route, the user
+    test ping works, and the other adjacencies are still FULL.
+  verify:
+  - device: DIST2
+    command: show ip ospf neighbor
+    expect: 6.6.6.6 (BR2) in state `FULL`.
+  - device: BR2
+    command: show ip route ospf
+    expect: "`O IA 10.100.0.0/24` via 10.2.46.4 (and the other inter-area routes plus the default)."
+  - device: CORE2
+    command: show ip route ospf
+    expect: "`O IA 10.2.100.0/24`: the core knows the Branch-2 users again."
+  - device: BR2
+    command: ping 10.100.0.10 source 10.2.100.1
+    expect: Success rate 80-100 percent.
+  - device: DIST1
+    command: show ip ospf neighbor
+    expect: 5.5.5.5 (BR1) still `FULL`; on CORE1, 7.7.7.7 (EDGE) is also still `FULL`.
+  checks: [br2-ping-server, dist2-nbr-br2, br2-route-server, core2-route-br2-users, guard-dist1-br1, guard-core1-edge]

@@ -392,3 +392,16 @@ aside.catalog[hidden]{display:none}
 .exam-more[open]{display:contents}
 .exam-more[open]>summary{order:99}
 .inline-row{display:flex;gap:var(--sp-1);align-items:center}.inline-row>input{flex:1;min-width:0}
+/* 3.3.7: challenge / walkthrough mode (build dialog chooser, badge on the lab page) */
+.mode-choice{border:1px solid var(--color-border);border-radius:var(--radius-md);margin:var(--sp-2) 0;padding:var(--sp-2) var(--sp-3);display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:var(--sp-2)}
+.mode-choice legend{font-weight:var(--fw-semibold);padding:0 var(--sp-1);color:var(--color-text)}
+.mode-opt{display:flex;gap:var(--sp-2);align-items:flex-start;border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--sp-2) var(--sp-3);background:var(--color-surface);cursor:pointer;color:var(--color-text)}
+.mode-opt:hover{border-color:var(--color-border-strong)}
+.mode-opt:has(input:checked){border:2px solid var(--color-primary-text);background:var(--color-primary-soft);padding:calc(var(--sp-2) - 1px) calc(var(--sp-3) - 1px)}
+.mode-opt input{margin-top:.2rem;accent-color:var(--color-primary)}
+.mode-opt b{display:block}
+.mode-desc{display:block;font-size:var(--fs-sm);color:var(--color-text-muted);line-height:var(--lh-body)}
+.mode-choice .mode-note{grid-column:1/-1;margin:0}
+.tag.mode-badge.chal{background:var(--color-surface-2);border-color:var(--color-border-strong);color:var(--color-text);font-weight:var(--fw-semibold)}
+.tag.mode-badge.walk{background:var(--color-primary);border-color:var(--color-primary);color:var(--color-on-primary);font-weight:var(--fw-semibold)}
+@media (forced-colors:active){.mode-opt:has(input:checked){border-color:Highlight}.tag.mode-badge{forced-color-adjust:none}}

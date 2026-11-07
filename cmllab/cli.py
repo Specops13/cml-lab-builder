@@ -75,6 +75,7 @@ def list_labs():
         r = sizing.estimate(lab, s.platform, s.ram_heavy_gb)
         ram = f"RAM heavy {r['label']}" if r["heavy"] else r["label"]
         kind = "  [walkthrough]" if lab.is_walkthrough else ""
+        kind += "  (mode chosen)" if e.native is not None else ""
         typer.echo(f"{lid:28} {e.source:7} {lab.node_count} nodes  d{lab.difficulty}  {ram:>9}  "
                    f"[{', '.join(lab.blueprint)}]  {render(lab.title, plat)}{fl}{kind}")
 
@@ -280,9 +281,69 @@ def resource_diagnostics(out: Path = typer.Option(None, "-o", "--out", help="wri
 
 
 @app.command()
-def build(lab_id: str, rebuild: bool = typer.Option(False, help="delete and re-import if it exists")):
-    """Import + start a lab and wait for boot."""
-    service.do_build(_settings(), lab_id, _p, rebuild=rebuild)
+def build(lab_id: str, rebuild: bool = typer.Option(False, help="delete and re-import if it exists"),
+          mode: str = typer.Option("challenge", "--mode", "-m",
+                                   help="challenge (goals, checks, hints, solution at the end) or walkthrough (exact "
+                                        "commands per step, what each does, expected output; checks still run)")):
+    """Import + start a lab and wait for boot, in challenge (default) or walkthrough mode."""
+    from . import guide
+    if mode not in guide.MODES:
+        typer.echo("--mode must be challenge or walkthrough", err=True)
+        raise typer.Exit(2)
+    try:
+        service.do_build(_settings(), lab_id, _p, rebuild=rebuild, mode=mode)
+    except guide.GuideError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    if mode == "walkthrough":
+        typer.echo(f"Walkthrough mode: `cmllab step {lab_id}` lists the steps, `cmllab step {lab_id} 1` shows the first.")
+
+
+@app.command("mode")
+def mode_cmd(lab_id: str, mode: str = typer.Argument(None, help="challenge or walkthrough; omit to show the current mode")):
+    """Show or switch a lab's mode (challenge / walkthrough) without rebuilding it."""
+    from . import guide
+    e = catalog.entry(lab_id)
+    if mode is None:
+        chosen = guide.get_mode(lab_id)
+        typer.echo(f"{lab_id}: {e.lab.type} mode" + ("" if chosen else f" (never chosen: the lab's own type)"))
+        return
+    try:
+        r = service.set_mode(lab_id, mode)
+    except guide.GuideError as ex:
+        typer.echo(str(ex), err=True)
+        raise typer.Exit(1)
+    typer.echo(f"{lab_id}: now in {r['mode']} mode")
+
+
+@app.command("guide")
+def guide_cmd(source: Path = typer.Argument(..., help="challenge lab folder (lab.yaml + solution.cfg)"),
+              write: bool = typer.Option(False, "--write", help="write guide.yaml (refuses to overwrite)")):
+    """Show the walkthrough-mode steps of a challenge lab, or scaffold its guide.yaml to edit."""
+    from . import guide, packs as pk
+    pack = pk.read_dir(source)
+    lab = pk.pack_lab(pack)
+    if lab.is_walkthrough:
+        typer.echo(f"{lab.id} is already a walkthrough lab: its steps are its walkthrough", err=True)
+        raise typer.Exit(1)
+    raw = guide.read_sidecar(pack.guide_yaml) if pack.guide_yaml else \
+        guide.derive(lab, pk.solution_of(lab, pack), pack.fixtures.get("solved"))
+    if write:
+        f = Path(source) / guide.SIDECAR
+        if f.exists():
+            typer.echo(f"{f} already exists", err=True)
+            raise typer.Exit(1)
+        f.write_text(guide.dump_sidecar(raw), encoding="utf-8")
+        typer.echo(f"wrote {f} ({len(raw)} steps)")
+        return
+    plat = get_platform(_settings().platform)
+    for i, st in enumerate(guide.steps_from(lab, raw), 1):
+        typer.echo(f"## {i}. {render(st.title, plat)}\n\n{render(st.explain, plat).rstrip()}\n")
+        for dev, cfg in st.config.items():
+            typer.echo(f"! device {dev}\n{render(cfg, plat).rstrip()}\n")
+        for v in st.verify:
+            typer.echo(f"{v.device}# {render(v.command, plat)}\n    expect: {render(v.expect, plat).strip()}")
+        typer.echo("")
 
 
 def _print_check(rep: dict) -> None:
@@ -335,7 +396,7 @@ def step_cmd(lab_id: str, step: str = typer.Argument(None, help="step id or numb
     from . import walkthrough
     lab = catalog.get(lab_id)
     if not lab.is_walkthrough:
-        typer.echo(f"{lab_id} is not a walkthrough lab", err=True)
+        typer.echo(f"{lab_id} is in challenge mode: switch with `cmllab mode {lab_id} walkthrough`", err=True)
         raise typer.Exit(1)
     s = _settings()
     plat = get_platform(s.platform)

@@ -1,6 +1,6 @@
 "use strict";
 /* CML Lab Builder UI - vanilla JS, no build step. */
-const APP_JS_VERSION = "3.3.6";  // must equal cmllab.__version__ (tests/test_packaging.py)
+const APP_JS_VERSION = "3.3.7";  // must equal cmllab.__version__ (tests/test_packaging.py)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 /* links that come from data (CML, GitHub, lab files) are only ever http(s): never javascript: or data: URLs */
@@ -824,8 +824,8 @@ async function selectLab(id) {
   if (l.type === "walkthrough") return renderWalkthrough(l);
   $("#lab-detail").innerHTML = `
     <div class="toolbar"><h2 style="margin:0">${esc(l.title)}</h2><span class="sep"></span>
-      <span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
-      ${srcTag(labs.find((x) => x.id === l.id) || l)}${l.marked_manually ? '<span class="tag ok">completed</span>' + manTag() : ""}</div>${examTags(l.exams, 8)}${libNote(l.id)}
+      ${modeBadge(l)}<span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
+      ${srcTag(labs.find((x) => x.id === l.id) || l)}${l.marked_manually ? '<span class="tag ok">completed</span>' + manTag() : ""}${modeSwitchBtn(l)}</div>${examTags(l.exams, 8)}${libNote(l.id)}
     <div class="toolbar">
       <button data-help="lab.build" id="a-build" class="primary">Build</button>${l.exam ? '<button data-help="lab.examSubmit" id="a-check" class="primary">Submit exam</button>' : '<button data-help="lab.check" id="a-check">Check</button>'}<button data-help="lab.hintNext" id="a-hint">Hint</button>
       <label class="inline">Grading<select data-help="lab.mode" id="mode"><option value="">Mode: default</option><option value="auto">Auto</option><option value="live">Live only</option><option value="config">Config only</option></select></label>
@@ -900,7 +900,7 @@ async function selectLab(id) {
   if ($("#a-edit")) $("#a-edit").onclick = () => openInBuilder(id);
   if ($("#a-export")) $("#a-export").onclick = () => { location.href = `/api/labs/${encodeURIComponent(id)}/export`; };
   if ($("#a-delete")) $("#a-delete").onclick = () => deleteLab(id, l.title);
-  bindMarkLab(l);
+  bindMarkLab(l); bindModeSwitch(l);
   $("#t-toggle").onclick = () => (timerState(id).start ? timerPause(id) : timerStart(id));
   $("#t-reset").onclick = () => confirm("Reset the timer?") && timerSet(id, {acc: 0, start: null});
   bindHints($("#lab-detail")); bindConsoleTest(l);
@@ -1137,17 +1137,56 @@ async function libFitTags() {
   }
 }
 const gb1 = (x) => x == null ? "?" : (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10);
+/* 3.3.7: two ways to do every lab, chosen when it is built and switchable later without a rebuild */
+const MODE_TEXT = {
+  challenge: ["Challenge", "Goals and checks only: work it out yourself. Hints on request, the full solution at the end."],
+  walkthrough: ["Walkthrough", "Step by step: the exact commands per device, what each one does and what good output looks like. Checks still run."]};
+const modeOf = (l) => (l.mode || l.type) === "walkthrough" ? "walkthrough" : "challenge";
+const modeBadge = (l) => `<span class="tag mode-badge ${modeOf(l) === "walkthrough" ? "walk" : "chal"}" data-help="lab.modeBadge">${MODE_TEXT[modeOf(l)][0]} mode</span>`;
+function modeChooser(l) {
+  const sel = l.mode_chosen || "challenge";
+  return `<fieldset class="mode-choice" data-help="lab.buildMode"><legend>How do you want to do this lab?</legend>
+    ${Object.entries(MODE_TEXT).map(([k, [name, text]]) => `<label class="mode-opt"><input data-help="lab.buildMode" type="radio" name="bc-mode" value="${k}"${k === sel ? " checked" : ""}>
+      <span><b>${name}</b><span class="mode-desc">${esc(text)}</span></span></label>`).join("")}
+    <p class="muted small mode-note">You can switch modes later on the lab page; the lab does not need to be rebuilt.</p></fieldset>`;
+}
+function modeSwitchBtn(l) {
+  if (l.exam || l.fault) return "";
+  const other = modeOf(l) === "walkthrough" ? "challenge" : "walkthrough";
+  return `<button data-help="lab.modeSwitch" id="a-mode" class="hint-btn">Switch to ${MODE_TEXT[other][0].toLowerCase()} mode</button>`;
+}
+function bindModeSwitch(l) {
+  const b = $("#a-mode"); if (!b) return;
+  const other = modeOf(l) === "walkthrough" ? "challenge" : "walkthrough";
+  b.onclick = async () => {
+    if (!confirm(`Switch "${l.title}" to ${other} mode?\n\n${MODE_TEXT[other][1]}\n\nThe lab in CML is not rebuilt; your device configs stay as they are.`)) return;
+    try {
+      await api(`/api/labs/${encodeURIComponent(l.id)}/mode?mode=${other}`, {method: "POST"});
+      toast(`${MODE_TEXT[other][0]} mode`, "ok"); loadLabs(); await selectLab(l.id); $("#a-mode")?.focus();
+    } catch (e) { toast(`Could not switch: ${e.message}`, "err", 8000); }
+  };
+}
 function confirmBuild(l) {
   const box = $("#build-confirm"); if (!box) return run("build");
   const r = l.ram || {};
   box.innerHTML = `<section class="${r.heavy ? "build-box heavy" : "build-box"}" data-help="lab.buildBox" aria-labelledby="bc-title">
     <p id="bc-title"><b>Build "${esc(l.title)}" in CML?</b> ${ramTag(r)}</p>
     <p class="small">${l.nodes} nodes. ${esc(r.tooltip || "")}${r.vcpus ? ` About ${r.vcpus} vCPUs.` : ""}</p>
+    ${modeChooser(l)}
     <div id="res-panel" class="res-panel" aria-live="polite" aria-busy="true"><p class="muted small loading"><span class="spinner" aria-hidden="true"></span>Checking free memory and running labs on CML…</p></div>
     <div class="toolbar"><button data-help="lab.buildGo" id="bc-go" class="primary">Build</button><button data-help="lab.buildCancel" id="bc-cancel" class="hint-btn">Cancel</button>
       <button data-help="res.recheck" id="bc-recheck" class="hint-btn" hidden>${icon("refresh")}Check again</button>
       <button data-help="res.copyDiag" id="bc-diag" class="hint-btn">${icon("info")}Copy diagnostics</button></div></section>`;
-  $("#bc-go").onclick = () => { box.innerHTML = ""; resCache = null; run("build"); };
+  $("#bc-go").onclick = async () => {
+    const m = (box.querySelector('input[name="bc-mode"]:checked') || {}).value || "challenge";
+    box.innerHTML = ""; resCache = null;
+    if (m !== (l.mode || l.type)) {       // switch the view first, then build in the chosen mode
+      try { await api(`/api/labs/${encodeURIComponent(l.id)}/mode?mode=${m}`, {method: "POST"}); }
+      catch (e) { toast(`Could not set the mode: ${e.message}`, "err", 8000); return; }
+      await selectLab(l.id); loadLabs();
+    }
+    run("build", `/api/labs/${encodeURIComponent(l.id)}/build?mode=${m}`);
+  };
   $("#bc-cancel").onclick = () => { box.innerHTML = ""; };
   $("#bc-recheck").onclick = () => renderPrecheck(l);
   $("#bc-diag").onclick = copyResourceDiagnostics;
@@ -1239,8 +1278,8 @@ function renderWalkthrough(l) {
   walk = {lab: l, status: l.walkthrough, index: Math.min(l.walkthrough.current, l.steps.length)};
   $("#lab-detail").innerHTML = `
     <div class="toolbar"><h2 style="margin:0">${esc(l.title)}</h2><span class="sep"></span>
-      ${walkTag(l)}<span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
-      ${srcTag(labs.find((x) => x.id === l.id) || l)}</div>${examTags(l.exams, 8)}${libNote(l.id)}
+      ${modeBadge(l)}<span class="tag">${esc(l.domain)}</span><span class="tag">${"★".repeat(l.difficulty)}</span>${ramTag(l.ram)}
+      ${srcTag(labs.find((x) => x.id === l.id) || l)}${modeSwitchBtn(l)}</div>${examTags(l.exams, 8)}${libNote(l.id)}
     <div class="toolbar">
       <button data-help="lab.build" id="a-build" class="primary">Build</button>
       <button data-help="w.checkAll" id="w-check-all">Check every step</button>
@@ -1258,6 +1297,7 @@ function renderWalkthrough(l) {
     <h3 data-help="lab.activity">Activity</h3><pre id="log" class="log">-</pre>
     <details id="cons-box" hidden><summary data-help="lab.consoles">Consoles</summary><div id="consoles"></div></details>${consoleTestBox(l)}`;
   $("#a-build").onclick = () => confirmBuild(l);
+  bindModeSwitch(l);
   $("#w-check-all").onclick = () => run("step-check", `/api/labs/${l.id}/walkthrough/check-all`);
   $("#a-reset").onclick = () => confirm("Reset wipes all device configs back to the starting point (hostname and logins only). Your walkthrough progress is kept. Continue?") && run("reset");
   $("#a-destroy").onclick = () => confirm("Delete this lab from CML?") && run("destroy");

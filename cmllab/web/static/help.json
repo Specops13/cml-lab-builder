@@ -270,5 +270,8 @@
   "w.unmarkStep": "Remove the manual mark from this step. Its graded check result is kept.",
   "p.marked": "Challenge labs you marked complete by hand. Courses count them as done; they stay out of solved labs and mastery.",
   "lab.exams": "Cisco exam objectives this lab covers, from the official exam topics. Hover a tag for the objective text.",
-  "w.exams": "Exam objectives this step practises. Hover a tag for the objective text from the Cisco exam topics."
+  "w.exams": "Exam objectives this step practises. Hover a tag for the objective text from the Cisco exam topics.",
+  "lab.buildMode": "Challenge: goals and checks, hints on request, solution at the end. Walkthrough: the exact commands per step, what each does and the expected output; checks still run.",
+  "lab.modeBadge": "The mode this lab is in: Challenge (work it out from the goals) or Walkthrough (guided steps with the exact commands). Chosen when you build the lab.",
+  "lab.modeSwitch": "Switch between challenge and walkthrough mode; the lab in CML is not rebuilt and your device configs are kept (not during an exam or fault practice)."
 }

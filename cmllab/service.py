@@ -19,7 +19,26 @@ def make_cml(settings, client_factory=None) -> CML:
     return CML(settings, client_factory=client_factory)
 
 
-def do_build(settings, lab_id, progress, rebuild=False, client_factory=None):
+def set_mode(lab_id: str, mode: str) -> dict:
+    """Choose how a lab is presented (3.3.7): "challenge" or "walkthrough". Only the presentation and grading
+    change, so it works for a built lab without a rebuild. Refused while an exam or fault practice runs."""
+    from . import exam, faults, guide
+    e = catalog.entry(lab_id)
+    if mode not in guide.MODES:
+        raise guide.GuideError(f"mode must be one of {', '.join(guide.MODES)}")
+    if mode != e.lab.type and exam.active(lab_id):
+        raise guide.GuideError("finish or abort the exam before switching the lab's mode")
+    if mode != e.lab.type and faults.active(lab_id):
+        raise guide.GuideError("end fault practice before switching the lab's mode")
+    guide.effective(e.own, e.path, mode)          # raises if the other shape cannot be produced
+    guide.set_mode(lab_id, mode)
+    return {"lab_id": lab_id, "mode": mode, "native_type": e.own.type}
+
+
+def do_build(settings, lab_id, progress, rebuild=False, client_factory=None, mode=None):
+    if mode:
+        set_mode(lab_id, mode)
+        progress(f"Mode: {mode} (switch any time on the lab page or with `cmllab mode`)")
     lab = catalog.get(lab_id)
     cml = make_cml(settings, client_factory)
     cl = cml.build(lab, start=True, rebuild=rebuild, progress=progress)
