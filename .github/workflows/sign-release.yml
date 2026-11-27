@@ -1,7 +1,7 @@
 # Sign an already published release (3.3.9+): Actions > sign release > Run workflow, enter the tag.
 # Downloads SHA256SUMS.txt and cml-lab-builder-patch-<version>.zip from that release, checks the patch against the sums,
 # signs both with the RELEASE_SIGNING_KEY secret (packaging/sign_release.py refuses a key the app does not trust) and
-# uploads the two .sig files. Existing .sig assets are never replaced (gh release upload without --clobber fails).
+# uploads the two .sig files, and fills in empty release notes from CHANGELOG.md. Existing .sig assets are never replaced (gh release upload without --clobber fails).
 # New releases are signed by the release job in build.yml; this is for releases published before the secret existed.
 name: sign release
 on:
@@ -40,3 +40,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
         run: gh release upload "$TAG" -R "$GITHUB_REPOSITORY" dist/*.sig
+      - name: Release notes from CHANGELOG.md (only if the release has none)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body --jq .body)" ]; then
+            awk -v h="## [${TAG#v}]" 'index($0, h) == 1 {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md > release-notes.md
+            if [ -s release-notes.md ]; then gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file release-notes.md; fi
+          fi

@@ -7,7 +7,8 @@ All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). V
 - **Releases are signed in CI:** the release job signs `SHA256SUMS.txt` and the patch with the `RELEASE_SIGNING_KEY`
   Actions secret (`packaging/sign_release.py`, which refuses a key the app does not trust and a patch that does not
   match the sums), and the new `sign release` workflow signs an already published release. No change to the app:
-  it verifies exactly as before.
+  it verifies exactly as before. Release notes are filled in from this file (the version's section) by the release
+  job, and by `sign release` when a release has none.
 
 ## [3.3.9] - 2026-11-26
 ### Added

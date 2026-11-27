@@ -181,9 +181,13 @@ jobs:
         env:
           RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
         run: python packaging/sign_release.py --dist dist --optional
+      # release notes: the CHANGELOG.md section of this version (tag v3.3.9 -> "## [3.3.9] - date")
+      - env: {TAG: "${{ inputs.tag }}"}
+        run: awk -v h="## [${TAG#v}]" 'index($0, h) == 1 {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md > release-notes.md
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
+          body_path: release-notes.md
           overwrite_files: false
           files: |
             dist/CMLLabBuilder-*
