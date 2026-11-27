@@ -31,6 +31,13 @@ def _sums(text: str) -> dict[str, str]:
     return out
 
 
+def public_hex(private_pem: bytes) -> str:
+    """The raw Ed25519 public key of a PEM private key (safe to print: it is what TRUSTED_KEYS holds)."""
+    from cryptography.hazmat.primitives import serialization
+    key = serialization.load_pem_private_key(private_pem, None)
+    return key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw).hex()
+
+
 def sign_dist(dist: Path, private_pem: bytes) -> list[Path]:
     """Sign SHA256SUMS.txt and the patch zip(s) in dist; returns the .sig files written."""
     sums_file = dist / "SHA256SUMS.txt"
@@ -53,7 +60,9 @@ def sign_dist(dist: Path, private_pem: bytes) -> list[Path]:
         try:
             kid = signing.verify(data, sig, path.name)
         except signing.SignatureError as e:
-            raise SystemExit(f"refusing to sign with a key the app does not trust: {e}") from None
+            raise SystemExit(f"refusing to sign with a key the app does not trust: {e}\n"
+                             f"public key of RELEASE_SIGNING_KEY (raw Ed25519, hex): {public_hex(private_pem)}\n"
+                             "add it to TRUSTED_KEYS in cmllab/signing.py (key rotation, SECURITY.md)") from None
         out = path.with_name(path.name + signing.SIG_SUFFIX)
         out.write_bytes(sig)
         written.append(out)

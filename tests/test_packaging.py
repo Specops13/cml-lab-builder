@@ -125,8 +125,8 @@ def test_ci_signs_releases_with_a_trusted_key_only(tmp_path, monkeypatch):
     patch.write_bytes(b"patch bytes")
     sums = tmp_path / "SHA256SUMS.txt"
     sums.write_text(f"{hashlib.sha256(b'patch bytes').hexdigest()}  {patch.name}\n", encoding="utf-8")
-    with __import__("pytest").raises(SystemExit, match="does not trust"):
-        sr.sign_dist(tmp_path, pem)                                   # not in TRUSTED_KEYS
+    with __import__("pytest").raises(SystemExit, match=f"does not trust(?s:.*){pub}"):
+        sr.sign_dist(tmp_path, pem)                    # not in TRUSTED_KEYS: says which public key to add
     assert not list(tmp_path.glob("*.sig"))
     monkeypatch.setitem(signing.TRUSTED_KEYS, "test-ci", pub)
     written = sr.sign_dist(tmp_path, pem)
