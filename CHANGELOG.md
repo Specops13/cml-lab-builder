@@ -2,7 +2,14 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
+## [3.3.10] - 2026-11-26
+**Full download required once** if you run 3.3.0 - 3.3.9: this release is signed with a new key, and older apps
+cannot install it as an in-app update (they say it is signed with an unknown key). Your data folder is not touched.
+### Security
+- **New release signing key `release-2026b`** (key id `2f80e6afc2633a04`, public key
+  `ec2f23cf8c85e46952023006cba3cf13704ffd0135815eb6e46caf4e68fd7af5`). The old key `release-2026` is retired and no
+  longer trusted: its private key was lost, so it could neither sign 3.3.9 nor a hand-over to a new key. 3.3.9 stays
+  unsigned. In-app updates from 3.3.10 on are signed with the new key, by CI.
 ### Changed
 - **Releases are signed in CI:** the release job signs `SHA256SUMS.txt` and the patch with the `RELEASE_SIGNING_KEY`
   Actions secret (`packaging/sign_release.py`, which refuses a key the app does not trust and a patch that does not

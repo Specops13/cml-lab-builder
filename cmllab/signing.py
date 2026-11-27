@@ -22,9 +22,11 @@ import os
 from urllib.parse import urlparse
 
 FORMAT = 1
-# raw Ed25519 public keys (hex) trusted for releases; the private key never leaves the maintainer's machine
+# raw Ed25519 public keys (hex) trusted for releases; the private key lives in the RELEASE_SIGNING_KEY Actions secret
+# 3.3.10: "release-2026" (48f799c3...) was retired because its private key was lost; apps up to 3.3.9 trust only that
+# key, so they cannot install 3.3.10+ as an update (full download once, see SECURITY.md "Key rotation").
 TRUSTED_KEYS = {
-    "release-2026": "48f799c3e8938c8be616cde0c4c8bf1927aeea8ab9f5b8cd310efa04e294c6be",
+    "release-2026b": "ec2f23cf8c85e46952023006cba3cf13704ffd0135815eb6e46caf4e68fd7af5",
 }
 SIG_SUFFIX = ".sig"
 MAX_SIG_BYTES = 4096

@@ -198,7 +198,8 @@ def test_verify_rejects_unsigned_tampered_and_garbage():
 
 def test_release_key_embedded():
     assert any(len(v) == 64 for v in signing.TRUSTED_KEYS.values())
-    assert "48f799c3e8938c8be616cde0c4c8bf1927aeea8ab9f5b8cd310efa04e294c6be" in signing.TRUSTED_KEYS.values()
+    assert "ec2f23cf8c85e46952023006cba3cf13704ffd0135815eb6e46caf4e68fd7af5" in signing.TRUSTED_KEYS.values()
+    assert "48f799c3e8938c8be616cde0c4c8bf1927aeea8ab9f5b8cd310efa04e294c6be" not in signing.TRUSTED_KEYS.values()   # 3.3.10: lost key retired
 
 
 def test_test_key_env_only_for_loopback_update_url(monkeypatch):

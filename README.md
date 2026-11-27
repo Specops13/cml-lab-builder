@@ -295,6 +295,12 @@ delete the whole old `encorlab` folder.
 uses that folder for everything, including `app/`, and nothing is moved.
 
 ## Updating (small patches instead of a full download)
+> **Coming from 3.3.0 - 3.3.9? Download 3.3.10 in full, once.** 3.3.10 is signed with a new release key (the old
+> one was lost, see [SECURITY.md](SECURITY.md#release-signing)), and older apps trust only the old key, so their
+> in-app update says the update is signed with an unknown key and installs nothing. Install the full 3.3.10 download
+> over your current one (Windows zip, Linux tarball or `.deb`); your data folder is not touched, and in-app updates
+> work again from 3.3.10 on.
+
 Since 1.6.0 the download is split in two parts:
 
 - **The runtime:** the exe, Python and the libraries in `_internal/`. It only changes with a full download.
@@ -1342,7 +1348,7 @@ After changing the schema, templates, guide or example, run `python -m cmllab do
 fact you want pinned (0 to 2 asserts). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Version and changelog
-Current version: **3.3.9**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.3.10**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License

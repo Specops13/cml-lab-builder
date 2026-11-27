@@ -37,9 +37,14 @@ A `.sig` file is JSON: `{"format": 1, "alg": "ed25519", "key_id": "<first 16 hex
 The public keys the app trusts are in `cmllab/signing.py` (`TRUSTED_KEYS`). The current release key:
 
 ```
-key name:   release-2026
-public key: 48f799c3e8938c8be616cde0c4c8bf1927aeea8ab9f5b8cd310efa04e294c6be   (raw Ed25519, hex)
+key name:   release-2026b   (since 3.3.10, key id 2f80e6afc2633a04)
+public key: ec2f23cf8c85e46952023006cba3cf13704ffd0135815eb6e46caf4e68fd7af5   (raw Ed25519, hex)
 ```
+
+Retired: `release-2026` (`48f799c3e8938c8be616cde0c4c8bf1927aeea8ab9f5b8cd310efa04e294c6be`), which signed 3.3.0 - 3.3.8.
+Its private key was lost, so it could not sign the switch to the new key: **apps from 3.3.0 to 3.3.9 cannot install
+3.3.10 or later as an in-app update** (they report an update signed with an unknown key and install nothing).
+Download the full 3.3.10 once; in-app updates work again from there. 3.3.9 itself is unsigned.
 
 3.3.0 and later refuse an update whose signature is missing, made with an unknown key, or invalid. Versions up to
 3.2.0 do not know about signatures and keep verifying `SHA256SUMS.txt` only, so they can still update to 3.3.0 (which
@@ -50,7 +55,7 @@ Verify a download by hand (Python with `cryptography`):
 ```python
 import base64, json
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-pub = Ed25519PublicKey.from_public_bytes(bytes.fromhex("48f799c3e8938c8be616cde0c4c8bf1927aeea8ab9f5b8cd310efa04e294c6be"))
+pub = Ed25519PublicKey.from_public_bytes(bytes.fromhex("ec2f23cf8c85e46952023006cba3cf13704ffd0135815eb6e46caf4e68fd7af5"))
 sig = json.load(open("SHA256SUMS.txt.sig"))
 pub.verify(base64.b64decode(sig["sig"]), open("SHA256SUMS.txt", "rb").read())   # raises InvalidSignature if bad
 ```
@@ -76,6 +81,8 @@ accounts, and tokens or apps with write access) can sign an update. Keep write a
 ### Key rotation
 1. Generate a new key pair and add its public key to `TRUSTED_KEYS` **next to** the old one; release that version
    signed with the **old** key (installed apps only trust keys they already have).
+   (If the old private key is **lost**, that is impossible: retire it, trust only the new key and tell users to
+   download that release in full, as in 3.3.10.)
 2. From the next release on, sign with the new key. Remove the old key from `TRUSTED_KEYS` one or two releases later.
 3. If the private key is **compromised**: remove its public key from `TRUSTED_KEYS` at once, publish a release signed
    with a new key and tell users (release notes, README) to download it in full, because apps that only trust the
