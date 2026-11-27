@@ -2,6 +2,16 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+### Added
+- **New library walkthrough `34-isis-levels-route-leak`** (IS-IS, 4 IOL nodes, about 4 GB; CCIE-DC track): NET/NSAP
+  addressing and IS types in two areas (L1 R1/R4, L1/L2 R2/R3), `metric-style wide`, `isis network point-to-point`
+  (no DIS or pseudonode LSPs), the ATT-bit default route into a Level-1 area, and leaking R4's loopback from Level-2
+  into Level-1 with a route-map. Strict IOL day-0 configs, `show`/`ping` checks only, debug commands in the text,
+  exam tags CCIE-DC 1.2.b.i/ii and CCNA 3.1.e. Published in the library on commit; no app update needed.
+- Library topic **IS-IS** (`isis`) in the topic vocabulary (older apps ignore it and file the lab under its second
+  topic, *Redistribution & PBR*).
+
 ## [3.3.8] - 2026-11-07
 ### Fixed
 - **Invalid /30 addresses in 9 labs: IOS rejected them, so those links never came up** (reported on

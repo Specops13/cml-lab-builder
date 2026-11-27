@@ -1,0 +1,26 @@
+# Cisco exam objectives this lab covers: '<EXAM> <objective>' from cmllab/exams/*.yaml
+# IS-IS is not in ENCOR 350-401 v1.2 or ENARSI 300-410 v1.1; CCIE Data Center 1.2.b lists it.
+lab:
+- CCIE-DC 1.2.b
+- CCIE-DC 1.2.b.i
+- CCIE-DC 1.2.b.i.1
+- CCIE-DC 1.2.b.ii
+- CCIE-DC 1.2.b.ii.1
+- CCIE-DC 1.2.b.ii.2
+- CCNA 3.1.e
+steps:
+  baseline:
+  - CCNA 1.6
+  isis-enable:
+  - CCIE-DC 1.2.b.i
+  - CCIE-DC 1.2.b.i.1
+  - CCIE-DC 1.2.b.ii
+  - CCIE-DC 1.2.b.ii.1
+  point-to-point:
+  - CCIE-DC 1.2.b.ii.2
+  att-default:
+  - CCIE-DC 1.2.b.ii
+  - CCNA 3.1.e
+  route-leak:
+  - CCIE-DC 1.2.b
+  - CCIE-DC 1.2.b.ii

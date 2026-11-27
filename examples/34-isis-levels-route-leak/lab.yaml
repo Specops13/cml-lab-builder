@@ -1,0 +1,504 @@
+id: 34-isis-levels-route-leak
+type: walkthrough
+title: 'Walkthrough: IS-IS areas, levels and route leaking (IOL)'
+track: CCIE-DC
+blueprint:
+- 1.2.b
+domain: 3.0 Infrastructure
+difficulty: 3
+platforms:
+- iol
+summary: Build IS-IS from scratch across two areas (NET addressing, Level-1, Level-2 and L1/L2 routers), switch the links
+  to point-to-point, follow the ATT-bit default route into a Level-1 area, and leak one Level-2 prefix into Level-1.
+author: CML Lab Builder
+version: '1'
+nodes:
+- name: R1
+  kind: router
+  x: -375
+  y: 0
+  config: |
+    ! Area 49.0001, will be a Level-1-only router. Addresses are pre-built; you add IS-IS.
+    interface %if0%
+     description to R2 Et0/0
+     ip address 10.34.12.1 255.255.255.0
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description router-id / loopback
+     ip address 10.34.0.1 255.255.255.255
+- name: R2
+  kind: router
+  x: -125
+  y: 0
+  config: |
+    ! Area 49.0001, will be the area's Level-1/Level-2 border router.
+    interface %if0%
+     description to R1 Et0/0
+     ip address 10.34.12.2 255.255.255.0
+     no shutdown
+    interface %if1%
+     description to R3 Et0/0
+     ip address 10.34.23.2 255.255.255.0
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description router-id / loopback
+     ip address 10.34.0.2 255.255.255.255
+- name: R3
+  kind: router
+  x: 125
+  y: 0
+  config: |
+    ! Area 49.0002, will be the area's Level-1/Level-2 border router.
+    interface %if0%
+     description to R2 Et0/1
+     ip address 10.34.23.3 255.255.255.0
+     no shutdown
+    interface %if1%
+     description to R4 Et0/0
+     ip address 10.34.34.3 255.255.255.0
+     no shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description router-id / loopback
+     ip address 10.34.0.3 255.255.255.255
+- name: R4
+  kind: router
+  x: 375
+  y: 0
+  config: |
+    ! Area 49.0002, will be a Level-1-only router; its Loopback0 is the prefix you leak in step 5.
+    interface %if0%
+     description to R3 Et0/1
+     ip address 10.34.34.4 255.255.255.0
+     no shutdown
+    interface %if1%
+     description unused
+     no ip address
+     shutdown
+    interface %if2%
+     description unused
+     no ip address
+     shutdown
+    interface %if3%
+     description unused
+     no ip address
+     shutdown
+    interface Loopback0
+     description router-id / loopback
+     ip address 10.34.0.4 255.255.255.255
+links:
+- a:
+    node: R1
+    port: 0
+  b:
+    node: R2
+    port: 0
+- a:
+    node: R2
+    port: 1
+  b:
+    node: R3
+    port: 0
+- a:
+    node: R3
+    port: 1
+  b:
+    node: R4
+    port: 0
+task: |
+  ## IS-IS areas, levels and route leaking (IOL)
+
+  IS-IS is the other link-state IGP: the same Dijkstra SPF as OSPF, but it runs directly over Layer 2 (CLNS, not
+  IP), identifies routers by an NSAP address (the **NET**), and builds its hierarchy from **levels** instead of
+  areas around a backbone. Service-provider cores, MPLS/SR networks and data-center fabrics (Cisco SD-Access, NX-OS
+  FabricPath, many VXLAN underlays) run it, so it is worth knowing even though ENCOR v1.2 does not list it. CCIE Data
+  Center 1.2.b covers exactly what you build here.
+
+  ```
+     Area 49.0001                         Area 49.0002
+   R1 (L1) ---- R2 (L1/L2) ==== R3 (L1/L2) ---- R4 (L1)
+         Level-1        Level-2        Level-1
+  ```
+
+  | Link / interface | Subnet |
+  |---|---|
+  | R1 Et0/0 - R2 Et0/0 | 10.34.12.0/24 |
+  | R2 Et0/1 - R3 Et0/0 | 10.34.23.0/24 |
+  | R3 Et0/1 - R4 Et0/0 | 10.34.34.0/24 |
+  | Loopback0 | 10.34.0.N/32 |
+
+  | Router | NET | IS type |
+  |---|---|---|
+  | R1 | 49.0001.0000.0000.0001.00 | level-1 |
+  | R2 | 49.0001.0000.0000.0002.00 | level-1-2 (default) |
+  | R3 | 49.0002.0000.0000.0003.00 | level-1-2 (default) |
+  | R4 | 49.0002.0000.0000.0004.00 | level-1 |
+
+  You will: enable IS-IS with the right NETs and IS types, make the links point-to-point, see how a Level-1 router
+  reaches the rest of the network through the **ATT bit** default route, and **leak** R4's loopback from Level-2
+  into Level-1 so R1 gets a specific route to it.
+
+  **Resources:** 4 IOL-XE nodes, about 4 GB RAM.
+steps:
+- id: baseline
+  title: 'Baseline: the links are up'
+  explain: |
+    Every link has its IPv4 address and is up. Neighbours answer on the directly connected subnets, but there is no
+    routing protocol yet, so nothing further away is reachable.
+  verify:
+  - device: R1
+    command: ping 10.34.12.2
+    expect: Success rate is 100 percent (5/5).
+  - device: R2
+    command: show ip interface brief
+    expect: Et0/0, Et0/1 and Loopback0 up/up with their addresses.
+  checks:
+  - id: r1-r2-ping
+    description: R1 reaches R2 on the connected link
+    device: R1
+    command: ping 10.34.12.2
+    min_success: 60
+    hint: Wait for the nodes to boot.
+- id: isis-enable
+  title: 'All routers: NET, IS type and IS-IS on the interfaces'
+  explain: |
+    **The NET** (network entity title) is the router's NSAP address with the selector set to 00. Read
+    `49.0001.0000.0000.0001.00` from the right:
+    - `00`: the **NSEL**, always 00 in a NET (it means "this router").
+    - `0000.0000.0001`: the 6-byte **system ID**, unique in the whole IS-IS domain (people often encode the
+      loopback address or a MAC here).
+    - `49.0001`: the **area address**. AFI 49 means a private address, like RFC 1918 for IP.
+
+    Two routers with the same area address are in the **same area**.
+
+    **Levels.** A Level-1 (L1) router knows only its own area. A Level-2 (L2) router carries routes between areas
+    (the backbone: a contiguous chain of L2 routers, not a special area 0). A **level-1-2** router does both and is
+    the area's exit. Adjacencies follow from the IS types and area addresses:
+    - R1-R2: R1 is level-1, same area -> **L1** adjacency only.
+    - R2-R3: different areas -> **L2** only (L1 needs a matching area).
+    - R3-R4: R4 is level-1, same area -> **L1**.
+
+    `level-1-2` is the IOS default, so R2 and R3 need no `is-type` line (it does not show in their running
+    config). On R1 and R4 set `is-type level-1`.
+
+    **Metrics.** `metric-style wide` switches from 6-bit "narrow" metrics (max 63 per link) to 24-bit TLVs 22/135.
+    MPLS-TE, Segment Routing and most modern designs need it; set it the same on every router. IS-IS does not derive
+    cost from bandwidth: every interface has metric **10** unless you set `isis metric`.
+
+    **Interfaces.** `ip router isis` on an interface puts it (and its subnet) into IS-IS; there is no `network`
+    command. Do the links and Loopback0. R1:
+
+    ```
+    router isis
+     net 49.0001.0000.0000.0001.00
+     is-type level-1
+     metric-style wide
+    interface Loopback0
+     ip router isis
+    interface Ethernet0/0
+     ip router isis
+    ```
+
+    Hostnames show up instead of system IDs because IS-IS advertises them (dynamic hostname, TLV 137).
+    Troubleshooting: `show isis neighbors`, `show clns neighbors detail` (area addresses, levels),
+    `show clns interface`, `debug isis adj-packets`. Usual causes: duplicate system ID, area mismatch on an L1
+    adjacency, IS type or `isis circuit-type` mismatch, MTU (IS-IS pads its hellos to the full MTU) and
+    authentication.
+  config:
+    R1: |
+      router isis
+       net 49.0001.0000.0000.0001.00
+       is-type level-1
+       metric-style wide
+      interface Loopback0
+       ip router isis
+      interface %if0%
+       ip router isis
+    R2: |
+      router isis
+       net 49.0001.0000.0000.0002.00
+       metric-style wide
+      interface Loopback0
+       ip router isis
+      interface %if0%
+       ip router isis
+      interface %if1%
+       ip router isis
+    R3: |
+      router isis
+       net 49.0002.0000.0000.0003.00
+       metric-style wide
+      interface Loopback0
+       ip router isis
+      interface %if0%
+       ip router isis
+      interface %if1%
+       ip router isis
+    R4: |
+      router isis
+       net 49.0002.0000.0000.0004.00
+       is-type level-1
+       metric-style wide
+      interface Loopback0
+       ip router isis
+      interface %if0%
+       ip router isis
+  verify:
+  - device: R2
+    command: show isis neighbors
+    expect: R1 type L1 on Et0/0 and R3 type L2 on Et0/1, both UP.
+  - device: R2
+    command: show clns neighbors detail
+    expect: 'R1 with area address 49.0001, R3 with area address 49.0002.'
+  - device: R1
+    command: show ip route isis
+    expect: '`i L1` routes for R2''s loopback and 10.34.23.0/24, and an `i*L1 0.0.0.0/0` default (step 4).'
+  checks:
+  - id: r1-isis-config
+    description: R1 runs IS-IS as a Level-1 router in area 49.0001
+    device: R1
+    mode: config
+    match:
+    - ^router isis\s*$
+    - ^ net 49\.0001\.0000\.0000\.0001\.00\s*$
+    - ^ is-type level-1\s*$
+    - ^ metric-style wide\s*$
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip router isis
+    hint: router isis / net 49.0001.0000.0000.0001.00 / is-type level-1 / metric-style wide; ip router isis on Et0/0 and Loopback0
+  - id: r3-isis-config
+    description: R3 is in area 49.0002 with IS-IS on both links
+    device: R3
+    mode: config
+    match:
+    - ^ net 49\.0002\.0000\.0000\.0003\.00\s*$
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+ip router isis
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+ip router isis
+    hint: router isis / net 49.0002.0000.0000.0003.00; ip router isis on both links and Loopback0
+  - id: r2-adjacencies
+    description: R2 has an L1 adjacency with R1 and an L2 adjacency with R3
+    device: R2
+    command: show isis neighbors
+    match:
+    - ^R1\s+L1\s+%if0s%\s+10\.34\.12\.1\s+UP
+    - ^R3\s+L2\s+%if1s%\s+10\.34\.23\.3\s+UP
+    hint: R1 needs is-type level-1 and the same area (49.0001) as R2; R3 is in another area, so only L2 forms.
+- id: point-to-point
+  title: 'All links: point-to-point network type'
+  explain: |
+    On a broadcast (Ethernet) circuit IS-IS elects a **DIS** (designated IS), the counterpart of the OSPF DR, which
+    creates a **pseudonode** LSP (`R2.01-00`) for the segment and floods CSNPs every 10 seconds. Unlike OSPF there is
+    no backup DIS, and a router with a higher priority (or MAC) **pre-empts** the DIS.
+
+    On a link with only two routers that is overhead. `isis network point-to-point` on **both ends** removes the
+    DIS and the pseudonode LSPs, and the adjacency comes up with a three-way handshake. Do it on every link:
+
+    ```
+    ! R1 Et0/0, R2 Et0/0 and Et0/1, R3 Et0/0 and Et0/1, R4 Et0/0
+    interface Ethernet0/0
+     isis network point-to-point
+    ```
+
+    Compare `show isis neighbors` before and after: the **Circuit Id** changes from a pseudonode ID (`R2.01`) to
+    `00`. `show isis database` no longer lists LSPs ending in `.01-00` / `.02-00`. A network-type mismatch does
+    not form an adjacency (the hellos are different PDU types), so change both ends.
+  config:
+    R1: |
+      interface %if0%
+       isis network point-to-point
+    R2: |
+      interface %if0%
+       isis network point-to-point
+      interface %if1%
+       isis network point-to-point
+    R3: |
+      interface %if0%
+       isis network point-to-point
+      interface %if1%
+       isis network point-to-point
+    R4: |
+      interface %if0%
+       isis network point-to-point
+  verify:
+  - device: R2
+    command: show isis neighbors
+    expect: Both neighbours UP with Circuit Id `00`.
+  - device: R2
+    command: show isis database
+    expect: Only router LSPs (`R1.00-00`, `R2.00-00`, ...), no pseudonode LSPs (`R2.01-00`).
+  checks:
+  - id: r2-p2p-config
+    description: R2 runs both links as point-to-point
+    device: R2
+    mode: config
+    match:
+    - ^interface %if0%\s*\n(?:[ \t].*\n)*?[ \t]+isis network point-to-point
+    - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+isis network point-to-point
+    hint: isis network point-to-point on Et0/0 and Et0/1 (and on the other end of each link)
+  - id: r2-p2p-circuit
+    description: R2's adjacencies are point-to-point (Circuit Id 00)
+    device: R2
+    command: show isis neighbors
+    match:
+    - ^R1\s+L1\s+%if0s%\s+\S+\s+UP\s+\d+\s+00\s*$
+    - ^R3\s+L2\s+%if1s%\s+\S+\s+UP\s+\d+\s+00\s*$
+    hint: Both ends of each link need isis network point-to-point.
+  - id: r2-no-pseudonode
+    description: R2's database has no pseudonode LSPs
+    device: R2
+    command: show isis database
+    match:
+    - ^R2\.00-00\s
+    absent:
+    - ^\S+\.0[1-9A-F]-00\s
+    hint: A pseudonode LSP (.01-00) means some link is still broadcast; set isis network point-to-point on it.
+- id: att-default
+  title: 'Level-1 routing: the ATT bit and the default route'
+  explain: |
+    A Level-1 router has no routes from other areas. Instead, every L1/L2 router that is connected to the Level-2
+    backbone sets the **attached (ATT) bit** in its Level-1 LSP, and L1 routers install a **default route** to the
+    nearest L1/L2 router that sets it. Nothing to configure: look at what step 2 already built.
+
+    - On R2, `show isis database` shows R2's own Level-1 LSP with **ATT/P/OL = 1/0/0**.
+    - On R1, `show ip route isis` has `i*L1 0.0.0.0/0 [115/10] via 10.34.12.2`: administrative distance **115**,
+      metric 10 (R1's link to R2). R1 has no specific route to R3's or R4's loopback, yet it reaches them through
+      the default. R4 reaches R1 the same way through R3.
+    - R2 and R3 have everything: by default an L1/L2 router copies its Level-1 routes into its Level-2 LSP, so R3
+      learns R1's loopback as an `i L2` route.
+
+    The catch: with two exits from an area, the L1 router takes the **closest** ATT router, not the best path to
+    the destination (suboptimal routing). Step 5 fixes that for one prefix. Related knobs:
+    `set-attached-bit route-map` (only set ATT while a route is present), `ignore-attached-bit` on the L1 router,
+    and `default-information originate` for a default route from outside IS-IS.
+  verify:
+  - device: R2
+    command: show isis database
+    expect: In the Level-1 database, R2.00-00 (marked `*`, R2's own LSP) with ATT/P/OL `1/0/0`.
+  - device: R1
+    command: show ip route isis
+    expect: '`i*L1 0.0.0.0/0 [115/10] via 10.34.12.2`, no route to 10.34.0.3 or 10.34.0.4.'
+  - device: R1
+    command: ping 10.34.0.4 source Loopback0
+    expect: Success rate is 100 percent (through the default route).
+  checks:
+  - id: r2-att-bit
+    description: R2 sets the ATT bit in its Level-1 LSP
+    device: R2
+    command: show isis database
+    match:
+    - ^R2\.00-00\s+\*\s+0x[0-9A-Fa-f]+\s+0x[0-9A-Fa-f]+\s+\S+\s+1/0/0
+    hint: R2 must be level-1-2 (the default, no is-type line) with an L2 adjacency to R3.
+  - id: r1-default-route
+    description: R1 has the ATT-bit default route via R2
+    device: R1
+    command: show ip route isis
+    match:
+    - ^i\*L1\s+0\.0\.0\.0/0 \[115/10\] via 10\.34\.12\.2
+    hint: R1 installs the default only from an L1/L2 router that has a Level-2 adjacency (R2 to R3).
+  - id: r1-r4-ping
+    description: R1 reaches R4's loopback from its loopback
+    device: R1
+    command: ping 10.34.0.4 source Loopback0
+    min_success: 60
+    hint: R1 and R4 both use the ATT default route; check every router's IS-IS interfaces, including Loopback0.
+- id: route-leak
+  title: 'R2: leak R4''s loopback from Level-2 into Level-1'
+  explain: |
+    **Route leaking** (RFC 5302, formerly "L2 to L1 route propagation") lets an L1/L2 router copy chosen Level-2
+    prefixes into its Level-1 LSP, marked with the **up/down bit** so they are never advertised back up into
+    Level-2 (that prevents loops between areas). R1 then sees a specific route and picks the best exit per prefix
+    instead of the closest ATT router.
+
+    Leak only R4's loopback on R2:
+
+    ```
+    ip prefix-list LEAK-R4 seq 5 permit 10.34.0.4/32
+    route-map LEAK-R4 permit 10
+     match ip address prefix-list LEAK-R4
+    router isis
+     redistribute isis ip level-2 into level-1 route-map LEAK-R4
+    ```
+
+    R1 now has `i ia 10.34.0.4/32 [115/40]` (an **inter-area** route): 10 (R1-R2) + 10 (R2-R3) + 10 (R3-R4) + 10
+    (R4's loopback). It is more specific than the default, so the longest match wins. R3's loopback is not leaked,
+    so it still goes through the default. Look at R2's Level-1 LSP with
+    `show isis database R2.00-00 level-1 detail`: the prefix is listed with the up/down bit set.
+    Leaking every L2 route (`redistribute isis ip level-2 into level-1` with a permit-all route-map) makes L1
+    routers see the whole domain and loses the scaling benefit of Level-1 areas.
+  config:
+    R2: |
+      ip prefix-list LEAK-R4 seq 5 permit 10.34.0.4/32
+      route-map LEAK-R4 permit 10
+       match ip address prefix-list LEAK-R4
+      router isis
+       redistribute isis ip level-2 into level-1 route-map LEAK-R4
+  verify:
+  - device: R1
+    command: show ip route isis
+    expect: '`i ia 10.34.0.4/32 [115/40] via 10.34.12.2` next to the default route; still no 10.34.0.3.'
+  - device: R1
+    command: show ip route 10.34.0.4
+    expect: Known via "isis", distance 115, metric 40 (the leaked inter-area route).
+  checks:
+  - id: r2-leak-config
+    description: R2 leaks only 10.34.0.4/32 from Level-2 into Level-1
+    device: R2
+    mode: config
+    match:
+    - ^ip prefix-list LEAK-R4 seq 5 permit 10\.34\.0\.4/32\s*$
+    - ^route-map LEAK-R4 permit 10\s*\n\s+match ip address prefix-list LEAK-R4
+    - ^ redistribute isis ip level-2 into level-1 route-map LEAK-R4\s*$
+    hint: ip prefix-list LEAK-R4 / route-map LEAK-R4; under router isis, redistribute isis ip level-2 into level-1 route-map LEAK-R4
+  - id: r1-leaked-route
+    description: R1 has an inter-area route to R4's loopback
+    device: R1
+    command: show ip route isis
+    match:
+    - ^i ia\s+10\.34\.0\.4/32 \[115/40\] via 10\.34\.12\.2
+    absent:
+    - ^i\s+\S*\s+10\.34\.0\.3/32
+    hint: The leak is configured on R2 (the L1/L2 router of R1's area), not on R1 or R3.
+solution_summary: |
+  **What you built**
+
+  - **IS-IS in two areas:** R1 `49.0001.0000.0000.0001.00` and R4 `49.0002.0000.0000.0004.00` as `is-type
+    level-1`; R2 and R3 as level-1-2 (the default) in areas 49.0001 and 49.0002. `metric-style wide` everywhere,
+    `ip router isis` on every link and Loopback0. Adjacencies: R1-R2 L1, R2-R3 L2, R3-R4 L1.
+  - **Point-to-point links:** `isis network point-to-point` on both ends of every link (no DIS, no pseudonode LSPs,
+    Circuit Id 00).
+  - **ATT bit:** R2 and R3 set the attached bit in their Level-1 LSPs; R1 and R4 install `i*L1 0.0.0.0/0`.
+  - **Route leaking on R2:** `redistribute isis ip level-2 into level-1 route-map LEAK-R4` (prefix-list
+    10.34.0.4/32), so R1 has `i ia 10.34.0.4/32 [115/40]`.
+
+  **Why it works:** the area address in the NET decides which routers can form Level-1 adjacencies; Level-2 joins
+  the areas. L1 routers leave the area through the closest ATT router, unless a more specific route is leaked
+  from Level-2 (with the up/down bit, so it never goes back up).
+
+  **Verification commands:** `show isis neighbors`, `show clns neighbors detail`, `show isis database`,
+  `show ip route isis`, `show ip route 10.34.0.4`.

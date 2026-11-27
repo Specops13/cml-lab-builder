@@ -15,6 +15,7 @@ TOPICS: list[tuple[str, str, str]] = [
     ("ospf", "OSPF", "Routing"),
     ("eigrp", "EIGRP", "Routing"),
     ("bgp", "BGP", "Routing"),
+    ("isis", "IS-IS", "Routing"),
     ("routing-policy", "Redistribution & PBR", "Routing"),
     ("ipv6", "IPv6", "Routing"),
     ("switching", "VLAN / STP / EtherChannel", "Switching"),
@@ -46,7 +47,7 @@ _ALIASES = {lbl.lower(): t for t, lbl, _ in TOPICS} | {
     "vxlan": "evpn-vxlan", "datacenter": "data-center", "redistribution": "routing-policy", "pbr": "routing-policy",
     "ipsec": "tunnels", "gre": "tunnels", "dmvpn": "tunnels", "nhrp": "tunnels", "dhcp": "ip-services",
     "dhcpv6": "ipv6", "slaac": "ipv6", "copp": "security", "aaa": "security", "urpf": "security",
-    "monitoring": "assurance", "assurance": "assurance", "nat": "ip-services"}
+    "monitoring": "assurance", "assurance": "assurance", "nat": "ip-services", "is-is": "isis"}
 
 # ENCOR 350-401 blueprint items -> topic (the longest matching prefix wins)
 BLUEPRINT = {"1.5": "qos", "1.1.a": "data-center", "2.2.a": "vrf", "2.2.b": "tunnels", "2.2": "mpls", "2.3": "evpn-vxlan",
@@ -55,7 +56,7 @@ BLUEPRINT = {"1.5": "qos", "1.1.a": "data-center", "2.2.a": "vrf", "2.2.b": "tun
              "5": "security", "6": "automation"}
 
 KEYWORDS: list[tuple[str, str]] = [   # (regex on id/title/summary/domain, topic)
-    (r"\bospf", "ospf"), (r"\beigrp", "eigrp"), (r"\bbgp|\bebgp|\bibgp", "bgp"),
+    (r"\bospf", "ospf"), (r"\beigrp", "eigrp"), (r"\bbgp|\bebgp|\bibgp", "bgp"), (r"\bisis\b|\bis[- ]is\b", "isis"),
     (r"redistribut|\bpbr\b|policy[- ]based|route[- ]map", "routing-policy"),
     (r"\bipv6|dhcpv6|\bslaac", "ipv6"),
     (r"\bvlans?\b|\bstp\b|spanning|trunk|etherchannel|\blacp\b|\bpagp\b|\bswitch", "switching"),

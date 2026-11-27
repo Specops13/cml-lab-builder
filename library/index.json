@@ -1564,6 +1564,47 @@
       ]
     },
     {
+      "file": "34-isis-levels-route-leak.cmllab",
+      "sha256": "285488ba4c8e70ba7d9e8c567a4afbf8d99ad44b5735ba0be6caf64b56ae596a",
+      "size": 8359,
+      "kind": "lab",
+      "id": "34-isis-levels-route-leak",
+      "title": "Walkthrough: IS-IS areas, levels and route leaking (IOL)",
+      "version": "1",
+      "description": "Build IS-IS from scratch across two areas (NET addressing, Level-1, Level-2 and L1/L2 routers), switch the links to point-to-point, follow the ATT-bit default route into a Level-1 area, and leak one Level-2 prefix into Level-1.",
+      "blueprint": [
+        "1.2.b"
+      ],
+      "nodes": 4,
+      "difficulty": 3,
+      "type": "walkthrough",
+      "ram_gb": 4.0,
+      "domain": "3.0 Infrastructure",
+      "track": "CCIE-DC",
+      "platforms": [
+        "iol"
+      ],
+      "node_types": [
+        "iol-xe"
+      ],
+      "exams": [
+        "CCIE-DC 1.2.b",
+        "CCIE-DC 1.2.b.i",
+        "CCIE-DC 1.2.b.i.1",
+        "CCIE-DC 1.2.b.ii",
+        "CCIE-DC 1.2.b.ii.1",
+        "CCIE-DC 1.2.b.ii.2",
+        "CCNA 3.1.e",
+        "CCNA 1.6"
+      ],
+      "topics": [
+        "isis",
+        "routing-policy",
+        "walkthrough",
+        "ccie-dc"
+      ]
+    },
+    {
       "file": "data-center.cmlcourse",
       "sha256": "b4b6068514fe63db3dde3629651bfa52a5e2c485bfcc88230b6b761c8f492fe8",
       "size": 477,

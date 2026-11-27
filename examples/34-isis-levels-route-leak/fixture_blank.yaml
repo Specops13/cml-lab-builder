@@ -1,0 +1,34 @@
+# Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
+# IS-IS outputs follow the IOS XE IS-IS configuration guide and command reference.
+# State: freshly booted lab (day-0 only, no IS-IS).
+R1:
+  ping 10.34.12.2: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.34.12.2, timeout is 2 seconds:
+    !!!!!
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+  show ip route isis: |
+    Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+           D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+           N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+           E1 - OSPF external type 1, E2 - OSPF external type 2, m - OMP
+           n - NAT, Ni - NAT inside, No - NAT outside, Nd - NAT DIA
+           i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+           ia - IS-IS inter area, * - candidate default, U - per-user static route
+           H - NHRP, G - NHRP registered, g - NHRP registration summary
+           o - ODR, P - periodic downloaded static route, l - LISP
+           a - application route
+           + - replicated route, % - next hop override, p - overrides from PfR
+           & - replicated local route overrides by connected
+
+    Gateway of last resort is not set
+
+  ping 10.34.0.4 source Loopback0: |
+    Type escape sequence to abort.
+    Sending 5, 100-byte ICMP Echos to 10.34.0.4, timeout is 2 seconds:
+    Packet sent with a source address of 10.34.0.1
+    .....
+    Success rate is 0 percent (0/5)
+R2:
+  show isis neighbors: ''
+  show isis database: ''
