@@ -1,6 +1,7 @@
 # Synthesized from Cisco IOS XE documentation and command references - not recorded on real hardware.
 # IS-IS outputs follow the IOS XE IS-IS configuration guide and command reference.
 # State: every step done (final state of the walkthrough).
+# show isis neighbors as recorded on IOL-XE in CML (point-to-point: local circuit number 01, no "Tag null:" line).
 R1:
   ping 10.34.12.2: |
     Type escape sequence to abort.
@@ -37,10 +38,9 @@ R1:
 R2:
   show isis neighbors: |
 
-    Tag null:
     System Id       Type Interface     IP Address      State Holdtime Circuit Id
-    R1              L1   %if0s%         10.34.12.1      UP    27       00
-    R3              L2   %if1s%         10.34.23.3      UP    25       00
+    R1              L1   %if0s%         10.34.12.1      UP    28       01
+    R3              L2   %if1s%         10.34.23.3      UP    29       01
   show isis database: |
 
     Tag null:

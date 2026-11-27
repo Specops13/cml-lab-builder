@@ -2,6 +2,13 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+### Fixed
+- **`34-isis-levels-route-leak` (pack version 2): *Check this step* failed on the point-to-point step on real IOL.**
+  The check expected Circuit Id `00`, but IOS shows the local circuit number (`01`) for a point-to-point adjacency.
+  The check now accepts a plain circuit number and still fails on a DIS/pseudonode ID (`R2.01`); the step text, the
+  solution summary and the recorded output say the same. Update the lab from the library (*Update available*).
+
 ## [3.3.10] - 2026-11-26
 **Full download required once** if you run 3.3.0 - 3.3.9: this release is signed with a new key, and older apps
 cannot install it as an in-app update (they say it is signed with an unknown key). Your data folder is not touched.

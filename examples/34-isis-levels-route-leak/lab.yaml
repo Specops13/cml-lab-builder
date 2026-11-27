@@ -11,7 +11,7 @@ platforms:
 summary: Build IS-IS from scratch across two areas (NET addressing, Level-1, Level-2 and L1/L2 routers), switch the links
   to point-to-point, follow the ATT-bit default route into a Level-1 area, and leak one Level-2 prefix into Level-1.
 author: CML Lab Builder
-version: '1'
+version: '2'
 nodes:
 - name: R1
   kind: router
@@ -325,8 +325,8 @@ steps:
      isis network point-to-point
     ```
 
-    Compare `show isis neighbors` before and after: the **Circuit Id** changes from a pseudonode ID (`R2.01`) to
-    `00`. `show isis database` no longer lists LSPs ending in `.01-00` / `.02-00`. A network-type mismatch does
+    Compare `show isis neighbors` before and after: the **Circuit Id** changes from the DIS's pseudonode ID
+    (`R2.01`: system ID + circuit number) to a plain local circuit number such as `01`. `show isis database` no longer lists LSPs ending in `.01-00` / `.02-00`. A network-type mismatch does
     not form an adjacency (the hellos are different PDU types), so change both ends.
   config:
     R1: |
@@ -348,7 +348,7 @@ steps:
   verify:
   - device: R2
     command: show isis neighbors
-    expect: Both neighbours UP with Circuit Id `00`.
+    expect: Both neighbours UP with a plain Circuit Id such as `01` (no `R2.01`-style DIS ID).
   - device: R2
     command: show isis database
     expect: Only router LSPs (`R1.00-00`, `R2.00-00`, ...), no pseudonode LSPs (`R2.01-00`).
@@ -362,12 +362,12 @@ steps:
     - ^interface %if1%\s*\n(?:[ \t].*\n)*?[ \t]+isis network point-to-point
     hint: isis network point-to-point on Et0/0 and Et0/1 (and on the other end of each link)
   - id: r2-p2p-circuit
-    description: R2's adjacencies are point-to-point (Circuit Id 00)
+    description: R2's adjacencies are point-to-point (no DIS in the Circuit Id)
     device: R2
     command: show isis neighbors
     match:
-    - ^R1\s+L1\s+%if0s%\s+\S+\s+UP\s+\d+\s+00\s*$
-    - ^R3\s+L2\s+%if1s%\s+\S+\s+UP\s+\d+\s+00\s*$
+    - ^R1\s+L1\s+%if0s%\s+\S+\s+UP\s+\d+\s+[0-9A-Fa-f]{1,2}\s*$
+    - ^R3\s+L2\s+%if1s%\s+\S+\s+UP\s+\d+\s+[0-9A-Fa-f]{1,2}\s*$
     hint: Both ends of each link need isis network point-to-point.
   - id: r2-no-pseudonode
     description: R2's database has no pseudonode LSPs
@@ -491,7 +491,7 @@ solution_summary: |
     level-1`; R2 and R3 as level-1-2 (the default) in areas 49.0001 and 49.0002. `metric-style wide` everywhere,
     `ip router isis` on every link and Loopback0. Adjacencies: R1-R2 L1, R2-R3 L2, R3-R4 L1.
   - **Point-to-point links:** `isis network point-to-point` on both ends of every link (no DIS, no pseudonode LSPs,
-    Circuit Id 00).
+    a plain circuit number in the Circuit Id column).
   - **ATT bit:** R2 and R3 set the attached bit in their Level-1 LSPs; R1 and R4 install `i*L1 0.0.0.0/0`.
   - **Route leaking on R2:** `redistribute isis ip level-2 into level-1 route-map LEAK-R4` (prefix-list
     10.34.0.4/32), so R1 has `i ia 10.34.0.4/32 [115/40]`.

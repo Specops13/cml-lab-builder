@@ -1565,12 +1565,12 @@
     },
     {
       "file": "34-isis-levels-route-leak.encorlab",
-      "sha256": "285488ba4c8e70ba7d9e8c567a4afbf8d99ad44b5735ba0be6caf64b56ae596a",
-      "size": 8359,
+      "sha256": "76939e02dc63c7815f81227c3493d525ec6ab88c82a090d46de386fe08a2c65f",
+      "size": 8490,
       "kind": "lab",
       "id": "34-isis-levels-route-leak",
       "title": "Walkthrough: IS-IS areas, levels and route leaking (IOL)",
-      "version": "1",
+      "version": "2",
       "description": "Build IS-IS from scratch across two areas (NET addressing, Level-1, Level-2 and L1/L2 routers), switch the links to point-to-point, follow the ATT-bit default route into a Level-1 area, and leak one Level-2 prefix into Level-1.",
       "blueprint": [
         "1.2.b"
