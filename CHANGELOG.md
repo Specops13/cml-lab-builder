@@ -2,6 +2,13 @@
 
 All notable changes to CML Lab Builder (called ENCOR Lab Builder up to 2.1.0). Versions follow `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+### Changed
+- **Releases are signed in CI:** the release job signs `SHA256SUMS.txt` and the patch with the `RELEASE_SIGNING_KEY`
+  Actions secret (`packaging/sign_release.py`, which refuses a key the app does not trust and a patch that does not
+  match the sums), and the new `sign release` workflow signs an already published release. No change to the app:
+  it verifies exactly as before.
+
 ## [3.3.9] - 2026-11-26
 ### Added
 - **New library walkthrough `34-isis-levels-route-leak`** (IS-IS, 4 IOL nodes, about 4 GB; CCIE-DC track): NET/NSAP

@@ -10,8 +10,9 @@
 #    and checks packaging/runtime.lock.json, so a runtime change cannot ship as a patch by accident.
 #  - the release also carries the transition files for ENCOR Lab Builder 1.7 - 2.1 (packaging/build_compat.py).
 #  - 3.3.0+: the app only installs updates whose SHA256SUMS.txt (and patch zip) carry an Ed25519 signature
-#    (*.sig, see SECURITY.md). The release key is NOT in this repository; the maintainer signs the published
-#    SHA256SUMS.txt and patch locally and uploads the .sig files.
+#    (*.sig, see SECURITY.md). The release key is NOT in this repository: since 3.3.9 the release job signs with
+#    the RELEASE_SIGNING_KEY Actions secret (packaging/sign_release.py). sign-release.yml signs an already
+#    published release (Actions > sign release > Run workflow).
 #  - caches: pip (setup-python), uv (Linux bundle) and the PyInstaller bin cache, keyed on pyproject.toml and the
 #    runtime lock.
 name: CML Lab Builder build
@@ -172,6 +173,14 @@ jobs:
       - run: python3 packaging/build_compat.py --dist dist
       # the in-app updater verifies the patch against SHA256SUMS.txt of the same release
       - run: cd dist && sha256sum CMLLabBuilder-* cml-lab-builder_*.deb cml-lab-builder-patch-*.zip ENCORLab-* encorlab_*.deb encorlab-patch-*.zip > SHA256SUMS.txt
+      # 3.3.9: sign SHA256SUMS.txt and the patch with the RELEASE_SIGNING_KEY secret (skipped with a warning if unset)
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install --quiet cryptography
+      - name: Sign the release (Ed25519, SECURITY.md)
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: python packaging/sign_release.py --dist dist --optional
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
@@ -184,3 +193,5 @@ jobs:
             dist/encorlab_*.deb
             dist/encorlab-patch-*.zip
             dist/SHA256SUMS.txt
+            dist/SHA256SUMS.txt.sig
+            dist/cml-lab-builder-patch-*.zip.sig

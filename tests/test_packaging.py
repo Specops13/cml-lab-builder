@@ -98,3 +98,48 @@ def test_frozen_paths_are_package_relative():
     assert catalog.LABS_DIR == Path(os.environ["CMLLAB_BUILTIN_LABS_DIR"])   # the suite uses labsrc/ in place
     assert not (Path(catalog.__file__).parent / "labs").exists()           # 2.0.0: the package ships no labs
     assert prompt.RES.parent == Path(prompt.__file__).parent and app.HERE == Path(app.__file__).parent
+
+
+def _sign_release_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("sign_release", ROOT / "packaging" / "sign_release.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_ci_signs_releases_with_a_trusted_key_only(tmp_path, monkeypatch):
+    """3.3.9: the release job signs SHA256SUMS.txt and the patch with the RELEASE_SIGNING_KEY secret; the script
+    checks the patch against the sums and refuses a key the app does not trust (it would ship uninstallable updates)."""
+    import hashlib
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from cmllab import signing
+    sr = _sign_release_module()
+    key = Ed25519PrivateKey.generate()
+    pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    pub = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw).hex()
+    patch = tmp_path / "cml-lab-builder-patch-9.9.9.zip"
+    patch.write_bytes(b"patch bytes")
+    sums = tmp_path / "SHA256SUMS.txt"
+    sums.write_text(f"{hashlib.sha256(b'patch bytes').hexdigest()}  {patch.name}\n", encoding="utf-8")
+    with __import__("pytest").raises(SystemExit, match="does not trust"):
+        sr.sign_dist(tmp_path, pem)                                   # not in TRUSTED_KEYS
+    assert not list(tmp_path.glob("*.sig"))
+    monkeypatch.setitem(signing.TRUSTED_KEYS, "test-ci", pub)
+    written = sr.sign_dist(tmp_path, pem)
+    assert sorted(p.name for p in written) == ["SHA256SUMS.txt.sig", f"{patch.name}.sig"]
+    for p in (sums, patch):
+        signing.verify(p.read_bytes(), (tmp_path / f"{p.name}.sig").read_bytes(), p.name)
+    patch.write_bytes(b"tampered")
+    with __import__("pytest").raises(SystemExit, match="does not match"):
+        sr.sign_dist(tmp_path, pem)
+    monkeypatch.delenv(sr.KEY_ENV, raising=False)
+    assert sr.main(["--dist", str(tmp_path), "--optional"]) == 0      # no secret: warn, release unsigned
+    wf = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
+    assert "secrets.RELEASE_SIGNING_KEY" in wf and "sign_release.py --dist dist" in wf and "dist/SHA256SUMS.txt.sig" in wf
+    sw = yaml.safe_load((ROOT / ".github" / "workflows" / "sign-release.yml").read_text(encoding="utf-8"))
+    run = " ".join(str(s.get("run", "")) for s in sw["jobs"]["sign"]["steps"])
+    assert "sign_release.py --dist dist" in run and "--clobber" not in run and "sha256sum -c" in run

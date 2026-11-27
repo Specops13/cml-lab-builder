@@ -43,5 +43,7 @@ blueprint cannot be fetched, leave the exam out. `tests/test_exams.py` validates
 
 ## Releases
 Version in `cmllab/__init__.py`, `pyproject.toml` and `app.js` (`APP_JS_VERSION`), plus README and CHANGELOG in the same
-commit. Push `main` first and the `v*` tag last, never force-push. CI builds the bundles, patch and .deb on the tag, and
-the maintainer signs `SHA256SUMS.txt` and the patch locally (see SECURITY.md).
+commit. Push `main` first and the `v*` tag last, never force-push. CI builds the bundles, patch and .deb on the tag;
+*Actions > build > Run workflow* with *publish* and the tag creates the GitHub Release and signs `SHA256SUMS.txt` and
+the patch with the `RELEASE_SIGNING_KEY` secret (see SECURITY.md). *Actions > sign release* signs a release that was
+published unsigned.

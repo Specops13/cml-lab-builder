@@ -59,9 +59,19 @@ then `sha256sum -c SHA256SUMS.txt --ignore-missing`.
 
 ### The private key
 The private key is **never** in this repository (`.signing/` and `*.key` are git-ignored, and a test fails if a
-private key appears in the tree). The maintainer keeps it offline, with a backup, and signs the published
-`SHA256SUMS.txt` and the patch after CI has built them. It can optionally be stored as the GitHub Actions secret
-`RELEASE_SIGNING_KEY` so CI can sign.
+private key appears in the tree). The maintainer keeps the original offline, with a backup.
+
+Since 3.3.9 **CI signs releases**: the key (PEM) is stored as the GitHub Actions secret `RELEASE_SIGNING_KEY`, and the
+release job of `build.yml` runs `packaging/sign_release.py` after it has written `SHA256SUMS.txt`. The script checks
+the patch against the sums and verifies each new signature against `TRUSTED_KEYS`, so a wrong or retired key fails the
+release instead of publishing updates the app refuses. Without the secret the release is published unsigned, with a
+warning. A release published before the secret existed is signed with *Actions > sign release > Run workflow* (tag),
+which uploads the two `.sig` files and never replaces existing ones.
+
+Trade-off: with the key in Actions, anyone who can change the workflows or run them on this repository (maintainer
+accounts, and tokens or apps with write access) can sign an update. Keep write access to the repository limited, keep
+2FA on, and treat a leaked token like a leaked key (rotation below). To sign by hand instead, delete the secret and use
+`python packaging/sign_release.py --dist <folder>` with `RELEASE_SIGNING_KEY` set locally.
 
 ### Key rotation
 1. Generate a new key pair and add its public key to `TRUSTED_KEYS` **next to** the old one; release that version
