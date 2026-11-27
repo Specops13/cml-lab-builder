@@ -840,13 +840,13 @@ Older apps reject these labs with an "unknown definition" error; update to 3.3.6
 `aaa authentication login CONSOLE none` on the Cat8000v console so the app can still grade it after
 `aaa new-model`.
 
-### Walkthrough added after 3.3.8: IS-IS
+### Walkthrough added in 3.3.9: IS-IS
 | Lab | Nodes / RAM | Covers (examples) |
 |---|---|---|
 | `34-isis-levels-route-leak`: IS-IS from scratch in two areas (NET/NSAP addressing, Level-1, Level-2 and L1/L2 routers), point-to-point links (no DIS or pseudonode), the ATT-bit default route, and leaking one Level-2 prefix into Level-1 | 4 IOL, ~4 GB | CCIE-DC 1.2.b.i/ii (adjacencies, levels and router types, NSAP addressing, point-to-point and broadcast links), CCNA 3.1.e |
 
 IS-IS is not in ENCOR 350-401 v1.2 or ENARSI 300-410 v1.1, so the lab uses the CCIE-DC track (CCIE Data Center 1.2.b
-lists IS-IS). It is IOL-only, installs in any 3.x app and gets the new **IS-IS** library topic (older apps file it under
+lists IS-IS). It is IOL-only, installs in any 3.x app (it is in the online library, so no update is needed for it) and gets the new **IS-IS** library topic (older apps file it under
 *Redistribution & PBR*).
 
 ### RAM estimate and the RAM heavy tag
@@ -1342,7 +1342,7 @@ After changing the schema, templates, guide or example, run `python -m cmllab do
 fact you want pinned (0 to 2 asserts). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Version and changelog
-Current version: **3.3.8**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
+Current version: **3.3.9**. It is shown in the UI header, by `cmllab version` and by `/api/health`.
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release, and [Releases](https://github.com/Specops13/cml-lab-builder/releases) for downloads.
 
 ## License
